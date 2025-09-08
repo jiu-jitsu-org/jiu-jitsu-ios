@@ -1,6 +1,6 @@
 name: 🐛 버그 수정
 description: 버그 수정을 위한 이슈
-title: "[BE] 버그명"
+title: "[iOS] 버그명"
 labels: ["type: bugfix 🐛"]
 assignees: []
 
@@ -16,7 +16,7 @@ body:
         - '🤖 Android'
         - '📱 iOS'
         - '🎯 All'
-      default: 0
+      default: 3
     validations:
       required: true
 
