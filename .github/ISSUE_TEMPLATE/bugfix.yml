@@ -1,0 +1,115 @@
+name: 🐛 버그 수정
+description: 버그 수정을 위한 이슈
+title: "[BE] 버그명"
+labels: ["type: bugfix 🐛"]
+assignees: []
+
+body:
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 플랫폼
+      description: 어떤 플랫폼에서 발생한 버그인가요?
+      options:
+        - '⚙️ Backend'
+        - '💻 Frontend'
+        - '🤖 Android'
+        - '📱 iOS'
+        - '🎯 All'
+      default: 0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: epic
+    attributes:
+      label: Epic (대분류)
+      description: 어떤 Epic과 관련된 버그인가요?
+      options:
+        - '📦 세팅'
+        - '🎨 디자인시스템'
+        - '👤 로그인/회원가입'
+        - '🙍‍♂️ 프로필'
+        - '💬 커뮤니티'
+        - '⚙️ 설정'
+        - '🔮 향후 계획'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority # id를 priority로 변경하여 자동화 일관성 확보
+    attributes:
+      label: 심각도 (Severity)
+      description: 버그의 심각도는 어느 정도인가요? (프로젝트의 '우선순위'와 연결됩니다)
+      options:
+        - '🔥 Critical (서비스 중단/크래시)'
+        - '🔥 High (주요 기능 오류)'
+        - '⚡ Medium (일부 기능 오류)'
+        - '🌱 Low (사소한 UI 문제)'
+      default: 1
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: sprint
+    attributes:
+      label: Sprint
+      description: 이 버그 수정은 어떤 스프린트에 포함되나요?
+      options:
+        - "🏁 Sprint 1 (Current: ~9/14)"
+        - "🗓️ Sprint 2 (Planned)"
+        - "🗓️ Sprint 3 (Planned)"
+        - "🗄️ Backlog"
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: bug_description
+    attributes:
+      label: 📝 버그 요약
+      description: 어떤 문제가 발생했는지 간결하게 설명해주세요.
+    validations:
+      required: true
+      
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: 🔄 재현 단계
+      description: 버그를 재현하는 방법을 단계별로 설명해주세요.
+      placeholder: |
+        1. 
+        2. 
+        3. 
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: ✅ 기대 동작
+      description: 원래 어떻게 동작해야 하나요?
+      
+  - type: input
+    id: start_date
+    attributes:
+      label: 시작 예정일
+      description: 언제부터 수정을 시작할 예정인가요? (선택사항)
+      placeholder: "YYYY-MM-DD"
+
+  - type: input
+    id: due_date
+    attributes:
+      label: 완료 예정일
+      description: 언제까지 수정할 예정인가요? (선택사항)
+      placeholder: "YYYY-MM-DD"
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 🖥 환경 정보
+      description: 버그가 발생한 환경을 알려주세요.
+      placeholder: |
+        - OS: 
+        - 브라우저/앱 버전: 
+        - 디바이스:
