@@ -1,3 +1,7 @@
+// Tuist/Config.swift
 import ProjectDescription
 
-let tuist = Tuist(project: .tuist())
+let config = Config(
+    compatibleXcodeVersions: .upToNextMajor("16.2"),
+    swiftVersion: "6.0"
+)

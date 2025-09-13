@@ -15,8 +15,6 @@ import PackageDescription
 let package = Package(
     name: "JiuJitsuConnect",
     dependencies: [
-        // Add your own dependencies here:
-        // .package(url: "https://github.com/Alamofire/Alamofire", from: "5.0.0"),
-        // You can read more about dependencies here: https://docs.tuist.io/documentation/tuist/dependencies
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.22.2")
     ]
 )
