@@ -1,57 +1,83 @@
 import ProjectDescription
-import ProjectDescriptionHelpers
 
-struct AppTarget: TargetBuildable {
-    let name = "JiuJitsuLabConnect"
-    let destinations: Destinations = .iOS
-    let product: Product = .app
-    let bundleId = "com.jiujitsulab.connect"
-    let sources: SourceFilesList = ["Targets/App/Sources/**"]
-    let dependencies: [TargetDependency] = [.target(name: "Presentation")]
-}
-
-// UI와 상태 관리를 담당 (TCA)
-struct PresentationTarget: TargetBuildable {
-    let name = "Presentation"
-    let destinations: Destinations = .iOS
-    let product: Product = .framework
-    let bundleId = "com.jiujitsulab.connect.presentation"
-    let sources: SourceFilesList = ["Targets/Presentation/Sources/**"]
-    let dependencies: [TargetDependency] = [
-        .target(name: "Domain"),
-        .external(name: "ComposableArchitecture")
-    ]
-}
-
-// 핵심 비즈니스 로직 담당
-struct DomainTarget: TargetBuildable {
-    let name = "Domain"
-    let destinations: Destinations = .iOS
-    let product: Product = .framework
-    let bundleId = "com.jiujitsulab.connect.domain"
-    let sources: SourceFilesList = ["Targets/Domain/Sources/**"]
-    let dependencies: [TargetDependency] = [
-        .target(name: "Data")
-    ]
-}
-
-// 네트워킹, DB 등 데이터 소스 담당
-struct DataTarget: TargetBuildable {
-    let name = "Data"
-    let destinations: Destinations = .iOS
-    let product: Product = .framework
-    let bundleId = "com.jiujitsulab.connect.data"
-    let sources: SourceFilesList = ["Targets/Data/Sources/**"]
-    let dependencies: [TargetDependency] = []
-}
-
+// MARK: - Project
 let project = Project(
     name: "JiuJitsuConnect",
-    organizationName: "com.jiujitsulab",
     targets: [
-        .make(buildable: AppTarget()),
-        .make(buildable: PresentationTarget()),
-        .make(buildable: DomainTarget()),
-        .make(buildable: DataTarget())
+        // MARK: - App Target (Executable)
+        .target(
+            name: "App",
+            destinations: [.iPhone, .iPad],
+            product: .app,
+            bundleId: "com.jiujitsulab.connect",
+            sources: ["Targets/App/Sources/**"],
+            resources: ["Targets/App/Resources/**"],
+            dependencies: [
+                .target(name: "Presentation")
+            ]
+        ),
+        
+        // MARK: - Presentation Target (UI & State Management)
+        .target(
+            name: "Presentation",
+            destinations: [.iPhone, .iPad],
+            product: .framework,
+            bundleId: "com.jiujitsulab.connect.presentation",
+            sources: ["Targets/Presentation/Sources/**"],
+            resources: ["Targets/Presentation/Resources/**"],
+            dependencies: [
+                .target(name: "Domain"),
+                .target(name: "DesignSystem"),
+                .external(name: "ComposableArchitecture")
+            ]
+        ),
+        
+        // MARK: - Domain Target (Business Logic)
+        .target(
+            name: "Domain",
+            destinations: [.iPhone, .iPad],
+            product: .framework,
+            bundleId: "com.jiujitsulab.connect.domain",
+            sources: ["Targets/Domain/Sources/**"],
+            dependencies: [
+                .target(name: "CoreKit")
+            ]
+        ),
+        
+        // MARK: - Data Target (Data Handling)
+        .target(
+            name: "Data",
+            destinations: [.iPhone, .iPad],
+            product: .framework,
+            bundleId: "com.jiujitsulab.connect.data",
+            sources: ["Targets/Data/Sources/**"],
+            dependencies: [
+                .target(name: "Domain"),
+                .target(name: "CoreKit")
+            ]
+        ),
+        
+        // MARK: - CoreKit Target (Shared Non-UI Modules)
+        .target(
+            name: "CoreKit",
+            destinations: [.iPhone, .iPad],
+            product: .framework,
+            bundleId: "com.jiujitsulab.connect.corekit",
+            sources: ["Targets/CoreKit/Sources/**"],
+            dependencies: []
+        ),
+        
+        // MARK: - DesignSystem Target (Shared UI Modules)
+        .target(
+            name: "DesignSystem",
+            destinations: [.iPhone, .iPad],
+            product: .framework,
+            bundleId: "com.jiujitsulab.connect.designsystem",
+            sources: ["Targets/DesignSystem/Sources/**"],
+            resources: ["Targets/DesignSystem/Resources/**"],
+            dependencies: [
+                .target(name: "CoreKit")
+            ]
+        )
     ]
 )
