@@ -1,0 +1,75 @@
+#--------------------------------#
+# Xcode
+#--------------------------------#
+build/
+DerivedData/
+
+*.xcodeproj
+*.xcworkspace
+*.xcarchive
+*.app
+*.ipa
+
+# Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# User specific Xcode files
+*.xcuserstate
+
+
+#--------------------------------#
+# Tuist
+#--------------------------------#
+# Tuist로 자동 생성되는 파일들이므로 저장소에 포함하지 않음
+Tuist/Dependencies/
+Tuist/.build/
+*.xcodeproj
+*.xcworkspace
+Project.swift.in
+Derived/
+
+# Tuist Cloud (사용 시)
+.tuist-cache/
+.tuist-config.yml
+
+
+#--------------------------------#
+# Dependencies & Caches
+#--------------------------------#
+# Swift Package Manager
+.build/
+Packages/
+*.resolved
+
+# Carthage (사용하지 않지만, 만약을 위해)
+Carthage/
+
+# CocoaPods (사용하지 않지만, 만약을 위해)
+Pods/
+
+
+#--------------------------------#
+# Fastlane
+#--------------------------------#
+# Fastlane이 생성하는 임시 파일 및 리포트
+fastlane/report.xml
+fastlane/test_output/
+fastlane/screenshots/
+
+
+#--------------------------------#
+# Operating System Files
+#--------------------------------#
+.DS_Store
+.Trash
+*~
+*.swp
+
+
+#--------------------------------#
+# Secrets (Optional but Recommended)
+#--------------------------------#
+# API 키나 비밀번호가 포함된 파일 (예시)
+# Secrets.swift
+# .env
