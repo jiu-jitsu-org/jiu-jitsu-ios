@@ -17,7 +17,7 @@ public struct SplashView: View {
                 .foregroundStyle(.white)
         }
         .onAppear {
-            store.send(.onAppear)
+//            store.send(.onAppear)
         }
     }
 }

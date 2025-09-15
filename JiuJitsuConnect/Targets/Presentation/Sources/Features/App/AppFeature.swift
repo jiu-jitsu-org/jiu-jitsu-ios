@@ -3,44 +3,62 @@ import Foundation
 
 @Reducer
 public struct AppFeature {
-    public enum State: Equatable {
-        case splash(SplashFeature.State)
-        case onboarding(OnboardingFeature.State)
-        case auth(AuthFeature.State)
-        case main(MainFeature.State)
+    public init() { }
+    
+    @Reducer(state: .equatable, action: .equatable)
+    public enum Destination {
+        case splash(SplashFeature)
+        case onboarding(OnboardingFeature)
+        case main(MainFeature)
+        case login(LoginFeature)
     }
     
+    @ObservableState
+    public struct State: Equatable {
+        @Presents public var destination: Destination.State? = .splash(.init())
+        
+        public init() {}
+    }
+    
+    @CasePathable
     public enum Action {
-        case splash(SplashFeature.Action)
+        case destination(PresentationAction<Destination.Action>)
     }
     
     public var body: some ReducerOf<Self> {
-        Scope(state: /State.splash, action: /Action.splash) {
-            SplashFeature()
+      Reduce { state, action in
+        switch action {
+//        case .destination(.presented(.splash(.didFinishInitLaunch))):
+//          state.destination = .onboarding(.init(isInit: true))
+//          return .none
+//          
+//        case .destination(.presented(.splash(.didFinish(let isLogin)))):
+//          state.destination = .mainTab(.init(isLogin: isLogin))
+//          return .none
+//          
+//        case .destination(.presented(.onboarding(.didFinish))):
+//          state.destination = .login(.init(isInit: true))
+//          return .none
+//          
+//        case .destination(.presented(.login(.aroundTapped))):
+//          state.destination = .mainTab(.init(isLogin: false))
+//          return .none
+//          
+//        case .destination(.presented(.login(.successLogin(let isNewUser)))),
+//             .destination(.presented(.mainTab(.successLogin(let isNewUser)))):
+//          // TODO: - isNewUser가 true일 때 회원 가입 축하 화면 로직 추가 필요
+//          state.destination = .main(.init(isLogin: true))
+//          return .none
+//          
+//        case .destination(.presented(.main(.appReLaunch))):
+//          state.destination = .splash(.init())
+//          return .none
+          
+        case .destination:
+          return .none
+        default: return .none
         }
-        
-        Reduce { state, action in
-            switch action {
-            // 스플래쉬의 Delegate 액션을 받아서 처리
-            case let .splash(.delegate(.complete(result))):
-                switch result {
-                case .needsUpdate:
-                    // TODO: 업데이트 팝업 노출 로직
-                    return .none
-                case .needsOnboarding:
-                    state = .onboarding(OnboardingFeature.State())
-                    return .none
-                case .loginSuccess:
-                    state = .main(MainFeature.State(isLoggedIn: true))
-                    return .none
-                case .loginFailure:
-                    state = .main(MainFeature.State(isLoggedIn: false))
-                    return .none
-                }
-            
-            default:
-                return .none
-            }
-        }
+      }
+      .ifLet(\.$destination, action: \.destination)
     }
 }

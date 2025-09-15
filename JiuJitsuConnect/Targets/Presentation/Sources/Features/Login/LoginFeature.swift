@@ -2,12 +2,16 @@ import ComposableArchitecture
 import Foundation
 
 @Reducer
-public struct AuthFeature {
-    public enum State: Equatable {
+public struct LoginFeature {
+    public init() {}
+    
+    @ObservableState
+    public struct State: Equatable {
         
     }
     
-    public enum Action {
+    @CasePathable
+    public enum Action: Equatable {
 
     }
     

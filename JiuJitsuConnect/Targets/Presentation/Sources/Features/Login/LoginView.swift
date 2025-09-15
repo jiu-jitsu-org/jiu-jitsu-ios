@@ -1,10 +1,10 @@
 import SwiftUI
 import ComposableArchitecture
 
-public struct MainView: View {
-    let store: StoreOf<MainFeature>
+public struct LoginView: View {
+    let store: StoreOf<LoginFeature>
     
-    public init(store: StoreOf<MainFeature>) {
+    public init(store: StoreOf<LoginFeature>) {
         self.store = store
     }
     

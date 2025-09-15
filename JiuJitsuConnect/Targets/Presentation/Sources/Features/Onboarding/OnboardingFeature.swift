@@ -3,13 +3,15 @@ import Foundation
 
 @Reducer
 public struct OnboardingFeature {
+    public init() {}
+    
     @ObservableState
     public struct State: Equatable {
         
-        public init() {}
     }
     
-    public enum Action {
+    @CasePathable
+    public enum Action: Equatable {
 
     }
     
