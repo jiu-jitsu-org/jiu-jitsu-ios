@@ -15,6 +15,21 @@ import PackageDescription
 let package = Package(
     name: "JiuJitsuConnect",
     dependencies: [
-        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.22.2")
+        .package(
+            url: "https://github.com/pointfreeco/swift-composable-architecture",
+            from: "1.22.2"
+        ),
+        .package(
+            url: "https://github.com/google/GoogleSignIn-iOS",
+            branch: "main"
+        ),
+        .package(
+            url: "https://github.com/onevcat/Kingfisher",
+            branch: "master"
+        ),
+        .package(
+            url: "https://github.com/kakao/kakao-ios-sdk",
+            branch: "master"
+        )
     ]
 )

@@ -57,11 +57,19 @@ let appInfoPlist: [String: Plist.Value] = {
         "CFBundleURLTypes": [
             [
                 "CFBundleURLSchemes": ["com.googleusercontent.apps.$(GOOGLE_CLIENT_ID)"]
+            ],
+            [
+                "CFBundleURLSchemes": ["kakao$(KAKAO_NATIVE_APP_KEY)"]
             ]
         ],
+        "KAKAO_NATIVE_APP_KEY": "$(KAKAO_NATIVE_APP_KEY)",
         "GoogleSignIn": "$(GOOGLE_SIGN_IN)",
         "BASE_URL": "$(BASE_URL)",
         "TEST_BASE_URL": "$(TEST_BASE_URL)",
+        "LSApplicationQueriesSchemes": [
+            "kakaokompassauth",
+            "kakaolink"
+        ]
     ]
     return base
 }()
@@ -123,7 +131,12 @@ let project = Project(
             scripts: [swiftlintScript],
             dependencies: [
                 .target(name: "Domain"),
-                .target(name: "CoreKit")
+                .target(name: "CoreKit"),
+                .package(product: "KakaoSDKCommon"),
+                .package(product: "KakaoSDKAuth"),
+                .package(product: "KakaoSDKUser"),
+                .package(product: "GoogleSignIn"),
+                .package(product: "GoogleSignInSwift")
             ]
         ),
         
