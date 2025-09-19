@@ -72,8 +72,7 @@ fastlane/screenshots/
 #--------------------------------#
 # API 키나 비밀번호가 포함된 파일 (예시)
 *.p8
-Secrets.plist
 GoogleService-Info.plist
 Secrets.xcconfig
-Configs/Secrets.xcconfig
+Configs/Secrets/
 *.env
