@@ -1,6 +1,5 @@
 included:
-  - "Sources"
-  - "Tests"
+  - "Targets"
   
 excluded:
   - "**/*.generated.swift"
