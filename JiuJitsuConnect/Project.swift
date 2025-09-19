@@ -92,7 +92,10 @@ let project = Project(
             product: .app,
             bundleId: "com.jiujitsulab.connect",
             sources: ["Targets/App/Sources/**"],
-            resources: ["Targets/App/Resources/**"],
+            resources: [
+                "Targets/App/Resources/**",
+                "Secrets/GoogleService-Info.plist"
+            ],
             scripts: [swiftlintScript],
             dependencies: [
                 .target(name: "Presentation")
