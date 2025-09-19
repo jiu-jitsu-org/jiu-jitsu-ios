@@ -74,5 +74,6 @@ fastlane/screenshots/
 *.p8
 GoogleService-Info.plist
 Secrets.xcconfig
-Configs/Secrets/
+Configs/Secrets.xcconfig
+Secrets/
 *.env
