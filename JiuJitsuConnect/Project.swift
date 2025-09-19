@@ -10,12 +10,12 @@ let isAppStore = Environment.isAppStore.getBoolean(default: false)
 // MARK: - SwiftLint
 let swiftlintScript: TargetScript = .pre(
     script: """
-  if which swiftlint >/dev/null; then
-    swiftlint
-  else
-    echo "warning: SwiftLint not installed, download from https://github.com/realm/SwiftLint"
-  fi
-  """,
+    if which swiftlint >/dev/null; then
+        swiftlint --fix && swiftlint
+    else
+        echo "warning: SwiftLint not installed, download from https://github.com/realm/SwiftLint"
+    fi
+    """,
     name: "SwiftLint",
     basedOnDependencyAnalysis: false
 )
@@ -77,6 +77,13 @@ let appInfoPlist: [String: Plist.Value] = {
 // MARK: - Project
 let project = Project(
     name: "JiuJitsuConnect",
+    settings: .settings(
+        base: [:], // 기본 설정
+        configurations: [
+            .debug(name: "Debug", xcconfig: .relativeToRoot("Configs/Secrets.xcconfig")),
+            .release(name: "Release", xcconfig: .relativeToRoot("Configs/Secrets.xcconfig"))
+        ]
+    ),
     targets: [
         // MARK: - App Target (Executable)
         .target(
