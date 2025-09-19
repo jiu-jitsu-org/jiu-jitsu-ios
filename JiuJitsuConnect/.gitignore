@@ -71,5 +71,9 @@ fastlane/screenshots/
 # Secrets (Optional but Recommended)
 #--------------------------------#
 # API 키나 비밀번호가 포함된 파일 (예시)
-# Secrets.swift
-# .env
+*.p8
+Secrets.plist
+GoogleService-Info.plist
+Secrets.xcconfig
+Configs/Secrets.xcconfig
+*.env
