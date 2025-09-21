@@ -18,7 +18,6 @@ public extension View {
     }
 }
 
-
 // MARK: - Usage Examples
 /*
  
