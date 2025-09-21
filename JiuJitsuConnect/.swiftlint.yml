@@ -97,7 +97,15 @@ identifier_name:
     - iO
     - vc
     - by
+    - bg
+    - on
+    - bw
 
+type_name:
+  excluded:
+    - On
+    - BW
+    
 modifier_order:
   preferred_modifier_order:
     [

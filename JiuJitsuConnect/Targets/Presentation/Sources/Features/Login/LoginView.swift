@@ -1,5 +1,6 @@
 import SwiftUI
 import ComposableArchitecture
+import DesignSystem
 
 public struct LoginView: View {
     let store: StoreOf<LoginFeature>
@@ -12,14 +13,14 @@ public struct LoginView: View {
         VStack(spacing: 0) {
             // MARK: - 상단 여백 및 타이틀
             Spacer()
-            
+//            GlassBanner(title: "타이틀", message: "메시지")
             Text("JiuJitsuConnect")
                 .font(.largeTitle)
                 .fontWeight(.bold)
             
             Text("로그인하고 모든 기능을 이용해보세요")
                 .font(.subheadline)
-                .foregroundStyle(.gray)
+                .foregroundStyle(Color.component.textfieldDisplay.default.placeholder)
                 .padding(.top, 8)
             
             Spacer()
@@ -106,3 +107,38 @@ struct SocialLoginButton: View {
         )
     }
 }
+// struct GlassBanner: View {
+//    var title: String
+//    var message: String
+//
+//    var body: some View {
+//        HStack(spacing: 12) {
+//            Image(systemName: "sparkles")
+//                .imageScale(.large)
+//
+//            VStack(alignment: .leading, spacing: 2) {
+//                Text(title).font(.headline)
+//                Text(message).font(.subheadline).opacity(0.85)
+//            }
+//
+//            Spacer()
+//
+//            Button("확인") { /* action */ }
+//                .buttonStyle(.borderedProminent)
+//        }
+//        .padding(16)
+//        .background {
+//            if #available(iOS 26, *) {
+//                // iOS26 유리 배경
+//                RoundedRectangle(cornerRadius: 20, style: .continuous)
+//                    .fill(.clear) // 내용물은 투명
+//                    .glassBackgroundEffect(in: .rect(cornerRadius: 20), displayMode: .elevated)
+//            } else {
+//                // iOS15+ 호환: 머티리얼 블러
+//                RoundedRectangle(cornerRadius: 20, style: .continuous)
+//                    .fill(.ultraThinMaterial)
+//            }
+//        }
+//        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+//    }
+// }
