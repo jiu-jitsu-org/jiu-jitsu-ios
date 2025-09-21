@@ -33,10 +33,9 @@ public struct AppView: View {
     case .none:
       EmptyView()
         
-    case .some(_):
+    case .some:
         EmptyView()
 
     }
   }
 }
-

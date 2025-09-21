@@ -14,11 +14,4 @@ public struct OnboardingFeature {
     public enum Action: Equatable {
 
     }
-    
-    public var body: some ReducerOf<Self> {
-        
-        Reduce { state, action in
-            return .none
-        }
-    }
 }

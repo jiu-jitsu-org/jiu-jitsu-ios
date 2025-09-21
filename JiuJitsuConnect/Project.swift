@@ -6,6 +6,7 @@ public let deploymentTargetString = "17.0"
 public let appDeploymentTargets: DeploymentTargets = .iOS(deploymentTargetString)
 public let appDestinations: Destinations = [.iPhone, .iPad]
 let isAppStore = Environment.isAppStore.getBoolean(default: false)
+let additionalCondition = isAppStore ? "APPSTORE" : ""
 
 // MARK: - SwiftLint
 let swiftlintScript: TargetScript = .pre(
@@ -78,7 +79,15 @@ let appInfoPlist: [String: Plist.Value] = {
 let project = Project(
     name: "JiuJitsuConnect",
     settings: .settings(
-        base: [:], // 기본 설정
+        base: [
+            "GCC_TREAT_WARNINGS_AS_ERRORS": "YES",
+            "SWIFT_TREAT_WARNINGS_AS_ERRORS": "YES",
+            "IPHONEOS_DEPLOYMENT_TARGET": SettingValue(stringLiteral: deploymentTargetString),
+            "ENABLE_BITCODE": "NO",
+            "CODE_SIGN_IDENTITY": "",
+            "CODE_SIGNING_REQUIRED": "NO",
+            "DEVELOPMENT_LANGUAGE": "ko"
+        ],
         configurations: [
             .debug(name: "Debug", xcconfig: .relativeToRoot("Configs/Secrets.xcconfig")),
             .release(name: "Release", xcconfig: .relativeToRoot("Configs/Secrets.xcconfig"))
@@ -91,6 +100,8 @@ let project = Project(
             destinations: appDestinations,
             product: .app,
             bundleId: "com.jiujitsulab.connect",
+            deploymentTargets: appDeploymentTargets,
+            infoPlist: .extendingDefault(with: appInfoPlist),
             sources: ["Targets/App/Sources/**"],
             resources: [
                 "Targets/App/Resources/**",
@@ -98,8 +109,27 @@ let project = Project(
             ],
             scripts: [swiftlintScript],
             dependencies: [
-                .target(name: "Presentation")
-            ]
+                .target(name: "Presentation"),
+                .target(name: "Data")
+            ],
+            settings: .settings(
+                base: [
+                    "CODE_SIGN_STYLE": "Automatic",
+                    "MARKETING_VERSION": SettingValue(stringLiteral: version),
+                    "CODE_SIGN_IDENTITY": "iPhone Developer",
+                    "CODE_SIGNING_REQUIRED": "YES",
+                    "OTHER_LDFLAGS": "-ObjC",
+                ],
+                debug: [
+                    "OTHER_SWIFT_FLAGS": "-D DEBUG $(inherited) -Xfrontend -warn-long-function-bodies=500 -Xfrontend -warn-long-expression-type-checking=500 -Xfrontend -debug-time-function-bodies -Xfrontend -debug-time-expression-type-checking -Xfrontend -enable-actor-data-race-checks",
+                    "OTHER_LDFLAGS": "-Xlinker -interposable $(inherited)",
+                    "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "\(additionalCondition) DEBUG",
+                ],
+                release: [
+                    "OTHER_LDFLAGS": "$(inherited)",
+                    "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "\(additionalCondition)",
+                ]
+            )
         ),
         
         // MARK: - Presentation Target (UI & State Management)
@@ -108,6 +138,7 @@ let project = Project(
             destinations: appDestinations,
             product: .framework,
             bundleId: "com.jiujitsulab.connect.presentation",
+            deploymentTargets: appDeploymentTargets,
             sources: ["Targets/Presentation/Sources/**"],
             resources: ["Targets/Presentation/Resources/**"],
             scripts: [swiftlintScript],
@@ -124,6 +155,7 @@ let project = Project(
             destinations: appDestinations,
             product: .framework,
             bundleId: "com.jiujitsulab.connect.domain",
+            deploymentTargets: appDeploymentTargets,
             sources: ["Targets/Domain/Sources/**"],
             scripts: [swiftlintScript],
             dependencies: [
@@ -135,18 +167,20 @@ let project = Project(
         .target(
             name: "Data",
             destinations: appDestinations,
-            product: .framework,
+            product: Environment.forPreview.getBoolean(default: false) ? .framework : .staticFramework,
             bundleId: "com.jiujitsulab.connect.data",
-            sources: ["Targets/Data/Sources/**"],
+            deploymentTargets: appDeploymentTargets,
+            sources: ["Targets/Data/Sources/**",
+                      "Secrets/GoogleService-Info.plist"],
             scripts: [swiftlintScript],
             dependencies: [
                 .target(name: "Domain"),
                 .target(name: "CoreKit"),
-                .package(product: "KakaoSDKCommon"),
-                .package(product: "KakaoSDKAuth"),
-                .package(product: "KakaoSDKUser"),
-                .package(product: "GoogleSignIn"),
-                .package(product: "GoogleSignInSwift")
+                .external(name: "KakaoSDKCommon"),
+                .external(name: "KakaoSDKAuth"),
+                .external(name: "KakaoSDKUser"),
+                .external(name: "GoogleSignIn"),
+                .external(name: "GoogleSignInSwift")
             ]
         ),
         
@@ -156,6 +190,7 @@ let project = Project(
             destinations: appDestinations,
             product: .framework,
             bundleId: "com.jiujitsulab.connect.corekit",
+            deploymentTargets: appDeploymentTargets,
             sources: ["Targets/CoreKit/Sources/**"],
             scripts: [swiftlintScript],
             dependencies: []
@@ -167,6 +202,7 @@ let project = Project(
             destinations: appDestinations,
             product: .framework,
             bundleId: "com.jiujitsulab.connect.designsystem",
+            deploymentTargets: appDeploymentTargets,
             sources: ["Targets/DesignSystem/Sources/**"],
             resources: ["Targets/DesignSystem/Resources/**"],
             scripts: [swiftlintScript],
