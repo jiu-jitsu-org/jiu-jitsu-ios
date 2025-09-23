@@ -22,14 +22,20 @@ public struct ToastView: View {
                 .font(.pretendard.bodyS)
                 .foregroundStyle(Color.component.toast.default.text)
                 .lineLimit(2)
+                .lineHeight(7)
+            
+            Spacer(minLength: 0)
 
             if case let .action(title, action) = state.style {
-                Spacer(minLength: 0)
                 Button(title) {
                     onButtonTapped(action)
                 }
                 .font(.pretendard.buttonS)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.component.button.neutral.defaultBg)
                 .foregroundStyle(Color.component.button.neutral.defaultText)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
             }
         }
         .padding(.horizontal, 16)
@@ -80,7 +86,7 @@ public struct ToastView: View {
                         // Action Toast
                         Button("Show Action Toast") {
                             showToast(
-                                ToastState(message: "연결이 끊어졌습니다.", style: .action(title: "다시 시도", action: .undo))
+                                ToastState(message: "연결이 끊어졌습니다.", style: .action(title: "확인", action: .done))
                             )
                         }
                         .buttonStyle(PreviewButtonStyle())
@@ -90,7 +96,7 @@ public struct ToastView: View {
                             showToast(
                                 ToastState(
                                     message: "네트워크 연결에 문제가 발생했습니다. 인터넷 연결을 확인해주세요.",
-                                    style: .action(title: "다시 시도", action: .undo)
+                                    style: .action(title: "확인", action: .done)
                                 )
                             )
                         }
@@ -133,7 +139,7 @@ public struct ToastView: View {
                     .allowsHitTesting(true)
                 }
             }
-            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showToast)
+            .animation(.easeInOut(duration: 0.3), value: showToast)
         }
         
         private func showToast(_ toast: ToastState) {
@@ -177,87 +183,4 @@ struct PreviewButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
-}
-
-// MARK: - 단순한 테스트 Preview
-#Preview("Simple Test") {
-    ZStack {
-        Color.gray.opacity(0.1)
-            .ignoresSafeArea()
-        
-        // 강제로 Toast 표시
-        ToastView(
-            state: ToastState(message: "테스트 메시지입니다.", style: .info),
-            onSwipe: {},
-            onButtonTapped: { _ in },
-            hasBottomNavBar: false
-        )
-    }
-}
-
-#Preview("Action Test") {
-    ZStack {
-        Color.gray.opacity(0.1)
-            .ignoresSafeArea()
-        
-        ToastView(
-            state: ToastState(
-                message: "액션이 있는 토스트입니다.",
-                style: .action(title: "확인", action: .undo)
-            ),
-            onSwipe: {},
-            onButtonTapped: { _ in },
-            hasBottomNavBar: true
-        )
-    }
-}
-
-// MARK: - 디버깅을 위한 상태 추적 Preview
-#Preview("Debug Toast") {
-    struct DebugToastView: View {
-        @State private var showToast = false
-        @State private var toastCount = 0
-        
-        var body: some View {
-            VStack(spacing: 20) {
-                Text("Debug Toast")
-                    .font(.title)
-                
-                Text("Toast Count: \(toastCount)")
-                Text("Show Toast: \(showToast.description)")
-                
-                Button("Toggle Toast") {
-                    showToast.toggle()
-                    toastCount += 1
-                }
-                .buttonStyle(.bordered)
-                
-                Spacer()
-            }
-            .padding()
-            .background(Color.gray.opacity(0.1))
-            .overlay(alignment: .bottom) {
-                if showToast {
-                    VStack {
-                        Text("Toast가 여기 표시되어야 합니다")
-                            .padding()
-                            .background(.red)
-                            .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        
-                        ToastView(
-                            state: ToastState(message: "디버그 토스트 #\(toastCount)", style: .info),
-                            onSwipe: { showToast = false },
-                            onButtonTapped: { _ in showToast = false },
-                            hasBottomNavBar: false
-                        )
-                    }
-                    .padding(.bottom, 50)
-                }
-            }
-            .animation(.spring(), value: showToast)
-        }
-    }
-    
-    return DebugToastView()
 }
