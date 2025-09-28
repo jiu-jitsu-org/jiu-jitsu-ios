@@ -53,7 +53,7 @@ public struct LoginFeature {
             case .appleButtonTapped:
                 state.isLoading = true
                 return .run { _ in
-                    let user = try await self.authClient.loginWithGoogle()
+                    let user = try await self.authClient.loginWithApple()
                     print("user \(user)")
                 }
 

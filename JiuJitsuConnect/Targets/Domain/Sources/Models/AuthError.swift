@@ -12,6 +12,7 @@ public enum AuthError: Error, LocalizedError {
     case missingProfileData
     case dependencyNotFound
     case signInCancelled
+    case unknown(String)
     
     public var errorDescription: String? {
         switch self {
@@ -23,6 +24,8 @@ public enum AuthError: Error, LocalizedError {
             return "의존성을 찾을 수 없습니다."
         case .signInCancelled:
             return "로그인이 취소되었습니다."
+        case .unknown(let message):
+            return "알 수 없는 오류가 발생했습니다: \(message)"
         }
     }
 }

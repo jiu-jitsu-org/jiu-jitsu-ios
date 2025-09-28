@@ -8,11 +8,16 @@
 import Foundation
 import Domain
 import GoogleSignIn
+import AuthenticationServices
 import UIKit
 
-public final class AuthRepositoryImpl: AuthRepository {
+public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     
-    public init() {}
+    private var appleSignInContinuation: CheckedContinuation<SNSUser, Error>?
+    
+    public init(appleSignInContinuation: CheckedContinuation<SNSUser, Error>? = nil) {
+        self.appleSignInContinuation = appleSignInContinuation
+    }
     
     @MainActor
     public func signInWithGoogle() async throws -> Domain.SNSUser {
@@ -25,10 +30,61 @@ public final class AuthRepositoryImpl: AuthRepository {
         return try mapToSnsUser(from: result.user)
     }
     
-    public func signOut() async throws {
-        await MainActor.run {
-            GIDSignIn.sharedInstance.signOut()
+    @MainActor
+    public func signInWithApple() async throws -> Domain.SNSUser {
+        return try await withCheckedThrowingContinuation { continuation in
+            self.appleSignInContinuation = continuation
+            
+            let appleIDProvider = ASAuthorizationAppleIDProvider()
+            let request = appleIDProvider.createRequest()
+            request.requestedScopes = [.fullName, .email]
+            
+            let authorizationController = ASAuthorizationController(authorizationRequests: [request])
+            authorizationController.delegate = self
+            authorizationController.presentationContextProvider = self
+            authorizationController.performRequests()
         }
+    }
+    
+    // MARK: - ASAuthorizationControllerDelegate
+    
+    public func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
+            guard let identityToken = appleIDCredential.identityToken,
+                  let tokenString = String(data: identityToken, encoding: .utf8) else {
+                appleSignInContinuation?.resume(throwing: AuthError.missingProfileData)
+                return
+            }
+            
+            let nickname = appleIDCredential.fullName?.formatted() ?? appleIDCredential.email ?? ""
+            
+            let user = SNSUser(
+                id: appleIDCredential.user,
+                idToken: tokenString,
+                email: appleIDCredential.email ?? "",
+                nickname: nickname,
+                snsProvider: "APPLE"
+            )
+            appleSignInContinuation?.resume(returning: user)
+        } else {
+            appleSignInContinuation?.resume(throwing: AuthError.unknown("Apple credential is not AppleIDCredential."))
+        }
+    }
+    
+    public func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        if let authError = error as? ASAuthorizationError, authError.code == .canceled {
+            appleSignInContinuation?.resume(throwing: AuthError.signInCancelled)
+        } else {
+            appleSignInContinuation?.resume(throwing: error)
+        }
+    }
+    
+    // MARK: - ASAuthorizationControllerPresentationContextProviding
+    
+    public func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        // findRootViewController()를 통해 현재 활성화된 window를 반환합니다.
+        // 이 메서드는 MainActor에서 호출되므로 try! 사용이 비교적 안전합니다.
+        return try! findRootViewController().view.window!
     }
     
     // MARK: - Private Methods
@@ -56,5 +112,12 @@ public final class AuthRepositoryImpl: AuthRepository {
             nickname: name,
             snsProvider: "GOOGLE"
         )
+    }
+    
+    public func signOut() async throws {
+        await MainActor.run {
+            GIDSignIn.sharedInstance.signOut()
+            
+        }
     }
 }

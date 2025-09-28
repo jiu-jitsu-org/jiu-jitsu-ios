@@ -19,6 +19,18 @@ public final class GoogleLoginUseCase {
     }
 }
 
+public final class AppleLoginUseCase {
+    private let authRepository: AuthRepository
+    
+    public init(authRepository: AuthRepository) {
+        self.authRepository = authRepository
+    }
+    
+    public func execute() async throws -> SNSUser {
+        return try await authRepository.signInWithApple()
+    }
+}
+
 public final class LogoutUseCase {
     private let authRepository: AuthRepository
     

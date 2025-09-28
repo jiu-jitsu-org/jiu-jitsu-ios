@@ -108,6 +108,7 @@ let project = Project(
                 "Secrets/GoogleService-Info.plist",
                 .glob(pattern: .relativeToRoot("Targets/DesignSystem/Resources/**"))
             ],
+            entitlements: "JiuJitsuConnect.entitlements",
             scripts: [swiftlintScript],
             dependencies: [
                 .target(name: "Presentation"),

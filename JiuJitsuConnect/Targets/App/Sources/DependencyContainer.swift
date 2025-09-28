@@ -20,9 +20,8 @@ public final class DependencyContainer {
     // MARK: - Use Cases
     private lazy var authRepository: AuthRepository = AuthRepositoryImpl()
     
-    private lazy var googleLoginUseCase = GoogleLoginUseCase(
-        authRepository: authRepository
-    )
+    private lazy var googleLoginUseCase = GoogleLoginUseCase(authRepository: authRepository)
+    private lazy var appleLoginUseCase = AppleLoginUseCase(authRepository: authRepository)
     
     private lazy var logoutUseCase = LogoutUseCase(
         authRepository: authRepository
@@ -36,7 +35,9 @@ public final class DependencyContainer {
                 guard let self else { throw AuthError.dependencyNotFound }
                 return try await self.googleLoginUseCase.execute()
             },
-            logout: { [weak self] in
+            loginWithApple: { [weak self] in
+                try await self?.appleLoginUseCase.execute() ?? { throw AuthError.dependencyNotFound }()
+            }, logout: { [weak self] in
                 guard let self else { throw AuthError.dependencyNotFound }
                 try await self.logoutUseCase.execute()
             }
