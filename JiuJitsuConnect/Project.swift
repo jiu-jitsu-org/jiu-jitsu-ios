@@ -2,7 +2,7 @@ import Foundation
 import ProjectDescription
 
 public let version = "1.0.0"
-public let deploymentTargetString = "17.0"
+public let deploymentTargetString = "26.0"
 public let appDeploymentTargets: DeploymentTargets = .iOS(deploymentTargetString)
 public let appDestinations: Destinations = [.iPhone, .iPad]
 let isAppStore = Environment.isAppStore.getBoolean(default: false)
@@ -105,7 +105,8 @@ let project = Project(
             sources: ["Targets/App/Sources/**"],
             resources: [
                 "Targets/App/Resources/**",
-                "Secrets/GoogleService-Info.plist"
+                "Secrets/GoogleService-Info.plist",
+                .glob(pattern: .relativeToRoot("Targets/DesignSystem/Resources/**"))
             ],
             scripts: [swiftlintScript],
             dependencies: [
@@ -139,6 +140,7 @@ let project = Project(
             product: .framework,
             bundleId: "com.jiujitsulab.connect.presentation",
             deploymentTargets: appDeploymentTargets,
+            infoPlist: .default,
             sources: ["Targets/Presentation/Sources/**"],
             resources: ["Targets/Presentation/Resources/**"],
             scripts: [swiftlintScript],
@@ -156,6 +158,7 @@ let project = Project(
             product: .framework,
             bundleId: "com.jiujitsulab.connect.domain",
             deploymentTargets: appDeploymentTargets,
+            infoPlist: .default,
             sources: ["Targets/Domain/Sources/**"],
             scripts: [swiftlintScript],
             dependencies: [
@@ -170,6 +173,7 @@ let project = Project(
             product: Environment.forPreview.getBoolean(default: false) ? .framework : .staticFramework,
             bundleId: "com.jiujitsulab.connect.data",
             deploymentTargets: appDeploymentTargets,
+            infoPlist: .default,
             sources: ["Targets/Data/Sources/**",
                       "Secrets/GoogleService-Info.plist"],
             scripts: [swiftlintScript],
@@ -191,6 +195,7 @@ let project = Project(
             product: .framework,
             bundleId: "com.jiujitsulab.connect.corekit",
             deploymentTargets: appDeploymentTargets,
+            infoPlist: .default,
             sources: ["Targets/CoreKit/Sources/**"],
             scripts: [swiftlintScript],
             dependencies: []
@@ -203,6 +208,7 @@ let project = Project(
             product: .framework,
             bundleId: "com.jiujitsulab.connect.designsystem",
             deploymentTargets: appDeploymentTargets,
+            infoPlist: .default,
             sources: ["Targets/DesignSystem/Sources/**"],
             resources: ["Targets/DesignSystem/Resources/**"],
             scripts: [swiftlintScript],

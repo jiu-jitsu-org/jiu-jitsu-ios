@@ -17,6 +17,9 @@ public struct PrimitiveColors {
     public let red = Red()
     public let bw = BW()
     public let opacity = Opacity()
+    public let kakao = Kakao()
+    public let apple = Apple()
+    public let google = Google()
     
     public struct Blue {
         public let b50 = Color("Blue/Blue-50", bundle: .module)
@@ -65,5 +68,20 @@ public struct PrimitiveColors {
         public let blue10 = Color("Opacity/Blue-10", bundle: .module)
         public let blue40 = Color("Opacity/Blue-40", bundle: .module)
         public let red10 = Color("Opacity/Red-10", bundle: .module)
+    }
+    
+    public struct Kakao {
+        public let bg = Color("Kakao/Bg", bundle: .module)
+        public let text = Color("Kakao/Text", bundle: .module)
+    }
+    
+    public struct Apple {
+        public let bg = Color("Apple/Bg", bundle: .module)
+        public let text = Color("Apple/Text", bundle: .module)
+    }
+    
+    public struct Google {
+        public let bg = Color("Google/Bg", bundle: .module)
+        public let text = Color("Google/Text", bundle: .module)
     }
 }

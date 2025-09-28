@@ -1,0 +1,9 @@
+xcassets:          
+  - inputs:
+    - Targets/DesignSystem/Resources/Assets.xcassets
+    outputs:
+      - templateName: swift6
+        output: Targets/DesignSystem/Sources/Asset/Assets.swift
+        params:
+          enumName: Assets
+          publicAccess: true

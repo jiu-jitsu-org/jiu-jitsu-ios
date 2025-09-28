@@ -14,8 +14,9 @@ public final class AuthRepositoryImpl: AuthRepository {
     
     public init() {}
     
+    @MainActor
     public func signInWithGoogle() async throws -> Domain.SNSUser {
-        let rootViewController = try await findRootViewController()
+        let rootViewController = try findRootViewController()
         
         let result = try await GIDSignIn.sharedInstance.signIn(
             withPresenting: rootViewController
