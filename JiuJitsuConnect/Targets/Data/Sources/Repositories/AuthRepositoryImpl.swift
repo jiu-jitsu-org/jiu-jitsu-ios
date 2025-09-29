@@ -64,7 +64,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                         continuation.resume(throwing: authError)
                     } else if let oauthToken = oauthToken {
                         let snsUser = Domain.SNSUser(
-                            idToken: oauthToken.accessToken,
+                            accessToken: oauthToken.accessToken,
                             snsProvider: .kakao
                         )
                         continuation.resume(returning: snsUser)
@@ -82,7 +82,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                         continuation.resume(throwing: authError)
                     } else if let oauthToken = oauthToken {
                         let snsUser = Domain.SNSUser(
-                            idToken: oauthToken.accessToken,
+                            accessToken: oauthToken.accessToken,
                             snsProvider: .kakao
                         )
                         continuation.resume(returning: snsUser)
@@ -111,7 +111,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             }
             
             let user = SNSUser(
-                idToken: tokenString,
+                accessToken: tokenString,
                 snsProvider: .apple
             )
             appleSignInContinuation?.resume(returning: user)
@@ -156,7 +156,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             throw AuthError.missingProfileData
         }
         return Domain.SNSUser(
-            idToken: idToken,
+            accessToken: idToken,
             snsProvider: .google
         )
     }

@@ -8,11 +8,11 @@
 import Foundation
 
 public struct SNSUser: Equatable {
-    public init(idToken: String, snsProvider: SNSProvider) {
-        self.idToken = idToken
+    public init(accessToken: String, snsProvider: SNSProvider) {
+        self.accessToken = accessToken
         self.snsProvider = snsProvider
     }
     
-    public let idToken: String
+    public let accessToken: String
     public let snsProvider: SNSProvider
 }

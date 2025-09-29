@@ -22,15 +22,15 @@ extension AuthClient: DependencyKey {
     
     public static let testValue: Self = Self(
         loginWithGoogle: {
-            Domain.SNSUser(idToken: "textIdToken",
+            Domain.SNSUser(accessToken: "textIdToken",
                            snsProvider: .google)
         },
         loginWithApple: {
-            Domain.SNSUser(idToken: "textIdToken",
+            Domain.SNSUser(accessToken: "textIdToken",
                            snsProvider: .apple)
         },
         loginWithKakao: {
-            Domain.SNSUser(idToken: "textIdToken",
+            Domain.SNSUser(accessToken: "textIdToken",
                            snsProvider: .kakao)
         },
         appLogin: { _ in

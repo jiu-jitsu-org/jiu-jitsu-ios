@@ -71,9 +71,9 @@ public struct LoginFeature {
             // MARK: - 로그인 결과 처리
             case let ._socialLoginResponse(.success(user)):
                 return .run { send in
-                    let request = AuthRequest(idToken: snsUser.idToken, provider: snsUser.snsProvider)
+                    let request = AuthRequest(accessToken: user.accessToken, provider: user.snsProvider)
                     await send(._serverLoginResponse(
-                        await TaskResult { try await self.authClient.serverLogin(request) }
+                        await TaskResult { try await self.authClient.appLogin(request) }
                     ))
                 }
                 
@@ -95,13 +95,13 @@ public struct LoginFeature {
                 }
                 return .none
                 
-            case let ._serverLoginResponse(.success(authResponse)):
+            case ._serverLoginResponse(.success):
                 state.isLoading = false
                 // TODO: 서버로부터 받은 accessToken 저장 및 로그인 완료 처리
                 // return .send(.delegate(.didLogin(authResponse)))
                 return .none
 
-            case let ._serverLoginResponse(.failure(error)):
+            case ._serverLoginResponse(.failure):
                 state.isLoading = false
                 // TODO: 서버 로그인 실패 에러 처리 (토스트 등)
                 return .none
