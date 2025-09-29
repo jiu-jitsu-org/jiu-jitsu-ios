@@ -7,6 +7,7 @@
 
 import SwiftUI
 import CoreText // 폰트 등록을 위해 CoreText를 import 합니다.
+import OSLog
 
 private final class FontInitializer {
     static let shared = FontInitializer()
@@ -33,14 +34,14 @@ private final class FontInitializer {
         // ✅ 현재 코드가 실행되는 번들(DesignSystem.framework)을 찾습니다.
         // FontInitializer.self를 사용하여 번들을 정확히 찾습니다.
         guard let url = Bundle(for: FontInitializer.self).url(forResource: fontName, withExtension: nil) else {
-            print("🛑 [DesignSystem] Font not found: \(fontName)")
+            Logger.view.error("Font not found: \(fontName)")
             return
         }
         
         var error: Unmanaged<CFError>?
         // ✅ 폰트 URL을 통해 시스템 폰트 관리자에 등록합니다.
         if !CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error) {
-            print("🛑 [DesignSystem] Font registration error: \(error.debugDescription)")
+            Logger.view.error("Font registration error: \(error.debugDescription)")
         }
     }
 }

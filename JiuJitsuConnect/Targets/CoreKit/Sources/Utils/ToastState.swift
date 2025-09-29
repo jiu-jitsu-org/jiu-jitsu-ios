@@ -25,6 +25,13 @@ public struct ToastState: Equatable, Identifiable {
     // 버튼이 눌렸을 때 Reducer가 어떤 동작을 할지 정의
     public enum Action: Equatable {
         case done
+        
+        public var description: String {
+            switch self {
+            case .done:
+                return "done"
+            }
+        }
     }
     
     // 노출 시간을 스타일별로 반환

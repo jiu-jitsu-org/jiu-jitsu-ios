@@ -55,6 +55,10 @@ public final class DefaultNetworkService: NetworkService {
             throw NetworkError.invalidURL
         }
         
+        #if DEBUG
+        NetworkLogger.log(request: urlRequest)
+        #endif
+            
         // --- 1. API 요청 및 데이터 수신 ---
         let (data, response) = try await session.data(for: urlRequest)
         
@@ -62,6 +66,10 @@ public final class DefaultNetworkService: NetworkService {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
         }
+        
+        #if DEBUG
+        NetworkLogger.log(response: httpResponse, data: data)
+        #endif
         
         guard (200...299).contains(httpResponse.statusCode) else {
             // TODO: 서버에서 내려주는 에러 DTO가 있다면 여기서 디코딩하여 더 구체적인 에러 반환

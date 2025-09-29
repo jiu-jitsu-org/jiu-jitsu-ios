@@ -7,6 +7,7 @@
 
 import SwiftUI
 import CoreKit
+import OSLog
 
 public struct ToastView: View {
     
@@ -138,7 +139,7 @@ public struct ToastView: View {
                             dismissToast()
                         },
                         onButtonTapped: { action in
-                            print("Button tapped: \(action)")
+                            Logger.view.debug("Button tapped: \(action.description)")
                             dismissToast()
                         },
                         hasBottomNavBar: true
