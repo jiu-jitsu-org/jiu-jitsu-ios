@@ -28,7 +28,7 @@ public struct ToastState: Equatable, Identifiable {
     }
     
     // 노출 시간을 스타일별로 반환
-    var duration: Duration {
+    public var duration: Duration {
         switch self.style {
         case .info: return .seconds(3)
         case .action: return .seconds(5)

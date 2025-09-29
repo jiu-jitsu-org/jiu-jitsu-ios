@@ -87,6 +87,7 @@ function_parameter_count:
 legacy_hashing: error
 
 identifier_name:
+  allowed_symbols: "_"
   excluded:
     - i
     - id

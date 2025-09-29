@@ -9,6 +9,14 @@ import SwiftUI
 import CoreKit
 
 public struct ToastView: View {
+    
+    public init(state: ToastState, onSwipe: @escaping () -> Void, onButtonTapped: @escaping (ToastState.Action) -> Void, hasBottomNavBar: Bool) {
+        self.state = state
+        self.onSwipe = onSwipe
+        self.onButtonTapped = onButtonTapped
+        self.hasBottomNavBar = hasBottomNavBar
+    }
+    
     let state: ToastState
     var onSwipe: () -> Void
     var onButtonTapped: (ToastState.Action) -> Void

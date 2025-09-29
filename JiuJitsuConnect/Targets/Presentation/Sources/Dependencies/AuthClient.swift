@@ -20,25 +20,16 @@ extension AuthClient: DependencyKey {
     
     public static let testValue: Self = Self(
         loginWithGoogle: {
-            Domain.SNSUser(id: "testId",
-                           idToken: "textIdToken",
-                           email: "test@test.com",
-                           nickname: "test",
-                           snsProvider: "GOOGLE")
+            Domain.SNSUser(idToken: "textIdToken",
+                           snsProvider: .google)
         },
         loginWithApple: {
-            Domain.SNSUser(id: "testId",
-                           idToken: "textIdToken",
-                           email: "test@test.com",
-                           nickname: "test",
-                           snsProvider: "APPLE")
+            Domain.SNSUser(idToken: "textIdToken",
+                           snsProvider: .apple)
         },
         loginWithKakao: {
-            Domain.SNSUser(id: "testId",
-                           idToken: "textIdToken",
-                           email: "test@test.com",
-                           nickname: "test",
-                           snsProvider: "KAKAO")
+            Domain.SNSUser(idToken: "textIdToken",
+                           snsProvider: .kakao)
         },
         logout: { }
     )

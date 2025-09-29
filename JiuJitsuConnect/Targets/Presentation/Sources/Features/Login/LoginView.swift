@@ -10,56 +10,74 @@ public struct LoginView: View {
     }
     
     public var body: some View {
-        VStack {
-            
-            Spacer()
-            // MARK: - 소셜 로그인 버튼
-            VStack(spacing: 10) {
-                // 카카오 로그인 버튼
-                Button(action: { store.send(.kakaoButtonTapped) }) {
-                    SocialLoginButton(
-                        asset: Assets.logoKakao,
-                        text: "카카오 계속하기",
-                        backgroundColor: Color.primitive.kakao.bg,
-                        foregroundColor: Color.primitive.kakao.text
-                    )
+        WithViewStore(self.store, observe: { $0 }) { viewStore in
+            ZStack {
+                VStack {
+                    Spacer()
+                    // MARK: - 소셜 로그인 버튼
+                    VStack(spacing: 10) {
+                        // 카카오 로그인 버튼
+                        Button(action: { store.send(.kakaoButtonTapped) }) {
+                            SocialLoginButton(
+                                asset: Assets.logoKakao,
+                                text: "카카오 계속하기",
+                                backgroundColor: Color.primitive.kakao.bg,
+                                foregroundColor: Color.primitive.kakao.text
+                            )
+                        }
+                        .frame(height: 52)
+                        
+                        // 구글 로그인 버튼
+                        Button(action: { store.send(.googleButtonTapped) }) {
+                            SocialLoginButton(
+                                asset: Assets.logoGoogle,
+                                text: "구글로 계속하기",
+                                backgroundColor: Color.primitive.google.bg,
+                                foregroundColor: Color.primitive.google.text
+                            )
+                        }
+                        .frame(height: 52)
+                        
+                        // 애플 로그인 버튼
+                        Button(action: { store.send(.appleButtonTapped) }) {
+                            SocialLoginButton(
+                                asset: Assets.logoApple,
+                                text: "애플로 계속하기",
+                                backgroundColor: Color.primitive.apple.bg,
+                                foregroundColor: Color.primitive.apple.text
+                            )
+                        }
+                        .frame(height: 52)
+                        
+                        // 둘러보기 버튼
+                        Button(action: { store.send(.aroundButtonTapped) }) {
+                            Text("로그인 없이 둘러보기")
+                                .font(Font.pretendard.custom(weight: .semiBold, size: 16))
+                                .foregroundStyle(Color.primitive.bw.white)
+                        }
+                        .frame(height: 44)
+                    }
+                    .padding(.horizontal, 35)
                 }
-                .frame(height: 52)
-                
-                // 구글 로그인 버튼
-                Button(action: { store.send(.googleButtonTapped) }) {
-                    SocialLoginButton(
-                        asset: Assets.logoGoogle,
-                        text: "구글로 계속하기",
-                        backgroundColor: Color.primitive.google.bg,
-                        foregroundColor: Color.primitive.google.text
-                    )
-                }
-                .frame(height: 52)
-                
-                // 애플 로그인 버튼
-                Button(action: { store.send(.appleButtonTapped) }) {
-                    SocialLoginButton(
-                        asset: Assets.logoApple,
-                        text: "애플로 계속하기",
-                        backgroundColor: Color.primitive.apple.bg,
-                        foregroundColor: Color.primitive.apple.text
-                    )
-                }
-                .frame(height: 52)
-                
-                // 둘러보기 버튼
-                Button(action: { store.send(.aroundButtonTapped) }) {
-                    Text("로그인 없이 둘러보기")
-                        .font(Font.pretendard.custom(weight: .semiBold, size: 16))
-                        .foregroundStyle(Color.primitive.bw.white)
-                }
-                .frame(height: 44)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.primitive.coolGray.cg500)
             }
-            .padding(.horizontal, 35)
+            .overlay {
+                if let toastState = viewStore.toast {
+                    ToastView(
+                        state: toastState,
+                        onSwipe: {
+                            viewStore.send(.toastDismissed, animation: .default)
+                        },
+                        onButtonTapped: { toastAction in
+                            viewStore.send(.toastButtonTapped(toastAction), animation: .default)
+                        },
+                        hasBottomNavBar: false
+                    )
+                }
+            }
+            .animation(.default, value: viewStore.toast)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.primitive.coolGray.cg500)
     }
 }
 

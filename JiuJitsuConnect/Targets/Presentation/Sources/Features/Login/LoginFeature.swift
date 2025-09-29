@@ -1,15 +1,17 @@
 import ComposableArchitecture
 import Domain
+import CoreKit
 
 @Reducer
 public struct LoginFeature {
+    
+    private enum CancelID { case toast }
     
     // MARK: - State & Action
     @ObservableState
     public struct State: Equatable {
         public var isLoading = false
-        // AlertState를 사용하여 에러 발생 시 알림창을 띄울 수 있습니다.
-        @Presents public var alert: AlertState<Action.Alert>?
+        public var toast: ToastState?
         
         public init() {}
     }
@@ -21,23 +23,21 @@ public struct LoginFeature {
         case appleButtonTapped
         case aroundButtonTapped
         
-        // 비동기 로그인 결과 처리를 위한 내부 액션
-//        case _loginResponse(TaskResult<SNSUser>)
+        case _loginResponse(TaskResult<SNSUser>)
+        case showToast(ToastState)
+        case toastDismissed
+        case toastButtonTapped(ToastState.Action)
         
-        // 부모(AppFeature)에게 결과를 알리는 Delegate 액션
         public enum Delegate: Equatable {
             case didLogin(SNSUser)
             case skipLogin // '둘러보기' 선택 시
         }
         case delegate(Delegate)
-        
-        // Alert 관련 액션
-        case alert(PresentationAction<Alert>)
-        public enum Alert: Equatable {}
     }
     
     // MARK: - Dependencies
     @Dependency(\.authClient) var authClient
+    @Dependency(\.continuousClock) var clock
     
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -45,46 +45,73 @@ public struct LoginFeature {
             // MARK: - 로그인 버튼 탭
             case .googleButtonTapped:
                 state.isLoading = true
-                return .run { _ in
-                    let user = try await self.authClient.loginWithGoogle()
-                    print("google login success \(user)")
+                return .run { send in
+                    await send(._loginResponse(
+                        await TaskResult { try await self.authClient.loginWithGoogle() }
+                    ))
                 }
-                
             case .appleButtonTapped:
                 state.isLoading = true
-                return .run { _ in
-                    let user = try await self.authClient.loginWithApple()
-                    print("user \(user)")
+                return .run { send in
+                    await send(._loginResponse(
+                        await TaskResult { try await self.authClient.loginWithApple() }
+                    ))
                 }
 
             case .kakaoButtonTapped:
                 state.isLoading = true
-                return .run { _ in
-                    let user = try await self.authClient.loginWithKakao()
-                    print("user \(user)")
+                return .run { send in
+                    await send(._loginResponse(
+                        await TaskResult { try await self.authClient.loginWithKakao() }
+                    ))
                 }
                 
             // MARK: - 로그인 결과 처리
-//            case let ._loginResponse(.success(user)):
-//                state.isLoading = false
-//                // 부모에게 로그인 성공과 사용자 정보를 알림
-//                return .send(.delegate(.didLogin(user)))
-//                
-//            case let ._loginResponse(.failure(error)):
-//                state.isLoading = false
-//                // 로그인 실패 시 에러 알림창 표시
-//                state.alert = AlertState { TextState(error.localizedDescription) }
-//                return .none
+            case let ._loginResponse(.success(user)):
+                state.isLoading = false
+                return .send(.delegate(.didLogin(user)))
+                
+            case let ._loginResponse(.failure(error)):
+                state.isLoading = false
+                guard let authError = error as? AuthError else {
+                    return .send(.showToast(.init(message: "알 수 없는 오류가 발생했습니다.", style: .info)))
+                }
+                
+                // 정책: 사용자가 취소한 경우는 무시
+                if authError == .signInCancelled {
+                    return .none
+                }
+                
+                // 그 외 에러는 메시지가 있을 경우 Toast로 표시
+                if let errorMessage = authError.errorDescription {
+                    let toastState = ToastState(message: errorMessage, style: .info)
+                    return .send(.showToast(toastState))
+                }
+                return .none
+                
+            case let .showToast(toastState):
+                state.toast = toastState
+                return .run { send in
+                    try await self.clock.sleep(for: toastState.duration)
+                    await send(.toastDismissed, animation: .default)
+                }
+                .cancellable(id: CancelID.toast)
+
+            case .toastDismissed:
+                state.toast = nil
+                return .cancel(id: CancelID.toast)
+                
+            case .toastButtonTapped:
+                return .send(.toastDismissed)
                 
             // MARK: - 기타 액션
             case .aroundButtonTapped:
                 // 부모에게 '둘러보기'를 선택했음을 알림
                 return .send(.delegate(.skipLogin))
                 
-            case .alert, .delegate:
+            case .delegate:
                 return .none
             }
         }
-        .ifLet(\.$alert, action: \.alert)
     }
 }
