@@ -19,7 +19,7 @@ public struct LoginView: View {
                         // 카카오 로그인 버튼
                         Button(action: { store.send(.kakaoButtonTapped) }) {
                             SocialLoginButton(
-                                asset: Assets.logoKakao,
+                                asset: Assets.Login.Logo.kakao,
                                 text: "카카오 계속하기",
                                 backgroundColor: Color.primitive.kakao.bg,
                                 foregroundColor: Color.primitive.kakao.text
@@ -30,7 +30,7 @@ public struct LoginView: View {
                         // 구글 로그인 버튼
                         Button(action: { store.send(.googleButtonTapped) }) {
                             SocialLoginButton(
-                                asset: Assets.logoGoogle,
+                                asset: Assets.Login.Logo.google,
                                 text: "구글로 계속하기",
                                 backgroundColor: Color.primitive.google.bg,
                                 foregroundColor: Color.primitive.google.text
@@ -41,7 +41,7 @@ public struct LoginView: View {
                         // 애플 로그인 버튼
                         Button(action: { store.send(.appleButtonTapped) }) {
                             SocialLoginButton(
-                                asset: Assets.logoApple,
+                                asset: Assets.Login.Logo.apple,
                                 text: "애플로 계속하기",
                                 backgroundColor: Color.primitive.apple.bg,
                                 foregroundColor: Color.primitive.apple.text
