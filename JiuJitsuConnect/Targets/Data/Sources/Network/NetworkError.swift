@@ -12,7 +12,8 @@ public enum NetworkError: Error, LocalizedError, Sendable {
     case invalidURL
     case invalidResponse
     case decodingError(Error)
-    case serverError(statusCode: Int, data: Data? = nil)
+    case serverError(statusCode: Int)
+    case apiError(APIErrorResponse)
     case timeout
     case noConnection
     case unknown(Error)
@@ -25,8 +26,10 @@ public enum NetworkError: Error, LocalizedError, Sendable {
             return "유효하지 않은 응답입니다."
         case .decodingError:
             return "데이터를 변환하는 데 실패했습니다."
-        case .serverError(let statusCode, _):
+        case .serverError(let statusCode):
             return "서버 오류가 발생했습니다. (코드: \(statusCode))"
+        case .apiError(let errorResponse):
+            return errorResponse.message
         case .timeout:
             return "요청 시간이 초과되었습니다."
         case .noConnection:
@@ -41,7 +44,7 @@ public enum NetworkError: Error, LocalizedError, Sendable {
         switch self {
         case .timeout, .noConnection:
             return true
-        case .serverError(let statusCode, _):
+        case .serverError(let statusCode):
             return statusCode >= 500 // 5xx 에러는 재시도 가능
         default:
             return false

@@ -71,11 +71,18 @@ public final class DefaultNetworkService: NetworkService {
         NetworkLogger.log(response: httpResponse, data: data)
         #endif
         
-        guard (200...299).contains(httpResponse.statusCode) else {
-            // TODO: 서버에서 내려주는 에러 DTO가 있다면 여기서 디코딩하여 더 구체적인 에러 반환
-            throw NetworkError.serverError(statusCode: httpResponse.statusCode)
+        if (200...299).contains(httpResponse.statusCode) {
+            // 성공한 경우, 그대로 data를 반환
+            return data
+        } else {
+            // 실패한 경우, 서버가 보낸 에러 메시지를 디코딩 시도
+            do {
+                let apiError = try decoder.decode(APIErrorResponse.self, from: data)
+                throw NetworkError.apiError(apiError)
+            } catch {
+                // 서버 에러 DTO 디코딩에 실패하면, 일반 서버 에러로 처리
+                throw NetworkError.serverError(statusCode: httpResponse.statusCode)
+            }
         }
-        
-        return data
     }
 }

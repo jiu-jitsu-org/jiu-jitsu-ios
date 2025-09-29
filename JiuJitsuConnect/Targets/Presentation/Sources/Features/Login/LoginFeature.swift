@@ -1,6 +1,6 @@
 import ComposableArchitecture
 import Domain
-import CoreKit
+import DesignSystem
 
 @Reducer
 public struct LoginFeature {
