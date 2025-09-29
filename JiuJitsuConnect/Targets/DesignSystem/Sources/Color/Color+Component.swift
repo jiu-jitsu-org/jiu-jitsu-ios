@@ -1,3 +1,4 @@
+// swiftlint:disable all
 //
 //  Color+Component.swift
 //  DesignSystem
@@ -274,29 +275,47 @@ public struct ComponentColors {
         public let unselected = Unselected()
 
         public struct Selected {
-            public let scrim = Color.semantic.overlay.scrim
-            public let background = Color.semantic.surface.container
-            public let handle = Color.semantic.border.default
-            public let title = Color.semantic.text.primary
-            public let closeIcon = Color.semantic.icon.primary
-            public let leadingIcon = Color.semantic.interactive.primary
-            public let label = Color.semantic.text.primary
-            public let followingIcon = Color.semantic.text.secondary
-            public let labelRequired = Color.semantic.interactive.primary
-            public let labelOptional = Color.semantic.text.tertiary
+            public let container = Container()
+            
+            public struct Container {
+                public let scrim = Color.semantic.overlay.scrim
+                public let background = Color.semantic.surface.container
+                public let handle = Color.semantic.border.default
+                public let title = Color.semantic.text.primary
+                public let closeIcon = Color.semantic.icon.primary
+            }
+            
+            public let listItem = ListItem()
+            
+            public struct ListItem {
+                public let leadingIcon = Color.semantic.interactive.primary
+                public let followingIcon = Color.semantic.text.secondary
+                public let label = Color.semantic.text.primary
+                public let labelRequired = Color.semantic.interactive.primary
+                public let labelOptional = Color.semantic.text.tertiary
+            }
         }
 
         public struct Unselected {
-            public let scrim = Color.semantic.overlay.scrim
-            public let background = Color.semantic.surface.container
-            public let handle = Color.semantic.border.default
-            public let title = Color.semantic.text.primary
-            public let closeIcon = Color.semantic.icon.primary
-            public let leadingIcon = Color.semantic.icon.secondary
-            public let followingIcon = Color.semantic.icon.secondary
-            public let label = Color.semantic.text.secondary
-            public let labelRequired = Color.semantic.interactive.primary
-            public let labelOptional = Color.semantic.text.tertiary
+            public let container = Container()
+            
+            public struct Container {
+                public let scrim = Color.semantic.overlay.scrim
+                public let background = Color.semantic.surface.container
+                public let handle = Color.semantic.border.default
+                public let title = Color.semantic.text.primary
+                public let closeIcon = Color.semantic.icon.primary
+            }
+            
+            public let listItem = ListItem()
+            
+            public struct ListItem {
+                public let leadingIcon = Color.semantic.icon.secondary
+                public let followingIcon = Color.semantic.icon.secondary
+                public let label = Color.semantic.text.secondary
+                public let labelRequired = Color.semantic.interactive.primary
+                public let labelOptional = Color.semantic.text.tertiary
+            }
         }
     }
 }

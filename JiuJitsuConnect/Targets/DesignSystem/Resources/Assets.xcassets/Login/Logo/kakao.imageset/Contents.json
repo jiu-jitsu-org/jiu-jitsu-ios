@@ -1,17 +1,17 @@
 {
   "images" : [
     {
-      "filename" : "카카오 로고 1.png",
+      "filename" : "kakao.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "카카오 로고@2x 1.png",
+      "filename" : "kakao@2x 1.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
-      "filename" : "카카오 로고@3x.png",
+      "filename" : "kakao@3x.png",
       "idiom" : "universal",
       "scale" : "3x"
     }

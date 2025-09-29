@@ -22,9 +22,21 @@ public typealias AssetImageTypeAlias = ImageAsset.Image
 
 // swiftlint:disable identifier_name line_length nesting type_body_length type_name
 public enum Assets {
-  public static let logoApple = ImageAsset(name: "logo-apple")
-  public static let logoGoogle = ImageAsset(name: "logo-google")
-  public static let logoKakao = ImageAsset(name: "logo-kakao")
+  public enum Common {
+    public enum Icon {
+      public static let chevronRight = ImageAsset(name: "Common/Icon/chevron-right")
+    }
+  }
+  public enum Login {
+    public enum Icon {
+      public static let check = ImageAsset(name: "Login/Icon/check")
+    }
+    public enum Logo {
+      public static let apple = ImageAsset(name: "Login/Logo/apple")
+      public static let google = ImageAsset(name: "Login/Logo/google")
+      public static let kakao = ImageAsset(name: "Login/Logo/kakao")
+    }
+  }
 }
 // swiftlint:enable identifier_name line_length nesting type_body_length type_name
 
