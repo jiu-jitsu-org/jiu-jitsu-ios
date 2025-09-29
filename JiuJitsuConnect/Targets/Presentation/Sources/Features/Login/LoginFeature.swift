@@ -60,7 +60,7 @@ public struct LoginFeature {
             case .kakaoButtonTapped:
                 state.isLoading = true
                 return .run { _ in
-                    let user = try await self.authClient.loginWithGoogle()
+                    let user = try await self.authClient.loginWithKakao()
                     print("user \(user)")
                 }
                 

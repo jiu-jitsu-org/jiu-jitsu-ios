@@ -22,6 +22,7 @@ public final class DependencyContainer {
     
     private lazy var googleLoginUseCase = GoogleLoginUseCase(authRepository: authRepository)
     private lazy var appleLoginUseCase = AppleLoginUseCase(authRepository: authRepository)
+    private lazy var kakaoLoginUseCase = KakaoLoginUseCase(authRepository: authRepository)
     
     private lazy var logoutUseCase = LogoutUseCase(
         authRepository: authRepository
@@ -32,14 +33,16 @@ public final class DependencyContainer {
     public func configureAuthClient() -> AuthClient {
         return AuthClient(
             loginWithGoogle: { [weak self] in
-                guard let self else { throw AuthError.dependencyNotFound }
-                return try await self.googleLoginUseCase.execute()
+                try await self?.googleLoginUseCase.execute() ?? { throw AuthError.dependencyNotFound }()
             },
             loginWithApple: { [weak self] in
                 try await self?.appleLoginUseCase.execute() ?? { throw AuthError.dependencyNotFound }()
-            }, logout: { [weak self] in
-                guard let self else { throw AuthError.dependencyNotFound }
-                try await self.logoutUseCase.execute()
+            },
+            loginWithKakao: { [weak self] in
+                try await self?.kakaoLoginUseCase.execute() ?? { throw AuthError.dependencyNotFound }()
+            },
+            logout: { [weak self] in
+                try await self?.logoutUseCase.execute() ?? { throw AuthError.dependencyNotFound }()
             }
         )
     }

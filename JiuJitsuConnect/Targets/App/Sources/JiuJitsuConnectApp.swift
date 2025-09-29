@@ -2,11 +2,13 @@ import SwiftUI
 import ComposableArchitecture
 import Presentation
 import GoogleSignIn
+import KakaoSDKCommon
 
 @main
 struct JiuJitsuConnectApp: App {
     init() {
         configureGoogleSignIn()
+        configureKakaoSDK()
     }
     
     var body: some Scene {
@@ -26,7 +28,15 @@ struct JiuJitsuConnectApp: App {
         GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientId)
     }
     
-    // ✅ Store 생성 함수
+    private func configureKakaoSDK() {
+        // Info.plist에서 KAKAO_NATIVE_APP_KEY 값을 가져와 초기화
+        guard let kakaoAppKey = Bundle.main.object(forInfoDictionaryKey: "KAKAO_NATIVE_APP_KEY") as? String else {
+            fatalError("KAKAO_NATIVE_APP_KEY is not set in Info.plist")
+        }
+        KakaoSDK.initSDK(appKey: kakaoAppKey)
+    }
+    
+    // Store 생성 함수
     private func createStore() -> StoreOf<AppFeature> {
         // 테스트 환경이 아닐 때만 Live 의존성 주입
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {

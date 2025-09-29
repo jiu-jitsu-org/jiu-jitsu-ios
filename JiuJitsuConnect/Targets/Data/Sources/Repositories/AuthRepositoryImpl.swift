@@ -10,6 +10,9 @@ import Domain
 import GoogleSignIn
 import AuthenticationServices
 import UIKit
+import KakaoSDKCommon
+import KakaoSDKAuth
+import KakaoSDKUser
 
 public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     
@@ -45,6 +48,36 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             authorizationController.performRequests()
         }
     }
+    
+    @MainActor
+    public func signInWithKakao() async throws -> Domain.SNSUser {
+            return try await withCheckedThrowingContinuation { continuation in
+                
+                // 카카오톡 앱으로 로그인 시도
+                if UserApi.isKakaoTalkLoginAvailable() {
+                    UserApi.shared.loginWithKakaoTalk { (oauthToken, error) in
+                        if let error = error {
+                            continuation.resume(throwing: error)
+                        } else if let oauthToken = oauthToken {
+                            self.fetchKakaoUserInfo(accessToken: oauthToken.accessToken, continuation: continuation)
+                        } else {
+                            continuation.resume(throwing: AuthError.unknown("Kakao login failed with no token and no error."))
+                        }
+                    }
+                } else {
+                    // 카카오 계정(웹뷰)으로 로그인 시도
+                    UserApi.shared.loginWithKakaoAccount { (oauthToken, error) in
+                        if let error = error {
+                            continuation.resume(throwing: error)
+                        } else if let oauthToken = oauthToken {
+                            self.fetchKakaoUserInfo(accessToken: oauthToken.accessToken, continuation: continuation)
+                        } else {
+                            continuation.resume(throwing: AuthError.unknown("Kakao login failed with no token and no error."))
+                        }
+                    }
+                }
+            }
+        }
     
     // MARK: - ASAuthorizationControllerDelegate
     
@@ -87,6 +120,13 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
         return try! findRootViewController().view.window!
     }
     
+    public func signOut() async throws {
+        await MainActor.run {
+            GIDSignIn.sharedInstance.signOut()
+            
+        }
+    }
+    
     // MARK: - Private Methods
     
     @MainActor
@@ -114,10 +154,35 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
         )
     }
     
-    public func signOut() async throws {
-        await MainActor.run {
-            GIDSignIn.sharedInstance.signOut()
-            
+    private func mapToSnsUser(from kakaoUser: KakaoSDKUser.User, accessToken: String) throws -> Domain.SNSUser {
+        guard let email = kakaoUser.kakaoAccount?.email,
+              let nickname = kakaoUser.kakaoAccount?.profile?.nickname else {
+            throw AuthError.missingProfileData
+        }
+        
+        return Domain.SNSUser(
+            id: String(kakaoUser.id!),
+            idToken: accessToken,
+            email: email,
+            nickname: nickname,
+            snsProvider: "KAKAO"
+        )
+    }
+    
+    private func fetchKakaoUserInfo(accessToken: String, continuation: CheckedContinuation<SNSUser, Error>) {
+        UserApi.shared.me { (user, error) in
+            if let error = error {
+                continuation.resume(throwing: error)
+            } else if let user = user {
+                do {
+                    let snsUser = try self.mapToSnsUser(from: user, accessToken: accessToken)
+                    continuation.resume(returning: snsUser)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            } else {
+                continuation.resume(throwing: AuthError.missingProfileData)
+            }
         }
     }
 }

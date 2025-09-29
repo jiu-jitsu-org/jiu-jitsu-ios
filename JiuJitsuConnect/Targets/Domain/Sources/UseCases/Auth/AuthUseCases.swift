@@ -30,6 +30,17 @@ public final class AppleLoginUseCase {
         return try await authRepository.signInWithApple()
     }
 }
+public final class KakaoLoginUseCase {
+    private let authRepository: AuthRepository
+    
+    public init(authRepository: AuthRepository) {
+        self.authRepository = authRepository
+    }
+    
+    public func execute() async throws -> SNSUser {
+        return try await authRepository.signInWithKakao()
+    }
+}
 
 public final class LogoutUseCase {
     private let authRepository: AuthRepository

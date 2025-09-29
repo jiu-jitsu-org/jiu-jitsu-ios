@@ -4,11 +4,13 @@ import Domain
 public struct AuthClient {
     public var loginWithGoogle: @Sendable () async throws -> Domain.SNSUser
     public var loginWithApple: @Sendable () async throws -> Domain.SNSUser
+    public var loginWithKakao: @Sendable () async throws -> Domain.SNSUser
     public var logout: @Sendable () async throws -> Void
     
-    public init(loginWithGoogle: @Sendable @escaping () async throws -> Domain.SNSUser, loginWithApple: @Sendable @escaping () async throws -> Domain.SNSUser, logout: @Sendable @escaping () async throws -> Void) {
+    public init(loginWithGoogle: @Sendable @escaping () async throws -> Domain.SNSUser, loginWithApple: @Sendable @escaping () async throws -> Domain.SNSUser, loginWithKakao: @Sendable @escaping () async throws -> Domain.SNSUser, logout: @Sendable @escaping () async throws -> Void) {
         self.loginWithGoogle = loginWithGoogle
         self.loginWithApple = loginWithApple
+        self.loginWithKakao = loginWithKakao
         self.logout = logout
     }
 }
@@ -31,6 +33,13 @@ extension AuthClient: DependencyKey {
                            nickname: "test",
                            snsProvider: "APPLE")
         },
+        loginWithKakao: {
+            Domain.SNSUser(id: "testId",
+                           idToken: "textIdToken",
+                           email: "test@test.com",
+                           nickname: "test",
+                           snsProvider: "KAKAO")
+        },
         logout: { }
     )
 }
@@ -49,6 +58,9 @@ extension AuthClient {
         },
         loginWithApple: {
             fatalError("AuthClient.loginWithApple is not implemented")
+        },
+        loginWithKakao: {
+            fatalError("AuthClient.loginWithKakao is not implemented")
         },
         logout: {
             fatalError("AuthClient.logout is not implemented")
