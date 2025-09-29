@@ -15,10 +15,12 @@ import KakaoSDKAuth
 import KakaoSDKUser
 
 public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    private let networkService: NetworkService
     
     private var appleSignInContinuation: CheckedContinuation<SNSUser, Error>?
     
-    public init(appleSignInContinuation: CheckedContinuation<SNSUser, Error>? = nil) {
+    public init(networkService: NetworkService  = DefaultNetworkService(), appleSignInContinuation: CheckedContinuation<SNSUser, Error>? = nil) {
+        self.networkService = networkService
         self.appleSignInContinuation = appleSignInContinuation
     }
     
@@ -91,6 +93,11 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                 }
             }
         }
+    }
+    
+    public func appLogin(request: AuthRequest) async throws -> AuthResponse {
+        let endpoint = AuthEndpoint.appLogin(request)
+        return try await networkService.request(endpoint: endpoint)
     }
     
     // MARK: - ASAuthorizationControllerDelegate

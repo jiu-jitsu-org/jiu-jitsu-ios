@@ -12,4 +12,6 @@ public protocol AuthRepository {
     func signInWithApple() async throws -> SNSUser
     func signInWithKakao() async throws -> SNSUser
     func signOut() async throws
+    
+    func appLogin(request: AuthRequest) async throws -> AuthResponse
 }

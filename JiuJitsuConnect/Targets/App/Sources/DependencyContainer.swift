@@ -24,6 +24,8 @@ public final class DependencyContainer {
     private lazy var appleLoginUseCase = AppleLoginUseCase(authRepository: authRepository)
     private lazy var kakaoLoginUseCase = KakaoLoginUseCase(authRepository: authRepository)
     
+    private lazy var serverLoginUseCase = AppLoginUseCase(authRepository: authRepository)
+    
     private lazy var logoutUseCase = LogoutUseCase(
         authRepository: authRepository
     )
@@ -40,6 +42,9 @@ public final class DependencyContainer {
             },
             loginWithKakao: { [weak self] in
                 try await self?.kakaoLoginUseCase.execute() ?? { throw AuthError.dependencyNotFound }()
+            },
+            appLogin: { [weak self] request in
+                try await self?.serverLoginUseCase.execute(request: request) ?? { throw AuthError.dependencyNotFound }()
             },
             logout: { [weak self] in
                 try await self?.logoutUseCase.execute() ?? { throw AuthError.dependencyNotFound }()

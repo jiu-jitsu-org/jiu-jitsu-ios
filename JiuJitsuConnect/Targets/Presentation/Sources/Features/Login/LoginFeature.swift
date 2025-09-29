@@ -23,7 +23,9 @@ public struct LoginFeature {
         case appleButtonTapped
         case aroundButtonTapped
         
-        case _loginResponse(TaskResult<SNSUser>)
+        case _socialLoginResponse(TaskResult<SNSUser>)
+        case _serverLoginResponse(TaskResult<AuthResponse>)
+        
         case showToast(ToastState)
         case toastDismissed
         case toastButtonTapped(ToastState.Action)
@@ -46,14 +48,14 @@ public struct LoginFeature {
             case .googleButtonTapped:
                 state.isLoading = true
                 return .run { send in
-                    await send(._loginResponse(
+                    await send(._socialLoginResponse(
                         await TaskResult { try await self.authClient.loginWithGoogle() }
                     ))
                 }
             case .appleButtonTapped:
                 state.isLoading = true
                 return .run { send in
-                    await send(._loginResponse(
+                    await send(._socialLoginResponse(
                         await TaskResult { try await self.authClient.loginWithApple() }
                     ))
                 }
@@ -61,17 +63,21 @@ public struct LoginFeature {
             case .kakaoButtonTapped:
                 state.isLoading = true
                 return .run { send in
-                    await send(._loginResponse(
+                    await send(._socialLoginResponse(
                         await TaskResult { try await self.authClient.loginWithKakao() }
                     ))
                 }
                 
             // MARK: - 로그인 결과 처리
-            case let ._loginResponse(.success(user)):
-                state.isLoading = false
-                return .send(.delegate(.didLogin(user)))
+            case let ._socialLoginResponse(.success(user)):
+                return .run { send in
+                    let request = AuthRequest(idToken: snsUser.idToken, provider: snsUser.snsProvider)
+                    await send(._serverLoginResponse(
+                        await TaskResult { try await self.authClient.serverLogin(request) }
+                    ))
+                }
                 
-            case let ._loginResponse(.failure(error)):
+            case let ._socialLoginResponse(.failure(error)):
                 state.isLoading = false
                 guard let authError = error as? AuthError else {
                     return .send(.showToast(.init(message: "알 수 없는 오류가 발생했습니다.", style: .info)))
@@ -87,6 +93,17 @@ public struct LoginFeature {
                     let toastState = ToastState(message: errorMessage, style: .info)
                     return .send(.showToast(toastState))
                 }
+                return .none
+                
+            case let ._serverLoginResponse(.success(authResponse)):
+                state.isLoading = false
+                // TODO: 서버로부터 받은 accessToken 저장 및 로그인 완료 처리
+                // return .send(.delegate(.didLogin(authResponse)))
+                return .none
+
+            case let ._serverLoginResponse(.failure(error)):
+                state.isLoading = false
+                // TODO: 서버 로그인 실패 에러 처리 (토스트 등)
                 return .none
                 
             case let .showToast(toastState):

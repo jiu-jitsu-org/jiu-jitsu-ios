@@ -7,7 +7,7 @@
 
 import Foundation
 
-public enum SNSProvider: String, Codable, CaseIterable {
+public enum SNSProvider: String, Codable, CaseIterable, Sendable {
     case google = "GOOGLE"
     case apple = "APPLE"
     case kakao = "KAKAO"
