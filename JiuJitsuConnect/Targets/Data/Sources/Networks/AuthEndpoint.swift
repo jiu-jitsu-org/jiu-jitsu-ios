@@ -34,11 +34,10 @@ extension AuthEndpoint: Endpoint {
         }
     }
     
-    // POST 요청의 body를 설정
-    var parameters: [String: Any]? {
+    var body: Data? {
         switch self {
         case .appLogin(let request):
-            return request.toDictionary
+            return try? JSONEncoder().encode(request)
         }
     }
 }

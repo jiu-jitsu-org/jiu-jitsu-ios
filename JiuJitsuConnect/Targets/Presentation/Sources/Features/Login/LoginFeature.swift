@@ -71,7 +71,7 @@ public struct LoginFeature {
             // MARK: - 로그인 결과 처리
             case let ._socialLoginResponse(.success(user)):
                 return .run { send in
-                    let request = AuthRequest(accessToken: user.accessToken, provider: user.snsProvider)
+                    let request = AuthRequest(accessToken: user.accessToken, snsProvider: user.snsProvider)
                     await send(._serverLoginResponse(
                         await TaskResult { try await self.authClient.appLogin(request) }
                     ))

@@ -13,7 +13,6 @@ public protocol Endpoint: Sendable {
     var method: HTTPMethod { get }
     var headers: [String: String]? { get }
     var queryParameters: [String: String]? { get } // GET 파라미터용
-    var bodyParameters: [String: Any]? { get } // POST body용
     var body: Data? { get }
     var timeout: TimeInterval { get } // 타임아웃 설정
 }
@@ -36,21 +35,11 @@ public extension Endpoint {
         return nil
     }
     
-    var bodyParameters: [String: Any]? {
-        return nil
-    }
-    
     var timeout: TimeInterval {
         return 30.0
     }
     
-    var body: Data? {
-        guard let params = bodyParameters,
-              let data = try? JSONSerialization.data(withJSONObject: params) else {
-            return nil
-        }
-        return data
-    }
+    var body: Data? { nil } 
     
     func asURLRequest() -> URLRequest? {
         guard var urlComponents = URLComponents(string: baseURL) else { return nil }

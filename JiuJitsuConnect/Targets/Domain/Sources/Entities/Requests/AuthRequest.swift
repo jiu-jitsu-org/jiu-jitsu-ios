@@ -9,11 +9,11 @@ import Foundation
 
 public struct AuthRequest: Encodable, Sendable {
     public let accessToken: String
-    public let provider: SNSProvider
+    public let snsProvider: SNSProvider
     
-    public init(accessToken: String, provider: SNSProvider) {
+    public init(accessToken: String, snsProvider: SNSProvider) {
         self.accessToken = accessToken
-        self.provider = provider
+        self.snsProvider = snsProvider
     }
     
 }
