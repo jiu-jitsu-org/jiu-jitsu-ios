@@ -31,7 +31,7 @@ public struct TermsAgreementSheetView: View {
         self.onButtonTapped = onButtonTapped
         self.onRowTapped = onRowTapped
     }
-
+    
     // MARK: - Body
     public var body: some View {
         VStack(spacing: 0) {
@@ -83,14 +83,13 @@ public struct TermsAgreementSheetView: View {
                     topLeadingRadius: 24,
                     topTrailingRadius: 24
                 ))
-                .ignoresSafeArea(edges: .bottom)
         )
     }
 }
 
 // MARK: - Preview
 
- #Preview("Terms Agreement Sheet") {
+#Preview("Terms Agreement Sheet") {
     // Preview를 위한 간단한 컨테이너 View
     struct BottomSheetPreviewContainer: View {
         // 바텀시트 표시 여부를 제어하는 State
@@ -131,4 +130,4 @@ public struct TermsAgreementSheetView: View {
     
     // 컨테이너 View를 반환하여 Preview를 생성합니다.
     return BottomSheetPreviewContainer()
- }
+}
