@@ -41,8 +41,6 @@ struct TermsAgreementSheetModifier: ViewModifier {
                         onButtonTapped: onButtonTapped,
                         onRowTapped: onRowTapped
                     )
-                    .background(Color.component.bottomSheet.selected.container.background)
-                    .ignoresSafeArea(edges: .bottom) // 바텀시트 자체는 하단 안전 영역을 무시
                 }
                 .transition(.move(edge: .bottom))
             }

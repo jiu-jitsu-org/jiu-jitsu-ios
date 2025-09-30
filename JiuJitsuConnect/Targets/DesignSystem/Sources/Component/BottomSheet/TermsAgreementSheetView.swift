@@ -36,25 +36,29 @@ public struct TermsAgreementSheetView: View {
     public var body: some View {
         VStack(spacing: 0) {
             // 상단 핸들
-            Capsule()
-                .fill(Color.component.bottomSheet.selected.container.handle)
-                .frame(width: 40, height: 4)
-                .padding(.top, 10)
-                .padding(.bottom, 10)
+            ZStack {
+                Capsule()
+                    .fill(Color.component.bottomSheet.selected.container.handle)
+                    .frame(width: 40, height: 4)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 24)
             
             // 타이틀
             Text(title)
                 .font(Font.pretendard.title2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 20)
-                .padding(.top, 16)
+                .padding(.top, 24)
             
             // 동의 항목 리스트
             VStack(spacing: 4) {
                 ForEach($items) { $item in
                     TermsAgreementSheetRowView(item: $item, onRowTapped: onRowTapped)
+                        .frame(height: 40)
                 }
             }
+            .padding(.top, 16)
             .padding(.horizontal, 20)
             .padding(.bottom, 16)
             
@@ -69,12 +73,18 @@ public struct TermsAgreementSheetView: View {
                     .background(Color.blue)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 20)
             .padding(.top, 8)
             .padding(.bottom, 8)
         }
-        .background(Color.component.bottomSheet.selected.container.background)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(
+            Color.component.bottomSheet.selected.container.background
+                .clipShape(.rect(
+                    topLeadingRadius: 24,
+                    topTrailingRadius: 24
+                ))
+                .ignoresSafeArea(edges: .bottom)
+        )
     }
 }
 

@@ -13,12 +13,15 @@ struct TermsAgreementSheetRowView: View {
     let onRowTapped: (UUID) -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 9) {
             // 체크마크 버튼
             Button(action: {
                 item.isChecked.toggle()
             }) {
                 Assets.Login.Icon.check.swiftUIImage
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 24, height: 24)
                     .foregroundStyle(item.isChecked ? Color.component.bottomSheet.selected.listItem.leadingIcon : Color.component.bottomSheet.unselected.listItem.leadingIcon)
             }
             
@@ -38,9 +41,11 @@ struct TermsAgreementSheetRowView: View {
                 onRowTapped(item.id)
             }) {
                 Assets.Common.Icon.chevronRight.swiftUIImage
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 24, height: 24)
                     .foregroundStyle(item.isChecked ? Color.component.bottomSheet.selected.listItem.followingIcon : Color.component.bottomSheet.unselected.listItem.followingIcon)
             }
         }
-        .frame(height: 40)
     }
 }
