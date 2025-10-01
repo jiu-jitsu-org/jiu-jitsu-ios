@@ -35,6 +35,19 @@ public struct TermsAgreementSheetView: View {
     // MARK: - Body
     public var body: some View {
         VStack(spacing: 0) {
+            header
+            
+            content
+        }
+        .background(
+            Color.component.bottomSheet.selected.container.background
+        )
+    }
+    
+    // MARK: - Private View
+    
+    private var header: some View {
+        VStack(spacing: 0) {
             // 상단 핸들
             ZStack {
                 Capsule()
@@ -51,6 +64,11 @@ public struct TermsAgreementSheetView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 24)
             
+        }
+    }
+    
+    private var content: some View {
+        VStack(spacing: 0) {
             // 동의 항목 리스트
             VStack(spacing: 4) {
                 ForEach($items) { $item in
@@ -76,14 +94,8 @@ public struct TermsAgreementSheetView: View {
             .padding(.horizontal, 20)
             .padding(.top, 8)
             .padding(.bottom, 8)
+            
         }
-        .background(
-            Color.component.bottomSheet.selected.container.background
-                .clipShape(.rect(
-                    topLeadingRadius: 24,
-                    topTrailingRadius: 24
-                ))
-        )
     }
 }
 

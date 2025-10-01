@@ -17,16 +17,18 @@ struct TermsAgreementSheetModifier: ViewModifier {
     let buttonTitle: String
     let onButtonTapped: () -> Void
     let onRowTapped: (UUID) -> Void
-    
-    // 드래그가 끝나고 시트가 닫힐 임계값 (threshold)
-    private let dismissThreshold: CGFloat = 100
 
     // MARK: - 제스처 상태를 위한 프로퍼티
     @State private var sheetOffset: CGFloat = 0       // 시트 전체의 Y축 위치
     @State private var additionalHeight: CGFloat = 0  // 스트레칭 배경의 추가 높이
-    @State private var isDragging = false
+    @State private var isDragging = false    
     
-    private let maxUpwardHeight: CGFloat = 50 // 위로 늘어날 수 있는 최대 높이
+    private enum SheetConstants {
+        static let dismissThreshold: CGFloat = 100 // 드래그가 끝나고 시트가 닫힐 임계값 (threshold)
+        static let maxUpwardHeight: CGFloat = 50 // 위로 늘어날 수 있는 최대 높이
+        static let baseResistance: CGFloat = 3.0
+        static let resistanceScale: CGFloat = 150.0
+    }
     
     func body(content: Content) -> some View {
         GeometryReader { geometry in
@@ -68,37 +70,12 @@ struct TermsAgreementSheetModifier: ViewModifier {
                         DragGesture()
                             .onChanged { value in
                                 isDragging = true
-                                let translationHeight = value.translation.height
-                                
-                                if translationHeight < 0 { // 위로 드래그 (스트레칭)
-                                     let dragDistance = abs(translationHeight)
-                                     // 1. 기본 저항값 설정
-                                     let baseResistance: CGFloat = 3.0
-                                     // 2. 드래그 거리에 비례한 추가 저항 계산
-                                     let additionalResistance = dragDistance / 150.0
-                                     // 3. 최종 저항값
-                                     let totalResistance = baseResistance + additionalResistance
-                                     
-                                     let resistedHeight = dragDistance / totalResistance
-                                     
-                                     additionalHeight = min(resistedHeight, maxUpwardHeight)
-                                     sheetOffset = 0 // 위로 드래그 시에는 offset 고정
-                                    
-                                } else { // 아래로 드래그 (닫기)
-                                    if additionalHeight > 0 {
-                                        // 1. 스트레칭 된 높이가 있다면 먼저 줄입니다.
-                                        additionalHeight = max(0, -translationHeight)
-                                        sheetOffset = 0
-                                    } else {
-                                        // 2. 스트레칭 높이가 0이 되면, 그때부터 시트 전체를 내립니다.
-                                        sheetOffset = translationHeight
-                                    }
-                                }
+                                self.handleDragChange(value.translation.height)
                             }
                             .onEnded { _ in
                                 isDragging = false
                                 // offset 기준으로 닫힘 여부 판단
-                                if sheetOffset > dismissThreshold {
+                                if sheetOffset > SheetConstants.dismissThreshold {
                                     dismiss()
                                 } else {
                                     // 모든 경우에 원래 상태로 복귀
@@ -124,6 +101,32 @@ struct TermsAgreementSheetModifier: ViewModifier {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             additionalHeight = 0
         }
+    }
+    
+    private func handleDragChange(_ translationHeight: CGFloat) {
+        if translationHeight < 0 { // 위로 드래그 (스트레칭)
+             let dragDistance = abs(translationHeight)
+             // 2. 드래그 거리에 비례한 추가 저항 계산
+            let additionalResistance = dragDistance / SheetConstants.resistanceScale
+             // 3. 최종 저항값
+            let totalResistance = SheetConstants.baseResistance + additionalResistance
+             
+             let resistedHeight = dragDistance / totalResistance
+             
+            additionalHeight = min(resistedHeight, SheetConstants.maxUpwardHeight)
+             sheetOffset = 0 // 위로 드래그 시에는 offset 고정
+            
+        } else { // 아래로 드래그 (닫기)
+            if additionalHeight > 0 {
+                // 1. 스트레칭 된 높이가 있다면 먼저 줄입니다.
+                additionalHeight = max(0, -translationHeight)
+                sheetOffset = 0
+            } else {
+                // 2. 스트레칭 높이가 0이 되면, 그때부터 시트 전체를 내립니다.
+                sheetOffset = translationHeight
+            }
+        }
+        
     }
 }
 
