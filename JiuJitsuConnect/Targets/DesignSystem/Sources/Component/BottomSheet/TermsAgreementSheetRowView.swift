@@ -13,26 +13,29 @@ struct TermsAgreementSheetRowView: View {
     let onRowTapped: (UUID) -> Void
 
     var body: some View {
-        HStack(spacing: 9) {
-            // 체크마크 버튼
-            Button(action: {
-                item.isChecked.toggle()
-            }) {
+        HStack(spacing: 0) {
+            HStack(spacing: 9) {
                 Assets.Login.Icon.check.swiftUIImage
                     .resizable()
                     .scaledToFit()
                     .frame(width: 24, height: 24)
                     .foregroundStyle(item.isChecked ? Color.component.bottomSheet.selected.listItem.leadingIcon : Color.component.bottomSheet.unselected.listItem.leadingIcon)
+                    .padding(.leading, 8)
+                
+                Text(item.title)
+                    .font(Font.pretendard.bodyS)
+                    .foregroundStyle(item.isChecked ? Color.component.bottomSheet.selected.listItem.label : Color.component.bottomSheet.unselected.listItem.label)
+                
+                Text(item.type.text)
+                    .font(Font.pretendard.bodyS)
+                    .foregroundStyle(item.isChecked ? item.type.selectedColor : item.type.unselectedColor)
+                    .padding(.trailing, 8)
             }
-            
-            // 텍스트
-            Text(item.title)
-                .font(Font.pretendard.bodyS)
-                .foregroundStyle(item.isChecked ? Color.component.bottomSheet.selected.listItem.label : Color.component.bottomSheet.unselected.listItem.label)
-            
-            Text(item.type.text)
-                .font(Font.pretendard.bodyS)
-                .foregroundStyle(item.isChecked ? item.type.selectedColor : item.type.unselectedColor)
+            .frame(height: 40)
+            .contentShape(Rectangle()) // ✅ HStack 내 빈 공간까지 탭 가능하도록 모양 정의
+            .onTapGesture {
+                item.isChecked.toggle()
+            }
             
             Spacer()
             
@@ -46,6 +49,7 @@ struct TermsAgreementSheetRowView: View {
                     .frame(width: 24, height: 24)
                     .foregroundStyle(item.isChecked ? Color.component.bottomSheet.selected.listItem.followingIcon : Color.component.bottomSheet.unselected.listItem.followingIcon)
             }
+            .frame(width: 40, height: 40)
         }
     }
 }
