@@ -3,6 +3,7 @@ import ComposableArchitecture
 import Presentation
 import GoogleSignIn
 import KakaoSDKCommon
+import KakaoSDKAuth
 
 @main
 struct JiuJitsuConnectApp: App {
@@ -14,6 +15,13 @@ struct JiuJitsuConnectApp: App {
     var body: some Scene {
         WindowGroup {
             AppView(store: createStore())
+                .onOpenURL { url in
+                    if AuthApi.isKakaoTalkLoginUrl(url) {
+                        _ = AuthController.handleOpenUrl(url: url)
+                    } else {
+                        GIDSignIn.sharedInstance.handle(url)
+                    }
+                }
         }
     }
     
