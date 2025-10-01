@@ -20,13 +20,13 @@ struct TermsAgreementSheetModifier: ViewModifier {
     
     // 드래그가 끝나고 시트가 닫힐 임계값 (threshold)
     private let dismissThreshold: CGFloat = 100
+
     // MARK: - 제스처 상태를 위한 프로퍼티
-    // ✅ 이제 offset이 아니라 '추가 높이'를 제어합니다.
     @State private var sheetOffset: CGFloat = 0       // 시트 전체의 Y축 위치
     @State private var additionalHeight: CGFloat = 0  // 스트레칭 배경의 추가 높이
     @State private var isDragging = false
     
-    private let maxUpwardHeight: CGFloat = 30 // 위로 늘어날 수 있는 최대 높이
+    private let maxUpwardHeight: CGFloat = 50 // 위로 늘어날 수 있는 최대 높이
     
     func body(content: Content) -> some View {
         GeometryReader { geometry in
@@ -71,11 +71,18 @@ struct TermsAgreementSheetModifier: ViewModifier {
                                 let translationHeight = value.translation.height
                                 
                                 if translationHeight < 0 { // 위로 드래그 (스트레칭)
-                                    let calculatedHeight = -translationHeight
-                                    let resistance: CGFloat = 3.0
-                                    let resistedHeight = calculatedHeight / resistance
-                                    additionalHeight = min(resistedHeight, maxUpwardHeight)
-                                    sheetOffset = 0 // 위로 드래그 시에는 offset 고정
+                                     let dragDistance = abs(translationHeight)
+                                     // 1. 기본 저항값 설정
+                                     let baseResistance: CGFloat = 3.0
+                                     // 2. 드래그 거리에 비례한 추가 저항 계산
+                                     let additionalResistance = dragDistance / 150.0
+                                     // 3. 최종 저항값
+                                     let totalResistance = baseResistance + additionalResistance
+                                     
+                                     let resistedHeight = dragDistance / totalResistance
+                                     
+                                     additionalHeight = min(resistedHeight, maxUpwardHeight)
+                                     sheetOffset = 0 // 위로 드래그 시에는 offset 고정
                                     
                                 } else { // 아래로 드래그 (닫기)
                                     if additionalHeight > 0 {
