@@ -73,26 +73,27 @@ public struct LoginFeature {
                 return .run { send in
                     let request = AuthRequest(accessToken: user.accessToken, snsProvider: user.snsProvider)
                     await send(._serverLoginResponse(
-                        await TaskResult { try await self.authClient.appLogin(request) }
+                        await TaskResult { try await self.authClient.serverLogin(request) }
                     ))
                 }
                 
-            case let ._socialLoginResponse(.failure(error)):
+//            case let ._socialLoginResponse(.failure(error)):
+            case ._socialLoginResponse(.failure):
                 state.isLoading = false
-                guard let authError = error as? AuthError else {
-                    return .send(.showToast(.init(message: "알 수 없는 오류가 발생했습니다.", style: .info)))
-                }
-                
-                // 정책: 사용자가 취소한 경우는 무시
-                if authError == .signInCancelled {
-                    return .none
-                }
-                
-                // 그 외 에러는 메시지가 있을 경우 Toast로 표시
-                if let errorMessage = authError.errorDescription {
-                    let toastState = ToastState(message: errorMessage, style: .info)
-                    return .send(.showToast(toastState))
-                }
+//                guard let authError = error as? AuthError else {
+//                    return .send(.showToast(.init(message: "알 수 없는 오류가 발생했습니다.", style: .info)))
+//                }
+//                
+//                // 정책: 사용자가 취소한 경우는 무시
+//                if authError == .signInCancelled {
+//                    return .none
+//                }
+//                
+//                // 그 외 에러는 메시지가 있을 경우 Toast로 표시
+//                if let errorMessage = authError.errorDescription {
+//                    let toastState = ToastState(message: errorMessage, style: .info)
+//                    return .send(.showToast(toastState))
+//                }
                 return .none
                 
             case ._serverLoginResponse(.success):

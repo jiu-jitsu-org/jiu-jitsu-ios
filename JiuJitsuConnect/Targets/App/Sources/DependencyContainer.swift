@@ -24,7 +24,7 @@ public final class DependencyContainer {
     private lazy var appleLoginUseCase = AppleLoginUseCase(authRepository: authRepository)
     private lazy var kakaoLoginUseCase = KakaoLoginUseCase(authRepository: authRepository)
     
-    private lazy var serverLoginUseCase = AppLoginUseCase(authRepository: authRepository)
+    private lazy var serverLoginUseCase = ServerLoginUseCase(authRepository: authRepository)
     
     private lazy var logoutUseCase = LogoutUseCase(
         authRepository: authRepository
@@ -35,19 +35,19 @@ public final class DependencyContainer {
     public func configureAuthClient() -> AuthClient {
         return AuthClient(
             loginWithGoogle: { [weak self] in
-                try await self?.googleLoginUseCase.execute() ?? { throw AuthError.dependencyNotFound }()
+                try await self?.googleLoginUseCase.execute() ?? { throw DomainError.dependencyNotFound }()
             },
             loginWithApple: { [weak self] in
-                try await self?.appleLoginUseCase.execute() ?? { throw AuthError.dependencyNotFound }()
+                try await self?.appleLoginUseCase.execute() ?? { throw DomainError.dependencyNotFound }()
             },
             loginWithKakao: { [weak self] in
-                try await self?.kakaoLoginUseCase.execute() ?? { throw AuthError.dependencyNotFound }()
+                try await self?.kakaoLoginUseCase.execute() ?? { throw DomainError.dependencyNotFound }()
             },
-            appLogin: { [weak self] request in
-                try await self?.serverLoginUseCase.execute(request: request) ?? { throw AuthError.dependencyNotFound }()
+            serverLogin: { [weak self] request in
+                try await self?.serverLoginUseCase.execute(request: request) ?? { throw DomainError.dependencyNotFound }()
             },
             logout: { [weak self] in
-                try await self?.logoutUseCase.execute() ?? { throw AuthError.dependencyNotFound }()
+                try await self?.logoutUseCase.execute() ?? { throw DomainError.dependencyNotFound }()
             }
         )
     }

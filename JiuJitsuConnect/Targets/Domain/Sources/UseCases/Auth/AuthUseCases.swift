@@ -54,7 +54,7 @@ public final class LogoutUseCase {
     }
 }
 
-public final class AppLoginUseCase {
+public final class ServerLoginUseCase {
     private let authRepository: AuthRepository
 
     public init(authRepository: AuthRepository) {
@@ -62,6 +62,6 @@ public final class AppLoginUseCase {
     }
 
     public func execute(request: AuthRequest) async throws -> AuthResponse {
-        return try await authRepository.appLogin(request: request)
+        return try await authRepository.serverLogin(request: request)
     }
 }

@@ -13,6 +13,8 @@ import UIKit
 import KakaoSDKCommon
 import KakaoSDKAuth
 import KakaoSDKUser
+import OSLog
+import CoreKit
 
 public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     private let networkService: NetworkService
@@ -31,7 +33,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
             return try mapToSnsUser(from: result.user)
         } catch let error as GIDSignInError {
-            throw mapToAuthError(from: error, provider: .google)
+            throw mapToDomainError(from: error, provider: .google)
         }
     }
     
@@ -60,7 +62,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                 UserApi.shared.loginWithKakaoTalk { [weak self] (oauthToken, error) in
                     guard let self else { return }
                     if let error = error {
-                        let authError = mapToAuthError(from: error, provider: .kakao)
+                        let authError = mapToDomainError(from: error, provider: .kakao)
                         continuation.resume(throwing: authError)
                     } else if let oauthToken = oauthToken {
                         let snsUser = Domain.SNSUser(
@@ -69,7 +71,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                         )
                         continuation.resume(returning: snsUser)
                     } else {
-                        let authError = mapToAuthError(from: AuthError.unknown("Kakao login failed with no token and no error."), provider: .kakao)
+                        let authError = mapToDomainError(from: DomainError.unknown("Kakao login failed with no token and no error."), provider: .kakao)
                         continuation.resume(throwing: authError)
                     }
                 }
@@ -78,7 +80,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                 UserApi.shared.loginWithKakaoAccount { [weak self] (oauthToken, error) in
                     guard let self else { return }
                     if let error = error {
-                        let authError = mapToAuthError(from: error, provider: .kakao)
+                        let authError = mapToDomainError(from: error, provider: .kakao)
                         continuation.resume(throwing: authError)
                     } else if let oauthToken = oauthToken {
                         let snsUser = Domain.SNSUser(
@@ -87,7 +89,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                         )
                         continuation.resume(returning: snsUser)
                     } else {
-                        let authError = mapToAuthError(from: AuthError.unknown("Kakao login failed with no token and no error."), provider: .kakao)
+                        let authError = mapToDomainError(from: DomainError.unknown("Kakao login failed with no token and no error."), provider: .kakao)
                         continuation.resume(throwing: authError)
                     }
                 }
@@ -95,9 +97,16 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
         }
     }
     
-    public func appLogin(request: AuthRequest) async throws -> AuthResponse {
-        let endpoint = AuthEndpoint.appLogin(request)
-        return try await networkService.request(endpoint: endpoint)
+    public func serverLogin(request: AuthRequest) async throws -> AuthResponse {
+        do {
+            let endpoint = AuthEndpoint.serverLogin(request)
+            return try await networkService.request(endpoint: endpoint)
+        } catch let error as NetworkError {
+            throw mapToDomainError(from: error)
+        } catch {
+            // 그 외 모든 에러
+            throw DomainError.unknown(error.localizedDescription)
+        }
     }
     
     // MARK: - ASAuthorizationControllerDelegate
@@ -106,7 +115,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
         if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
             guard let identityToken = appleIDCredential.identityToken,
                   let tokenString = String(data: identityToken, encoding: .utf8) else {
-                appleSignInContinuation?.resume(throwing: AuthError.missingProfileData)
+                appleSignInContinuation?.resume(throwing: DomainError.missingProfileData)
                 return
             }
             
@@ -116,12 +125,12 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             )
             appleSignInContinuation?.resume(returning: user)
         } else {
-            appleSignInContinuation?.resume(throwing: AuthError.unknown("Apple credential is not AppleIDCredential."))
+            appleSignInContinuation?.resume(throwing: DomainError.unknown("Apple credential is not AppleIDCredential."))
         }
     }
     
     public func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-        let authError = mapToAuthError(from: error, provider: .apple)
+        let authError = mapToDomainError(from: error, provider: .apple)
         appleSignInContinuation?.resume(throwing: authError)
     }
     
@@ -146,14 +155,14 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     private func findRootViewController() throws -> UIViewController {
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let rootViewController = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController else {
-            throw AuthError.cannotFindRootViewController
+            throw DomainError.cannotFindRootViewController
         }
         return rootViewController
     }
     
     private func mapToSnsUser(from gidUser: GIDGoogleUser) throws -> Domain.SNSUser {
         guard let idToken = gidUser.idToken?.tokenString else {
-            throw AuthError.missingProfileData
+            throw DomainError.missingProfileData
         }
         return Domain.SNSUser(
             accessToken: idToken,
@@ -162,11 +171,24 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     }
     
     // MARK: - Error Mapping
-    
-    private func mapToAuthError(from error: Error, provider: SNSProvider) -> AuthError {
-        // 원본 에러는 여기서 분석을 위해 로깅하는 것이 좋습니다.
-        // Logger.error("Original Auth Error from \(provider.rawValue): \(error)")
+    private func mapToDomainError(from error: Error, provider: SNSProvider? = nil) -> DomainError {
+        Logger.network.error("Original Auth Error from \(provider?.rawValue ?? "nil"): \(error)")
         
+        // --- NetworkError 매핑 ---
+        if let networkError = error as? NetworkError {
+            switch networkError {
+            case .noConnection, .timeout:
+                return .networkUnavailable
+            case .decodingError:
+                return .dataParsingFailed
+            case .statusCodeError(_, let response):
+                return .serverError(message: response?.message)
+            default:
+                return .unknown("네트워크 오류: \(networkError.localizedDescription)")
+            }
+        }
+        
+        // --- Google 에러 매핑 ---
         // --- Google 에러 매핑 ---
         if let gidError = error as? GIDSignInError {
             switch gidError.code {
@@ -224,74 +246,21 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                 return .unknown(asError.localizedDescription)
             }
         }
-        
         // --- Kakao 에러 매핑 ---
         if let sdkError = error as? KakaoSDKCommon.SdkError {
-            
-            // 1. 클라이언트 에러 (네트워크 외적인 문제)
-            if sdkError.isClientFailed {
-                let clientError = sdkError.getClientError()
-                switch clientError.reason {
-                case .Cancelled:
-                    // 사용자가 직접 취소 (웹뷰 닫기, 카톡 앱에서 돌아오기 등)
-                    return .signInCancelled
-                    
-                case .TokenNotFound:
-                    // SDK 내부에 토큰이 없는 경우. 계정 문제로 간주.
-                    return .accountProblem(provider: .kakao)
-                    
-                case .NotSupported:
-                    // 카카오톡이 설치되지 않은 상태에서 talk 로그인 시도 등
-                    // 이 경우는 Repository에서 이미 분기 처리 했으므로 발생 가능성 낮음.
-                    return .unknown("카카오톡이 설치되어 있지 않습니다.")
-                    
-                default:
-                    // 그 외 클라이언트 에러는 일반 오류로 처리
-                    return .unknown(clientError.message)
-                }
+            if sdkError.isClientFailed, sdkError.getClientError().reason == .Cancelled {
+                return .signInCancelled
             }
-            
-            // 2. 인증/인가 에러 (로그인 자체의 문제)
-            if sdkError.isAuthFailed {
-                let authError = sdkError.getAuthError()
-                switch authError.reason {
-                case .AccessDenied:
-                    // 사용자가 동의 화면에서 필수 항목을 거부했거나 '취소'를 누름
-                    return .permissionRequired(provider: .kakao, permissionName: "필수 동의 항목")
-                    
-                case .InvalidGrant, .InvalidClient:
-                    // 리프레시 토큰 만료, 잘못된 앱 키 등. 계정 문제로 간주.
-                    return .accountProblem(provider: .kakao)
-                    
-                default:
-                    return .unknown(authError.info?.errorDescription)
-                }
+            if sdkError.isAuthFailed, sdkError.getAuthError().reason == .AccessDenied {
+                return .permissionRequired(provider: .kakao, permissionName: "필수 동의 항목")
             }
-            
-            // 3. API 에러 (로그인 성공 후, 'me()' 호출 등에서 발생)
-            if sdkError.isApiFailed {
-                let apiError = sdkError.getApiError()
-                switch apiError.reason {
-                case .InsufficientScope:
-                    // 필요한 동의 항목(ex. 이메일)을 사용자가 동의하지 않음
-                    let requiredScopes = apiError.info?.requiredScopes?.joined(separator: ", ") ?? "필수 항목"
-                    return .permissionRequired(provider: .kakao, permissionName: requiredScopes)
-                    
-                case .NotSignedUpUser, .NotKakaoAccountUser, .Blocked:
-                    // 가입되지 않았거나, 휴면/제재 계정. 계정 문제로 간주.
-                    return .accountProblem(provider: .kakao)
-                    
-                case .InvalidAccessToken:
-                    // 토큰이 만료되었거나 유효하지 않음. 다시 로그인 필요.
-                    return .accountProblem(provider: .kakao)
-                    
-                default:
-                    return .unknown(apiError.info?.msg)
-                }
+            if sdkError.isAuthFailed || sdkError.isApiFailed {
+                return .accountProblem(provider: .kakao)
             }
         }
         
         // 매핑되지 않은 모든 에러
         return .unknown(error.localizedDescription)
     }
+    
 }

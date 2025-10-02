@@ -5,14 +5,14 @@ public struct AuthClient {
     public var loginWithGoogle: @Sendable () async throws -> Domain.SNSUser
     public var loginWithApple: @Sendable () async throws -> Domain.SNSUser
     public var loginWithKakao: @Sendable () async throws -> Domain.SNSUser
-    public var appLogin: @Sendable (AuthRequest) async throws -> AuthResponse
+    public var serverLogin: @Sendable (AuthRequest) async throws -> AuthResponse
     public var logout: @Sendable () async throws -> Void
     
-    public init(loginWithGoogle: @Sendable @escaping () async throws -> Domain.SNSUser, loginWithApple: @Sendable @escaping () async throws -> Domain.SNSUser, loginWithKakao: @Sendable @escaping () async throws -> Domain.SNSUser, appLogin: @Sendable @escaping (AuthRequest) async throws -> AuthResponse, logout: @Sendable @escaping () async throws -> Void) {
+    public init(loginWithGoogle: @Sendable @escaping () async throws -> Domain.SNSUser, loginWithApple: @Sendable @escaping () async throws -> Domain.SNSUser, loginWithKakao: @Sendable @escaping () async throws -> Domain.SNSUser, serverLogin: @Sendable @escaping (AuthRequest) async throws -> AuthResponse, logout: @Sendable @escaping () async throws -> Void) {
         self.loginWithGoogle = loginWithGoogle
         self.loginWithApple = loginWithApple
         self.loginWithKakao = loginWithKakao
-        self.appLogin = appLogin
+        self.serverLogin = serverLogin
         self.logout = logout
     }
 }
@@ -33,7 +33,7 @@ extension AuthClient: DependencyKey {
             Domain.SNSUser(accessToken: "textIdToken",
                            snsProvider: .kakao)
         },
-        appLogin: { _ in
+        serverLogin: { _ in
             Domain.AuthResponse(
                 accessToken: "testAccessToken",
                 refreshToken: "testRefreshToken",
@@ -70,8 +70,8 @@ extension AuthClient {
         loginWithKakao: {
             fatalError("AuthClient.loginWithKakao is not implemented")
         },
-        appLogin: { _ in
-            fatalError("AuthClient.appLogin is not implemented")
+        serverLogin: { _ in
+            fatalError("AuthClient.serverLogin is not implemented")
         },
         logout: {
             fatalError("AuthClient.logout is not implemented")

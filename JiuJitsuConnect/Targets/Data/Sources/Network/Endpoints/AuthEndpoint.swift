@@ -9,7 +9,7 @@ import Foundation
 import Domain
 
 enum AuthEndpoint {
-    case appLogin(AuthRequest)
+    case serverLogin(AuthRequest)
 }
 
 extension AuthEndpoint: Endpoint {
@@ -22,21 +22,21 @@ extension AuthEndpoint: Endpoint {
     
     var path: String {
         switch self {
-        case .appLogin:
+        case .serverLogin:
             return "/api/auth/sns-login"
         }
     }
     
     var method: HTTPMethod {
         switch self {
-        case .appLogin:
+        case .serverLogin:
             return .post
         }
     }
     
     var body: Data? {
         switch self {
-        case .appLogin(let request):
+        case .serverLogin(let request):
             return try? JSONEncoder().encode(request)
         }
     }
