@@ -77,24 +77,29 @@ public struct LoginFeature {
                     ))
                 }
                 
-//            case let ._socialLoginResponse(.failure(error)):
-            case ._socialLoginResponse(.failure):
+            case let ._socialLoginResponse(.failure(error)):
                 state.isLoading = false
-//                guard let authError = error as? AuthError else {
-//                    return .send(.showToast(.init(message: "알 수 없는 오류가 발생했습니다.", style: .info)))
-//                }
-//                
-//                // 정책: 사용자가 취소한 경우는 무시
-//                if authError == .signInCancelled {
-//                    return .none
-//                }
-//                
-//                // 그 외 에러는 메시지가 있을 경우 Toast로 표시
-//                if let errorMessage = authError.errorDescription {
-//                    let toastState = ToastState(message: errorMessage, style: .info)
-//                    return .send(.showToast(toastState))
-//                }
-                return .none
+                // TODO: 서버 로그인 실패 에러 처리 (토스트 등)
+                // 1. DisplayError를 받아옵니다.
+                guard let displayError = handleLoginError(error: error) else {
+                    // nil이 반환되면 (예: .signInCancelled) 아무것도 하지 않습니다.
+                    return .none
+                }
+                
+                // 2. DisplayError에 따라 상태를 업데이트하고 Effect를 반환합니다.
+                switch displayError {
+                case .toast(let message):
+                    let toastState = ToastState(message: message, style: .info)
+                    state.toast = toastState
+                    
+                    return .run { send in
+                        try await self.clock.sleep(for: toastState.duration)
+                        await send(.toastDismissed, animation: .default)
+                    }
+                    .cancellable(id: CancelID.toast)
+                    
+                default: return .none
+                }
                 
             case ._serverLoginResponse(.success):
                 state.isLoading = false
@@ -102,10 +107,29 @@ public struct LoginFeature {
                 // return .send(.delegate(.didLogin(authResponse)))
                 return .none
 
-            case ._serverLoginResponse(.failure):
+            case let ._serverLoginResponse(.failure(error)):
                 state.isLoading = false
                 // TODO: 서버 로그인 실패 에러 처리 (토스트 등)
-                return .none
+                // 1. DisplayError를 받아옵니다.
+                guard let displayError = handleLoginError(error: error) else {
+                    // nil이 반환되면 (예: .signInCancelled) 아무것도 하지 않습니다.
+                    return .none
+                }
+                
+                // 2. DisplayError에 따라 상태를 업데이트하고 Effect를 반환합니다.
+                switch displayError {
+                case .toast(let message):
+                    let toastState = ToastState(message: message, style: .info)
+                    state.toast = toastState
+                    
+                    return .run { send in
+                        try await self.clock.sleep(for: toastState.duration)
+                        await send(.toastDismissed, animation: .default)
+                    }
+                    .cancellable(id: CancelID.toast)
+                    
+                default: return .none
+                }
                 
             case let .showToast(toastState):
                 state.toast = toastState
@@ -131,5 +155,21 @@ public struct LoginFeature {
                 return .none
             }
         }
+    }
+    
+    private func handleLoginError(error: Error) -> DisplayError? {
+        guard let domainError = error as? DomainError else {
+            return .toast("알 수 없는 오류가 발생했습니다.")
+        }
+        
+        // DomainError를 DisplayError로 변환
+        let displayError = DomainErrorMapper.toDisplayError(from: domainError)
+        
+        // .none 케이스는 nil을 반환하여 UI 변경이 없음을 알림
+        if case .none = displayError {
+            return nil
+        }
+        
+        return displayError
     }
 }
