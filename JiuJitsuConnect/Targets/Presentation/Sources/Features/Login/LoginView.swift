@@ -3,7 +3,7 @@ import ComposableArchitecture
 import DesignSystem
 
 public struct LoginView: View {
-    let store: StoreOf<LoginFeature>
+    @Bindable var store: StoreOf<LoginFeature>
     
     public init(store: StoreOf<LoginFeature>) {
         self.store = store
@@ -63,21 +63,53 @@ public struct LoginView: View {
                 .background(Color.primitive.coolGray.cg500)
             }
             .overlay {
-                if let toastState = viewStore.toast {
+                if let toastState = store.toast {
                     ToastView(
                         state: toastState,
-                        onSwipe: {
-                            viewStore.send(.toastDismissed, animation: .default)
-                        },
-                        onButtonTapped: { toastAction in
-                            viewStore.send(.toastButtonTapped(toastAction), animation: .default)
-                        },
+                        onSwipe: { store.send(.toastDismissed, animation: .default) },
+                        onButtonTapped: { store.send(.toastButtonTapped($0), animation: .default) },
                         hasBottomNavBar: false
                     )
                 }
             }
             .animation(.default, value: viewStore.toast)
+            .sheet(
+                store: self.store.scope(state: \.$destination, action: \.destination)
+            ) { destinationStore in
+                // CaseLet을 바로 사용하지 않고, destinationStore의 상태로 switch합니다.
+                switch destinationStore.state {
+                case .termsAgreement:
+                    // scope를 사용하여 destinationStore를 자식 store로 좁힙니다.
+                    if let termsStore = destinationStore.scope(
+                        state: \.termsAgreement,
+                        action: \.termsAgreement
+                    ) {
+                        TermsAgreementView(store: termsStore)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                            .presentationDragIndicator(.hidden)
+                            .presentationDetents(
+                                [.height(calculateSheetHeight(itemCount: termsStore.state.rows.count))]
+                            )
+                            .presentationCornerRadius(24)
+                            .presentationBackground(
+                                Color.component.bottomSheet.selected.container.background
+                            )
+                    }
+                }
+            }
         }
+    }
+    
+    private func calculateSheetHeight(itemCount: Int) -> CGFloat {
+        // 기본 UI 높이 (핸들, 타이틀, 버튼, 여백 등)
+        let baseHeight: CGFloat = 24 + 48 + 16 + 16 + 8 + 52 + 8
+        // 각 약관 항목 Row의 높이
+        let rowHeight: CGFloat = 40
+        // 항목 사이의 간격
+        let spacing: CGFloat = 4
+        // 최종 높이 계산
+        let totalHeight = baseHeight + (CGFloat(itemCount) * rowHeight) + (CGFloat(max(0, itemCount - 1)) * spacing)
+        return totalHeight
     }
 }
 

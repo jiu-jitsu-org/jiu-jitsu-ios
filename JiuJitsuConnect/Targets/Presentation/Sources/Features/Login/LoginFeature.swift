@@ -13,6 +13,8 @@ public struct LoginFeature {
         public var isLoading = false
         public var toast: ToastState?
         
+        @Presents public var destination: Destination.State?
+        
         public init() {}
     }
     
@@ -26,6 +28,8 @@ public struct LoginFeature {
         case _socialLoginResponse(TaskResult<SNSUser>)
         case _serverLoginResponse(TaskResult<AuthResponse>)
         
+        case destination(PresentationAction<Destination.Action>)
+        
         case showToast(ToastState)
         case toastDismissed
         case toastButtonTapped(ToastState.Action)
@@ -35,6 +39,11 @@ public struct LoginFeature {
             case skipLogin // '둘러보기' 선택 시
         }
         case delegate(Delegate)
+    }
+    
+    @Reducer(state: .equatable, action: .equatable)
+    public enum Destination {
+        case termsAgreement(TermsAgreementFeature)
     }
     
     // MARK: - Dependencies
@@ -103,33 +112,56 @@ public struct LoginFeature {
                 
             case ._serverLoginResponse(.success):
                 state.isLoading = false
-                // TODO: 서버로부터 받은 accessToken 저장 및 로그인 완료 처리
-                // return .send(.delegate(.didLogin(authResponse)))
-                return .none
-
-            case let ._serverLoginResponse(.failure(error)):
-                state.isLoading = false
-                // TODO: 서버 로그인 실패 에러 처리 (토스트 등)
-                // 1. DisplayError를 받아옵니다.
-                guard let displayError = handleLoginError(error: error) else {
-                    // nil이 반환되면 (예: .signInCancelled) 아무것도 하지 않습니다.
-                    return .none
-                }
                 
-                // 2. DisplayError에 따라 상태를 업데이트하고 Effect를 반환합니다.
-                switch displayError {
-                case .toast(let message):
-                    let toastState = ToastState(message: message, style: .info)
-                    state.toast = toastState
-                    
-                    return .run { send in
-                        try await self.clock.sleep(for: toastState.duration)
-                        await send(.toastDismissed, animation: .default)
-                    }
-                    .cancellable(id: CancelID.toast)
-                    
-                default: return .none
-                }
+//                if authResponse.isNewUser {
+                    // ✅ 4. 신규 유저일 경우, destination 상태를 설정하여 바텀시트를 띄웁니다.
+                    state.destination = .termsAgreement(.init())
+//                } else {
+                    // TODO: 기존 유저일 경우, 바로 로그인 완료 처리
+                    // return .send(.delegate(.didLogin(authResponse)))
+//                }
+                return .none
+                
+            case ._serverLoginResponse(.failure):
+                // TEST: - 임시 연결
+                state.isLoading = false
+                state.destination = .termsAgreement(.init())
+                return .none
+                
+//            case let ._serverLoginResponse(.failure(error)):
+//                state.isLoading = false
+//                // TODO: 서버 로그인 실패 에러 처리 (토스트 등)
+//                // 1. DisplayError를 받아옵니다.
+//                guard let displayError = handleLoginError(error: error) else {
+//                    // nil이 반환되면 (예: .signInCancelled) 아무것도 하지 않습니다.
+//                    return .none
+//                }
+//                
+//                // 2. DisplayError에 따라 상태를 업데이트하고 Effect를 반환합니다.
+//                switch displayError {
+//                case .toast(let message):
+//                    let toastState = ToastState(message: message, style: .info)
+//                    state.toast = toastState
+//                    
+//                    return .run { send in
+//                        try await self.clock.sleep(for: toastState.duration)
+//                        await send(.toastDismissed, animation: .default)
+//                    }
+//                    .cancellable(id: CancelID.toast)
+//                    
+//                default: return .none
+//                }
+                
+                // MARK: - Destination 액션 처리
+            case .destination(.presented(.termsAgreement(.delegate(.didAgree)))):
+                // 약관 동의 완료 시 바텀시트를 닫고 다음 로직 수행
+                state.destination = nil
+                // TODO: 회원가입 완료 API 호출 또는 메인 화면으로 이동
+                return .none
+                
+            case .destination:
+                // .dismiss() 등 다른 presentation 액션 처리
+                return .none
                 
             case let .showToast(toastState):
                 state.toast = toastState
@@ -155,6 +187,7 @@ public struct LoginFeature {
                 return .none
             }
         }
+        .ifLet(\.$destination, action: \.destination)
     }
     
     private func handleLoginError(error: Error) -> DisplayError? {

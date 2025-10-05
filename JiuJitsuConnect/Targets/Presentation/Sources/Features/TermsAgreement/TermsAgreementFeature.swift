@@ -32,11 +32,11 @@ public struct TermsAgreementFeature {
         }
     }
     
-    public enum Action {
+    public enum Action: Equatable {
         case rows(IdentifiedAction<TermsAgreementRowFeature.State.ID, TermsAgreementRowFeature.Action>)
         case allAgreeButtonTapped
         
-        public enum Delegate { case didAgree }
+        public enum Delegate: Equatable { case didAgree }
         case delegate(Delegate)
     }
     
