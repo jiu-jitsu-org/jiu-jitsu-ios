@@ -90,7 +90,6 @@ public struct LoginView: View {
                             .presentationDetents(
                                 [.height(calculateSheetHeight(itemCount: termsStore.state.rows.count))]
                             )
-                            .presentationCornerRadius(24)
                             .presentationBackground(
                                 Color.component.bottomSheet.selected.container.background
                             )
@@ -120,7 +119,7 @@ struct SocialLoginButton: View {
     let backgroundColor: Color
     let foregroundColor: Color
     var borderColor: Color = .clear // 테두리 색상 (선택 사항)
-
+    
     var body: some View {
         HStack(spacing: 21) {
             asset.swiftUIImage
