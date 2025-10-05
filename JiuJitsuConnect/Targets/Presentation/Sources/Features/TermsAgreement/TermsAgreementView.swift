@@ -50,15 +50,17 @@ public struct TermsAgreementView: View {
             
             // TODO: - 공통 CTA 컴포넌트로 변경
             // 메인 액션 버튼
-            Button(action: { store.send(.allAgreeButtonTapped) }) {
-                Text("모두 동의하기")
+            Button(action: { store.send(.mainButtonTapped) }) {
+                Text(store.buttonTitle)
                     .font(.headline)
                     .foregroundStyle(.white)
-                    .frame(height: 52)
-                    .frame(maxWidth: .infinity)
-                    .background(Color.blue)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .id(store.buttonTitle)
+                    .transition(.opacity.animation(.easeInOut(duration: 0.2)))
             }
+            .frame(height: 52)
+            .frame(maxWidth: .infinity)
+            .background(Color.primitive.blue.b500p)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
             .padding(.horizontal, 20)
             .padding(.top, 8)
             .padding(.bottom, 8)
