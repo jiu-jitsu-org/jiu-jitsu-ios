@@ -37,6 +37,8 @@ public struct CTAButton: View {
         Button(action: action) {
             Text(title)
                 .font(.pretendard.buttonM)
+                .id(title)
+                .transition(.opacity.animation(.easeInOut(duration: 0.2)))
         }
         .buttonStyle(CTAButtonStyle(type: type))
     }
@@ -49,17 +51,18 @@ private struct CTAButtonStyle: ButtonStyle {
     
     func makeBody(configuration: Configuration) -> some View {
         let isPressed = configuration.isPressed
-        
-        // 상태(isEnabled, isPressed)와 타입(type)에 따라 색상을 결정합니다.
         let colors = getColors(type: type, isEnabled: isEnabled, isPressed: isPressed)
         
-        configuration.label
-            .frame(maxWidth: .infinity)
-            .frame(height: 52)
-            .background(colors.background)
-            .foregroundStyle(colors.foreground)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .animation(.easeInOut(duration: 0.1), value: isPressed)
+        ZStack {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(colors.background)
+            configuration.label
+                .foregroundStyle(colors.foreground)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 52)
+        .animation(.easeInOut(duration: 0.1), value: isPressed)
+        .animation(.easeInOut(duration: 0.2), value: isEnabled)
     }
     
     /// 버튼의 상태와 타입에 맞는 배경/전경 색상 튜플을 반환합니다.
