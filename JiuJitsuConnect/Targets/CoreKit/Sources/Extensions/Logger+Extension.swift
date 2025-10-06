@@ -12,6 +12,9 @@ public extension Logger {
     /// 앱의 고유한 Subsystem Identifier
     private static var subsystem = Bundle.main.bundleIdentifier!
     
+    /// DEBUG
+    static let debug = Logger(subsystem: subsystem, category: "Debug")
+    
     /// 네트워크 통신 관련 로그
     static let network = Logger(subsystem: subsystem, category: "Network")
     

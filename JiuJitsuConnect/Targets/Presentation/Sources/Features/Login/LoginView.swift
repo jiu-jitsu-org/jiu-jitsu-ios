@@ -10,7 +10,7 @@ public struct LoginView: View {
     }
     
     public var body: some View {
-        WithViewStore(self.store, observe: { $0 }) { viewStore in
+        NavigationStack(path: $store.scope(state: \.path, action: \.path)) {
             ZStack {
                 VStack {
                     Spacer()
@@ -72,31 +72,29 @@ public struct LoginView: View {
                     )
                 }
             }
-            .animation(.default, value: viewStore.toast)
-            .sheet(
-                store: self.store.scope(state: \.$destination, action: \.destination)
-            ) { destinationStore in
-                // CaseLet을 바로 사용하지 않고, destinationStore의 상태로 switch합니다.
-                switch destinationStore.state {
-                case .termsAgreement:
-                    // scope를 사용하여 destinationStore를 자식 store로 좁힙니다.
-                    if let termsStore = destinationStore.scope(
-                        state: \.termsAgreement,
-                        action: \.termsAgreement
-                    ) {
-                        TermsAgreementView(store: termsStore)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                            .presentationDragIndicator(.hidden)
-                            .presentationDetents(
-                                [.height(calculateSheetHeight(itemCount: termsStore.state.rows.count))]
-                            )
-                            .presentationBackground(
-                                Color.component.bottomSheet.selected.container.background
-                            )
-                    }
-                }
+            .animation(.default, value: store.toast)
+        } destination: { store in
+            switch store.case {
+            case let .nicknameSetting(nicknameStore):
+                NicknameSettingView(store: nicknameStore)
             }
         }
+        .sheet(item: $store.scope(state: \.sheet, action: \.sheet)) { store in
+            // CaseLet을 바로 사용하지 않고, destinationStore의 상태로 switch합니다.
+            switch store.case {
+            case let .termsAgreement(termsStore):
+                TermsAgreementView(store: termsStore)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .presentationDragIndicator(.hidden)
+                    .presentationDetents(
+                        [.height(calculateSheetHeight(itemCount: termsStore.state.rows.count))]
+                    )
+                    .presentationBackground(
+                        Color.component.bottomSheet.selected.container.background
+                    )
+            }
+        }
+        //        }
     }
     
     private func calculateSheetHeight(itemCount: Int) -> CGFloat {

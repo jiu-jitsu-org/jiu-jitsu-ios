@@ -25,6 +25,9 @@ public struct TermsAgreementFeature {
             rows.filter { $0.term.type == .required }
                 .allSatisfy { $0.isChecked }
         }
+        var isMarketingAgreed: Bool {
+            rows.first { $0.term.type == .optional }?.isChecked ?? false
+        }
         
         private static let fixedTerms: [TermItem] = [
             .init(title: "서비스 이용약관 동의", type: .required, contentURL: URL(string: "https://example.com/service")),
@@ -44,7 +47,9 @@ public struct TermsAgreementFeature {
         case rows(IdentifiedAction<TermsAgreementRowFeature.State.ID, TermsAgreementRowFeature.Action>)
         case mainButtonTapped
         
-        public enum Delegate: Equatable { case didAgree }
+        public enum Delegate: Equatable {
+            case didFinishAgreement(isMarketingAgreed: Bool)
+        }
         case delegate(Delegate)
     }
     
@@ -54,19 +59,18 @@ public struct TermsAgreementFeature {
         Reduce { state, action in
             switch action {
             case .mainButtonTapped:
+                let isMarketingAgreed = state.isMarketingAgreed
+                
                 if state.didAgreeToAllRequired {
-                    // '다음' 버튼 기능
-                    // TODO: 다음 화면으로 이동하는 로직 구현 (예: delegate action 전송)
                     Logger.view.debug("다음 화면으로 이동")
-                    return .send(.delegate(.didAgree))
+                    return .send(.delegate(.didFinishAgreement(isMarketingAgreed: isMarketingAgreed)))
                 } else {
-                    // '모두 동의하기' 버튼 기능
                     for id in state.rows.ids {
                         state.rows[id: id]?.isChecked = true
                     }
-                    // TODO: 모두 동의 후 다음 화면으로 이동하는 로직 구현
                     Logger.view.debug("모두 동의 완료, 다음 화면으로 이동")
-                    return .send(.delegate(.didAgree))
+                    // 모두 동의 시, 마케팅 동의는 true가 됨
+                    return .send(.delegate(.didFinishAgreement(isMarketingAgreed: true)))
                 }
                 
             case .rows(.element(id: let id, action: .seeDetailsTapped)):

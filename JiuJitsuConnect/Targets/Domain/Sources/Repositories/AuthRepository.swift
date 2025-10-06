@@ -1,6 +1,6 @@
 //
 //  AuthRepository.swift
-//  App
+//  Domain
 //
 //  Created by suni on 9/21/25.
 //
