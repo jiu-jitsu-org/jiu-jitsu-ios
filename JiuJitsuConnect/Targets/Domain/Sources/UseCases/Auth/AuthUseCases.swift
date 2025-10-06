@@ -61,7 +61,7 @@ public final class ServerLoginUseCase {
         self.authRepository = authRepository
     }
 
-    public func execute(request: AuthRequest) async throws -> AuthResponse {
-        return try await authRepository.serverLogin(request: request)
+    public func execute(user: SNSUser) async throws -> AuthInfo {
+        return try await authRepository.serverLogin(user: user)
     }
 }

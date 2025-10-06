@@ -73,7 +73,7 @@ public final class DefaultNetworkService: NetworkService {
         
         guard (200...299).contains(httpResponse.statusCode) else {
             // 실패 시, 응답 데이터를 APIErrorResponse로 디코딩 시도
-            let apiError = try? decoder.decode(APIErrorResponse.self, from: data)
+            let apiError = try? decoder.decode(APIErrorResponseDTO.self, from: data)
             
             // 상태 코드와 디코딩된 에러를 함께 담아 throw
             throw NetworkError.statusCodeError(statusCode: httpResponse.statusCode, response: apiError)

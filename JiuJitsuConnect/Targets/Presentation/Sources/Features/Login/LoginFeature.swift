@@ -33,7 +33,7 @@ public struct LoginFeature {
         case aroundButtonTapped
         
         case _socialLoginResponse(TaskResult<SNSUser>)
-        case _serverLoginResponse(TaskResult<AuthResponse>)
+        case _serverLoginResponse(TaskResult<AuthInfo>)
 //        case _registerResponse(TaskResult<VoidSuccess>)
         case successRegister
         
@@ -95,9 +95,8 @@ public struct LoginFeature {
                 // MARK: - 로그인 결과 처리
             case let ._socialLoginResponse(.success(user)):
                 return .run { send in
-                    let request = AuthRequest(accessToken: user.accessToken, snsProvider: user.snsProvider)
                     await send(._serverLoginResponse(
-                        await TaskResult { try await self.authClient.serverLogin(request) }
+                        await TaskResult { try await self.authClient.serverLogin(user) }
                     ))
                 }
                 

@@ -18,13 +18,15 @@ import CoreKit
 
 public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     private let networkService: NetworkService
-    
+
     private var appleSignInContinuation: CheckedContinuation<SNSUser, Error>?
     
     public init(networkService: NetworkService  = DefaultNetworkService(), appleSignInContinuation: CheckedContinuation<SNSUser, Error>? = nil) {
         self.networkService = networkService
         self.appleSignInContinuation = appleSignInContinuation
     }
+    
+    // MARK: - SNS Login
     
     @MainActor
     public func signInWithGoogle() async throws -> Domain.SNSUser {
@@ -97,14 +99,23 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
         }
     }
     
-    public func serverLogin(request: AuthRequest) async throws -> AuthResponse {
+    // MARK: - API
+    
+    public func serverLogin(user: SNSUser) async throws -> AuthInfo {
         do {
-            let endpoint = AuthEndpoint.serverLogin(request)
-            return try await networkService.request(endpoint: endpoint)
+            // 1. Domain 모델(SNSUser)을 Data 모델(AuthRequestDTO)로 변환
+            let requestDTO = user.toRequestDTO()
+            
+            // 2. 변환된 DTO를 사용하여 API Endpoint 생성 및 요청
+            let endpoint = AuthEndpoint.serverLogin(requestDTO)
+            let responseDTO: AuthResponseDTO = try await networkService.request(endpoint: endpoint)
+            
+            // 3. 응답받은 Data 모델(AuthResponseDTO)을 Domain 모델(AuthInfo)로 변환하여 반환
+            return responseDTO.toDomain()
+            
         } catch let error as NetworkError {
             throw mapToDomainError(from: error)
         } catch {
-            // 그 외 모든 에러
             throw DomainError.unknown(error.localizedDescription)
         }
     }
@@ -171,6 +182,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     }
     
     // MARK: - Error Mapping
+    
     private func mapToDomainError(from error: Error, provider: SNSProvider? = nil) -> DomainError {
         Logger.network.error("Original Auth Error from \(provider?.rawValue ?? "nil"): \(error)")
         

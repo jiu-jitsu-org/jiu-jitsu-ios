@@ -43,8 +43,8 @@ public final class DependencyContainer {
             loginWithKakao: { [weak self] in
                 try await self?.kakaoLoginUseCase.execute() ?? { throw DomainError.dependencyNotFound }()
             },
-            serverLogin: { [weak self] request in
-                try await self?.serverLoginUseCase.execute(request: request) ?? { throw DomainError.dependencyNotFound }()
+            serverLogin: { [weak self] user in
+                try await self?.serverLoginUseCase.execute(user: user) ?? { throw DomainError.dependencyNotFound }()
             },
             logout: { [weak self] in
                 try await self?.logoutUseCase.execute() ?? { throw DomainError.dependencyNotFound }()

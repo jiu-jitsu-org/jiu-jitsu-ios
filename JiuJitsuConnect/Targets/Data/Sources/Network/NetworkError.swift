@@ -12,7 +12,7 @@ public enum NetworkError: Error, LocalizedError, Sendable {
     case invalidURL
     case invalidResponse
     case decodingError(Error)
-    case statusCodeError(statusCode: Int, response: APIErrorResponse?)
+    case statusCodeError(statusCode: Int, response: APIErrorResponseDTO?)
     case timeout
     case noConnection
     case unknown(Error)

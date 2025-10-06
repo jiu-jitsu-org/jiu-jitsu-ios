@@ -5,10 +5,10 @@ public struct AuthClient {
     public var loginWithGoogle: @Sendable () async throws -> Domain.SNSUser
     public var loginWithApple: @Sendable () async throws -> Domain.SNSUser
     public var loginWithKakao: @Sendable () async throws -> Domain.SNSUser
-    public var serverLogin: @Sendable (AuthRequest) async throws -> AuthResponse
+    public var serverLogin: @Sendable (Domain.SNSUser) async throws -> Domain.AuthInfo
     public var logout: @Sendable () async throws -> Void
     
-    public init(loginWithGoogle: @Sendable @escaping () async throws -> Domain.SNSUser, loginWithApple: @Sendable @escaping () async throws -> Domain.SNSUser, loginWithKakao: @Sendable @escaping () async throws -> Domain.SNSUser, serverLogin: @Sendable @escaping (AuthRequest) async throws -> AuthResponse, logout: @Sendable @escaping () async throws -> Void) {
+    public init(loginWithGoogle: @Sendable @escaping () async throws -> Domain.SNSUser, loginWithApple: @Sendable @escaping () async throws -> Domain.SNSUser, loginWithKakao: @Sendable @escaping () async throws -> Domain.SNSUser, serverLogin: @Sendable @escaping (Domain.SNSUser) async throws -> Domain.AuthInfo, logout: @Sendable @escaping () async throws -> Void) {
         self.loginWithGoogle = loginWithGoogle
         self.loginWithApple = loginWithApple
         self.loginWithKakao = loginWithKakao
@@ -22,31 +22,21 @@ extension AuthClient: DependencyKey {
     
     public static let testValue: Self = Self(
         loginWithGoogle: {
-            Domain.SNSUser(accessToken: "textIdToken",
+            Domain.SNSUser(accessToken: "testIdToken",
                            snsProvider: .google)
         },
         loginWithApple: {
-            Domain.SNSUser(accessToken: "textIdToken",
+            Domain.SNSUser(accessToken: "testIdToken",
                            snsProvider: .apple)
         },
         loginWithKakao: {
-            Domain.SNSUser(accessToken: "textIdToken",
+            Domain.SNSUser(accessToken: "testIdToken",
                            snsProvider: .kakao)
         },
         serverLogin: { _ in
-            Domain.AuthResponse(
-                accessToken: "testAccessToken",
-                refreshToken: "testRefreshToken",
-                userInfo:
-                    AuthResponse.UserInfo(
-                        id: 0,
-                        email: nil,
-                        nickname: "test",
-                        profileImageUrl: nil,
-                        snsProvider: "APPLE",
-                        deactivatedWithinGrace: false
-                    )
-                )
+            Domain.AuthInfo(accessToken: nil,
+                            refreshToken: nil,
+                            tempToken: "test-temp-token")
         },
         logout: { }
     )
