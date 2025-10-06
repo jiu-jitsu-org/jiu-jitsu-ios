@@ -1,22 +1,27 @@
 import ComposableArchitecture
 import Domain
 
+// MARK: - API Client Interface
 public struct AuthClient {
     public var loginWithGoogle: @Sendable () async throws -> Domain.SNSUser
     public var loginWithApple: @Sendable () async throws -> Domain.SNSUser
     public var loginWithKakao: @Sendable () async throws -> Domain.SNSUser
     public var serverLogin: @Sendable (Domain.SNSUser) async throws -> Domain.AuthInfo
-    public var logout: @Sendable () async throws -> Void
     
-    public init(loginWithGoogle: @Sendable @escaping () async throws -> Domain.SNSUser, loginWithApple: @Sendable @escaping () async throws -> Domain.SNSUser, loginWithKakao: @Sendable @escaping () async throws -> Domain.SNSUser, serverLogin: @Sendable @escaping (Domain.SNSUser) async throws -> Domain.AuthInfo, logout: @Sendable @escaping () async throws -> Void) {
+    public init(
+        loginWithGoogle: @Sendable @escaping () async throws -> Domain.SNSUser,
+        loginWithApple: @Sendable @escaping () async throws -> Domain.SNSUser,
+        loginWithKakao: @Sendable @escaping () async throws -> Domain.SNSUser,
+        serverLogin: @Sendable @escaping (Domain.SNSUser) async throws -> Domain.AuthInfo
+    ) {
         self.loginWithGoogle = loginWithGoogle
         self.loginWithApple = loginWithApple
         self.loginWithKakao = loginWithKakao
         self.serverLogin = serverLogin
-        self.logout = logout
     }
 }
 
+// MARK: - Live Implementation
 extension AuthClient: DependencyKey {
     public static let liveValue: Self = .unimplemented
     
@@ -37,11 +42,11 @@ extension AuthClient: DependencyKey {
             Domain.AuthInfo(accessToken: nil,
                             refreshToken: nil,
                             tempToken: "test-temp-token")
-        },
-        logout: { }
+        }
     )
 }
 
+// MARK: - Dependency Injection
 public extension DependencyValues {
     var authClient: AuthClient {
         get { self[AuthClient.self] }
@@ -62,9 +67,6 @@ extension AuthClient {
         },
         serverLogin: { _ in
             fatalError("AuthClient.serverLogin is not implemented")
-        },
-        logout: {
-            fatalError("AuthClient.logout is not implemented")
         }
     )
 }

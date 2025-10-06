@@ -26,10 +26,6 @@ public final class DependencyContainer {
     
     private lazy var serverLoginUseCase = ServerLoginUseCase(authRepository: authRepository)
     
-    private lazy var logoutUseCase = LogoutUseCase(
-        authRepository: authRepository
-    )
-    
     // MARK: - Public Methods
     
     public func configureAuthClient() -> AuthClient {
@@ -45,9 +41,6 @@ public final class DependencyContainer {
             },
             serverLogin: { [weak self] user in
                 try await self?.serverLoginUseCase.execute(user: user) ?? { throw DomainError.dependencyNotFound }()
-            },
-            logout: { [weak self] in
-                try await self?.logoutUseCase.execute() ?? { throw DomainError.dependencyNotFound }()
             }
         )
     }

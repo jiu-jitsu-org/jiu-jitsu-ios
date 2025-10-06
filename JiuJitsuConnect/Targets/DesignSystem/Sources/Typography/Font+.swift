@@ -55,6 +55,9 @@ public extension Font {
 }
 
 public struct Pretendard {
+    // MARK: - Display
+    public let display1 = Font.custom("Pretendard-SemiBold", size: 30)
+    
     // MARK: - Title
     public let title1 = Font.custom("Pretendard-SemiBold", size: 22)
     public let title2 = Font.custom("Pretendard-SemiBold", size: 20)

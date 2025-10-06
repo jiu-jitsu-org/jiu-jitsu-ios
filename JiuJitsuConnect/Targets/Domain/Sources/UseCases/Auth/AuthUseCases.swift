@@ -42,18 +42,6 @@ public final class KakaoLoginUseCase {
     }
 }
 
-public final class LogoutUseCase {
-    private let authRepository: AuthRepository
-    
-    public init(authRepository: AuthRepository) {
-        self.authRepository = authRepository
-    }
-    
-    public func execute() async throws {
-        try await authRepository.signOut()
-    }
-}
-
 public final class ServerLoginUseCase {
     private let authRepository: AuthRepository
 
