@@ -5,7 +5,8 @@ import DesignSystem
 public struct NicknameSettingView: View {
     
     @Bindable var store: StoreOf<NicknameSettingFeature>
-    @FocusState private var isTextFieldFocused: Bool
+    // ✅ @FocusState는 isKeyboardVisible 상태와 바인딩됩니다.
+    @FocusState private var isKeyboardVisible: Bool
     
     public init(store: StoreOf<NicknameSettingFeature>) {
         self.store = store
@@ -25,7 +26,8 @@ public struct NicknameSettingView: View {
         .onTapGesture {
             store.send(.viewTapped)
         }
-        .bind($store.isTextFieldFocused, to: $isTextFieldFocused)
+        // ✅ isKeyboardVisible 상태를 @FocusState와 바인딩합니다.
+        .bind($store.isKeyboardVisible, to: $isKeyboardVisible)
         .alert($store.scope(state: \.alert, action: \.alert))
         .navigationBarBackButtonHidden(true)
         .navigationBarHidden(true)
@@ -35,7 +37,6 @@ public struct NicknameSettingView: View {
 // MARK: - Private Views
 private extension NicknameSettingView {
     
-    /// 상단 임시 이미지 영역 뷰
     var imagePlaceholderSection: some View {
         Rectangle()
             .fill(Color(uiColor: .systemGray5))
@@ -44,7 +45,6 @@ private extension NicknameSettingView {
             .padding(.bottom, 48)
     }
     
-    /// 안내 문구 또는 유효성 검사 메시지를 표시하는 뷰
     var titleSection: some View {
         Text(store.validationState.message)
             .font(Font.pretendard.display1)
@@ -52,21 +52,35 @@ private extension NicknameSettingView {
             .frame(maxWidth: .infinity, alignment: .center)
             .multilineTextAlignment(.center)
             .lineLimit(2)
+            .lineSpacing(6.2)
             .padding(.horizontal, 30)
             .padding(.bottom, 8)
     }
     
-    /// 닉네임 입력 필드 뷰
     var textFieldSection: some View {
-        TextField(store.textFieldPlaceHolder, text: $store.nickname)
-            .font(Font.pretendard.display1)
-            .focused($isTextFieldFocused)
-            .multilineTextAlignment(.center)
-            .tint(Color.component.textfieldDisplay.focus.text)
-            .padding(.horizontal, 30)
+        ZStack {
+            if !store.isTextFieldActive {
+                Text("닉네임을 입력해주세요")
+                    .font(Font.pretendard.display1)
+                    .foregroundStyle(Color.gray.opacity(0.5))
+                    .allowsHitTesting(false)
+            }
+            
+            TextField("", text: $store.nickname)
+                .font(Font.pretendard.display1)
+                .focused($isKeyboardVisible)
+                .multilineTextAlignment(.center)
+                .tint(Color.component.textfieldDisplay.focus.text)
+            
+            // ✅ 키보드가 내려갔을 때만 보이는 커스텀 커서
+            if store.isTextFieldActive && !store.isKeyboardVisible && store.nickname.isEmpty {
+                BlinkingCursorView()
+                    .allowsHitTesting(false)
+            }
+        }
+        .padding(.horizontal, 30)
     }
     
-    /// "확인" CTA 버튼 뷰
     var ctaButtonSection: some View {
         CTAButton(
             title: "확인",
@@ -78,8 +92,28 @@ private extension NicknameSettingView {
     }
 }
 
+// MARK: - Custom Cursor View
+private struct BlinkingCursorView: View {
+    @State private var isVisible: Bool = false
+    
+    var body: some View {
+        // ✅ Text 대신 Rectangle을 사용하여 커서 굵기를 직접 제어합니다.
+        Rectangle()
+            .fill(Color.component.textfieldDisplay.focus.text)
+            .frame(width: 2, height: 35) // 너비 2pt, 높이 35pt로 실제 커서와 유사하게 설정
+            .opacity(isVisible ? 1 : 0)
+            .onAppear {
+                // 0.5초마다 타이머를 실행하여 깜빡이는 효과를 줍니다.
+                Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+                    withAnimation(.easeInOut(duration: 0.1)) {
+                        isVisible.toggle()
+                    }
+                }
+            }
+    }
+}
+
 #Preview {
-    // Preview를 위한 NavigationStack 래핑
     NavigationStack {
         NicknameSettingView(
             store: Store(initialState: NicknameSettingFeature.State(tempToken: "test-token", isMarketingAgreed: false)) {
