@@ -5,7 +5,6 @@ import DesignSystem
 public struct NicknameSettingView: View {
     
     @Bindable var store: StoreOf<NicknameSettingFeature>
-    // ✅ @FocusState는 isKeyboardVisible 상태와 바인딩됩니다.
     @FocusState private var isKeyboardVisible: Bool
     
     public init(store: StoreOf<NicknameSettingFeature>) {
@@ -26,7 +25,6 @@ public struct NicknameSettingView: View {
         .onTapGesture {
             store.send(.viewTapped)
         }
-        // ✅ isKeyboardVisible 상태를 @FocusState와 바인딩합니다.
         .bind($store.isKeyboardVisible, to: $isKeyboardVisible)
         .alert($store.scope(state: \.alert, action: \.alert))
         .navigationBarBackButtonHidden(true)
@@ -57,22 +55,32 @@ private extension NicknameSettingView {
             .padding(.bottom, 8)
     }
     
+    // ✅ ZStack을 사용하여 입력과 표시를 분리합니다.
     var textFieldSection: some View {
         ZStack {
+            // MARK: - 보여주기용 뷰 (Display View)
+            // 플레이с홀더와 실제 입력 텍스트를 보여주는 역할을 합니다.
             if !store.isTextFieldActive {
                 Text("닉네임을 입력해주세요")
                     .font(Font.pretendard.display1)
                     .foregroundStyle(Color.gray.opacity(0.5))
                     .allowsHitTesting(false)
+            } else {
+                Text(store.nickname)
+                    .font(Font.pretendard.display1)
+                    .foregroundStyle(store.validationState.textColor)
             }
             
+            // MARK: - 입력용 뷰 (Input View)
+            // 실제 키보드 입력을 처리하지만, 텍스트 색상은 투명합니다.
             TextField("", text: $store.nickname)
                 .font(Font.pretendard.display1)
                 .focused($isKeyboardVisible)
                 .multilineTextAlignment(.center)
                 .tint(Color.component.textfieldDisplay.focus.text)
+                .foregroundStyle(.clear) // ✅ 텍스트를 투명하게 만들어 숨깁니다.
             
-            // ✅ 키보드가 내려갔을 때만 보이는 커스텀 커서
+            // 커스텀 커서
             if store.isTextFieldActive && !store.isKeyboardVisible && store.nickname.isEmpty {
                 BlinkingCursorView()
                     .allowsHitTesting(false)
@@ -97,13 +105,11 @@ private struct BlinkingCursorView: View {
     @State private var isVisible: Bool = false
     
     var body: some View {
-        // ✅ Text 대신 Rectangle을 사용하여 커서 굵기를 직접 제어합니다.
         Rectangle()
             .fill(Color.component.textfieldDisplay.focus.text)
-            .frame(width: 2, height: 35) // 너비 2pt, 높이 35pt로 실제 커서와 유사하게 설정
+            .frame(width: 2, height: 36)
             .opacity(isVisible ? 1 : 0)
             .onAppear {
-                // 0.5초마다 타이머를 실행하여 깜빡이는 효과를 줍니다.
                 Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
                     withAnimation(.easeInOut(duration: 0.1)) {
                         isVisible.toggle()

@@ -77,18 +77,8 @@ public struct NicknameSettingFeature {
                 
                 state.isCtaButtonEnabled = true
                 
-                guard !state.nickname.isEmpty else {
-                    state.validationState = .idle
-                    return .none
-                }
-                
-                if !(2...12).contains(state.nickname.count) {
-                    state.validationState = .invalidLength
-                } else if !isValid(nickname: state.nickname) {
-                    state.validationState = .invalidCharacters
-                } else {
-                    state.validationState = .idle
-                }
+                // 사용자가 닉네임을 수정하면 유효성 검사 상태를 초기화합니다.
+                state.validationState = .idle
                 return .none
                 
             case .doneButtonTapped:
@@ -96,10 +86,12 @@ public struct NicknameSettingFeature {
                 
                 if !(2...12).contains(state.nickname.count) {
                     state.validationState = .invalidLength
+                    state.isCtaButtonEnabled = false
                     return .none
                 }
                 if !isValid(nickname: state.nickname) {
                     state.validationState = .invalidCharacters
+                    state.isCtaButtonEnabled = false
                     return .none
                 }
                 
@@ -141,7 +133,6 @@ public struct NicknameSettingFeature {
         .ifLet(\.$alert, action: \.alert)
     }
     
-    /// 닉네임에 허용된 문자(한글, 영문, 숫자, 띄어쓰기, _, .)만 포함되어 있는지 확인합니다.
     private func isValid(nickname: String) -> Bool {
         let pattern = "^[a-zA-Z0-9가-힣\\s_.]*$"
         if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
@@ -179,6 +170,15 @@ public extension NicknameSettingFeature {
             switch self {
             default:
                 return Color.component.textfieldDisplay.`default`.title
+            }
+        }
+        
+        var textColor: Color {
+            switch self {
+            case .idle, .available:
+                return Color.component.textfieldDisplay.focus.text
+            case .unavailable, .invalidLength, .invalidCharacters, .networkError:
+                return Color.component.textfieldDisplay.default.placeholder
             }
         }
     }
