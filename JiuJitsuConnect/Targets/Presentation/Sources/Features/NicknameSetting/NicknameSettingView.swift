@@ -55,7 +55,6 @@ private extension NicknameSettingView {
             .padding(.bottom, 8)
     }
     
-    // ✅ ZStack을 사용하여 입력과 표시를 분리합니다.
     var textFieldSection: some View {
         ZStack {
             // MARK: - 보여주기용 뷰 (Display View)
@@ -78,7 +77,7 @@ private extension NicknameSettingView {
                 .focused($isKeyboardVisible)
                 .multilineTextAlignment(.center)
                 .tint(Color.component.textfieldDisplay.focus.text)
-                .foregroundStyle(.clear) // ✅ 텍스트를 투명하게 만들어 숨깁니다.
+                .foregroundStyle(.clear)
             
             // 커스텀 커서
             if store.isTextFieldActive && !store.isKeyboardVisible && store.nickname.isEmpty {
@@ -92,6 +91,9 @@ private extension NicknameSettingView {
     var ctaButtonSection: some View {
         CTAButton(
             title: "확인",
+            type: .blue,
+            style: .keypad,
+            height: 56,
             action: {
                 store.send(.doneButtonTapped)
             }
