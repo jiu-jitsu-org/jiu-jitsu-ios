@@ -56,29 +56,29 @@ public extension Font {
 
 public struct Pretendard {
     // MARK: - Display
-    public let display1 = Font.custom("Pretendard-SemiBold", size: 30)
+    public let display1 = Font.custom("Pretendard-SemiBold", fixedSize: 30)
     
     // MARK: - Title
-    public let title1 = Font.custom("Pretendard-SemiBold", size: 22)
-    public let title2 = Font.custom("Pretendard-SemiBold", size: 20)
-    public let title3 = Font.custom("Pretendard-SemiBold", size: 18)
+    public let title1 = Font.custom("Pretendard-SemiBold", fixedSize: 22)
+    public let title2 = Font.custom("Pretendard-SemiBold", fixedSize: 20)
+    public let title3 = Font.custom("Pretendard-SemiBold", fixedSize: 18)
 
     // MARK: - Body
-    public let bodyM = Font.custom("Pretendard-Medium", size: 16)
-    public let bodyS = Font.custom("Pretendard-Medium", size: 14)
+    public let bodyM = Font.custom("Pretendard-Medium", fixedSize: 16)
+    public let bodyS = Font.custom("Pretendard-Medium", fixedSize: 14)
 
     // MARK: - Label
-    public let labelM = Font.custom("Pretendard-Medium", size: 12)
-    public let labelS = Font.custom("Pretendard-Medium", size: 10)
+    public let labelM = Font.custom("Pretendard-Medium", fixedSize: 12)
+    public let labelS = Font.custom("Pretendard-Medium", fixedSize: 10)
     
     // MARK: - Button
-    public let buttonL = Font.custom("Pretendard-SemiBold", size: 18)
-    public let buttonM = Font.custom("Pretendard-SemiBold", size: 16)
-    public let buttonS = Font.custom("Pretendard-SemiBold", size: 12)
+    public let buttonL = Font.custom("Pretendard-SemiBold", fixedSize: 18)
+    public let buttonM = Font.custom("Pretendard-SemiBold", fixedSize: 16)
+    public let buttonS = Font.custom("Pretendard-SemiBold", fixedSize: 12)
     
     /// 사이즈와 웨이트를 직접 지정해야 할 경우 사용
     public func custom(weight: Pretendard.Weight, size: CGFloat) -> Font {
-        return Font.custom("Pretendard-\(weight.rawValue)", size: size)
+        return Font.custom("Pretendard-\(weight.rawValue)", fixedSize: size)
     }
     
     public enum Weight: String {
