@@ -41,7 +41,9 @@ extension AuthClient: DependencyKey {
         serverLogin: { _ in
             Domain.AuthInfo(accessToken: nil,
                             refreshToken: nil,
-                            tempToken: "test-temp-token")
+                            tempToken: "test-temp-token",
+                            isNewUser: true,
+                            userInfo: nil)
         }
     )
 }

@@ -9,5 +9,5 @@ import Foundation
 
 struct AuthRequestDTO: Encodable, Sendable {
     let accessToken: String
-    let provider: String
+    let snsProvider: String
 }

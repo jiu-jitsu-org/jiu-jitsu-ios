@@ -13,7 +13,7 @@ extension SNSUser {
     func toRequestDTO() -> AuthRequestDTO {
         return AuthRequestDTO(
             accessToken: self.accessToken,
-            provider: self.snsProvider.rawValue
+            snsProvider: self.snsProvider.rawValue
         )
     }
 }
@@ -24,7 +24,22 @@ extension AuthResponseDTO {
         return AuthInfo(
             accessToken: self.accessToken,
             refreshToken: self.refreshToken,
-            tempToken: self.tempToken
+            tempToken: self.tempToken,
+            isNewUser: self.isNewUser,
+            userInfo: self.userInfo?.toDomain()
+        )
+    }
+}
+
+extension AuthResponseDTO.UserInfo {
+    func toDomain() -> AuthInfo.UserInfo {
+        return AuthInfo.UserInfo(
+            id: self.id,
+            email: self.email,
+            nickname: self.nickname,
+            profileImageUrl: self.profileImageUrl,
+            snsProvider: self.snsProvider,
+            deactivatedWithinGrace: self.deactivatedWithinGrace
         )
     }
 }

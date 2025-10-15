@@ -34,8 +34,7 @@ public struct LoginFeature {
         
         case _socialLoginResponse(TaskResult<SNSUser>)
         case _serverLoginResponse(TaskResult<AuthInfo>)
-//        case _registerResponse(TaskResult<VoidSuccess>)
-        case successRegister
+        case _registerResponse(TaskResult<AuthInfo>)
         
         case sheet(PresentationAction<Destination.Action>)
         case path(StackAction<Path.State, Path.Action>)
@@ -45,7 +44,7 @@ public struct LoginFeature {
         case toastButtonTapped(ToastState.Action)
         
         public enum Delegate: Equatable {
-            case didLogin(SNSUser) // TODO: 최종 로그인 완료 시 유저 정보 전달
+            case didLogin(AuthInfo)
             case skipLogin
         }
         case delegate(Delegate)
@@ -76,6 +75,7 @@ public struct LoginFeature {
                         await TaskResult { try await self.authClient.loginWithGoogle() }
                     ))
                 }
+                
             case .appleButtonTapped:
                 state.isLoading = true
                 return .run { send in
@@ -102,79 +102,52 @@ public struct LoginFeature {
                 
             case let ._socialLoginResponse(.failure(error)):
                 state.isLoading = false
-                // TODO: 서버 로그인 실패 에러 처리 (토스트 등)
-                // 1. DisplayError를 받아옵니다.
                 guard let displayError = handleLoginError(error: error) else {
-                    // nil이 반환되면 (예: .signInCancelled) 아무것도 하지 않습니다.
                     return .none
                 }
                 
-                // 2. DisplayError에 따라 상태를 업데이트하고 Effect를 반환합니다.
                 switch displayError {
                 case .toast(let message):
-                    let toastState = ToastState(message: message, style: .info)
-                    state.toast = toastState
-                    
-                    return .run { send in
-                        try await self.clock.sleep(for: toastState.duration)
-                        await send(.toastDismissed, animation: .default)
-                    }
-                    .cancellable(id: CancelID.toast)
-                    
+                    return .send(.showToast(.init(message: message, style: .info)))
                 default: return .none
                 }
                 
-            case ._serverLoginResponse(.success):
+            case let ._serverLoginResponse(.success(authInfo)):
                 state.isLoading = false
-                
-                //                if authResponse.isNewUser {
-                // 신규 유저일 경우, tempToken 저장 후 약관 동의 Sheet 표시
-                state.tempToken = "dummy-temp-token-for-test"
-                state.sheet = .termsAgreement(.init())
-                //                } else {
-                // TODO: 기존 유저일 경우, 바로 로그인 완료 처리
-                // return .send(.delegate(.didLogin(authResponse)))
-                //                }
+                print(authInfo)
+                // 1. 신규 유저일 경우
+                if authInfo.isNewUser == true {
+                    // tempToken 저장 후 약관 동의 Sheet 표시
+                    guard let tempToken = authInfo.tempToken else {
+                        Logger.debug.error("Temp Token is missing for new user.")
+                        return .send(.showToast(.init(message: "오류가 발생했습니다. 다시 시도해주세요.", style: .info)))
+                    }
+                    state.tempToken = tempToken
+                    state.sheet = .termsAgreement(.init())
+                } else {
+                    // 2. 기존 유저일 경우, 바로 로그인 완료 처리
+                    Logger.debug.info("기존 유저 로그인 성공")
+                    return .send(.delegate(.didLogin(authInfo)))
+                }
                 return .none
                 
-            case ._serverLoginResponse(.failure):
+            case let ._serverLoginResponse(.failure(error)):
                 state.isLoading = false
-                // 테스트를 위한 임시 코드
-                state.tempToken = "dummy-temp-token-for-test"
-                state.sheet = .termsAgreement(.init())
-                return .none
-                
-                //            case let ._serverLoginResponse(.failure(error)):
-                //                state.isLoading = false
-                //                // TODO: 서버 로그인 실패 에러 처리 (토스트 등)
-                //                // 1. DisplayError를 받아옵니다.
-                //                guard let displayError = handleLoginError(error: error) else {
-                //                    // nil이 반환되면 (예: .signInCancelled) 아무것도 하지 않습니다.
-                //                    return .none
-                //                }
-                //
-                //                // 2. DisplayError에 따라 상태를 업데이트하고 Effect를 반환합니다.
-                //                switch displayError {
-                //                case .toast(let message):
-                //                    let toastState = ToastState(message: message, style: .info)
-                //                    state.toast = toastState
-                //
-                //                    return .run { send in
-                //                        try await self.clock.sleep(for: toastState.duration)
-                //                        await send(.toastDismissed, animation: .default)
-                //                    }
-                //                    .cancellable(id: CancelID.toast)
-                //
-                //                default: return .none
-                //                }
+                guard let displayError = handleLoginError(error: error) else {
+                    return .none
+                }
+                switch displayError {
+                case .toast(let message):
+                    return .send(.showToast(.init(message: message, style: .info)))
+                default: return .none
+                }
                 
                 // 약관 동의 완료 시 Sheet 닫고, NicknameSetting으로 Push
             case let .sheet(.presented(.termsAgreement(.delegate(.didFinishAgreement(isMarketingAgreed))))):
                 guard let tempToken = state.tempToken else {
-                    // tempToken이 없으면 에러 처리
-                    Logger.storage.error("Temp Token is missing.")
+                    Logger.debug.error("Temp Token is missing.")
                     state.sheet = nil
-                    return .send(.showToast(.init(message: "", style: .info)))
+                    return .send(.showToast(.init(message: "오류가 발생했습니다. 다시 시도해주세요.", style: .info)))
                 }
                 
                 state.sheet = nil
@@ -187,62 +160,47 @@ public struct LoginFeature {
                 )
                 return .none
                 
-                // 닉네임 설정 완료 시 최종 회원가입 API 호출
-//            case let .path(.element(id: _, action: .nicknameSetting(.delegate(.didCompleteNicknameSetting(nickname, tempToken, isMarketingAgreed))))):
-//                Logger.view.debug("""
-//                    최종 회원가입 정보 취합 완료
-//                    - Nickname: \(nickname)
-//                    - TempToken: \(tempToken)
-//                    - MarketingAgreed: \(isMarketingAgreed)
-//                    """)
-//                
-//                state.isLoading = true
-//                
-//                return .run { send in
-//                    try await self.clock.sleep(for: .seconds(1)) // API 호출 시뮬레이션
-//                    await send(.successRegister)
-//                }
-                 
-            case .successRegister:
+                // MARK: - (수정) 최종 회원가입 결과 처리
+            case let ._registerResponse(.success(authInfo)):
                 state.isLoading = false
-                state.path.removeAll()
-                Logger.view.debug("회원가입 및 로그인 성공!")
-                return .none
+                state.path.removeAll() // 회원가입 성공 시 스택 초기화
+                Logger.debug.info("회원가입 및 로그인 성공!")
+                return .send(.delegate(.didLogin(authInfo)))
                 
-//            case ._registerResponse(.success):
-//                state.isLoading = false
-//                state.path.removeAll() // 회원가입 성공 시 스택 초기화
-//                // TODO: 로그인 성공 처리 (예: 메인 화면으로 이동)
-//                Logger.view.debug("회원가입 및 로그인 성공!")
-//                // return .send(.delegate(.didLogin(...)))
-//                return .none
-//                
-//            case let ._registerResponse(.failure(error)):
-//                state.isLoading = false
-//                // TODO: 회원가입 실패 에러 처리
-//                Logger.error.error("회원가입 실패: \(error.localizedDescription)")
-//                return .send(.showToast(.init(message: "회원가입에 실패했습니다.", style: .error)))
+            case let ._registerResponse(.failure(error)):
+                state.isLoading = false
+                Logger.debug.error("회원가IP 실패: \(error.localizedDescription)")
+                return .send(.showToast(.init(message: "회원가입에 실패했습니다. 다시 시도해주세요.", style: .info)))
                 
                 // MARK: - Path Reducer
-            case .path:
-                return .none
-//            case let .path(action):
-//                switch action {
-//                case let .element(id: _, action: .nicknameSetting(.delegate(.didCompleteNicknameSetting(nickname, tempToken, isMarketingAgreed)))):
-//                    Logger.view.debug("""
-//                                        최종 회원가입 정보 취합 완료
-//                                        - Nickname: \(nickname)
-//                                        - TempToken: \(tempToken)
-//                                        - MarketingAgreed: \(isMarketingAgreed)
-//                                        """)
-//                    
-//                    state.isLoading = true
-//                    
-//                    return .run { send in
-//                        try await self.clock.sleep(for: .seconds(1)) // API 호출 시뮬레이션
-//                        await send(.successRegister)
-//                    }
-//                }
+            case let .path(action):
+                switch action {
+                    // 닉네임 설정 완료 시 최종 회원가입 API 호출
+                case let .element(id: _, action: .nicknameSetting(.delegate(.didCompleteNicknameSetting(nickname, tempToken, isMarketingAgreed)))):
+                    Logger.view.debug("""
+                                    최종 회원가입 정보 취합 완료
+                                    - Nickname: \(nickname)
+                                    - TempToken: \(tempToken)
+                                    - MarketingAgreed: \(isMarketingAgreed)
+                                    """)
+                    
+                    // TODO: Dependency에 실제 register API 호출로 교체해야 합니다.
+                    return .none
+                    //                state.isLoading = true
+                    //
+                    //                return .run { send in
+                    //                    await send(._registerResponse(
+                    //                        await TaskResult {
+                    //                            try await self.authClient.register(
+                    //                                nickname: nickname,
+                    //                                tempToken: tempToken,
+                    //                                isMarketingAgreed: isMarketingAgreed
+                    //                            )
+                    //                        }
+                    //                    ))
+                    //                }
+                default: return .none
+                }
                 
             case .sheet:
                 return .none
@@ -270,7 +228,7 @@ public struct LoginFeature {
             case .delegate:
                 return .none
                 
-//            default: return .none
+//                            default: return .none
             }
         }
         .ifLet(\.$sheet, action: \.sheet)
