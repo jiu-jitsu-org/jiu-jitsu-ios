@@ -70,9 +70,9 @@ public struct LoginFeature {
                 // MARK: - 로그인 버튼 탭
             case .googleButtonTapped:
                 state.isLoading = true
-                return .run { send in // Cannot infer contextual base in reference to member 'run'
-                    await send(._socialLoginResponse( // Cannot infer contextual base in reference to member '_socialLoginResponse'
-                        await TaskResult { try await self.authClient.loginWithGoogle() }
+                return .run { send in
+                    await send(._socialLoginResponse(
+                        await TaskResult { try await authClient.loginWithGoogle() }
                     ))
                 }
                 
@@ -80,7 +80,7 @@ public struct LoginFeature {
                 state.isLoading = true
                 return .run { send in
                     await send(._socialLoginResponse(
-                        await TaskResult { try await self.authClient.loginWithApple() }
+                        await TaskResult { try await authClient.loginWithApple() }
                     ))
                 }
                 
@@ -88,7 +88,7 @@ public struct LoginFeature {
                 state.isLoading = true
                 return .run { send in
                     await send(._socialLoginResponse(
-                        await TaskResult { try await self.authClient.loginWithKakao() }
+                        await TaskResult { try await authClient.loginWithKakao() }
                     ))
                 }
                 
@@ -96,20 +96,42 @@ public struct LoginFeature {
             case let ._socialLoginResponse(.success(user)):
                 return .run { send in
                     await send(._serverLoginResponse(
-                        await TaskResult { try await self.authClient.serverLogin(user) }
+                        await TaskResult { try await authClient.serverLogin(user) }
                     ))
                 }
                 
             case let ._socialLoginResponse(.failure(error)):
                 state.isLoading = false
-                guard let displayError = handleLoginError(error: error) else {
-                    return .none
+                
+                guard let domainError = error as? DomainError else {
+                    Logger.network.error("Unknown login error: \(error)")
+                    return .send(.showToast(.init(message: "알 수 없는 오류가 발생했습니다.", style: .info)))
                 }
                 
-                switch displayError {
-                case .toast(let message):
+                switch domainError {
+                case .signInCancelled:
+                    return .none
+                    
+                // 2. 이 Feature가 문맥에 맞게 처리해야 하는 API 에러
+                case .apiError(let code, _):
+                    let message: String
+                    switch code {
+                    case .authenticationFailed, .wrongParameter:
+                        message = code.displayMessage
+                    default:
+                        // .nicknameDuplicated 등 이 화면과 관련 없는 에러
+                        Logger.network.error("Unhandled API Error in LoginFeature: \(code.rawValue)")
+                        message = APIErrorCode.unknown.displayMessage
+                    }
                     return .send(.showToast(.init(message: message, style: .info)))
-                default: return .none
+
+                // 3. 그 외 모든 공통 에러는 DomainErrorMapper에게 위임
+                default:
+                    let displayError = DomainErrorMapper.toDisplayError(from: domainError)
+                    if case .toast(let message) = displayError {
+                        return .send(.showToast(.init(message: message, style: .info)))
+                    }
+                    return .none
                 }
                 
             case let ._serverLoginResponse(.success(authInfo)):
@@ -133,13 +155,32 @@ public struct LoginFeature {
                 
             case let ._serverLoginResponse(.failure(error)):
                 state.isLoading = false
-                guard let displayError = handleLoginError(error: error) else {
-                    return .none
+                guard let domainError = error as? DomainError else {
+                    Logger.network.error("Unknown server login error: \(error)")
+                    return .send(.showToast(.init(message: "알 수 없는 오류가 발생했습니다.", style: .info)))
                 }
-                switch displayError {
-                case .toast(let message):
+                
+                switch domainError {
+                // 1. 이 Feature가 문맥에 맞게 처리해야 하는 API 에러
+                case .apiError(let code, _): // 캡처
+                    let message: String
+                    
+                    switch code {
+                    case .authenticationFailed, .wrongParameter:
+                        message = code.displayMessage // 로컬 Fallback
+                    default:
+                        Logger.network.error("Unhandled API Error in LoginFeature: \(code.rawValue)")
+                        message = APIErrorCode.unknown.displayMessage
+                    }
                     return .send(.showToast(.init(message: message, style: .info)))
-                default: return .none
+
+                // 2. 그 외 모든 공통 에러는 DomainErrorMapper에게 위임
+                default:
+                    let displayError = DomainErrorMapper.toDisplayError(from: domainError)
+                    if case .toast(let message) = displayError {
+                        return .send(.showToast(.init(message: message, style: .info)))
+                    }
+                    return .none
                 }
                 
                 // 약관 동의 완료 시 Sheet 닫고, NicknameSetting으로 Push
@@ -233,21 +274,5 @@ public struct LoginFeature {
         }
         .ifLet(\.$sheet, action: \.sheet)
         .forEach(\.path, action: \.path)
-    }
-    
-    private func handleLoginError(error: Error) -> DisplayError? {
-        guard let domainError = error as? DomainError else {
-            return .toast("알 수 없는 오류가 발생했습니다.")
-        }
-        
-        // DomainError를 DisplayError로 변환
-        let displayError = DomainErrorMapper.toDisplayError(from: domainError)
-        
-        // .none 케이스는 nil을 반환하여 UI 변경이 없음을 알림
-        if case .none = displayError {
-            return nil
-        }
-        
-        return displayError
     }
 }

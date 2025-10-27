@@ -25,6 +25,23 @@ public struct DomainErrorMapper {
         case .permissionRequired(_, let permissionName):
             return .toast("서비스 이용을 위해 [\(permissionName)] 제공 동의가 필요합니다.")
             
+        case .apiError(let code, _):
+            // 이 매퍼는 "공통" 매퍼입니다.
+            // API 에러는 각 Feature에서 문맥에 맞게 처리하는 것이 가장 좋습니다.
+            // 여기서 반환하는 메시지는 Feature가 API 에러를 놓쳤을 때의 "폴백(fallback)"입니다.
+            let message = code.displayMessage
+            
+            if message.isEmpty {
+                // .nicknameDuplicated, .notMatchCategory 등
+                // Feature에서 처리했어야 하는 에러가 여기까지 왔을 때
+                Logger.network.error("Unhandled API Error: \(code.rawValue). This should be handled in the specific feature.")
+                return .info(APIErrorCode.unknown.displayMessage)
+            } else {
+                // .authenticationFailed, .wrongParameter 등
+                // displayMessage가 채워져 있는 공통 API 에러
+                return .info(message)
+            }
+            
         case .serverError:
             return .toast("오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
         

@@ -35,7 +35,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
             return try mapToSnsUser(from: result.user)
         } catch let error as GIDSignInError {
-            throw mapToDomainError(from: error, provider: .google)
+            throw mapAuthSDKErrorToDomainError(from: error, provider: .google)
         }
     }
     
@@ -64,7 +64,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                 UserApi.shared.loginWithKakaoTalk { [weak self] (oauthToken, error) in
                     guard let self else { return }
                     if let error = error {
-                        let authError = mapToDomainError(from: error, provider: .kakao)
+                        let authError = mapAuthSDKErrorToDomainError(from: error, provider: .kakao)
                         continuation.resume(throwing: authError)
                     } else if let oauthToken = oauthToken {
                         let snsUser = Domain.SNSUser(
@@ -73,7 +73,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                         )
                         continuation.resume(returning: snsUser)
                     } else {
-                        let authError = mapToDomainError(from: DomainError.unknown("Kakao login failed with no token and no error."), provider: .kakao)
+                        let authError = mapAuthSDKErrorToDomainError(from: DomainError.unknown("Kakao login failed with no token and no error."), provider: .kakao)
                         continuation.resume(throwing: authError)
                     }
                 }
@@ -82,7 +82,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                 UserApi.shared.loginWithKakaoAccount { [weak self] (oauthToken, error) in
                     guard let self else { return }
                     if let error = error {
-                        let authError = mapToDomainError(from: error, provider: .kakao)
+                        let authError = mapAuthSDKErrorToDomainError(from: error, provider: .kakao)
                         continuation.resume(throwing: authError)
                     } else if let oauthToken = oauthToken {
                         let snsUser = Domain.SNSUser(
@@ -91,7 +91,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                         )
                         continuation.resume(returning: snsUser)
                     } else {
-                        let authError = mapToDomainError(from: DomainError.unknown("Kakao login failed with no token and no error."), provider: .kakao)
+                        let authError = mapAuthSDKErrorToDomainError(from: DomainError.unknown("Kakao login failed with no token and no error."), provider: .kakao)
                         continuation.resume(throwing: authError)
                     }
                 }
@@ -114,7 +114,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             return responseDTO.toDomain()
             
         } catch let error as NetworkError {
-            throw mapToDomainError(from: error)
+            throw error.toDomainError()
         } catch {
             throw DomainError.unknown(error.localizedDescription)
         }
@@ -141,7 +141,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     }
     
     public func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-        let authError = mapToDomainError(from: error, provider: .apple)
+        let authError = mapAuthSDKErrorToDomainError(from: error, provider: .apple)
         appleSignInContinuation?.resume(throwing: authError)
     }
     
@@ -183,22 +183,8 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     
     // MARK: - Error Mapping
     
-    private func mapToDomainError(from error: Error, provider: SNSProvider? = nil) -> DomainError {
-        Logger.network.error("Original Auth Error from \(provider?.rawValue ?? "nil"): \(error)")
-        
-        // --- NetworkError 매핑 ---
-        if let networkError = error as? NetworkError {
-            switch networkError {
-            case .noConnection, .timeout:
-                return .networkUnavailable
-            case .decodingError:
-                return .dataParsingFailed
-            case .statusCodeError(_, let response):
-                return .serverError(message: response?.message)
-            default:
-                return .unknown("네트워크 오류: \(networkError.localizedDescription)")
-            }
-        }
+    private func mapAuthSDKErrorToDomainError(from error: Error, provider: SNSProvider) -> DomainError {
+        Logger.network.error("Original Auth Error from \(provider.rawValue): \(error)")
         
         // --- Google 에러 매핑 ---
         // --- Google 에러 매핑 ---

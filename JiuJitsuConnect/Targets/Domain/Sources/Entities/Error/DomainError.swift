@@ -19,6 +19,8 @@ public enum DomainError: Error, Equatable {
     case missingProfileData
     
     // MARK: - 네트워크(Network) 관련 에러
+    /// 서버가 정의한 비즈니스 에러 (코드를 enum으로 관리)
+    case apiError(code: APIErrorCode, message: String?)
     /// 인터넷 연결 문제 (네트워크 끊김, 타임아웃 등)
     case networkUnavailable
     /// 서버 비즈니스 에러 또는 5xx 에러

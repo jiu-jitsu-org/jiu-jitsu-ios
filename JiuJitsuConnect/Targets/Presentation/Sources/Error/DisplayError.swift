@@ -11,4 +11,5 @@ public enum DisplayError: Error, Equatable {
     case none
     case toast(String)
     case alert(String)
+    case info(String)
 }
