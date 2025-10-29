@@ -23,10 +23,6 @@ public enum APIErrorCode: String, Equatable {
     /// 사용자에게 보여줄 기본 에러 메시지
     public var displayMessage: String {
         switch self {
-        case .authenticationFailed:
-            return "인증에 실패하였습니다."
-        case .wrongParameter:
-            return "잘못된 요청 데이터입니다. 다시 확인해 주세요."
         default:
             return "알 수 없는 오류가 발생했습니다."
         }
