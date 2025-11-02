@@ -159,12 +159,10 @@ public struct LoginFeature {
             case let .path(action):
                 switch action {
                     // 닉네임 설정 완료 시 최종 회원가입 API 호출
-                case let .element(id: _, action: .nicknameSetting(.delegate(.didCompleteNicknameSetting(nickname, tempToken, isMarketingAgreed)))):
+                case let .element(id: _, action: .nicknameSetting(.delegate(.signupSuccessful(info)))):
                     Logger.view.debug("""
                                     최종 회원가입 정보 취합 완료
-                                    - Nickname: \(nickname)
-                                    - TempToken: \(tempToken)
-                                    - MarketingAgreed: \(isMarketingAgreed)
+                                    - Nickname: \(info.userInfo?.nickname ?? "")
                                     """)
                     
                     // TODO: Dependency에 실제 register API 호출로 교체해야 합니다.

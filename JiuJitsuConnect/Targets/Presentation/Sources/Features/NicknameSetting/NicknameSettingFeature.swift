@@ -48,18 +48,18 @@ public struct NicknameSettingFeature {
         case doneButtonTapped
         case alert(PresentationAction<Alert>)
         
-        case _validationResponse(TaskResult<Bool>)
-        
+        case _signupResponse(TaskResult<AuthInfo>)
+    
         public enum Alert: Equatable {}
         
         public enum Delegate: Equatable {
-            case didCompleteNicknameSetting(nickname: String, tempToken: String, isMarketingAgreed: Bool)
+            case signupSuccessful(info: AuthInfo)
         }
         case delegate(Delegate)
     }
     
     // MARK: - Dependencies
-    @Dependency(\.nicknameValidationClient) var nicknameValidationClient
+    @Dependency(\.userClient) var userClient
     
     public var body: some ReducerOf<Self> {
         BindingReducer()
@@ -95,32 +95,45 @@ public struct NicknameSettingFeature {
                     return .none
                 }
                 
-                return .run { [nickname = state.nickname] send in
-                    await send(._validationResponse(
-                        await TaskResult { try await nicknameValidationClient.isAvailable(nickname) }
+                let nickname = state.nickname
+                let isMarketingAgreed = state.isMarketingAgreed
+
+                return .run { send in
+                    let signupInfo = SignupInfo(
+                        nickname: nickname,
+                        isMarketingAgreed: isMarketingAgreed
+                    )
+                    await send(._signupResponse(
+                        await TaskResult { try await self.userClient.signup(signupInfo) }
                     ))
                 }
                 .cancellable(id: CancelID.validation)
-
-            case let ._validationResponse(.success(isAvailable)):
-                if isAvailable {
-                    state.validationState = .available
-                    return .run { [nickname = state.nickname, tempToken = state.tempToken, isMarketingAgreed = state.isMarketingAgreed] send in
-                        await send(.delegate(.didCompleteNicknameSetting(
-                            nickname: nickname,
-                            tempToken: tempToken,
-                            isMarketingAgreed: isMarketingAgreed
-                        )))
-                    }
-                } else {
-                    state.validationState = .unavailable
-                    state.isCtaButtonEnabled = false
-                }
-                return .none
                 
-            case ._validationResponse(.failure):
-                state.validationState = .networkError
-                return .none
+            case let ._signupResponse(.success(info)):
+                return .send(.delegate(.signupSuccessful(info: info)))
+                
+            case let ._signupResponse(.failure(error)):
+                
+                guard let domainError = error as? DomainError else {
+                    Logger.network.error("Unknown login error: \(error)")
+                    state.validationState = .networkError
+                    return .none
+                }
+                
+                switch domainError {
+                    
+                case .apiError(let code, _):
+                    if code == .nicknameDuplicated {
+                        state.validationState = .unavailable
+                        return .none
+                    }
+                    state.validationState = .networkError
+                    return .none
+                    
+                default:
+                    state.validationState = .networkError
+                    return .none
+                }
                 
             case .viewTapped:
                 state.isKeyboardVisible = false
