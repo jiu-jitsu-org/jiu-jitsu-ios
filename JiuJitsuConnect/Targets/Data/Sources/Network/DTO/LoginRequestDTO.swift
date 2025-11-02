@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct AuthRequestDTO: Encodable, Sendable {
+struct LoginRequestDTO: Encodable, Sendable {
     let accessToken: String
     let snsProvider: String
 }

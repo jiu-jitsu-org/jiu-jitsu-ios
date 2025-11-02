@@ -17,31 +17,26 @@ public final class DependencyContainer {
     
     private init() {}
     
-    // MARK: - Use Cases
+    // MARK: - Repositories
     private lazy var authRepository: AuthRepository = AuthRepositoryImpl()
-    
-    private lazy var googleLoginUseCase = GoogleLoginUseCase(authRepository: authRepository)
-    private lazy var appleLoginUseCase = AppleLoginUseCase(authRepository: authRepository)
-    private lazy var kakaoLoginUseCase = KakaoLoginUseCase(authRepository: authRepository)
-    
-    private lazy var serverLoginUseCase = ServerLoginUseCase(authRepository: authRepository)
     
     // MARK: - Public Methods
     
     public func configureAuthClient() -> AuthClient {
         return AuthClient(
-            loginWithGoogle: { [weak self] in
-                try await self?.googleLoginUseCase.execute() ?? { throw DomainError.dependencyNotFound }()
+            loginWithGoogle: {
+                try await self.authRepository.signInWithGoogle()
             },
-            loginWithApple: { [weak self] in
-                try await self?.appleLoginUseCase.execute() ?? { throw DomainError.dependencyNotFound }()
+            loginWithApple: {
+                try await self.authRepository.signInWithApple()
             },
-            loginWithKakao: { [weak self] in
-                try await self?.kakaoLoginUseCase.execute() ?? { throw DomainError.dependencyNotFound }()
+            loginWithKakao: {
+                try await self.authRepository.signInWithKakao()
             },
-            serverLogin: { [weak self] user in
-                try await self?.serverLoginUseCase.execute(user: user) ?? { throw DomainError.dependencyNotFound }()
+            serverLogin: { user in
+                try await self.authRepository.serverLogin(user: user)
             }
         )
     }
+    
 }

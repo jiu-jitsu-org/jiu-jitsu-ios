@@ -1,13 +1,13 @@
 //
-//  AuthResponseDTO.swift
+//  UserResponseDTO.swift
 //  Data
 //
-//  Created by suni on 10/6/25.
+//  Created by suni on 11/2/25.
 //
 
 import Foundation
 
-struct AuthResponseDTO: Decodable, Equatable {
+struct SignUpResponseDTO: Decodable, Equatable {
     let isNewUser: Bool?
     let tempToken: String?
     let accessToken: String?
@@ -15,7 +15,7 @@ struct AuthResponseDTO: Decodable, Equatable {
     let userInfo: UserInfo?
     
     struct UserInfo: Decodable, Equatable {
-        let id: Int
+        let userId: Int
         let email: String?
         let nickname: String?
         let profileImageUrl: String?
