@@ -25,7 +25,7 @@ public final class UserRepositoryImpl: NSObject, UserRepository {
             let requestDTO = info.toRequestDTO()
             
             // 2. 변환된 DTO를 사용하여 API Endpoint 생성 및 요청
-            let endpoint = UserEndpoint.signup(requestDTO)
+            let endpoint = UserEndpoint.signup(request: requestDTO, tempToken: info.tempToken)
             let responseDTO: SignupResponseDTO = try await networkService.request(endpoint: endpoint)
             
             // 3. 응답받은 Data 모델을 Domain 모델로 변환하여 반환

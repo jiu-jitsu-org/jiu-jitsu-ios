@@ -9,7 +9,7 @@ import Foundation
 import Domain
 
 enum UserEndpoint {
-    case signup(SignupRequestDTO)
+    case signup(request: SignupRequestDTO, tempToken: String)
 }
 
 extension UserEndpoint: Endpoint {
@@ -34,9 +34,16 @@ extension UserEndpoint: Endpoint {
         }
     }
     
+    var headers: [String: String]? {
+        switch self {
+        case .signup(_, let tempToken):
+            return ["Content-Type": "application/json", "Authorization": "Bearer \(tempToken)"]
+        }
+    }
+    
     var body: Data? {
         switch self {
-        case .signup(let request):
+        case .signup(let request, _):
             return try? JSONEncoder().encode(request)
         }
     }

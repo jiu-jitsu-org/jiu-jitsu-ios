@@ -59,6 +59,7 @@ public struct NicknameSettingFeature {
     }
     
     // MARK: - Dependencies
+    
     @Dependency(\.userClient) var userClient
     
     public var body: some ReducerOf<Self> {
@@ -95,11 +96,13 @@ public struct NicknameSettingFeature {
                     return .none
                 }
                 
+                let tempToken = state.tempToken
                 let nickname = state.nickname
                 let isMarketingAgreed = state.isMarketingAgreed
 
                 return .run { send in
                     let signupInfo = SignupInfo(
+                        tempToken: tempToken,
                         nickname: nickname,
                         isMarketingAgreed: isMarketingAgreed
                     )
