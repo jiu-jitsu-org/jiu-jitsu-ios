@@ -1,5 +1,5 @@
 //
-//  ProfileClent.swift
+//  UserClient.swift
 //  JiuJitsuConnect
 //
 //  Created by suni on 11/1/25.
@@ -9,22 +9,22 @@ import ComposableArchitecture
 import Domain
 
 // MARK: - API Client Interface
-public struct ProfileClent {
-    public var postUser: @Sendable () async throws -> Domain.AuthInfo // 회원 가입
+public struct UserClient {
+    public var signup: @Sendable (Domain.SignupInfo) async throws -> Domain.AuthInfo // 회원 가입
     
     public init(
-        postUser: @Sendable @escaping () async throws -> Domain.AuthInfo
+        signup: @Sendable @escaping (Domain.SignupInfo) async throws -> Domain.AuthInfo
     ) {
-        self.postUser = postUser
+        self.signup = signup
     }
 }
 
 // MARK: - Live Implementation
-extension ProfileClent: DependencyKey {
+extension UserClient: DependencyKey {
     public static let liveValue: Self = .unimplemented
     
     public static let testValue: Self = Self(
-        postUser: {
+        signup: { _ in
             Domain.AuthInfo(accessToken: nil,
                             refreshToken: nil,
                             tempToken: "test-temp-token",
@@ -36,16 +36,16 @@ extension ProfileClent: DependencyKey {
 
 // MARK: - Dependency Injection
 public extension DependencyValues {
-    var profileClent: ProfileClent {
-        get { self[ProfileClent.self] }
-        set { self[ProfileClent.self] = newValue }
+    var userClient: UserClient {
+        get { self[UserClient.self] }
+        set { self[UserClient.self] = newValue }
     }
 }
 
-extension ProfileClent {
+extension UserClient {
     static let unimplemented: Self = Self(
-        postUser: {
-            fatalError("AuthClient.serverLogin is not implemented")
+        signup: { _ in
+            fatalError("unimplemented.signup is not implemented")
         }
     )
 }

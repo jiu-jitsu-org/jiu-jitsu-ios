@@ -9,7 +9,7 @@ import Foundation
 import Domain
 
 enum AuthEndpoint {
-    case serverLogin(AuthRequestDTO)
+    case serverLogin(LoginRequestDTO)
 }
 
 extension AuthEndpoint: Endpoint {

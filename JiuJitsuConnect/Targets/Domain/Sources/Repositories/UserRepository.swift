@@ -6,3 +6,7 @@
 //
 
 import Foundation
+
+public protocol UserRepository {
+    func signup(info: SignupInfo) async throws -> AuthInfo
+}

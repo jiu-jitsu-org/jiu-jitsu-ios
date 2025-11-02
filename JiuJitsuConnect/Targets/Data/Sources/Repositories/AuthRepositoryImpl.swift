@@ -103,14 +103,14 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     
     public func serverLogin(user: SNSUser) async throws -> AuthInfo {
         do {
-            // 1. Domain 모델(SNSUser)을 Data 모델(AuthRequestDTO)로 변환
+            // 1. Domain 모델(SNSUser)을 Data 모델(LoginRequestDTO)로 변환
             let requestDTO = user.toRequestDTO()
             
             // 2. 변환된 DTO를 사용하여 API Endpoint 생성 및 요청
             let endpoint = AuthEndpoint.serverLogin(requestDTO)
-            let responseDTO: AuthResponseDTO = try await networkService.request(endpoint: endpoint)
+            let responseDTO: LoginResponseDTO = try await networkService.request(endpoint: endpoint)
             
-            // 3. 응답받은 Data 모델(AuthResponseDTO)을 Domain 모델(AuthInfo)로 변환하여 반환
+            // 3. 응답받은 Data 모델(LoginResponseDTO)을 Domain 모델(AuthInfo)로 변환하여 반환
             return responseDTO.toDomain()
             
         } catch let error as NetworkError {

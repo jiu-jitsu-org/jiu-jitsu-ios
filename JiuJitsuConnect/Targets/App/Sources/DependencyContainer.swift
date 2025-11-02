@@ -19,6 +19,7 @@ public final class DependencyContainer {
     
     // MARK: - Repositories
     private lazy var authRepository: AuthRepository = AuthRepositoryImpl()
+    private lazy var userRepository: UserRepository = UserRepositoryImpl()
     
     // MARK: - Public Methods
     
@@ -39,4 +40,11 @@ public final class DependencyContainer {
         )
     }
     
+    public func configureUserClient() -> UserClient {
+        return UserClient(
+            signup: { info in
+                try await self.userRepository.signup(info: info)
+            }
+        )
+    }
 }

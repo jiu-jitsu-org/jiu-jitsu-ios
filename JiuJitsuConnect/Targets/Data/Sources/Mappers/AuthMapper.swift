@@ -10,8 +10,8 @@ import Domain
 
 // MARK: - Domain To DTO
 extension SNSUser {
-    func toRequestDTO() -> AuthRequestDTO {
-        return AuthRequestDTO(
+    func toRequestDTO() -> LoginRequestDTO {
+        return LoginRequestDTO(
             accessToken: self.accessToken,
             snsProvider: self.snsProvider.rawValue
         )
@@ -19,7 +19,7 @@ extension SNSUser {
 }
 
 // MARK: - DTO to Domain
-extension AuthResponseDTO {
+extension LoginResponseDTO {
     func toDomain() -> AuthInfo {
         return AuthInfo(
             accessToken: self.accessToken,
@@ -31,10 +31,10 @@ extension AuthResponseDTO {
     }
 }
 
-extension AuthResponseDTO.UserInfo {
+extension LoginResponseDTO.UserInfo {
     func toDomain() -> AuthInfo.UserInfo {
         return AuthInfo.UserInfo(
-            id: self.id,
+            id: self.userId,
             email: self.email,
             nickname: self.nickname,
             profileImageUrl: self.profileImageUrl,
