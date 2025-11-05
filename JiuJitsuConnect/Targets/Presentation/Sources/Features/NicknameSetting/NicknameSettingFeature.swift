@@ -77,9 +77,8 @@ public struct NicknameSettingFeature {
                 }
                 
                 state.isCtaButtonEnabled = true
-                
-                // 사용자가 닉네임을 수정하면 유효성 검사 상태를 초기화합니다.
                 state.validationState = .idle
+                
                 return .none
                 
             case .doneButtonTapped:

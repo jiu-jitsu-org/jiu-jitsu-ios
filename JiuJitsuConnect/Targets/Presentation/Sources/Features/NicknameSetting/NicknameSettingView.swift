@@ -58,32 +58,40 @@ private extension NicknameSettingView {
     var textFieldSection: some View {
         ZStack {
             // MARK: - 보여주기용 뷰 (Display View)
-            // 플레이с홀더와 실제 입력 텍스트를 보여주는 역할을 합니다.
+            
+            // 정책 1: 초기 상태에서 플레이스홀더를 보여줍니다.
             if !store.isTextFieldActive {
                 Text("닉네임을 입력해주세요")
                     .font(Font.pretendard.display1)
                     .foregroundStyle(Color.gray.opacity(0.5))
                     .allowsHitTesting(false)
             } else {
+                // 정책 2 & 3: 사용자가 입력을 시작한 후
+                // 실제 텍스트를 보여주거나,
+                // 텍스트가 비어있으면 커스텀 커서를 보여줍니다.
                 Text(store.nickname)
                     .font(Font.pretendard.display1)
                     .foregroundStyle(store.validationState.textColor)
+                
+                // 정책 3: 입력 필드가 비어있고, 사용자가 입력을 시작한 상태라면
+                // 키보드 상태와 관계없이 커스텀 커서를 보여줍니다.
+                if store.nickname.isEmpty {
+                    BlinkingCursorView()
+                        .allowsHitTesting(false)
+                }
             }
             
             // MARK: - 입력용 뷰 (Input View)
-            // 실제 키보드 입력을 처리하지만, 텍스트 색상은 투명합니다.
+            // 실제 키보드 입력을 처리하는 보이지 않는 TextField입니다.
             TextField("", text: $store.nickname)
                 .font(Font.pretendard.display1)
                 .focused($isKeyboardVisible)
                 .multilineTextAlignment(.center)
-                .tint(Color.component.textfieldDisplay.focus.text)
+                // 정책 1: 초기 상태에서는 네이티브 커서를 숨깁니다.
+                // 정책 2: 입력 시작 후에는 네이티브 커서를 보여줍니다.
+                .tint(store.isTextFieldActive ? Color.component.textfieldDisplay.focus.text : .clear)
+                // 입력 처리를 위해 항상 투명하게 유지합니다.
                 .foregroundStyle(.clear)
-            
-            // 커스텀 커서
-            if store.isTextFieldActive && !store.isKeyboardVisible && store.nickname.isEmpty {
-                BlinkingCursorView()
-                    .allowsHitTesting(false)
-            }
         }
         .padding(.horizontal, 30)
     }
