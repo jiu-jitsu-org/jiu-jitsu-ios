@@ -15,15 +15,15 @@ public struct AuthInfo: Equatable {
     public let userInfo: UserInfo?
     
     public struct UserInfo: Equatable {
-        public let id: Int
+        public let userId: Int
         public let email: String?
         public let nickname: String?
         public let profileImageUrl: String?
         public let snsProvider: String?
         public let deactivatedWithinGrace: Bool?
         
-        public init(id: Int, email: String?, nickname: String?, profileImageUrl: String?, snsProvider: String?, deactivatedWithinGrace: Bool?) {
-            self.id = id
+        public init(userId: Int, email: String?, nickname: String?, profileImageUrl: String?, snsProvider: String?, deactivatedWithinGrace: Bool?) {
+            self.userId = userId
             self.email = email
             self.nickname = nickname
             self.profileImageUrl = profileImageUrl

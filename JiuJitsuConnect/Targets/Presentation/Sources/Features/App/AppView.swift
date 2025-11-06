@@ -30,6 +30,12 @@ public struct AppView: View {
       if let loginStore = store.scope(state: \.destination?.login, action: \.destination.login) {
         LoginView(store: loginStore)
       }
+        
+    case .setting:
+      if let settingStore = store.scope(state: \.destination?.setting, action: \.destination.setting) {
+        SettingView(store: settingStore)
+      }
+        
     case .none:
       EmptyView()
         

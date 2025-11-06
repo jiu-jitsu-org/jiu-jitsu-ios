@@ -13,7 +13,6 @@ public struct NicknameSettingView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            imagePlaceholderSection
             titleSection
             textFieldSection
             Spacer()
@@ -35,14 +34,6 @@ public struct NicknameSettingView: View {
 // MARK: - Private Views
 private extension NicknameSettingView {
     
-    var imagePlaceholderSection: some View {
-        Rectangle()
-            .fill(Color(uiColor: .systemGray5))
-            .frame(width: 212, height: 183)
-            .padding(.top, 60)
-            .padding(.bottom, 48)
-    }
-    
     var titleSection: some View {
         Text(store.validationState.message)
             .font(Font.pretendard.display1)
@@ -52,6 +43,7 @@ private extension NicknameSettingView {
             .lineLimit(2)
             .lineSpacing(6.2)
             .padding(.horizontal, 30)
+            .padding(.top, 120)
             .padding(.bottom, 8)
     }
     

@@ -11,6 +11,9 @@ public struct AppFeature {
         case onboarding(OnboardingFeature)
         case main(MainFeature)
         case login(LoginFeature)
+        
+        // TODO: - 설정화면 메인에 연결하고 여기서는 제거 필요.
+        case setting(SettingFeature)
     }
     
     @ObservableState
@@ -31,6 +34,11 @@ public struct AppFeature {
         case .destination(.presented(.splash(.didFinishInitLaunch))):
             state.destination = .login(.init())
           return .none
+            
+        case let .destination(.presented(.login(.delegate(.didLogin(authInfo))))):
+            state.destination = .setting(.init(authInfo: authInfo))
+            return .none
+            
         default: return .none
         }
       }

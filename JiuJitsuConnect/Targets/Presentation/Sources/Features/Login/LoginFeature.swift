@@ -34,7 +34,6 @@ public struct LoginFeature {
         
         case _socialLoginResponse(TaskResult<SNSUser>)
         case _serverLoginResponse(TaskResult<AuthInfo>)
-        case _registerResponse(TaskResult<AuthInfo>)
         
         case sheet(PresentationAction<Destination.Action>)
         case path(StackAction<Path.State, Path.Action>)
@@ -143,43 +142,13 @@ public struct LoginFeature {
                 )
                 return .none
                 
-                // MARK: - (수정) 최종 회원가입 결과 처리
-            case let ._registerResponse(.success(authInfo)):
-                state.isLoading = false
-                state.path.removeAll() // 회원가입 성공 시 스택 초기화
-                Logger.debug.info("회원가입 및 로그인 성공!")
-                return .send(.delegate(.didLogin(authInfo)))
-                
-            case let ._registerResponse(.failure(error)):
-                state.isLoading = false
-                Logger.debug.error("회원가IP 실패: \(error.localizedDescription)")
-                return .send(.showToast(.init(message: "회원가입에 실패했습니다. 다시 시도해주세요.", style: .info)))
-                
                 // MARK: - Path Reducer
             case let .path(action):
                 switch action {
-                    // 닉네임 설정 완료 시 최종 회원가입 API 호출
+                    // 닉네임 설정 완료
                 case let .element(id: _, action: .nicknameSetting(.delegate(.signupSuccessful(info)))):
-                    Logger.view.debug("""
-                                    최종 회원가입 정보 취합 완료
-                                    - Nickname: \(info.userInfo?.nickname ?? "")
-                                    """)
+                    return .send(.delegate(.didLogin(info)))
                     
-                    // TODO: Dependency에 실제 register API 호출로 교체해야 합니다.
-                    return .none
-                    //                state.isLoading = true
-                    //
-                    //                return .run { send in
-                    //                    await send(._registerResponse(
-                    //                        await TaskResult {
-                    //                            try await self.authClient.register(
-                    //                                nickname: nickname,
-                    //                                tempToken: tempToken,
-                    //                                isMarketingAgreed: isMarketingAgreed
-                    //                            )
-                    //                        }
-                    //                    ))
-                    //                }
                 default: return .none
                 }
                 

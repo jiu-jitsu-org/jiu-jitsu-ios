@@ -34,7 +34,7 @@ extension LoginResponseDTO {
 extension LoginResponseDTO.UserInfo {
     func toDomain() -> AuthInfo.UserInfo {
         return AuthInfo.UserInfo(
-            id: self.userId,
+            userId: self.userId,
             email: self.email,
             nickname: self.nickname,
             profileImageUrl: self.profileImageUrl,
