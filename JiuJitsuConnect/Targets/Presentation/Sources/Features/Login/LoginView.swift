@@ -62,23 +62,24 @@ public struct LoginView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.primitive.coolGray.cg500)
             }
-            .overlay {
-                if let toastState = store.toast {
-                    ToastView(
-                        state: toastState,
-                        onSwipe: { store.send(.toastDismissed, animation: .default) },
-                        onButtonTapped: { store.send(.toastButtonTapped($0), animation: .default) },
-                        hasBottomNavBar: false
-                    )
-                }
-            }
-            .animation(.default, value: store.toast)
         } destination: { store in
             switch store.case {
             case let .nicknameSetting(nicknameStore):
                 NicknameSettingView(store: nicknameStore)
             }
         }
+        .overlay(alignment: .bottom) {
+            if let toastState = store.toast {
+                ToastView(
+                    state: toastState,
+                    onSwipe: { store.send(.toastDismissed, animation: .default) },
+                    onButtonTapped: { store.send(.toastButtonTapped($0), animation: .default) }
+                )
+                .padding(.horizontal, 24)
+                .padding(.bottom, toastState.bottomPadding)
+            }
+        }
+        .animation(.default, value: store.toast)
         .sheet(item: $store.scope(state: \.sheet, action: \.sheet)) { store in
             // CaseLet을 바로 사용하지 않고, destinationStore의 상태로 switch합니다.
             switch store.case {

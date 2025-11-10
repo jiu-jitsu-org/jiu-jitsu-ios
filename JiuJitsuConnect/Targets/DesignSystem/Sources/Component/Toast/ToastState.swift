@@ -11,10 +11,14 @@ public struct ToastState: Equatable, Identifiable {
     public var id = UUID()
     public var message: String
     public var style: Style
+    public var bottomPadding: CGFloat
     
-    public init(message: String, style: Style) {
+    public init(message: String,
+                style: Style,
+                bottomPadding: CGFloat = 24) {
         self.message = message
         self.style = style
+        self.bottomPadding = bottomPadding
     }
     
     public enum Style: Equatable {

@@ -54,6 +54,7 @@ public struct NicknameSettingFeature {
         
         public enum Delegate: Equatable {
             case signupSuccessful(info: AuthInfo)
+            case signupFailed(message: String)
         }
         case delegate(Delegate)
     }
@@ -119,22 +120,31 @@ public struct NicknameSettingFeature {
                 guard let domainError = error as? DomainError else {
                     Log.trace("Unknown login error: \(error)", category: .network, level: .error)
                     state.validationState = .networkError
-                    return .none
+                    return .send(.delegate(.signupFailed(message: "오류가 발생했습니다. 다시 시도해주세요.")))
                 }
                 
                 switch domainError {
                     
                 case .apiError(let code, _):
+                    if code == .invalidNickname {
+                        state.validationState = .invalidCharacters
+                        state.isCtaButtonEnabled = false
+                        return .none
+                    }
+                    
                     if code == .nicknameDuplicated {
                         state.validationState = .unavailable
                         return .none
                     }
+                    
                     state.validationState = .networkError
-                    return .none
+                    state.isKeyboardVisible = false
+                    return .send(.delegate(.signupFailed(message: "오류가 발생했습니다. 다시 시도해주세요.")))
                     
                 default:
                     state.validationState = .networkError
-                    return .none
+                    state.isKeyboardVisible = false
+                    return .send(.delegate(.signupFailed(message: "오류가 발생했습니다. 다시 시도해주세요.")))
                 }
                 
             case .viewTapped:

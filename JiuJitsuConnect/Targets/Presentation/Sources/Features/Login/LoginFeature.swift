@@ -148,6 +148,10 @@ public struct LoginFeature {
                 case let .element(id: _, action: .nicknameSetting(.delegate(.signupSuccessful(info)))):
                     return .send(.delegate(.didLogin(info)))
                     
+                    // 닉네임 설정 실패
+                case let .element(id: _, action: .nicknameSetting(.delegate(.signupFailed(message)))):
+                    return .send(.showToast(.init(message: message, style: .info, bottomPadding: 72)))
+                    
                 default: return .none
                 }
                 
@@ -159,7 +163,7 @@ public struct LoginFeature {
                 state.toast = toastState
                 return .run { send in
                     try await self.clock.sleep(for: toastState.duration)
-                    await send(.toastDismissed, animation: .default)
+                    await send(.toastDismissed)
                 }
                 .cancellable(id: CancelID.toast)
                 
