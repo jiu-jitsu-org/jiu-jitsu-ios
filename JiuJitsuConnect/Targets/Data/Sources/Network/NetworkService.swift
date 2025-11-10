@@ -32,6 +32,12 @@ public final class DefaultNetworkService: NetworkService {
         }()
     ) {
         self.session = session
+//        #if DEBUG
+//        self.session = URLSessionProxy(configuration: .default)
+//        #else
+//        self.session = URLSession(configuration: .default)
+//        #endif
+        
         self.decoder = decoder
     }
     

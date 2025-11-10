@@ -1,7 +1,6 @@
 import ComposableArchitecture
 import Domain
 import DesignSystem
-import OSLog
 import CoreKit
 
 @Reducer
@@ -109,14 +108,14 @@ public struct LoginFeature {
                 if authInfo.isNewUser == true {
                     // tempToken 저장 후 약관 동의 Sheet 표시
                     guard let tempToken = authInfo.tempToken else {
-                        Logger.debug.error("Temp Token is missing for new user.")
+                        Log.trace("Temp Token is missing for new user.", category: .debug, level: .error)
                         return .send(.showToast(.init(message: "오류가 발생했습니다. 다시 시도해주세요.", style: .info)))
                     }
                     state.tempToken = tempToken
                     state.sheet = .termsAgreement(.init())
                 } else {
                     // 2. 기존 유저일 경우, 바로 로그인 완료 처리
-                    Logger.debug.info("기존 유저 로그인 성공")
+                    Log.trace("기존 유저 로그인 성공", category: .debug, level: .info)
                     return .send(.delegate(.didLogin(authInfo)))
                 }
                 return .none
@@ -127,7 +126,7 @@ public struct LoginFeature {
                 // 약관 동의 완료 시 Sheet 닫고, NicknameSetting으로 Push
             case let .sheet(.presented(.termsAgreement(.delegate(.didFinishAgreement(isMarketingAgreed))))):
                 guard let tempToken = state.tempToken else {
-                    Logger.debug.error("Temp Token is missing.")
+                    Log.trace("Temp Token is missing for new user.", category: .debug, level: .error)
                     state.sheet = nil
                     return .send(.showToast(.init(message: "오류가 발생했습니다. 다시 시도해주세요.", style: .info)))
                 }
@@ -189,7 +188,7 @@ public struct LoginFeature {
             state.isLoading = false
             
             guard let domainError = error as? DomainError else {
-                Logger.network.error("Unknown login error: \(error)")
+                Log.trace("Unknown login error: \(error)", category: .network, level: .error)
                 return .send(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info)))
             }
             

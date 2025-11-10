@@ -4,6 +4,7 @@ import Presentation
 import GoogleSignIn
 import KakaoSDKCommon
 import KakaoSDKAuth
+import PulseUI
 
 @main
 struct JiuJitsuConnectApp: App {
@@ -11,6 +12,8 @@ struct JiuJitsuConnectApp: App {
         configureGoogleSignIn()
         configureKakaoSDK()
     }
+    
+    @State private var isPulsePresented = false
     
     var body: some Scene {
         WindowGroup {
@@ -22,6 +25,16 @@ struct JiuJitsuConnectApp: App {
                         GIDSignIn.sharedInstance.handle(url)
                     }
                 }
+                #if DEBUG
+                .onShake {
+                    self.isPulsePresented  = true
+                }
+                .sheet(isPresented: $isPulsePresented) {
+                    NavigationView {
+                        ConsoleView()
+                    }
+                }
+                #endif
         }
     }
     
@@ -63,5 +76,64 @@ struct JiuJitsuConnectApp: App {
                 reducer: { AppFeature() }
             )
         }
+    }
+    
+}
+
+// TODO: - Clean Architecture에 코드 위치 수정
+// MARK: - DEBUG 전용 HAND SHAKE LOG VIEW (수정된 최종 버전)
+
+// 1. UIResponder 이벤트를 직접 처리하는 UIView 서브클래스 생성
+private class ShakeEnabledView: UIView {
+    // 흔들기 이벤트가 감지되면 실행될 클로저
+    var onShake: () -> Void = {}
+
+    // 이 뷰가 First Responder가 될 수 있음을 시스템에 알립니다. (매우 중요!)
+    override var canBecomeFirstResponder: Bool {
+        true
+    }
+
+    // 뷰가 윈도우에 추가된 후 First Responder가 되도록 요청합니다.
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        becomeFirstResponder()
+    }
+
+    // 쉐이크 모션이 끝났을 때 이 메서드가 호출됩니다.
+    override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+        if motion == .motionShake {
+            // 쉐이크가 감지되면 클로저를 실행합니다.
+            onShake()
+        }
+        // 상위 클래스의 메서드도 호출해주는 것이 좋습니다.
+        super.motionEnded(motion, with: event)
+    }
+}
+
+// 2. 위에서 만든 ShakeEnabledView를 SwiftUI에서 사용하도록 래핑
+private struct ShakeDetectorView: UIViewRepresentable {
+    var onShake: () -> Void
+
+    func makeUIView(context: Context) -> ShakeEnabledView {
+        let view = ShakeEnabledView()
+        view.onShake = onShake
+        return view
+    }
+
+    func updateUIView(_ uiView: ShakeEnabledView, context: Context) {}
+}
+
+private struct ShakeGestureModifier: ViewModifier {
+    let action: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .background(ShakeDetectorView(onShake: action))
+    }
+}
+
+public extension View {
+    func onShake(perform action: @escaping () -> Void) -> some View {
+        self.modifier(ShakeGestureModifier(action: action))
     }
 }

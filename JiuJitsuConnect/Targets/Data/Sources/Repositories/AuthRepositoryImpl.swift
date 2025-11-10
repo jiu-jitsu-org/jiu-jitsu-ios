@@ -184,7 +184,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     // MARK: - Error Mapping
     
     private func mapAuthSDKErrorToDomainError(from error: Error, provider: SNSProvider) -> DomainError {
-        Logger.network.error("Original Auth Error from \(provider.rawValue): \(error)")
+        Log.trace("Original Auth Error from \(provider.rawValue): \(error)", category: .network, level: .error)
         
         // --- Google 에러 매핑 ---
         // --- Google 에러 매핑 ---

@@ -30,6 +30,10 @@ let package = Package(
         .package(
             url: "https://github.com/kakao/kakao-ios-sdk",
             branch: "master"
+        ),
+        .package(
+            url: "https://github.com/kean/Pulse",
+            branch: "main"
         )
     ]
 )

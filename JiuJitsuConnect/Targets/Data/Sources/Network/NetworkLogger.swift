@@ -11,47 +11,64 @@ import OSLog
 
 final class NetworkLogger {
     static func log(request: URLRequest) {
-        let logger = Logger.network
-        logger.debug("-----------🚀 Request-----------")
+        // 로그의 각 부분을 배열에 담아 마지막에 합칩니다.
+        var components: [String] = ["-----------🚀 Request-----------"]
         
         if let url = request.url {
-            logger.debug("URL: \(url.absoluteString)")
+            components.append("URL: \(url.absoluteString)")
         }
         
         if let method = request.httpMethod {
-            logger.debug("Method: \(method)")
+            components.append("Method: \(method)")
         }
         
         if let headers = request.allHTTPHeaderFields, !headers.isEmpty {
-            logger.debug("Headers: \(headers)")
+            // 헤더를 보기 좋게 정렬하여 출력합니다.
+            let formattedHeaders = headers.map { "\($0.key): \($0.value)" }.joined(separator: "\n  ")
+            components.append("Headers: {\n  \(formattedHeaders)\n}")
         }
         
         if let body = request.httpBody, let bodyString = prettyPrintedJSON(from: body) {
-            logger.debug("Body: \n\(bodyString)")
+            components.append("Body: \n\(bodyString)")
         }
         
-        logger.debug("---------------------------------")
+        components.append("---------------------------------")
+        
+        // 모든 컴포넌트를 줄바꿈 문자로 합쳐 하나의 메시지로 만듭니다.
+        let message = components.joined(separator: "\n")
+        
+        // 마지막에 한 번만 로그를 기록합니다.
+        Log.trace(message, category: .network)
     }
     
     static func log(response: HTTPURLResponse, data: Data?) {
-        let logger = Logger.network
-        logger.debug("-----------✨ Response-----------")
+        var components: [String] = ["-----------✨ Response-----------"]
         
         if let url = response.url {
-            logger.debug("URL: \(url.absoluteString)")
+            components.append("URL: \(url.absoluteString)")
         }
         
-        logger.debug("StatusCode: \(response.statusCode)")
+        // 상태 코드에 따라 이모지를 추가하여 가독성을 높입니다.
+        let statusCodeEmoji = (200..<300).contains(response.statusCode) ? "✅" : "❌"
+        components.append("StatusCode: \(response.statusCode) \(statusCodeEmoji)")
         
         if let headers = response.allHeaderFields as? [String: Any], !headers.isEmpty {
-            logger.debug("Headers: \(headers)")
+            let formattedHeaders = headers.map { "\($0.key): \($0.value)" }.joined(separator: "\n  ")
+            components.append("Headers: {\n  \(formattedHeaders)\n}")
         }
         
         if let data = data, let bodyString = prettyPrintedJSON(from: data) {
-            logger.debug("Body: \n\(bodyString)")
+            components.append("Body: \n\(bodyString)")
         }
         
-        logger.debug("----------------------------------")
+        components.append("----------------------------------")
+        
+        let message = components.joined(separator: "\n")
+        
+        // 성공/실패 여부에 따라 로그 레벨을 동적으로 결정합니다.
+        let level: OSLogType = (200..<300).contains(response.statusCode) ? .default : .error
+        
+        Log.trace(message, category: .network, level: level)
     }
     
     /// Data를 예쁘게 포맷팅된 JSON 문자열로 변환합니다.

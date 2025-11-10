@@ -10,12 +10,18 @@ import Domain
 import Data
 import Presentation
 import ComposableArchitecture
+import CoreKit
 
 @MainActor
 public final class DependencyContainer {
     public static let shared = DependencyContainer()
     
-    private init() {}
+    private init() {
+        #if DEBUG
+        // 앱이 시작될 때, CoreKit의 Log 핸들러를 Pulse 핸들러로 설정합니다.
+        Log.handler = PulseLogHandler()
+        #endif
+    }
     
     // MARK: - Repositories
     private lazy var authRepository: AuthRepository = AuthRepositoryImpl()

@@ -10,7 +10,6 @@ import ComposableArchitecture
 import DesignSystem
 import Domain
 import CoreKit
-import OSLog
 
 @Reducer
 public struct TermsAgreementFeature {
@@ -62,13 +61,13 @@ public struct TermsAgreementFeature {
                 let isMarketingAgreed = state.isMarketingAgreed
                 
                 if state.didAgreeToAllRequired {
-                    Logger.view.debug("다음 화면으로 이동")
+                    Log.trace("다음 화면으로 이동", category: .view, level: .debug)
                     return .send(.delegate(.didFinishAgreement(isMarketingAgreed: isMarketingAgreed)))
                 } else {
                     for id in state.rows.ids {
                         state.rows[id: id]?.isChecked = true
                     }
-                    Logger.view.debug("모두 동의 완료, 다음 화면으로 이동")
+                    Log.trace("모두 동의 완료, 다음 화면으로 이동", category: .view, level: .debug)
                     // 모두 동의 시, 마케팅 동의는 true가 됨
                     return .send(.delegate(.didFinishAgreement(isMarketingAgreed: true)))
                 }

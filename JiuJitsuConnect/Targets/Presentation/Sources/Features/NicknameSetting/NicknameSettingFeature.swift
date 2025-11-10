@@ -117,7 +117,7 @@ public struct NicknameSettingFeature {
             case let ._signupResponse(.failure(error)):
                 
                 guard let domainError = error as? DomainError else {
-                    Logger.network.error("Unknown login error: \(error)")
+                    Log.trace("Unknown login error: \(error)", category: .network, level: .error)
                     state.validationState = .networkError
                     return .none
                 }

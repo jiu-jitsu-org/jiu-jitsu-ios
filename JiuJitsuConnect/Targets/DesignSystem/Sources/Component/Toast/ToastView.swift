@@ -139,7 +139,7 @@ public struct ToastView: View {
                             dismissToast()
                         },
                         onButtonTapped: { action in
-                            Logger.view.debug("Button tapped: \(action.description)")
+                            Log.trace("Button tapped: \(action.description)", category: .view, level: .debug)
                             dismissToast()
                         },
                         hasBottomNavBar: true

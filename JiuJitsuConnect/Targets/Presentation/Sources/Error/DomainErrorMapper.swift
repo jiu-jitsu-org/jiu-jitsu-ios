@@ -34,7 +34,7 @@ public struct DomainErrorMapper {
             if message.isEmpty {
                 // .nicknameDuplicated, .notMatchCategory 등
                 // Feature에서 처리했어야 하는 에러가 여기까지 왔을 때
-                Logger.network.error("Unhandled API Error: \(code.rawValue). This should be handled in the specific feature.")
+                Log.trace("Unhandled API Error: \(code.rawValue). This should be handled in the specific feature.", category: .network, level: .error)
                 return .info(APIErrorCode.unknown.displayMessage)
             } else {
                 // .authenticationFailed, .wrongParameter 등
@@ -47,7 +47,7 @@ public struct DomainErrorMapper {
         
         // 개발자 확인용 에러는 일반 메시지로 통일
         case .dataParsingFailed, .cannotFindRootViewController, .dependencyNotFound, .missingProfileData, .unknown:
-            Logger.network.error("Critical Error: \(domainError)")
+            Log.trace("Critical Error: \(domainError)", category: .network, level: .error)
             return .toast("오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
         }
     }

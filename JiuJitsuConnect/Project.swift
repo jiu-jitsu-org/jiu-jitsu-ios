@@ -112,7 +112,10 @@ let project = Project(
             scripts: [swiftlintScript],
             dependencies: [
                 .target(name: "Presentation"),
-                .target(name: "Data")
+                .target(name: "Data"),
+                .target(name: "CoreKit"),
+                .external(name: "Pulse"),
+                .external(name: "PulseUI")
             ],
             settings: .settings(
                 base: [
