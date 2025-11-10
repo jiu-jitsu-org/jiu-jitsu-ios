@@ -1,7 +1,13 @@
-// AppLogger.swift in CoreKit
+//
+//  Log.swift
+//  CoreKit
+//
+//  Created by suni on 11/10/25.
+//
 
 import Foundation
 import OSLog
+
 
 /// 프로젝트 전체에서 사용할 중앙 집중식 로거입니다.
 /// 사용법: Log.trace("메시지", category: .network, level: .info)
