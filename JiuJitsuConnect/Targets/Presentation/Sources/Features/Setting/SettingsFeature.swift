@@ -1,5 +1,5 @@
 //
-//  SettingFeature.swift
+//  SettingsFeature.swift
 //  Presentation
 //
 //  Created by suni on 11/6/25.
@@ -10,7 +10,7 @@ import Foundation
 import Domain
 
 @Reducer
-public struct SettingFeature {
+public struct SettingsFeature {
     public init() {}
     
     @ObservableState

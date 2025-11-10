@@ -25,6 +25,10 @@ public enum Assets {
   public enum Common {
     public enum Icon {
       public static let chevronRight = ImageAsset(name: "Common/Icon/chevron-right")
+      public static let documents = ImageAsset(name: "Common/Icon/documents")
+      public static let logOut = ImageAsset(name: "Common/Icon/log-out")
+      public static let secession = ImageAsset(name: "Common/Icon/secession")
+      public static let version = ImageAsset(name: "Common/Icon/version")
     }
   }
   public enum Login {

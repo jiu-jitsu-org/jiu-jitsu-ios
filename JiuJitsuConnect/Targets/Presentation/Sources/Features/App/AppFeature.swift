@@ -13,7 +13,7 @@ public struct AppFeature {
         case login(LoginFeature)
         
         // TODO: - 설정화면 메인에 연결하고 여기서는 제거 필요.
-        case setting(SettingFeature)
+        case settings(SettingsFeature)
     }
     
     @ObservableState
@@ -36,7 +36,7 @@ public struct AppFeature {
           return .none
             
         case let .destination(.presented(.login(.delegate(.didLogin(authInfo))))):
-            state.destination = .setting(.init(authInfo: authInfo))
+            state.destination = .settings(.init(authInfo: authInfo))
             return .none
             
         default: return .none

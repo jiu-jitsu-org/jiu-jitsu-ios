@@ -76,6 +76,9 @@ public struct Pretendard {
     public let buttonM = Font.custom("Pretendard-SemiBold", fixedSize: 16)
     public let buttonS = Font.custom("Pretendard-SemiBold", fixedSize: 12)
     
+    // MARK: - Caption
+    public let captionM = Font.custom("Pretendard-Medium", fixedSize: 12)
+    
     /// 사이즈와 웨이트를 직접 지정해야 할 경우 사용
     public func custom(weight: Pretendard.Weight, size: CGFloat) -> Font {
         return Font.custom("Pretendard-\(weight.rawValue)", fixedSize: size)
