@@ -24,6 +24,7 @@ public typealias AssetImageTypeAlias = ImageAsset.Image
 public enum Assets {
   public enum Common {
     public enum Icon {
+      public static let chevronLeft = ImageAsset(name: "Common/Icon/chevron-left")
       public static let chevronRight = ImageAsset(name: "Common/Icon/chevron-right")
       public static let documents = ImageAsset(name: "Common/Icon/documents")
       public static let logOut = ImageAsset(name: "Common/Icon/log-out")

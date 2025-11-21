@@ -25,6 +25,7 @@ public struct SemanticColors {
         public let secondaryPressed = Color.primitive.coolGray.cg75
         public let disabled = Color.primitive.coolGray.cg50
         public let background = Color.primitive.coolGray.cg25
+        public let backgroundDefault = Color.primitive.coolGray.cg25
         public let inactive = Color.primitive.coolGray.cg75
         public let field = Color.primitive.coolGray.cg25
         public let primary = Color.primitive.blue.b100

@@ -15,6 +15,12 @@ public extension Color {
 
 public struct ComponentColors {
     
+    // MARK: - Background
+    public let background = Background()
+    public struct Background {
+        public let `default` = Color.semantic.surface.backgroundDefault
+    }
+    
     // MARK: - Button
     public let button = Button()
     
