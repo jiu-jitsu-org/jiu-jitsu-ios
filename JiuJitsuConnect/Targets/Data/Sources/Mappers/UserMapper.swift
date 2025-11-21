@@ -18,6 +18,14 @@ extension SignupInfo {
     }
 }
 
+extension CheckNicknameInfo {
+    func toRequestDTO() -> CheckNicknameRequestDTO {
+        return CheckNicknameRequestDTO(
+            nickname: self.nickname
+        )
+    }
+}
+
 // MARK: - DTO to Domain
 extension SignupResponseDTO {
     func toDomain() -> AuthInfo {

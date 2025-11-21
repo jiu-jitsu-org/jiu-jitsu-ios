@@ -48,6 +48,9 @@ public final class DependencyContainer {
         return UserClient(
             signup: { info in
                 try await self.userRepository.signup(info: info)
+            },
+            checkNickname: { info in
+                try await self.userRepository.checkNickname(info: info)
             }
         )
     }

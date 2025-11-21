@@ -10,6 +10,7 @@ import Domain
 
 enum UserEndpoint {
     case signup(request: SignupRequestDTO, tempToken: String)
+    case checkNickname(request: CheckNicknameRequestDTO)
 }
 
 extension UserEndpoint: Endpoint {
@@ -24,11 +25,15 @@ extension UserEndpoint: Endpoint {
         switch self {
         case .signup:
             return "/api/user"
+        case .checkNickname:
+            return "/api/user/check/nickname"
         }
     }
     
     var method: HTTPMethod {
         switch self {
+        case .checkNickname:
+            return .get
         case .signup:
             return .post
         }
@@ -38,6 +43,16 @@ extension UserEndpoint: Endpoint {
         switch self {
         case .signup(_, let tempToken):
             return ["Content-Type": "application/json", "Authorization": "Bearer \(tempToken)"]
+        default:
+            return ["Content-Type": "application/json"]
+        }
+    }
+
+    var queryParameters: [String: String]? {
+        switch self {
+        case .checkNickname(let request):
+            return ["nickname": request.nickname]
+        default: return nil
         }
     }
     
@@ -45,8 +60,10 @@ extension UserEndpoint: Endpoint {
         switch self {
         case .signup(let request, _):
             return try? JSONEncoder().encode(request)
+        default: return nil
         }
     }
+    
 }
 
 private extension Encodable {

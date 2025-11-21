@@ -38,6 +38,24 @@ public final class UserRepositoryImpl: NSObject, UserRepository {
         }
     }
     
+    public func checkNickname(info: CheckNicknameInfo) async throws -> Bool {
+        do {
+            // 1. Domain 모델을 Data 모델로 변환
+            let requestDTO = info.toRequestDTO()
+        
+            // 2. 변환된 DTO를 사용하여 API Endpoint 생성 및 요청
+            let endpoint = UserEndpoint.checkNickname(request: requestDTO)
+            let responseDTO: Bool = try await networkService.request(endpoint: endpoint)
+            
+            return responseDTO
+            
+        } catch let error as NetworkError {
+            throw error.toDomainError()
+        } catch {
+            throw DomainError.unknown(error.localizedDescription)
+        }
+    }
+    
     // MARK: - Error Mapping
     
 }
