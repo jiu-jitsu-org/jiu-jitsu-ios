@@ -42,6 +42,11 @@ public enum Assets {
       public static let kakao = ImageAsset(name: "Login/Logo/kakao")
     }
   }
+  public enum Signup {
+    public enum Icon {
+      public static let signupComplete = ImageAsset(name: "Signup/Icon/signup-complete")
+    }
+  }
 }
 // swiftlint:enable identifier_name line_length nesting type_body_length type_name
 

@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import Domain
 
 @Reducer
 public struct AppFeature {
@@ -14,11 +15,14 @@ public struct AppFeature {
         
         // TODO: - 설정화면 메인에 연결하고 여기서는 제거 필요.
         case settings(SettingsFeature)
+        case signupComplete(SignupCompleteFeature)
     }
     
     @ObservableState
     public struct State: Equatable {
         @Presents public var destination: Destination.State? = .splash(.init())
+        // MARK: - View TEST
+//        @Presents public var destination: Destination.State? = .signupComplete(.init(authInfo: AuthInfo(accessToken: nil, refreshToken: nil, tempToken: nil, isNewUser: true, userInfo: AuthInfo.UserInfo(userId: 0, email: nil, nickname: "주짓수 개잘해", profileImageUrl: nil, snsProvider: "KAKAO", deactivatedWithinGrace: false))))
         
         public init() {}
     }

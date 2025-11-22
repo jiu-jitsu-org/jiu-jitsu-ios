@@ -66,6 +66,8 @@ public struct LoginView: View {
             switch store.case {
             case let .nicknameSetting(nicknameStore):
                 NicknameSettingView(store: nicknameStore)
+            case let .signupComplete(signupCompleteStore):
+                SignupCompleteView(store: signupCompleteStore)
             }
         }
         .overlay(alignment: .bottom) {

@@ -36,6 +36,11 @@ public struct AppView: View {
           SettingsView(store: settingStore)
       }
         
+    case .signupComplete:
+        if let signupCompleteStore = store.scope(state: \.destination?.signupComplete, action: \.destination.signupComplete) {
+            SignupCompleteView(store: signupCompleteStore)
+        }
+          
     case .none:
       EmptyView()
         

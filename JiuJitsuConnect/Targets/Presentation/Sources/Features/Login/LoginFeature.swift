@@ -51,6 +51,7 @@ public struct LoginFeature {
     @Reducer(state: .equatable, action: .equatable)
     public enum Path {
         case nicknameSetting(NicknameSettingFeature)
+        case signupComplete(SignupCompleteFeature)
     }
     
     @Reducer(state: .equatable, action: .equatable)
@@ -146,6 +147,12 @@ public struct LoginFeature {
                 switch action {
                     // 닉네임 설정 완료
                 case let .element(id: _, action: .nicknameSetting(.delegate(.signupSuccessful(info)))):
+//                    return .send(.delegate(.didLogin(info)))
+                    state.path.append(.signupComplete(.init(authInfo: info)))
+                    return .none
+                    
+                    // 회원가입 완료 확인
+                case let .element(id: _, action: .signupComplete(.delegate(.completeSignupFlow(info)))):
                     return .send(.delegate(.didLogin(info)))
                     
                     // 닉네임 설정 실패

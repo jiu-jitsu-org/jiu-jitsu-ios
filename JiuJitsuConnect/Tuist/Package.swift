@@ -34,6 +34,10 @@ let package = Package(
         .package(
             url: "https://github.com/kean/Pulse",
             branch: "main"
+        ),
+        .package(
+            url: "https://github.com/airbnb/lottie-ios",
+            from: "4.5.2"
         )
     ]
 )

@@ -217,7 +217,8 @@ let project = Project(
             resources: ["Targets/DesignSystem/Resources/**"],
             scripts: [swiftlintScript],
             dependencies: [
-                .target(name: "CoreKit")
+                .target(name: "CoreKit"),
+                .external(name: "Lottie")
             ]
         )
     ]
