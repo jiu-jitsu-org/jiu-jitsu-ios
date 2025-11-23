@@ -60,7 +60,8 @@ public struct SettingsView: View {
                                 Log.trace("서비스 이용 약관 상세 버튼 탭", category: .debug)
                             }
                         )
-                        .frame(maxWidth: .infinity, maxHeight: Style.rowHeight)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: Style.rowHeight)
                         
                         SettingsInteractiveRow(
                             asset: Assets.Common.Icon.documents,
@@ -69,9 +70,9 @@ public struct SettingsView: View {
                                 Log.trace("개인정보 처리 방침 상세 탭", category: .debug)
                             }
                         )
-                        .frame(maxWidth: .infinity, maxHeight: Style.rowHeight)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: Style.rowHeight)
                     }
-                    .padding(.horizontal, Style.horizontalPadding)
                     .padding(.vertical, Style.sectionVerticalPadding)
                     .background(Color.component.list.setting.background)
                     .clipShape(RoundedRectangle(cornerRadius: Style.sectionCornerRadius))
@@ -85,9 +86,10 @@ public struct SettingsView: View {
                                 .font(Font.pretendard.captionM)
                                 .foregroundStyle(Color.component.list.setting.valueText)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: Style.rowHeight)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: Style.rowHeight)
+                        .padding(.trailing, 16)
                     }
-                    .padding(.horizontal, Style.horizontalPadding)
                     .padding(.vertical, Style.sectionVerticalPadding)
                     .background(Color.component.list.setting.background)
                     .clipShape(RoundedRectangle(cornerRadius: Style.sectionCornerRadius))
@@ -101,7 +103,8 @@ public struct SettingsView: View {
                                 Log.trace("로그아웃 탭", category: .debug)
                             }
                         )
-                        .frame(maxWidth: .infinity, maxHeight: Style.rowHeight)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: Style.rowHeight)
                         
                         SettingsInteractiveRow(
                             asset: Assets.Common.Icon.secession,
@@ -110,16 +113,16 @@ public struct SettingsView: View {
                                 Log.trace("회원 탈퇴 탭", category: .debug)
                             }
                         )
-                        .frame(maxWidth: .infinity, maxHeight: Style.rowHeight)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: Style.rowHeight)
                     }
-                    .padding(.horizontal, Style.horizontalPadding)
                     .padding(.vertical, Style.sectionVerticalPadding)
                     .background(Color.component.list.setting.background)
                     .clipShape(RoundedRectangle(cornerRadius: Style.sectionCornerRadius))
                 }
+                .padding(.horizontal, Style.horizontalPadding)
                 .padding(.vertical, Style.verticalPadding)
             }
-//            .bounces(false) // 2. 스크롤뷰 바운스 효과 제거 (iOS 16.4 이상)
             .background(Color.component.background.default) // 전체 배경색
         }
         .navigationBarHidden(true) // 네비게이션 바를 완전히 숨김
@@ -180,6 +183,7 @@ private struct SettingsRowContent: View {
                 .font(Font.pretendard.bodyS)
                 .foregroundStyle(Color.component.list.setting.text)
         }
+        .padding(.leading, 16)
     }
 }
 
@@ -202,8 +206,27 @@ private struct SettingsInteractiveRow: View {
                 }
                 .frame(width: 34, height: 34)
                 .contentShape(Rectangle())
+                .padding(.trailing, 8)
             }
             .buttonStyle(.plain)
         }
     }
+}
+
+// MARK: - SwiftUI Preview
+import Domain
+
+#Preview("Settings View") {
+    SettingsView(
+        store: Store(initialState: SettingsFeature.State(authInfo: AuthInfo(accessToken: nil,
+                                                                            refreshToken: nil,
+                                                                            tempToken: "test-temp-token",
+                                                                            isNewUser: true,
+                                                                            userInfo: nil))) {
+            SettingsFeature()
+            // _printChanges()를 붙이면 Preview에서 버튼을 눌렀을 때
+            // 어떤 Action이 발생하는지 콘솔에서 확인할 수 있어 유용합니다.
+                ._printChanges()
+        }
+    )
 }
