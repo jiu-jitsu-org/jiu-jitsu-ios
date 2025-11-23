@@ -77,6 +77,13 @@ public struct SettingsView: View {
             }
             .background(Color.component.background.default)
         }
+        .appAlert(
+            isPresented: Binding(
+                get: { store.alert != nil },
+                set: { if !$0 { store.send(.alertDismissed) } }
+            ),
+            configuration: alertConfiguration(for: store.alert)
+        )
         .navigationBarHidden(true)
         .ignoresSafeArea(edges: .bottom)
     }
@@ -111,6 +118,29 @@ public struct SettingsView: View {
         .padding(.horizontal, Style.horizontalPadding)
         .frame(height: Style.headerHeight)
         .background(Color.component.background.default.ignoresSafeArea(edges: .top))
+    }
+    
+    // MARK: - Alert Configuration Helper
+    private func alertConfiguration(for alertType: SettingsFeature.State.Alert?) -> AppAlertConfiguration {
+        switch alertType {
+        case .logout:
+            return .init(
+                title: "로그아웃",
+                message: "로그아웃 하시겠습니까?",
+                primaryButton: .init(title: "로그아웃", style: .primary, action: { store.send(.alertConfirmButtonTapped) }),
+                secondaryButton: .init(title: "취소", style: .neutral, action: { store.send(.alertDismissed) })
+            )
+        case .withdrawal:
+            return .init(
+                title: "회원 탈퇴",
+                message: "30일 뒤 계정이 영구 삭제됩니다. 작성한 게시물과 댓글은 익명으로 남으며, 기간 내 재로그인 시 탈퇴가 취소됩니다.",
+                primaryButton: .init(title: "탈퇴하기", style: .destructive, action: { store.send(.alertConfirmButtonTapped) }),
+                secondaryButton: .init(title: "취소", style: .neutral, action: { store.send(.alertDismissed) })
+            )
+        case .none:
+            // Alert가 보이지 않을 때를 위한 기본값. 내용은 중요하지 않습니다.
+            return .init(title: "", message: "", primaryButton: .init(title: "", action: {}), secondaryButton: nil)
+        }
     }
 }
 

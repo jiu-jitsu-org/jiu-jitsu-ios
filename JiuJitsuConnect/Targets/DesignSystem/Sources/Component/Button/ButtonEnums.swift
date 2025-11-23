@@ -12,6 +12,7 @@ public enum ButtonStyleType {
     case tint       // Primary보다 덜 강조된 액션 버튼
     case text       // 배경이 없는 텍스트 버튼
     case neutral    // 일반적인 액션 버튼
+    case destructive // 빨간색 버튼
 }
 
 public enum ButtonSize {

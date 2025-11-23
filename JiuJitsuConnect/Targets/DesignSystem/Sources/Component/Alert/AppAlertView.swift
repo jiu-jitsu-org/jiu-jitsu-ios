@@ -42,7 +42,7 @@ public struct AppAlertView: View {
                         }) {
                             AppButtonConfiguration(title: secondaryButton.title, size: .large)
                         }
-                        .appButtonStyle(.neutral, size: .large)
+                        .appButtonStyle(secondaryButton.style, size: .large)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     
@@ -52,7 +52,7 @@ public struct AppAlertView: View {
                     }) {
                         AppButtonConfiguration(title: configuration.primaryButton.title, size: .large)
                     }
-                    .appButtonStyle(.primary, size: .large)
+                    .appButtonStyle(configuration.primaryButton.style, size: .large)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .frame(height: 51)

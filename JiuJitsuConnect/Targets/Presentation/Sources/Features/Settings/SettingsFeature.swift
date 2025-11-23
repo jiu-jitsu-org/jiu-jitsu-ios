@@ -75,19 +75,15 @@ public struct SettingsFeature {
                 return .none
                 
             case .logoutButtonTapped:
-                // State를 변경하여 로그아웃 Alert를 띄웁니다.
                 state.alert = .logout
                 return .none
                 
             case .withdrawalButtonTapped:
-                // State를 변경하여 회원 탈퇴 Alert를 띄웁니다.
                 state.alert = .withdrawal
                 return .none
                 
             // MARK: Alert Actions
             case .alertConfirmButtonTapped:
-                // "확인" 버튼이 눌렸을 때, 현재 어떤 Alert가 떴는지 확인하고
-                // 그에 맞는 로직을 실행합니다.
                 switch state.alert {
                 case .logout:
                     // TODO: 실제 로그아웃 API 호출
@@ -106,7 +102,6 @@ public struct SettingsFeature {
                 }
                 
             case .alertDismissed:
-                // Alert가 닫힐 때 State를 nil로 만들어 Alert를 숨깁니다.
                 state.alert = nil
                 return .none
                 

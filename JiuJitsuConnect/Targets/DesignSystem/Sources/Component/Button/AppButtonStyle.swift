@@ -49,6 +49,9 @@ public struct AppButtonStyle: ButtonStyle {
             if isPressed { return (componentColors.filled.pressedBg, componentColors.filled.pressedText) }
             return (componentColors.filled.defaultBg, componentColors.filled.defaultText)
             
+        case .destructive:
+            return (Color(hex: "#E52012") ?? componentColors.filled.disabledBg, componentColors.filled.defaultText)
+            
         case .tint:
             if !isEnabled { return (componentColors.tint.disabledBg, componentColors.tint.disabledText) }
             if isPressed { return (componentColors.tint.pressedBg, componentColors.tint.pressedText) }
