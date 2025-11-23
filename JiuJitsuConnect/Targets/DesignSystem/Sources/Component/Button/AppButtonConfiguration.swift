@@ -1,5 +1,5 @@
 //
-//  AppButtonContent.swift
+//  AppButtonConfiguration.swift
 //  DesignSystem
 //
 //  Created by suni on 9/21/25.
@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-public struct AppButtonContent: View {
+public struct AppButtonConfiguration: View {
     private let title: String?
     private let leftIcon: Image?
     private let rightIcon: Image?
@@ -58,6 +58,7 @@ public struct AppButtonContent: View {
                         .frame(width: iconSize, height: iconSize)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
     
