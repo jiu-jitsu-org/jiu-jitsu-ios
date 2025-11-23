@@ -31,54 +31,26 @@ public struct SettingsView: View {
         self.store = store
     }
     
-    // 앱의 버전 정보를 가져오는 Helper
-    private var appVersion: String {
-        // 이미지와 동일하게 보이기 위해 하드코딩합니다.
-        // 실제 앱에서는 아래의 동적 코드를 사용하는 것이 좋습니다.
-        return "99.99"
-        /*
-        guard let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String else {
-            return "N/A"
-        }
-        return version
-        */
-    }
+    private var appVersion: String { "99.99" }
     
     public var body: some View {
         VStack(spacing: 0) {
-            // MARK: - Header View
             headerView
             
             ScrollView {
                 VStack(spacing: Style.sectionSpacing) {
                     // MARK: - 약관 및 정책 섹션
-                    VStack(spacing: Style.rowSpacing) {
-                        SettingsInteractiveRow(
-                            asset: Assets.Common.Icon.documents,
-                            text: "서비스 이용 약관",
-                            action: {
-                                Log.trace("서비스 이용 약관 상세 버튼 탭", category: .debug)
-                            }
-                        )
-                        .frame(maxWidth: .infinity)
-                        .frame(height: Style.rowHeight)
-                        
-                        SettingsInteractiveRow(
-                            asset: Assets.Common.Icon.documents,
-                            text: "개인정보 처리 방침",
-                            action: {
-                                Log.trace("개인정보 처리 방침 상세 탭", category: .debug)
-                            }
-                        )
-                        .frame(maxWidth: .infinity)
-                        .frame(height: Style.rowHeight)
+                    SettingsSection {
+                        SettingsInteractiveRow(asset: Assets.Common.Icon.documents, text: "서비스 이용 약관") {
+                            store.send(.termsButtonTapped)
+                        }
+                        SettingsInteractiveRow(asset: Assets.Common.Icon.documents, text: "개인정보 처리 방침") {
+                            store.send(.privacyPolicyButtonTapped)
+                        }
                     }
-                    .padding(.vertical, Style.sectionVerticalPadding)
-                    .background(Color.component.list.setting.background)
-                    .clipShape(RoundedRectangle(cornerRadius: Style.sectionCornerRadius))
                     
                     // MARK: - 버전 정보 섹션
-                    VStack {
+                    SettingsSection {
                         HStack {
                             SettingsRowContent(asset: Assets.Common.Icon.version, text: "버전 정보")
                             Spacer()
@@ -86,55 +58,32 @@ public struct SettingsView: View {
                                 .font(Font.pretendard.captionM)
                                 .foregroundStyle(Color.component.list.setting.valueText)
                         }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: Style.rowHeight)
-                        .padding(.trailing, 16)
+                        .frame(minHeight: Style.rowHeight)
+                        .padding(.horizontal, 16)
                     }
-                    .padding(.vertical, Style.sectionVerticalPadding)
-                    .background(Color.component.list.setting.background)
-                    .clipShape(RoundedRectangle(cornerRadius: Style.sectionCornerRadius))
                     
                     // MARK: - 계정 관리 섹션
-                    VStack(spacing: Style.rowSpacing) {
-                        SettingsInteractiveRow(
-                            asset: Assets.Common.Icon.logOut,
-                            text: "로그아웃",
-                            action: {
-                                Log.trace("로그아웃 탭", category: .debug)
-                            }
-                        )
-                        .frame(maxWidth: .infinity)
-                        .frame(height: Style.rowHeight)
-                        
-                        SettingsInteractiveRow(
-                            asset: Assets.Common.Icon.secession,
-                            text: "회원 탈퇴",
-                            action: {
-                                Log.trace("회원 탈퇴 탭", category: .debug)
-                            }
-                        )
-                        .frame(maxWidth: .infinity)
-                        .frame(height: Style.rowHeight)
+                    SettingsSection {
+                        SettingsInteractiveRow(asset: Assets.Common.Icon.logOut, text: "로그아웃") {
+                            store.send(.logoutButtonTapped)
+                        }
+                        SettingsInteractiveRow(asset: Assets.Common.Icon.secession, text: "회원 탈퇴") {
+                            store.send(.withdrawalButtonTapped)
+                        }
                     }
-                    .padding(.vertical, Style.sectionVerticalPadding)
-                    .background(Color.component.list.setting.background)
-                    .clipShape(RoundedRectangle(cornerRadius: Style.sectionCornerRadius))
                 }
                 .padding(.horizontal, Style.horizontalPadding)
                 .padding(.vertical, Style.verticalPadding)
             }
-            .background(Color.component.background.default) // 전체 배경색
+            .background(Color.component.background.default)
         }
-        .navigationBarHidden(true) // 네비게이션 바를 완전히 숨김
-        .ignoresSafeArea(edges: .bottom) // 하단 홈 인디케이터 영역까지 배경색 채우기
+        .navigationBarHidden(true)
+        .ignoresSafeArea(edges: .bottom)
     }
     
     private var headerView: some View {
         HStack {
-            // 뒤로가기 버튼
-            Button(action: {
-                Log.trace("뒤로가기 탭", category: .debug)
-            }) {
+            Button(action: { store.send(.backButtonTapped) }) {
                 ZStack {
                     Assets.Common.Icon.chevronLeft.swiftUIImage
                         .resizable()
@@ -149,25 +98,41 @@ public struct SettingsView: View {
             
             Spacer()
             
-            // 타이틀
             Text("설정")
                 .font(Font.pretendard.title3)
                 .foregroundStyle(Color.component.header.text)
             
             Spacer()
             
-            // 타이틀 중앙 정렬을 위한 투명한 Placeholder
             Rectangle()
                 .fill(.clear)
                 .frame(width: 32, height: 32)
         }
         .padding(.horizontal, Style.horizontalPadding)
         .frame(height: Style.headerHeight)
-        .background(Color.component.background.default.ignoresSafeArea(edges: .top)) // 헤더 배경색 (상단 Safe Area까지 확장)
+        .background(Color.component.background.default.ignoresSafeArea(edges: .top))
     }
 }
 
-// MARK: - Reusable Row View
+// MARK: - Reusable Section Container
+private struct SettingsSection<Content: View>: View {
+    let content: Content
+    
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+    
+    var body: some View {
+        VStack(spacing: Style.rowSpacing) {
+            content
+        }
+        .padding(.vertical, Style.sectionVerticalPadding)
+        .background(Color.component.list.setting.background)
+        .clipShape(RoundedRectangle(cornerRadius: Style.sectionCornerRadius))
+    }
+}
+
+// MARK: - Reusable Row Views
 private struct SettingsRowContent: View {
     let asset: ImageAsset
     let text: String
@@ -183,7 +148,6 @@ private struct SettingsRowContent: View {
                 .font(Font.pretendard.bodyS)
                 .foregroundStyle(Color.component.list.setting.text)
         }
-        .padding(.leading, 16)
     }
 }
 
@@ -206,10 +170,12 @@ private struct SettingsInteractiveRow: View {
                 }
                 .frame(width: 34, height: 34)
                 .contentShape(Rectangle())
-                .padding(.trailing, 8)
             }
             .buttonStyle(.plain)
         }
+        .frame(minHeight: Style.rowHeight) // 고정 높이 대신 최소 높이 사용
+        .padding(.leading, 16)
+        .padding(.trailing, 8)
     }
 }
 
