@@ -11,15 +11,13 @@ public struct SplashFeature {
     @ObservableState
     public struct State: Equatable {
         @Presents public var alert: AlertState<Action.Alert>?
-        
         public init() {}
     }
     
     @CasePathable
     public enum Action: Equatable {
         case onAppear
-        case didFinishInitLaunch // 스플레시 완료 - 첫 진입
-        
+        case didFinishInitLaunch
         case alert(PresentationAction<Alert>)
         
         public enum Alert: Equatable {
@@ -28,18 +26,16 @@ public struct SplashFeature {
     }
     
     public var body: some ReducerOf<Self> {
-        
         Reduce { _, action in
             switch action {
-                
             case .onAppear:
                 return .run { send in
-                    try await self.clock.sleep(for: .seconds(2))
+                    try await clock.sleep(for: .seconds(2))
                     await send(.didFinishInitLaunch)
                 }
                 
             case .alert(.presented(.goToUpdateTapped)):
-//                Utility.moveAppStore()
+                // TODO: - 추후 업데이트 로직 구현 필요
                 return .none
                 
             default: return .none

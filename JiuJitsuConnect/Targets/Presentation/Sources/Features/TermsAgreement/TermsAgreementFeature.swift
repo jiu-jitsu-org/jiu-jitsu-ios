@@ -13,17 +13,22 @@ import CoreKit
 
 @Reducer
 public struct TermsAgreementFeature {
+    public init() {}
     
     @ObservableState
     public struct State: Equatable {
         var rows: IdentifiedArrayOf<TermsAgreementRowFeature.State>
+        
+        // Derived State
         var buttonTitle: String {
-            return didAgreeToAllRequired ? "다음" : "모두 동의하기"
+            didAgreeToAllRequired ? "다음" : "모두 동의하기"
         }
+        
         var didAgreeToAllRequired: Bool {
             rows.filter { $0.term.type == .required }
                 .allSatisfy { $0.isChecked }
         }
+        
         var isMarketingAgreed: Bool {
             rows.first { $0.term.type == .optional }?.isChecked ?? false
         }
@@ -58,17 +63,19 @@ public struct TermsAgreementFeature {
         Reduce { state, action in
             switch action {
             case .mainButtonTapped:
-                let isMarketingAgreed = state.isMarketingAgreed
-                
                 if state.didAgreeToAllRequired {
-                    Log.trace("다음 화면으로 이동", category: .view, level: .debug)
-                    return .send(.delegate(.didFinishAgreement(isMarketingAgreed: isMarketingAgreed)))
+                    Log.trace("필수 약관 동의 완료 -> 다음 화면 이동", category: .view, level: .debug)
+                    return .send(.delegate(.didFinishAgreement(isMarketingAgreed: state.isMarketingAgreed)))
+                    
                 } else {
-                    for id in state.rows.ids {
+                    Log.trace("모두 동의하기 실행", category: .view, level: .debug)
+                    // 모든 항목 체크 처리
+                    state.rows.ids.forEach { id in
                         state.rows[id: id]?.isChecked = true
                     }
-                    Log.trace("모두 동의 완료, 다음 화면으로 이동", category: .view, level: .debug)
-                    // 모두 동의 시, 마케팅 동의는 true가 됨
+                    
+                    // [정책 확인 필요] '모두 동의' 버튼 클릭 시 바로 다음 화면으로 넘어가는 것이 기획 의도라면 아래 코드 유지.
+                    // 만약 체크만 하고 유저가 다시 '다음'을 눌러야 한다면 return .none으로 변경해야 함.
                     return .send(.delegate(.didFinishAgreement(isMarketingAgreed: true)))
                 }
                 
@@ -76,7 +83,7 @@ public struct TermsAgreementFeature {
                 guard let row = state.rows[id: id], let url = row.term.contentURL else {
                     return .none
                 }
-                return .run { _ in await self.openURL(url) }
+                return .run { _ in await openURL(url) }
                 
             case .rows, .delegate:
                 return .none

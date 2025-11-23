@@ -27,19 +27,21 @@ public struct AppFeature {
     }
     
     public var body: some ReducerOf<Self> {
-      Reduce { state, action in
-        switch action {
-        case .destination(.presented(.splash(.didFinishInitLaunch))):
-            state.destination = .login(.init())
-          return .none
-            
-        case let .destination(.presented(.login(.delegate(.didLogin(authInfo))))):
-            state.destination = .main(.init(authInfo: authInfo))
-            return .none
-            
-        default: return .none
+        Reduce { state, action in
+            switch action {
+                // MARK: - Navigation Logic
+            case .destination(.presented(.splash(.didFinishInitLaunch))):
+                state.destination = .login(.init())
+                return .none
+                
+            case let .destination(.presented(.login(.delegate(.didLogin(authInfo))))):
+                state.destination = .main(.init(authInfo: authInfo))
+                return .none
+                
+            default:
+                return .none
+            }
         }
-      }
-      .ifLet(\.$destination, action: \.destination)
+        .ifLet(\.$destination, action: \.destination)
     }
 }
