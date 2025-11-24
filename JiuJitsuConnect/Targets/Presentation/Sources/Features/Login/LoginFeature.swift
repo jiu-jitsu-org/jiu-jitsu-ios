@@ -19,8 +19,6 @@ public struct LoginFeature {
         @Presents var sheet: Destination.State?
         var path = StackState<Path.State>()
         
-        //        @Presents public var destination: Destination.State?
-        
         public init() {}
     }
     
@@ -107,7 +105,6 @@ public struct LoginFeature {
                 print(authInfo)
                 // 1. 신규 유저일 경우
                 if authInfo.isNewUser == true {
-                    // tempToken 저장 후 약관 동의 Sheet 표시
                     guard let tempToken = authInfo.tempToken else {
                         Log.trace("Temp Token is missing for new user.", category: .debug, level: .error)
                         return .send(.showToast(.init(message: "오류가 발생했습니다. 다시 시도해주세요.", style: .info)))
@@ -115,7 +112,7 @@ public struct LoginFeature {
                     state.tempToken = tempToken
                     state.sheet = .termsAgreement(.init())
                 } else {
-                    // 2. 기존 유저일 경우, 바로 로그인 완료 처리
+                    // 2. 기존 유저일 경우
                     Log.trace("기존 유저 로그인 성공", category: .debug, level: .info)
                     return .send(.delegate(.didLogin(authInfo)))
                 }
@@ -124,7 +121,7 @@ public struct LoginFeature {
             case let ._serverLoginResponse(.failure(error)):
                 return handleLoginError(state: &state, error: error)
                 
-                // 약관 동의 완료 시 Sheet 닫고, NicknameSetting으로 Push
+                // 약관 동의 완료
             case let .sheet(.presented(.termsAgreement(.delegate(.didFinishAgreement(isMarketingAgreed))))):
                 guard let tempToken = state.tempToken else {
                     Log.trace("Temp Token is missing for new user.", category: .debug, level: .error)
@@ -133,8 +130,6 @@ public struct LoginFeature {
                 }
                 
                 state.sheet = nil
-                
-                // path에 NicknameSettingFeature 상태 추가하여 push
                 state.path.append(
                     .nicknameSetting(
                         .init(tempToken: tempToken, isMarketingAgreed: isMarketingAgreed)

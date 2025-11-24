@@ -38,6 +38,10 @@ public struct AppFeature {
                 state.destination = .main(.init(authInfo: authInfo))
                 return .none
                 
+            case .destination(.presented(.login(.delegate(.skipLogin)))):
+                state.destination = .main(.init(authInfo: .guest))
+                return .none
+                
             default:
                 return .none
             }

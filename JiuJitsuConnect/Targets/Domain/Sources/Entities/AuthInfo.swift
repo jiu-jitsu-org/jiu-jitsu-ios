@@ -14,6 +14,8 @@ public struct AuthInfo: Equatable {
     public let isNewUser: Bool?
     public let userInfo: UserInfo?
     
+    public var isGuest: Bool { accessToken == nil }
+    
     public struct UserInfo: Equatable {
         public let userId: Int
         public let email: String?
@@ -38,5 +40,12 @@ public struct AuthInfo: Equatable {
         self.tempToken = tempToken
         self.isNewUser = isNewUser
         self.userInfo = userInfo
+    }
+}
+
+public extension AuthInfo {
+    static var guest: AuthInfo {
+        // 토큰이 nil이거나 비어있는 게스트용 객체 생성
+        AuthInfo(accessToken: nil, refreshToken: nil, tempToken: nil, isNewUser: false, userInfo: nil)
     }
 }

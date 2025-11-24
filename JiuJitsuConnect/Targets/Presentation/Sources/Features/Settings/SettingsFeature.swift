@@ -15,7 +15,7 @@ public struct SettingsFeature {
     
     @ObservableState
     public struct State: Equatable {
-        let authInfo: AuthInfo
+        var authInfo: AuthInfo
         var appVersion: String
         
         public enum Alert: Equatable {

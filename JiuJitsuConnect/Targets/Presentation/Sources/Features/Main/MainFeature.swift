@@ -9,8 +9,9 @@ public struct MainFeature {
     @ObservableState
     public struct State: Equatable {
         @Presents var destination: Destination.State?
+        @Presents var loginModal: LoginFeature.State?
         
-        let authInfo: AuthInfo
+        var authInfo: AuthInfo
         
         public init(authInfo: AuthInfo) {
             self.authInfo = authInfo
@@ -28,8 +29,11 @@ public struct MainFeature {
         case settingsButtonTapped
         case profileButtonTapped
         
+        case showLoginModal
+        
         // 네비게이션 액션
         case destination(PresentationAction<Destination.Action>)
+        case loginModal(PresentationAction<LoginFeature.Action>)
     }
     
     public var body: some ReducerOf<Self> {
@@ -43,10 +47,38 @@ public struct MainFeature {
 //                state.destination = .profile(ProfileFeature.State())
                 return .none
                 
+                // MARK: - Login Logic
+            case .showLoginModal:
+                state.loginModal = LoginFeature.State()
+                return .none
+                
+            case let .loginModal(.presented(.delegate(delegateAction))):
+                switch delegateAction {
+                case let .didLogin(newAuthInfo):
+                    state.authInfo = newAuthInfo
+                    
+                    if case var .settings(settingsState) = state.destination {
+                        settingsState.authInfo = newAuthInfo
+                        state.destination = .settings(settingsState)
+                    }
+                    state.loginModal = nil
+                    return .none
+                    
+                case .skipLogin:
+                    state.loginModal = nil
+                    return .none
+                }
+                
+            case .loginModal:
+                return .none
+                
             case .destination:
                 return .none
             }
         }
         .ifLet(\.$destination, action: \.destination)
+        .ifLet(\.$loginModal, action: \.loginModal) {
+            LoginFeature()
+        }
     }
 }
