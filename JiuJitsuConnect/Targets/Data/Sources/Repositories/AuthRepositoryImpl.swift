@@ -1,6 +1,6 @@
 //
 //  AuthRepositoryImpl.swift
-//  JiuJitsuConnect
+//  Data
 //
 //  Created by suni on 9/21/25.
 //
@@ -35,7 +35,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
             return try mapToSnsUser(from: result.user)
         } catch let error as GIDSignInError {
-            throw mapAuthSDKErrorToDomainError(from: error, provider: .google)
+            throw AuthErrorMapper.map(from: error, provider: .google)
         }
     }
     
@@ -63,39 +63,36 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             if UserApi.isKakaoTalkLoginAvailable() {
                 UserApi.shared.loginWithKakaoTalk { [weak self] (oauthToken, error) in
                     guard let self else { return }
-                    if let error = error {
-                        let authError = mapAuthSDKErrorToDomainError(from: error, provider: .kakao)
-                        continuation.resume(throwing: authError)
-                    } else if let oauthToken = oauthToken {
-                        let snsUser = Domain.SNSUser(
-                            accessToken: oauthToken.accessToken,
-                            snsProvider: .kakao
-                        )
-                        continuation.resume(returning: snsUser)
-                    } else {
-                        let authError = mapAuthSDKErrorToDomainError(from: DomainError.unknown("Kakao login failed with no token and no error."), provider: .kakao)
-                        continuation.resume(throwing: authError)
+                    UserApi.shared.loginWithKakaoTalk { [weak self] (oauthToken, error) in
+                        self?.handleKakaoResponse(oauthToken: oauthToken, error: error, continuation: continuation)
                     }
                 }
             } else {
                 // 카카오 계정(웹뷰)으로 로그인 시도
                 UserApi.shared.loginWithKakaoAccount { [weak self] (oauthToken, error) in
-                    guard let self else { return }
-                    if let error = error {
-                        let authError = mapAuthSDKErrorToDomainError(from: error, provider: .kakao)
-                        continuation.resume(throwing: authError)
-                    } else if let oauthToken = oauthToken {
-                        let snsUser = Domain.SNSUser(
-                            accessToken: oauthToken.accessToken,
-                            snsProvider: .kakao
-                        )
-                        continuation.resume(returning: snsUser)
-                    } else {
-                        let authError = mapAuthSDKErrorToDomainError(from: DomainError.unknown("Kakao login failed with no token and no error."), provider: .kakao)
-                        continuation.resume(throwing: authError)
-                    }
+                    self?.handleKakaoResponse(oauthToken: oauthToken, error: error, continuation: continuation)
                 }
             }
+        }
+    }
+    
+    // 중복되는 카카오 응답 처리 로직을 메서드로 추출하여 정리
+    private func handleKakaoResponse(oauthToken: OAuthToken?, error: Error?, continuation: CheckedContinuation<SNSUser, Error>) {
+        if let error = error {
+            let authError = AuthErrorMapper.map(from: error, provider: .kakao)
+            continuation.resume(throwing: authError)
+        } else if let oauthToken = oauthToken {
+            let snsUser = Domain.SNSUser(
+                accessToken: oauthToken.accessToken,
+                snsProvider: .kakao
+            )
+            continuation.resume(returning: snsUser)
+        } else {
+            let authError = AuthErrorMapper.map(
+                from: DomainError.unknown("Kakao login failed with no token and no error."),
+                provider: .kakao
+            )
+            continuation.resume(throwing: authError)
         }
     }
     
@@ -104,7 +101,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     public func serverLogin(user: SNSUser) async throws -> AuthInfo {
         do {
             // 1. Domain 모델(SNSUser)을 Data 모델(LoginRequestDTO)로 변환
-            let requestDTO = user.toRequestDTO()
+            let requestDTO = LoginRequestDTO(user: user)
             
             // 2. 변환된 DTO를 사용하여 API Endpoint 생성 및 요청
             let endpoint = AuthEndpoint.serverLogin(requestDTO)
@@ -112,6 +109,22 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             
             // 3. 응답받은 Data 모델(LoginResponseDTO)을 Domain 모델(AuthInfo)로 변환하여 반환
             return responseDTO.toDomain()
+            
+        } catch let error as NetworkError {
+            throw error.toDomainError()
+        } catch {
+            throw DomainError.unknown(error.localizedDescription)
+        }
+    }
+    
+    public func serverLogout(info: LogoutInfo) async throws -> Bool {
+        do {
+            let requestDTO = LogoutRequestDTO(info: info)
+            
+            let endpoint = AuthEndpoint.serverLogout(requestDTO)
+            let responseDTO: Bool = try await networkService.request(endpoint: endpoint)
+            
+            return responseDTO
             
         } catch let error as NetworkError {
             throw error.toDomainError()
@@ -141,7 +154,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     }
     
     public func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-        let authError = mapAuthSDKErrorToDomainError(from: error, provider: .apple)
+        let authError = AuthErrorMapper.map(from: error, provider: .apple)
         appleSignInContinuation?.resume(throwing: authError)
     }
     
@@ -179,86 +192,6 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             accessToken: idToken,
             snsProvider: .google
         )
-    }
-    
-    // MARK: - Error Mapping
-    
-    private func mapAuthSDKErrorToDomainError(from error: Error, provider: SNSProvider) -> DomainError {
-        Log.trace("Original Auth Error from \(provider.rawValue): \(error)", category: .network, level: .error)
-        
-        // --- Google 에러 매핑 ---
-        // --- Google 에러 매핑 ---
-        if let gidError = error as? GIDSignInError {
-            switch gidError.code {
-            case .canceled:
-                return .signInCancelled
-            case .keychain, .EMM:
-                return .accountProblem(provider: .google)
-            case .mismatchWithCurrentUser:
-                return .missingProfileData
-            default:
-                return .unknown(gidError.localizedDescription)
-            }
-        }
-        
-        // --- Apple 에러 매핑 ---
-        if let asError = error as? ASAuthorizationError {
-            switch asError.code {
-            case .canceled:
-                // 사용자가 직접 인증 창을 닫은 경우
-                return .signInCancelled
-                
-            case .invalidResponse, .notHandled, .failed:
-                // Apple 서버의 응답이 잘못되었거나, 앱이 응답을 처리할 수 없거나,
-                // 인증 자체가 실패한 경우. 대부분 일시적인 문제이거나 계정 문제일 수 있음.
-                return .accountProblem(provider: .apple)
-                
-            case .unknown:
-                // 말 그대로 원인을 알 수 없는 오류.
-                // 사용자에게는 일반적인 실패로 안내하고, 개발자는 원본 에러를 로깅하여 원인 파악 필요.
-                return .unknown(asError.localizedDescription)
-                
-            case .notInteractive:
-                // 사용자의 추가적인 입력이 필요한데, 비대화형(non-interactive)으로 요청된 경우.
-                // 이는 개발자의 코드 로직 오류일 가능성이 높음.
-                return .unknown("Non-interactive authorization request failed.")
-                
-                // --- iOS 17.4+ Passkey 관련 에러 ---
-                // (Passkey를 사용하지 않는다면 발생 가능성 낮음)
-            case .matchedExcludedCredential, .credentialImport, .credentialExport:
-                return .unknown("Passkey credential error.")
-                
-                // --- iOS 18+ 관련 에러 ---
-                // (향후 OS 버전에 따라 추가될 수 있는 에러 처리)
-            case .preferSignInWithApple:
-                // 사용자가 다른 로그인 방식 대신 Apple 로그인을 선호하도록 시스템이 제안한 경우.
-                // 실제 에러는 아니지만, 개발자가 이 시그널을 처리할 수 있음.
-                return .unknown("User prefers Sign in with Apple.")
-                
-            case .deviceNotConfiguredForPasskeyCreation:
-                // Passkey 생성을 위해 기기 설정이 필요함을 의미.
-                return .accountProblem(provider: .apple)
-                
-            @unknown default:
-                // 향후 Apple이 새로운 에러 코드를 추가하더라도 앱이 크래시되지 않도록 처리
-                return .unknown(asError.localizedDescription)
-            }
-        }
-        // --- Kakao 에러 매핑 ---
-        if let sdkError = error as? KakaoSDKCommon.SdkError {
-            if sdkError.isClientFailed, sdkError.getClientError().reason == .Cancelled {
-                return .signInCancelled
-            }
-            if sdkError.isAuthFailed, sdkError.getAuthError().reason == .AccessDenied {
-                return .permissionRequired(provider: .kakao, permissionName: "필수 동의 항목")
-            }
-            if sdkError.isAuthFailed || sdkError.isApiFailed {
-                return .accountProblem(provider: .kakao)
-            }
-        }
-        
-        // 매핑되지 않은 모든 에러
-        return .unknown(error.localizedDescription)
     }
     
 }

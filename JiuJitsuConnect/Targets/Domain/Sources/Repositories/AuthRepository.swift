@@ -14,4 +14,5 @@ public protocol AuthRepository {
     func signOut() async throws
     
     func serverLogin(user: SNSUser) async throws -> AuthInfo
+    func serverLogout(info: LogoutInfo) async throws -> Bool
 }

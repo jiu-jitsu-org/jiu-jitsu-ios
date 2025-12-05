@@ -7,17 +7,20 @@ public struct AuthClient {
     public var loginWithApple: @Sendable () async throws -> Domain.SNSUser
     public var loginWithKakao: @Sendable () async throws -> Domain.SNSUser
     public var serverLogin: @Sendable (Domain.SNSUser) async throws -> Domain.AuthInfo
+    public var serverLogout: @Sendable (Domain.LogoutInfo) async throws -> Bool
     
     public init(
         loginWithGoogle: @Sendable @escaping () async throws -> Domain.SNSUser,
         loginWithApple: @Sendable @escaping () async throws -> Domain.SNSUser,
         loginWithKakao: @Sendable @escaping () async throws -> Domain.SNSUser,
-        serverLogin: @Sendable @escaping (Domain.SNSUser) async throws -> Domain.AuthInfo
+        serverLogin: @Sendable @escaping (Domain.SNSUser) async throws -> Domain.AuthInfo,
+        serverLogout: @Sendable @escaping (Domain.LogoutInfo) async throws -> Bool
     ) {
         self.loginWithGoogle = loginWithGoogle
         self.loginWithApple = loginWithApple
         self.loginWithKakao = loginWithKakao
         self.serverLogin = serverLogin
+        self.serverLogout = serverLogout
     }
 }
 
@@ -44,6 +47,9 @@ extension AuthClient: DependencyKey {
                             tempToken: "test-temp-token",
                             isNewUser: true,
                             userInfo: nil)
+        },
+        serverLogout: { _ in
+            true
         }
     )
 }
@@ -69,6 +75,9 @@ extension AuthClient {
         },
         serverLogin: { _ in
             fatalError("AuthClient.serverLogin is not implemented")
+        },
+        serverLogout: { _ in
+            fatalError("AuthClient.serverLogout is not implemented")
         }
     )
 }

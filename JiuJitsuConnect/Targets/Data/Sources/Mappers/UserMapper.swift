@@ -9,20 +9,16 @@ import Foundation
 import Domain
 
 // MARK: - Domain To DTO
-extension SignupInfo {
-    func toRequestDTO() -> SignupRequestDTO {
-        return SignupRequestDTO(
-            nickname: self.nickname,
-            isMarketingAgreed: self.isMarketingAgreed
-        )
+extension SignupRequestDTO {
+    init(info: SignupInfo) {
+        self.nickname = info.nickname
+        self.isMarketingAgreed = info.isMarketingAgreed
     }
 }
 
-extension CheckNicknameInfo {
-    func toRequestDTO() -> CheckNicknameRequestDTO {
-        return CheckNicknameRequestDTO(
-            nickname: self.nickname
-        )
+extension CheckNicknameRequestDTO {
+    init(info: CheckNicknameInfo) {
+        self.nickname = info.nickname
     }
 }
 

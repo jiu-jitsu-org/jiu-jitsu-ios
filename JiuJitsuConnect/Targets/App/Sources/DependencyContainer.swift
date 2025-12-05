@@ -40,6 +40,9 @@ public final class DependencyContainer {
             },
             serverLogin: { user in
                 try await self.authRepository.serverLogin(user: user)
+            },
+            serverLogout: { info in
+                try await self.authRepository.serverLogout(info: info)
             }
         )
     }

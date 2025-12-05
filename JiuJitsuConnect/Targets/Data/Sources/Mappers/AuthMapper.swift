@@ -9,12 +9,17 @@ import Foundation
 import Domain
 
 // MARK: - Domain To DTO
-extension SNSUser {
-    func toRequestDTO() -> LoginRequestDTO {
-        return LoginRequestDTO(
-            accessToken: self.accessToken,
-            snsProvider: self.snsProvider.rawValue
-        )
+extension LoginRequestDTO {
+    init(user: SNSUser) {
+        self.accessToken = user.accessToken
+        self.snsProvider = user.snsProvider.rawValue
+    }
+}
+
+extension LogoutRequestDTO {
+    init(info: LogoutInfo) {
+        self.accessToken = info.accessToken
+        self.refreshToken = info.refreshToken
     }
 }
 
