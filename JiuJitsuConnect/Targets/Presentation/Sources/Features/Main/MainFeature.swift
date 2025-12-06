@@ -32,8 +32,8 @@ public struct MainFeature {
         case showLoginModal
         
         // 네비게이션 액션
-        case destination(PresentationAction<Destination.Action>)
         case loginModal(PresentationAction<LoginFeature.Action>)
+        case destination(PresentationAction<Destination.Action>)
     }
     
     public var body: some ReducerOf<Self> {

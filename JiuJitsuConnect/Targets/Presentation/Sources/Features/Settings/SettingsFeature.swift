@@ -8,10 +8,14 @@
 import ComposableArchitecture
 import Foundation
 import Domain
+import DesignSystem
+import CoreKit
 
 @Reducer
 public struct SettingsFeature {
     public init() {}
+    
+    private enum CancelID { case toast }
     
     @ObservableState
     public struct State: Equatable {
@@ -22,7 +26,9 @@ public struct SettingsFeature {
             case logout
             case withdrawal
         }
+        
         var alert: Alert? = nil
+        public var toast: ToastState?
         
         public init(authInfo: AuthInfo) {
             self.authInfo = authInfo
@@ -43,10 +49,18 @@ public struct SettingsFeature {
         case logoutButtonTapped
         case withdrawalButtonTapped
         
+        case _logoutResponse(TaskResult<Bool>)
+        
         // Alert Actions
-        case alertConfirmButtonTapped
+        case confirmLogout
+        case confirmWithdrawal
         case alertDismissed
-
+        
+        // Toast Actions
+        case showToast(ToastState)
+        case toastDismissed
+        case toastButtonTapped(ToastState.Action)
+        
         // Delegate Actions (부모와 통신)
         case delegate(Delegate)
         public enum Delegate: Equatable {
@@ -57,6 +71,8 @@ public struct SettingsFeature {
     
     // MARK: - Dependencies
     @Dependency(\.dismiss) var dismiss
+    @Dependency(\.authClient) var authClient
+    @Dependency(\.continuousClock) var clock
     
     // MARK: - Reducer Body
     public var body: some ReducerOf<Self> {
@@ -83,27 +99,67 @@ public struct SettingsFeature {
                 return .none
                 
             // MARK: Alert Actions
-            case .alertConfirmButtonTapped:
-                switch state.alert {
-                case .logout:
-                    // TODO: 실제 로그아웃 API 호출
-                    return .run { send in
-                        // try await self.authClient.logout()
-                        await send(.delegate(.didLogoutSuccessfully))
-                    }
-                case .withdrawal:
-                    // TODO: 실제 회원 탈퇴 API 호출
-                    return .run { send in
-                        // try await self.userClient.withdraw()
-                        await send(.delegate(.didWithdrawSuccessfully))
-                    }
-                case .none:
-                    return .none
+            case .confirmLogout:
+                guard let accessToken = state.authInfo.accessToken,
+                      let refreshToken = state.authInfo.refreshToken else { return .none }
+//                    state.isLoading = true
+                let info = LogoutInfo(accessToken: accessToken, refreshToken: refreshToken)
+                return .run { send in
+                    await send(._logoutResponse(
+                        await TaskResult { try await authClient.serverLogout(info) }
+                    ))
                 }
+                
+            case .confirmWithdrawal:
+                // TODO: 실제 회원 탈퇴 API 호출
+                return .run { send in
+                    // try await self.userClient.withdraw()
+                    await send(.delegate(.didWithdrawSuccessfully))
+                }
+                
+            case let ._logoutResponse(.success(isSuccess)):
+//                state.isLoading = false
+                Log.trace("\(isSuccess)")
+                
+                if isSuccess {
+                    return .send(.delegate(.didLogoutSuccessfully))
+                } else {
+                    return .send(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info)))
+                }
+                
+            case let ._logoutResponse(.failure(error)):
+                Log.trace("\(error)")
+                //                state.isLoading = false
+                
+                guard let domainError = error as? DomainError else {
+                    return .send(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info)))
+                }
+                
+                let displayError = DomainErrorMapper.toDisplayError(from: domainError)
+                if case .toast(let message) = displayError {
+                    return .send(.showToast(.init(message: message, style: .info)))
+                }
+                return .none
                 
             case .alertDismissed:
                 state.alert = nil
                 return .none
+                
+            // MARK: - Toast Actions
+            case let .showToast(toastState):
+                state.toast = toastState
+                return .run { send in
+                    try await self.clock.sleep(for: toastState.duration)
+                    await send(.toastDismissed)
+                }
+                .cancellable(id: CancelID.toast)
+                
+            case .toastDismissed:
+                state.toast = nil
+                return .cancel(id: CancelID.toast)
+                
+            case .toastButtonTapped:
+                return .send(.toastDismissed)
                 
             case .delegate:
                 // 부모 Reducer에서 처리할 액션입니다.

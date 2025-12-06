@@ -181,8 +181,6 @@ public struct LoginFeature {
                 
             case .delegate:
                 return .none
-                
-//                            default: return .none
             }
         }
         .ifLet(\.$sheet, action: \.sheet)

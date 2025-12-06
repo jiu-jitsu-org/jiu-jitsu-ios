@@ -64,7 +64,7 @@ public enum Log {
 
     public static func trace(
         _ message: String,
-        category: Category,
+        category: Category = .debug,
         level: OSLogType = .default,
         file: String = #file, function: String = #function, line: UInt = #line
     ) {

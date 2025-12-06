@@ -118,6 +118,18 @@ public struct SettingsView: View {
         .padding(.horizontal, Style.horizontalPadding)
         .frame(height: Style.headerHeight)
         .background(Color.component.background.default.ignoresSafeArea(edges: .top))
+        .overlay(alignment: .bottom) {
+            if let toastState = store.toast {
+                ToastView(
+                    state: toastState,
+                    onSwipe: { store.send(.toastDismissed, animation: .default) },
+                    onButtonTapped: { store.send(.toastButtonTapped($0), animation: .default) }
+                )
+                .padding(.horizontal, 24)
+                .padding(.bottom, toastState.bottomPadding)
+            }
+        }
+        .animation(.default, value: store.toast)
     }
     
     // MARK: - Alert Configuration Helper
@@ -127,14 +139,14 @@ public struct SettingsView: View {
             return .init(
                 title: "로그아웃",
                 message: "로그아웃 하시겠습니까?",
-                primaryButton: .init(title: "로그아웃", style: .primary, action: { store.send(.alertConfirmButtonTapped) }),
+                primaryButton: .init(title: "로그아웃", style: .primary, action: { store.send(.confirmLogout) }),
                 secondaryButton: .init(title: "취소", style: .neutral, action: { store.send(.alertDismissed) })
             )
         case .withdrawal:
             return .init(
                 title: "회원 탈퇴",
                 message: "30일 뒤 계정이 영구 삭제됩니다. 작성한 게시물과 댓글은 익명으로 남으며, 기간 내 재로그인 시 탈퇴가 취소됩니다.",
-                primaryButton: .init(title: "탈퇴하기", style: .destructive, action: { store.send(.alertConfirmButtonTapped) }),
+                primaryButton: .init(title: "탈퇴하기", style: .destructive, action: { store.send(.confirmWithdrawal) }),
                 secondaryButton: .init(title: "취소", style: .neutral, action: { store.send(.alertDismissed) })
             )
         case .none:
