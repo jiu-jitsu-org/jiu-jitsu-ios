@@ -82,11 +82,17 @@ public struct MainFeature {
                 
             case let .destination(.presented(.settings(.delegate(delegateAction)))):
                 switch delegateAction {
-                case .didLogoutSuccessfully, .didWithdrawSuccessfully:
+                case .didLogoutSuccessfully:
                     state.authInfo = .guest
                     state.destination = nil
                     
                     return .none
+                    
+                case .didWithdrawSuccessfully:
+                    state.authInfo = .guest
+                    state.destination = nil
+                    
+                    return .send(.showLoginModal)
                 }
                 
             case .destination:
