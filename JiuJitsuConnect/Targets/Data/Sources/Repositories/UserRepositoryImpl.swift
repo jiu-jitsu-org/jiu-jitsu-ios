@@ -72,6 +72,20 @@ public final class UserRepositoryImpl: NSObject, UserRepository {
         }
     }
     
+    public func withdrawal() async throws -> Bool {
+        do {
+            let endpoint = UserEndpoint.withdrawal
+            let responseDTO: Bool = try await networkService.request(endpoint: endpoint)
+            
+            return responseDTO
+            
+        } catch let error as NetworkError {
+            throw error.toDomainError()
+        } catch {
+            throw DomainError.unknown(error.localizedDescription)
+        }
+    }
+    
     // MARK: - Error Mapping
     
 }

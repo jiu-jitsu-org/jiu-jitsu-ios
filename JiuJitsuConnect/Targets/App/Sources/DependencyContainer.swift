@@ -54,6 +54,9 @@ public final class DependencyContainer {
             },
             checkNickname: { info in
                 try await self.userRepository.checkNickname(info: info)
+            },
+            withdrawal: {
+                try await self.userRepository.withdrawal()
             }
         )
     }

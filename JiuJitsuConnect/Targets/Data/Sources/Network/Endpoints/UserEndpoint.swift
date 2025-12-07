@@ -11,6 +11,7 @@ import Domain
 enum UserEndpoint {
     case signup(request: SignupRequestDTO, tempToken: String)
     case checkNickname(request: CheckNicknameRequestDTO)
+    case withdrawal
 }
 
 extension UserEndpoint: Endpoint {
@@ -23,7 +24,7 @@ extension UserEndpoint: Endpoint {
     
     var path: String {
         switch self {
-        case .signup:
+        case .signup, .withdrawal:
             return "/api/user"
         case .checkNickname:
             return "/api/user/check/nickname"
@@ -36,6 +37,8 @@ extension UserEndpoint: Endpoint {
             return .get
         case .signup:
             return .post
+        case .withdrawal:
+            return .delete
         }
     }
     

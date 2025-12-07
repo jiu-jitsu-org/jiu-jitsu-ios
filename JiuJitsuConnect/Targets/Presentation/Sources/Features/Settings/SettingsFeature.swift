@@ -50,6 +50,7 @@ public struct SettingsFeature {
         case withdrawalButtonTapped
         
         case _logoutResponse(TaskResult<Bool>)
+        case _withdrawalResponse(TaskResult<Bool>)
         
         // Alert Actions
         case confirmLogout
@@ -72,6 +73,7 @@ public struct SettingsFeature {
     // MARK: - Dependencies
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.authClient) var authClient
+    @Dependency(\.userClient) var userClient
     @Dependency(\.continuousClock) var clock
     
     // MARK: - Reducer Body
@@ -113,8 +115,11 @@ public struct SettingsFeature {
             case .confirmWithdrawal:
                 // TODO: 실제 회원 탈퇴 API 호출
                 return .run { send in
-                    // try await self.userClient.withdraw()
-                    await send(.delegate(.didWithdrawSuccessfully))
+                    await send(._withdrawalResponse(
+                        await TaskResult { try await
+                            userClient.withdrawal()
+                        }
+                    ))
                 }
                 
             case let ._logoutResponse(.success(isSuccess)):
@@ -128,6 +133,30 @@ public struct SettingsFeature {
                 }
                 
             case let ._logoutResponse(.failure(error)):
+                Log.trace("\(error)")
+                //                state.isLoading = false
+                
+                guard let domainError = error as? DomainError else {
+                    return .send(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info)))
+                }
+                
+                let displayError = DomainErrorMapper.toDisplayError(from: domainError)
+                if case .toast(let message) = displayError {
+                    return .send(.showToast(.init(message: message, style: .info)))
+                }
+                return .none
+                
+            case let ._withdrawalResponse(.success(isSuccess)):
+//                state.isLoading = false
+                Log.trace("\(isSuccess)")
+                
+                if isSuccess {
+                    return .send(.delegate(.didWithdrawSuccessfully))
+                } else {
+                    return .send(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info)))
+                }
+                
+            case let ._withdrawalResponse(.failure(error)):
                 Log.trace("\(error)")
                 //                state.isLoading = false
                 

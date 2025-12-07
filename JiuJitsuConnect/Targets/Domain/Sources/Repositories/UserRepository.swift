@@ -10,4 +10,5 @@ import Foundation
 public protocol UserRepository {
     func signup(info: SignupInfo) async throws -> AuthInfo
     func checkNickname(info: CheckNicknameInfo) async throws -> Bool
+    func withdrawal() async throws -> Bool
 }
