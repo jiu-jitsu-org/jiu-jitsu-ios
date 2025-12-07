@@ -18,11 +18,15 @@ import CoreKit
 
 public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     private let networkService: NetworkService
+    private let tokenStorage: TokenStorage
 
     private var appleSignInContinuation: CheckedContinuation<SNSUser, Error>?
     
-    public init(networkService: NetworkService  = DefaultNetworkService(), appleSignInContinuation: CheckedContinuation<SNSUser, Error>? = nil) {
+    public init(networkService: NetworkService = DefaultNetworkService(),
+                tokenStorage: TokenStorage = DefaultTokenStorage(),
+                appleSignInContinuation: CheckedContinuation<SNSUser, Error>? = nil) {
         self.networkService = networkService
+        self.tokenStorage = tokenStorage
         self.appleSignInContinuation = appleSignInContinuation
     }
     
@@ -107,6 +111,15 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             let endpoint = AuthEndpoint.serverLogin(requestDTO)
             let responseDTO: LoginResponseDTO = try await networkService.request(endpoint: endpoint)
             
+            // 로그인 성공 시 토큰 저장
+            if let accessToken = responseDTO.accessToken, let refreshToken = responseDTO.refreshToken {
+                tokenStorage.save(
+                    accessToken: accessToken,
+                    refreshToken: refreshToken,
+                    provider: user.snsProvider.rawValue
+                )
+            }
+            
             // 3. 응답받은 Data 모델(LoginResponseDTO)을 Domain 모델(AuthInfo)로 변환하여 반환
             return responseDTO.toDomain()
             
@@ -124,8 +137,11 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             let endpoint = AuthEndpoint.serverLogout(requestDTO)
             let responseDTO: SuccessResponseDTO = try await networkService.request(endpoint: endpoint)
             
-            return responseDTO.success
+            if responseDTO.success {
+                tokenStorage.clear()
+            }
             
+            return responseDTO.success
         } catch let error as NetworkError {
             throw error.toDomainError()
         } catch {

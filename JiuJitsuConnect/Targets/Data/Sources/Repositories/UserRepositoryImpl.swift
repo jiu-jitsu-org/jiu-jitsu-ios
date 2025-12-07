@@ -12,9 +12,14 @@ import CoreKit
 
 public final class UserRepositoryImpl: NSObject, UserRepository {
     private let networkService: NetworkService
+    private let tokenStorage: TokenStorage
     
-    public init(networkService: NetworkService  = DefaultNetworkService()) {
+    public init(
+        networkService: NetworkService = DefaultNetworkService(),
+        tokenStorage: TokenStorage = DefaultTokenStorage()
+    ) {
         self.networkService = networkService
+        self.tokenStorage = tokenStorage
     }
     
     // MARK: - API
@@ -27,6 +32,17 @@ public final class UserRepositoryImpl: NSObject, UserRepository {
             // 2. 변환된 DTO를 사용하여 API Endpoint 생성 및 요청
             let endpoint = UserEndpoint.signup(request: requestDTO, tempToken: info.tempToken)
             let responseDTO: SignupResponseDTO = try await networkService.request(endpoint: endpoint)
+            
+            // 로그인 성공 시 토큰 저장
+            if let accessToken = responseDTO.accessToken,
+               let refreshToken = responseDTO.refreshToken,
+               let provider = responseDTO.userInfo?.snsProvider {
+                tokenStorage.save(
+                    accessToken: accessToken,
+                    refreshToken: refreshToken,
+                    provider: provider
+                )
+            }
             
             // 3. 응답받은 Data 모델을 Domain 모델로 변환하여 반환
             return responseDTO.toDomain()
@@ -42,7 +58,7 @@ public final class UserRepositoryImpl: NSObject, UserRepository {
         do {
             // 1. Domain 모델을 Data 모델로 변환
             let requestDTO = CheckNicknameRequestDTO(info: info)
-        
+            
             // 2. 변환된 DTO를 사용하여 API Endpoint 생성 및 요청
             let endpoint = UserEndpoint.checkNickname(request: requestDTO)
             let responseDTO: Bool = try await networkService.request(endpoint: endpoint)

@@ -20,10 +20,12 @@ public protocol NetworkService: Sendable {
 public final class DefaultNetworkService: NetworkService {
     
     private let session: URLSession
+    private let tokenStorage: TokenStorage
     private let decoder: JSONDecoder
     
     public init(
         session: URLSession = .shared,
+        tokenStorage: TokenStorage = DefaultTokenStorage(),
         decoder: JSONDecoder = {
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -32,6 +34,7 @@ public final class DefaultNetworkService: NetworkService {
         }()
     ) {
         self.session = session
+        self.tokenStorage = tokenStorage
 //        #if DEBUG
 //        self.session = URLSessionProxy(configuration: .default)
 //        #else
@@ -42,26 +45,19 @@ public final class DefaultNetworkService: NetworkService {
     }
     
     public func request<T: Decodable>(endpoint: Endpoint) async throws -> T {
-        // 1. requestData를 통해 서버로부터 원본 데이터를 받아옵니다.
-        //    (내부적으로 statusCode, network connection 등의 에러 처리가 모두 완료된 상태)
         let data = try await requestData(endpoint: endpoint)
         
-        // 2. 전체 응답을 BaseResponseDTO로 디코딩합니다.
         do {
             let baseResponse = try self.decoder.decode(BaseResponseDTO<T>.self, from: data)
             
-            // 3. API 응답이 성공이고, data가 존재하면 data만 반환합니다.
             if baseResponse.success, let responseData = baseResponse.data {
                 return responseData
             } else {
-            // 4. API가 정의한 비즈니스 에러일 경우, statusCodeError를 던집니다.
                 let apiError = APIErrorResponseDTO(
                     success: baseResponse.success,
                     code: baseResponse.code,
                     message: baseResponse.message
                 )
-                // 성공 응답(2xx) 코드 내에서 발생하는 비즈니스 에러이므로, status code는 임의로 200으로 설정하거나
-                // 혹은 별도의 DomainError로 처리할 수 있습니다. 여기서는 APIErrorResponseDTO를 담아 던집니다.
                 throw NetworkError.statusCodeError(statusCode: 200, response: apiError)
             }
         } catch let error as NetworkError {
@@ -78,8 +74,13 @@ public final class DefaultNetworkService: NetworkService {
     }
     
     public func requestData(endpoint: Endpoint) async throws -> Data {
-        guard let urlRequest = endpoint.asURLRequest() else {
+        guard var urlRequest = endpoint.asURLRequest() else {
             throw NetworkError.invalidURL
+        }
+
+        if urlRequest.value(forHTTPHeaderField: "Authorization") == nil,
+           let accessToken = tokenStorage.getAccessToken() {
+            urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         }
         
         #if DEBUG
