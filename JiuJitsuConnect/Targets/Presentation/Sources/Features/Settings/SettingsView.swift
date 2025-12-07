@@ -77,6 +77,18 @@ public struct SettingsView: View {
             }
             .background(Color.component.background.default)
         }
+        .overlay(alignment: .bottom) {
+            if let toastState = store.toast {
+                ToastView(
+                    state: toastState,
+                    onSwipe: { store.send(.toastDismissed, animation: .default) },
+                    onButtonTapped: { store.send(.toastButtonTapped($0), animation: .default) }
+                )
+                .padding(.horizontal, 24)
+                .padding(.bottom, toastState.bottomPadding)
+            }
+        }
+        .animation(.default, value: store.toast)
         .appAlert(
             isPresented: Binding(
                 get: { store.alert != nil },
@@ -118,18 +130,6 @@ public struct SettingsView: View {
         .padding(.horizontal, Style.horizontalPadding)
         .frame(height: Style.headerHeight)
         .background(Color.component.background.default.ignoresSafeArea(edges: .top))
-        .overlay(alignment: .bottom) {
-            if let toastState = store.toast {
-                ToastView(
-                    state: toastState,
-                    onSwipe: { store.send(.toastDismissed, animation: .default) },
-                    onButtonTapped: { store.send(.toastButtonTapped($0), animation: .default) }
-                )
-                .padding(.horizontal, 24)
-                .padding(.bottom, toastState.bottomPadding)
-            }
-        }
-        .animation(.default, value: store.toast)
     }
     
     // MARK: - Alert Configuration Helper

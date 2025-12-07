@@ -40,12 +40,20 @@ public struct MainFeature {
         Reduce { state, action in
             switch action {
             case .settingsButtonTapped:
-                state.destination = .settings(.init(authInfo: state.authInfo))
-                return .none
+                if state.authInfo.isGuest {
+                    return .send(.showLoginModal)
+                } else {
+                    state.destination = .settings(.init(authInfo: state.authInfo))
+                    return .none
+                }
                 
             case .profileButtonTapped:
-//                state.destination = .profile(ProfileFeature.State())
-                return .none
+                if state.authInfo.isGuest {
+                    return .send(.showLoginModal)
+                } else {
+                    state.destination = .settings(.init(authInfo: state.authInfo))
+                    return .none
+                }
                 
                 // MARK: - Login Logic
             case .showLoginModal:
@@ -71,6 +79,15 @@ public struct MainFeature {
                 
             case .loginModal:
                 return .none
+                
+            case let .destination(.presented(.settings(.delegate(delegateAction)))):
+                switch delegateAction {
+                case .didLogoutSuccessfully, .didWithdrawSuccessfully:
+                    state.authInfo = .guest
+                    state.destination = nil
+                    
+                    return .none
+                }
                 
             case .destination:
                 return .none

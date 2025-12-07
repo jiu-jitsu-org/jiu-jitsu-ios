@@ -122,9 +122,9 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             let requestDTO = LogoutRequestDTO(info: info)
             
             let endpoint = AuthEndpoint.serverLogout(requestDTO)
-            let responseDTO: Bool = try await networkService.request(endpoint: endpoint)
+            let responseDTO: SuccessResponseDTO = try await networkService.request(endpoint: endpoint)
             
-            return responseDTO
+            return responseDTO.success
             
         } catch let error as NetworkError {
             throw error.toDomainError()

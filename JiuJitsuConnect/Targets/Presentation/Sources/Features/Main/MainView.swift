@@ -60,5 +60,10 @@ public struct MainView: View {
                 SettingsView(store: store)
             }
         }
+        .fullScreenCover(
+            item: $store.scope(state: \.loginModal, action: \.loginModal)
+        ) { loginStore in
+            LoginView(store: loginStore)
+        }
     }
 }
