@@ -105,10 +105,9 @@ public struct SettingsFeature {
                 guard let accessToken = state.authInfo.accessToken,
                       let refreshToken = state.authInfo.refreshToken else { return .none }
 //                    state.isLoading = true
-                let info = LogoutInfo(accessToken: accessToken, refreshToken: refreshToken)
                 return .run { send in
                     await send(._logoutResponse(
-                        await TaskResult { try await authClient.serverLogout(info) }
+                        await TaskResult { try await authClient.serverLogout() }
                     ))
                 }
                 

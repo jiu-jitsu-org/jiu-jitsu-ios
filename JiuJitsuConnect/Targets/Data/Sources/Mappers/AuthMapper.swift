@@ -16,13 +16,6 @@ extension LoginRequestDTO {
     }
 }
 
-extension LogoutRequestDTO {
-    init(info: LogoutInfo) {
-        self.accessToken = info.accessToken
-        self.refreshToken = info.refreshToken
-    }
-}
-
 // MARK: - DTO to Domain
 extension LoginResponseDTO {
     func toDomain() -> AuthInfo {
