@@ -23,6 +23,7 @@ public struct SemanticColors {
         public let containerDisabled = Color.primitive.coolGray.cg100
         public let secondary = Color.primitive.coolGray.cg50
         public let secondaryPressed = Color.primitive.coolGray.cg75
+        public let tertiary = Color.primitive.coolGray.cg75
         public let disabled = Color.primitive.coolGray.cg50
         public let background = Color.primitive.coolGray.cg25
         public let backgroundDefault = Color.primitive.coolGray.cg25
@@ -69,10 +70,12 @@ public struct SemanticColors {
         public let primary = Color.primitive.coolGray.cg900
         public let secondary = Color.primitive.coolGray.cg500
         public let tertiary = Color.primitive.coolGray.cg300
+        public let subtle = Color.primitive.coolGray.cg100
         public let disabled = Color.primitive.coolGray.cg400
         public let onPrimary = Color.primitive.bw.white
         public let onDark = Color.primitive.bw.white
         public let onInactive = Color.primitive.bw.white
+        public let onInactive2 = Color.primitive.bw.white
         public let onOverlay = Color.primitive.bw.white
     }
 

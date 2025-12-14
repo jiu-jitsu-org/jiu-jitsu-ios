@@ -24,22 +24,30 @@ public typealias AssetImageTypeAlias = ImageAsset.Image
 public enum Assets {
   public enum Common {
     public enum Icon {
+      public static let check = ImageAsset(name: "Common/Icon/check")
       public static let chevronLeft = ImageAsset(name: "Common/Icon/chevron-left")
       public static let chevronRight = ImageAsset(name: "Common/Icon/chevron-right")
       public static let documents = ImageAsset(name: "Common/Icon/documents")
       public static let logOut = ImageAsset(name: "Common/Icon/log-out")
+      public static let profile = ImageAsset(name: "Common/Icon/profile")
       public static let secession = ImageAsset(name: "Common/Icon/secession")
       public static let version = ImageAsset(name: "Common/Icon/version")
     }
   }
   public enum Login {
-    public enum Icon {
-      public static let check = ImageAsset(name: "Login/Icon/check")
-    }
     public enum Logo {
       public static let apple = ImageAsset(name: "Login/Logo/apple")
       public static let google = ImageAsset(name: "Login/Logo/google")
       public static let kakao = ImageAsset(name: "Login/Logo/kakao")
+    }
+  }
+  public enum MyProfile {
+    public enum Icon {
+      public static let beltBlack = ImageAsset(name: "MyProfile/Icon/belt-black")
+      public static let beltBlue = ImageAsset(name: "MyProfile/Icon/belt-blue")
+      public static let beltBrown = ImageAsset(name: "MyProfile/Icon/belt-brown")
+      public static let beltPurple = ImageAsset(name: "MyProfile/Icon/belt-purple")
+      public static let beltWhite = ImageAsset(name: "MyProfile/Icon/belt-white")
     }
   }
   public enum Signup {

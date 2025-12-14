@@ -324,4 +324,75 @@ public struct ComponentColors {
             }
         }
     }
+    
+    // MARK: - My Profile Header
+    public let myProfileHeader = MyProfileHeader()
+    
+    public struct MyProfileHeader {
+        public let bg = Bg()
+        
+        public let profileImagePlaceholde = Color.semantic.surface.container
+        public let nicknameText = Color.semantic.primary.onPrimary
+        public let profileImageDefaultIcon = Color.semantic.icon.subtle
+        
+        public struct Bg {
+            public let `default` = Color.primitive.blue.b300
+            public let white = Color.primitive.coolGray.cg200
+            public let blue = Color.primitive.blue.b500p
+            public let purple = Color(hex: "#CD57FF")
+            public let brwon = Color(hex: "#A66040")
+            public let black = Color(hex: "#2D2D2D")
+        }
+    }
+    
+    // MARK: - Belt Card
+    public let beltCard = BeltCard()
+    
+    public struct BeltCard {
+        public let `default` = Default()
+        public let filled = Filled()
+        
+        public struct Default {
+            public let bg = Color.semantic.surface.container
+            public let text = Color.semantic.text.primary
+        }
+        
+        public struct Filled {
+            public let bg = Color.semantic.surface.container
+            public let divider = Color.semantic.border.default
+            public let labelText = Color.semantic.text.tertiary
+            public let contentText = Color.semantic.text.primary
+        }
+    }
+    
+    // MARK: - Skill Card
+    public let skillCard = SkillCard()
+    
+    public struct SkillCard {
+        public let container = Container()
+        public let `default` = Default()
+        public let editable = Editable()
+        
+        public struct Container {
+            public let bg = Color.semantic.surface.tertiary
+        }
+        
+        public struct Default {
+            public let bg = Color.semantic.surface.container
+            public let labelText = Color.semantic.text.tertiary
+            public let titleTextFilled = Color.semantic.text.primary
+            public let titleTextEmpty = Color.semantic.text.primary
+            public let titleTextFilled2 = Color.semantic.text.primary
+            public let iconBgEmpty = Color.semantic.surface.disabled
+        }
+        
+        public struct Editable {
+            public let bg = Color.semantic.surface.container
+            public let border = Color.semantic.border.default
+            public let labelText = Color.semantic.text.tertiary
+            public let labelText2 = Color.semantic.text.tertiary
+            public let titleTextFilled = Color.semantic.text.primary
+            public let titleTextEmpty = Color.semantic.text.primary
+        }
+    }
 }

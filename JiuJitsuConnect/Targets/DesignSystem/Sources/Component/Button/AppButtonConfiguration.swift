@@ -58,7 +58,7 @@ public struct AppButtonConfiguration: View {
                         .frame(width: iconSize, height: iconSize)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxHeight: .infinity)
         }
     }
     

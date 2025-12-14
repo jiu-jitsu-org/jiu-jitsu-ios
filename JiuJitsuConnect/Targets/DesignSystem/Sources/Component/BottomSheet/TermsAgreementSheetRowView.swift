@@ -34,7 +34,7 @@ public struct TermsAgreementRow: View {
     public var body: some View {
         HStack(spacing: 0) {
             HStack(spacing: 9) {
-                Assets.Login.Icon.check.swiftUIImage
+                Assets.Common.Icon.check.swiftUIImage
                     .resizable()
                     .scaledToFit()
                     .frame(width: 24, height: 24)
