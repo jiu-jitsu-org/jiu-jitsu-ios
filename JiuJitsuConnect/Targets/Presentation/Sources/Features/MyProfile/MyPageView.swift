@@ -51,6 +51,7 @@ public struct MyPageView: View {
                         .padding(.bottom, 50)
                 }
             }
+            .scrollBounceBehavior(.basedOnSize)
             .background(Color.component.background.default)
             .ignoresSafeArea(edges: .top)
         }
@@ -190,7 +191,7 @@ public struct MyPageView: View {
         ZStack {
             HStack(spacing: -15) {
                 decorativeCard(icon: "figure.wrestling", title: "특기", subtitle: "탑 포지션", color: .red)
-                    .rotationEffect(.degrees(-12))
+                    .rotationEffect(.degrees(-16.18))
                     .offset(y: 20)
                 
                 VStack(spacing: -10) {
@@ -210,31 +211,25 @@ public struct MyPageView: View {
     }
     
     private func decorativeCard(icon: String, title: String, subtitle: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 14) {
             Image(systemName: icon)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 20, height: 20)
-                .padding(8)
-                .background(color.opacity(0.15))
-                .clipShape(Circle())
-                .foregroundStyle(color)
+                .frame(width: 35, height: 35)
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.caption2)
-                    .foregroundStyle(.gray)
+                    .font(Font.pretendard.custom(weight: .medium, size: 10))
+                    .foregroundStyle(Color.component.skillCard.default.labelText)
                 Text(subtitle)
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.black)
+                    .font(Font.pretendard.custom(weight: .semiBold, size: 16))
+                    .foregroundStyle(Color.component.skillCard.default.titleTextFilled)
             }
         }
-        .padding(12)
-        .frame(width: 90, height: 110)
-        .background(Color.white)
+        .padding(14)
+        .frame(width: 142, height: 111, alignment: .topLeading)
+        .background(Color.component.skillCard.default.bg)
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
     }
 }
 

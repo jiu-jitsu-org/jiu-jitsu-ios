@@ -33,6 +33,7 @@ public struct AppButtonStyle: ButtonStyle {
         configuration.label
             .font(font)
             .padding(padding)
+            .frame(maxHeight: .infinity)
             .background(colors.background)
             .foregroundStyle(colors.foreground)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
@@ -84,24 +85,24 @@ public struct AppButtonStyle: ButtonStyle {
         switch size {
         case .large:
             return EdgeInsets(
-                top: 12,
+                top: 0,
                 leading: hasRightIcon ? 22 : 28,
-                bottom: 12,
+                bottom: 0,
                 // 오른쪽 아이콘이 있으면 오른쪽 패딩을 줄여서 균형을 맞춤
                 trailing: hasRightIcon ? 18 : 28
             )
         case .medium:
             return EdgeInsets(
-                top: 12,
+                top: 0,
                 leading: hasRightIcon ? 16 : 20,
-                bottom: 12,
+                bottom: 0,
                 trailing: hasRightIcon ? 12 : 20
             )
         case .small:
             return EdgeInsets(
-                top: 12,
+                top: 0,
                 leading: hasRightIcon ? 10 : 16,
-                bottom: 12,
+                bottom: 0,
                 trailing: hasRightIcon ? 6 : 16
             )
         case .iconOnly:
