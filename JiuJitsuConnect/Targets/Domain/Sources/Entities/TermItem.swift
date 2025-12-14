@@ -7,13 +7,13 @@
 
 import Foundation
 
-public struct TermItem: Equatable, Identifiable {
+public struct TermItem: Equatable, Identifiable, Sendable {
     public let id: UUID
     public let title: String
     public let type: TermType
     public let contentURL: URL? // 상세보기 웹뷰를 위한 URL
     
-    public enum TermType: Equatable {
+    public enum TermType: Equatable, Sendable {
         case required
         case optional
     }

@@ -11,6 +11,7 @@ public struct AppFeature {
         case splash(SplashFeature)
         case onboarding(OnboardingFeature)
         case main(MainFeature)
+        case appTab(AppTabFeature)
         case login(LoginFeature)
     }
     
@@ -35,11 +36,11 @@ public struct AppFeature {
                 return .none
                 
             case let .destination(.presented(.login(.delegate(.didLogin(authInfo))))):
-                state.destination = .main(.init(authInfo: authInfo))
+                state.destination = .appTab(.init(authInfo: authInfo))
                 return .none
                 
             case .destination(.presented(.login(.delegate(.skipLogin)))):
-                state.destination = .main(.init(authInfo: .guest))
+                state.destination = .appTab(.init(authInfo: .guest))
                 return .none
                 
             default:

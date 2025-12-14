@@ -18,14 +18,14 @@ public struct MainFeature {
         }
     }
     
-    @Reducer(state: .equatable, action: .equatable)
+    @Reducer(state: .equatable, action: .equatable, .sendable)
     public enum Destination {
         case settings(SettingsFeature)
 //        case profile(ProfileFeature)
     }
     
     @CasePathable
-    public enum Action: Equatable {
+    public enum Action: Equatable, Sendable {
         case settingsButtonTapped
         case profileButtonTapped
         

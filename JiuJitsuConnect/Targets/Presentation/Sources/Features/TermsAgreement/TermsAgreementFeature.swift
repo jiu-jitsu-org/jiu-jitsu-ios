@@ -12,11 +12,11 @@ import Domain
 import CoreKit
 
 @Reducer
-public struct TermsAgreementFeature {
+public struct TermsAgreementFeature: Sendable {
     public init() {}
     
     @ObservableState
-    public struct State: Equatable {
+    public struct State: Equatable, Sendable {
         var rows: IdentifiedArrayOf<TermsAgreementRowFeature.State>
         
         // Derived State
@@ -47,11 +47,11 @@ public struct TermsAgreementFeature {
         }
     }
     
-    public enum Action: Equatable {
+    public enum Action: Equatable, Sendable {
         case rows(IdentifiedAction<TermsAgreementRowFeature.State.ID, TermsAgreementRowFeature.Action>)
         case mainButtonTapped
         
-        public enum Delegate: Equatable {
+        public enum Delegate: Equatable, Sendable {
             case didFinishAgreement(isMarketingAgreed: Bool)
         }
         case delegate(Delegate)

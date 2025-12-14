@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct SNSUser: Equatable {
+public struct SNSUser: Equatable, Sendable {
     public init(accessToken: String, snsProvider: SNSProvider) {
         self.accessToken = accessToken
         self.snsProvider = snsProvider

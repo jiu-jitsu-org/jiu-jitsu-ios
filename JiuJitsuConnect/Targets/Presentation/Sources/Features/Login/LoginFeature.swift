@@ -23,7 +23,7 @@ public struct LoginFeature {
     }
     
     @CasePathable
-    public enum Action: Equatable {
+    public enum Action: Equatable, Sendable {
         case kakaoButtonTapped
         case googleButtonTapped
         case appleButtonTapped
@@ -39,20 +39,20 @@ public struct LoginFeature {
         case toastDismissed
         case toastButtonTapped(ToastState.Action)
         
-        public enum Delegate: Equatable {
+        public enum Delegate: Equatable, Sendable {
             case didLogin(AuthInfo)
             case skipLogin
         }
         case delegate(Delegate)
     }
     
-    @Reducer(state: .equatable, action: .equatable)
+    @Reducer(state: .equatable, .sendable, action: .equatable, .sendable)
     public enum Path {
         case nicknameSetting(NicknameSettingFeature)
         case signupComplete(SignupCompleteFeature)
     }
     
-    @Reducer(state: .equatable, action: .equatable)
+    @Reducer(state: .equatable, action: .equatable, .sendable)
     public enum Destination {
         case termsAgreement(TermsAgreementFeature)
     }

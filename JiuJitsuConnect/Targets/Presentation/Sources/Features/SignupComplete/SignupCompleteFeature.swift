@@ -10,10 +10,10 @@ import ComposableArchitecture
 import Domain
 
 @Reducer
-public struct SignupCompleteFeature {
+public struct SignupCompleteFeature: Sendable {
     
     @ObservableState
-    public struct State: Equatable {
+    public struct State: Equatable, Sendable {
         // MARK: - Passed Data
         let authInfo: AuthInfo
         
@@ -26,14 +26,14 @@ public struct SignupCompleteFeature {
         }
     }
     
-    public enum Action: Equatable {
+    public enum Action: Equatable, Sendable {
         case onAppear
         case homeButtonTapped
         
         // 애니메이션 시퀀스를 위한 내부 액션
         case _setContentVisible(Bool)
         
-        public enum Delegate: Equatable {
+        public enum Delegate: Equatable, Sendable {
             // 회원가입/설정 흐름이 모두 완료되었음을 부모에게 알림
             case completeSignupFlow(info: AuthInfo)
         }

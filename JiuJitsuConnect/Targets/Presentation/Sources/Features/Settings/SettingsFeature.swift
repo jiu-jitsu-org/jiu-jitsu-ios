@@ -22,7 +22,7 @@ public struct SettingsFeature {
         var authInfo: AuthInfo
         var appVersion: String
         
-        public enum Alert: Equatable {
+        public enum Alert: Equatable, Sendable {
             case logout
             case withdrawal
         }
@@ -41,7 +41,7 @@ public struct SettingsFeature {
     }
     
     @CasePathable
-    public enum Action: Equatable {
+    public enum Action: Equatable, Sendable {
         // View UI Actions
         case backButtonTapped
         case termsButtonTapped
@@ -64,7 +64,7 @@ public struct SettingsFeature {
         
         // Delegate Actions (부모와 통신)
         case delegate(Delegate)
-        public enum Delegate: Equatable {
+        public enum Delegate: Equatable, Sendable {
             case didLogoutSuccessfully
             case didWithdrawSuccessfully
         }
@@ -102,8 +102,6 @@ public struct SettingsFeature {
                 
             // MARK: Alert Actions
             case .confirmLogout:
-                guard let accessToken = state.authInfo.accessToken,
-                      let refreshToken = state.authInfo.refreshToken else { return .none }
 //                    state.isLoading = true
                 return .run { send in
                     await send(._logoutResponse(

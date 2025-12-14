@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct AuthInfo: Equatable {
+public struct AuthInfo: Equatable, Sendable {
     public let accessToken: String?
     public let refreshToken: String?
     public let tempToken: String?
@@ -16,7 +16,7 @@ public struct AuthInfo: Equatable {
     
     public var isGuest: Bool { accessToken == nil }
     
-    public struct UserInfo: Equatable {
+    public struct UserInfo: Equatable, Sendable {
         public let userId: Int
         public let email: String?
         public let nickname: String?

@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct ToastState: Equatable, Identifiable {
+public struct ToastState: Equatable, Identifiable, Sendable {
     public var id = UUID()
     public var message: String
     public var style: Style
@@ -21,13 +21,13 @@ public struct ToastState: Equatable, Identifiable {
         self.bottomPadding = bottomPadding
     }
     
-    public enum Style: Equatable {
+    public enum Style: Equatable, Sendable {
         case info
         case action(title: String, action: Action)
     }
 
     // 버튼이 눌렸을 때 Reducer가 어떤 동작을 할지 정의
-    public enum Action: Equatable {
+    public enum Action: Equatable, Sendable {
         case done
         
         public var description: String {

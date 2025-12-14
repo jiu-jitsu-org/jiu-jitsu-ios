@@ -14,7 +14,7 @@ import CoreKit
 import OSLog
 
 @Reducer
-public struct NicknameSettingFeature {
+public struct NicknameSettingFeature: Sendable {
     
     public init() {}
     
@@ -27,7 +27,7 @@ public struct NicknameSettingFeature {
     }()
     
     @ObservableState
-    public struct State: Equatable {
+    public struct State: Equatable, Sendable {
         // MARK: - Core State
         @Presents var alert: AlertState<Action.Alert>?
         
@@ -50,7 +50,7 @@ public struct NicknameSettingFeature {
         }
     }
     
-    public enum Action: BindableAction, Equatable {
+    public enum Action: BindableAction, Equatable, Sendable {
         case binding(BindingAction<State>)
         case onAppear
         case viewTapped
@@ -61,9 +61,9 @@ public struct NicknameSettingFeature {
         case _checkNicknameResponse(TaskResult<Bool>)
         case _signupResponse(TaskResult<AuthInfo>)
         
-        public enum Alert: Equatable {}
+        public enum Alert: Equatable, Sendable {}
         
-        public enum Delegate: Equatable {
+        public enum Delegate: Equatable, Sendable {
             case signupSuccessful(info: AuthInfo)
             case signupFailed(message: String)
         }
@@ -207,7 +207,7 @@ public struct NicknameSettingFeature {
 
 // MARK: - Validation State & View Helpers
 public extension NicknameSettingFeature {
-    enum ValidationState: Equatable {
+    enum ValidationState: Equatable, Sendable {
         case idle
         case available
         case unavailable
