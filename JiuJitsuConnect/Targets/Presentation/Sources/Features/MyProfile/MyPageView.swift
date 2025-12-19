@@ -13,12 +13,62 @@ import Domain
 private enum Style {
     enum Header {
         static let topPadding: CGFloat = 68 // Safe Area Top 부터 프로필 이미지까지의 거리
-        static let bottomPadding: CGFloat = 82
+        static let bottomPadding: CGFloat = 82.49
     }
     
     enum Card {
         static let overlapHeight: CGFloat = 46     // 카드가 헤더와 겹치는 높이
         static let minHeight: CGFloat = 195        // 카드 최소 높이
+    }
+    
+    struct DecorativeCardConfiguration {
+        let image: Image
+        let width: CGFloat
+        let height: CGFloat
+        let xPosition: CGFloat  // ZStack 중앙으로부터 카드 leading edge까지의 거리 (+ 오른쪽, - 왼쪽)
+        let yPosition: CGFloat  // 상단으로부터의 거리
+        let rotationDegrees: Double  // 회전 각도
+        let zIndex: Double
+        
+        static let guardPosition = DecorativeCardConfiguration(
+            image: Assets.MyProfile.Card.styleGuardPosition.swiftUIImage,
+            width: 151.09,
+            height: 117.58,
+            xPosition: -2.49,
+            yPosition: 26,
+            rotationDegrees: 16.33,
+            zIndex: 3
+        )
+        
+        static let topPosition = DecorativeCardConfiguration(
+            image: Assets.MyProfile.Card.styleTopPosition.swiftUIImage,
+            width: 142,
+            height: 110.51,
+            xPosition: -152.36,
+            yPosition: 59,
+            rotationDegrees: -16.18,
+            zIndex: 0
+        )
+        
+        static let armLock = DecorativeCardConfiguration(
+            image: Assets.MyProfile.Card.styleArmLock.swiftUIImage,
+            width: 153.67,
+            height: 119.6,
+            xPosition: -33.49,
+            yPosition: 110,
+            rotationDegrees: -11.04,
+            zIndex: 2
+        )
+        
+        static let escapeDefense = DecorativeCardConfiguration(
+            image: Assets.MyProfile.Card.styleEscapeDefense.swiftUIImage,
+            width: 132.43,
+            height: 103.09,
+            xPosition: -109.64,
+            yPosition: 163.46,
+            rotationDegrees: 5.83,
+            zIndex: 1
+        )
     }
 }
 
@@ -158,78 +208,56 @@ public struct MyPageView: View {
     }
     
     private var styleSectionView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 0) {
             VStack(spacing: 8) {
                 Text("나의 주짓수를 보여주세요")
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.black)
+                    .font(Font.pretendard.title3)
+                    .foregroundStyle(Color.component.sectionHeader.title)
                 
                 Text("특기와 최애 포지션, 기술 등을 등록해보세요.")
-                    .font(.subheadline)
-                    .foregroundStyle(.gray)
+                    .font(Font.pretendard.bodyM)
+                    .foregroundStyle(Color.component.sectionHeader.subTitle)
             }
             
             Button {
-                store.send(.registerStyleButtonTapped)
+                store.send(.gymInfoButtonTapped)
             } label: {
-                Text("내 스타일 등록하기")
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                    .foregroundStyle(Color.blue)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                    .background(Capsule().fill(Color.blue.opacity(0.1)))
+                AppButtonConfiguration(title: "내 스타일 등록하기", size: .medium)
             }
+            .appButtonStyle(.tint, size: .medium)
+            .frame(height: 38)
+            .padding(.top, 24)
             
             decorativeCardsView
-                .padding(.top, 20)
+                .padding(.top, 16)
         }
     }
     
     private var decorativeCardsView: some View {
-        ZStack {
-            HStack(spacing: -15) {
-                decorativeCard(icon: "figure.wrestling", title: "특기", subtitle: "탑 포지션", color: .red)
-                    .rotationEffect(.degrees(-16.18))
-                    .offset(y: 20)
-                
-                VStack(spacing: -10) {
-                    decorativeCard(icon: "figure.strengthtraining.traditional", title: "최애", subtitle: "가드 포지션", color: .gray)
-                        .rotationEffect(.degrees(5))
-                        .zIndex(1)
-                    
-                    decorativeCard(icon: "figure.rolling", title: "특기", subtitle: "팔 관절기", color: .cyan)
-                        .rotationEffect(.degrees(-5))
-                }
-                
-                decorativeCard(icon: "figure.run", title: "특기", subtitle: "이스케이프", color: .green)
-                    .rotationEffect(.degrees(10))
-                    .offset(y: 30)
+        GeometryReader { geometry in
+            let centerX = geometry.size.width / 2
+            
+            ZStack(alignment: .top) {
+                decorativeCard(config: .guardPosition, centerX: centerX)
+                decorativeCard(config: .topPosition, centerX: centerX)
+                decorativeCard(config: .armLock, centerX: centerX)
+                decorativeCard(config: .escapeDefense, centerX: centerX)
             }
         }
+        .frame(height: 282) // 카드들이 모두 들어갈 수 있는 높이 설정
     }
     
-    private func decorativeCard(icon: String, title: String, subtitle: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Image(systemName: icon)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 35, height: 35)
-            
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(Font.pretendard.custom(weight: .medium, size: 10))
-                    .foregroundStyle(Color.component.skillCard.default.labelText)
-                Text(subtitle)
-                    .font(Font.pretendard.custom(weight: .semiBold, size: 16))
-                    .foregroundStyle(Color.component.skillCard.default.titleTextFilled)
-            }
-        }
-        .padding(14)
-        .frame(width: 142, height: 111, alignment: .topLeading)
-        .background(Color.component.skillCard.default.bg)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+    private func decorativeCard(config: Style.DecorativeCardConfiguration, centerX: CGFloat) -> some View {
+        config.image
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .frame(width: config.width, height: config.height)
+            .rotationEffect(.degrees(config.rotationDegrees))
+            .position(
+                x: centerX + config.xPosition + config.width / 2,  // ZStack 중앙 + xPosition(leading 기준) + 카드 너비의 절반
+                y: config.yPosition + config.height / 2
+            )
+            .zIndex(config.zIndex)
     }
 }
 

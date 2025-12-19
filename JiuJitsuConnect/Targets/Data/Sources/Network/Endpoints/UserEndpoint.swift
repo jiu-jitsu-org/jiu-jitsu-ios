@@ -16,7 +16,7 @@ enum UserEndpoint {
 
 extension UserEndpoint: Endpoint {
     var baseURL: String {
-        guard let baseURL = Bundle.main.object(forInfoDictionaryKey: "BASE_URL") as? String else {
+        guard let baseURL = Bundle.main.object(forInfoDictionaryKey: "TEST_BASE_URL") as? String else {
             fatalError("BASE_URL is not set in Info.plist")
         }
         return baseURL

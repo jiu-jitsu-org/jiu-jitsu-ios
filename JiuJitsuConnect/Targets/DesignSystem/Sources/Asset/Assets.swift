@@ -42,12 +42,26 @@ public enum Assets {
     }
   }
   public enum MyProfile {
+    public enum Card {
+      public static let styleArmLock = ImageAsset(name: "MyProfile/Card/style-arm-lock")
+      public static let styleEscapeDefense = ImageAsset(name: "MyProfile/Card/style-escape-defense")
+      public static let styleGuardPosition = ImageAsset(name: "MyProfile/Card/style-guard-position")
+      public static let styleTopPosition = ImageAsset(name: "MyProfile/Card/style-top-position")
+    }
     public enum Icon {
       public static let beltBlack = ImageAsset(name: "MyProfile/Icon/belt-black")
       public static let beltBlue = ImageAsset(name: "MyProfile/Icon/belt-blue")
       public static let beltBrown = ImageAsset(name: "MyProfile/Icon/belt-brown")
       public static let beltPurple = ImageAsset(name: "MyProfile/Icon/belt-purple")
       public static let beltWhite = ImageAsset(name: "MyProfile/Icon/belt-white")
+      public static let styleArmLock = ImageAsset(name: "MyProfile/Icon/style-arm-lock")
+      public static let styleChoke = ImageAsset(name: "MyProfile/Icon/style-choke")
+      public static let styleEscapeDefense = ImageAsset(name: "MyProfile/Icon/style-escape-defense")
+      public static let styleGuardPass = ImageAsset(name: "MyProfile/Icon/style-guard-pass")
+      public static let styleGuardPosition = ImageAsset(name: "MyProfile/Icon/style-guard-position")
+      public static let styleLegLock = ImageAsset(name: "MyProfile/Icon/style-leg-lock")
+      public static let styleSweep = ImageAsset(name: "MyProfile/Icon/style-sweep")
+      public static let styleTopPosition = ImageAsset(name: "MyProfile/Icon/style-top-position")
     }
   }
   public enum Signup {

@@ -395,4 +395,13 @@ public struct ComponentColors {
             public let titleTextEmpty = Color.semantic.text.primary
         }
     }
+    
+    // MARK: - Section Header
+    public let sectionHeader = SectionHeader()
+    
+    public struct SectionHeader {
+        public let title = Color.semantic.text.primary
+        public let subTitle = Color.semantic.text.secondary
+        public let label = Color.semantic.text.secondary
+    }
 }
