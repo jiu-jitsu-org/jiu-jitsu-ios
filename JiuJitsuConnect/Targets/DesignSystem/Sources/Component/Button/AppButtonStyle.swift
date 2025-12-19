@@ -51,7 +51,7 @@ public struct AppButtonStyle: ButtonStyle {
             return (componentColors.filled.defaultBg, componentColors.filled.defaultText)
             
         case .destructive:
-            return (Color(hex: "#E52012") ?? componentColors.filled.disabledBg, componentColors.filled.defaultText)
+            return (Color(hex: "#E52012"), componentColors.filled.defaultText)
             
         case .tint:
             if !isEnabled { return (componentColors.tint.disabledBg, componentColors.tint.disabledText) }

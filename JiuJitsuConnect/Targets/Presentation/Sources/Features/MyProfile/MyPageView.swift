@@ -10,6 +10,9 @@ import DesignSystem
 import ComposableArchitecture
 import Domain
 
+extension Color {
+}
+
 private enum Style {
     enum Header {
         static let topPadding: CGFloat = 68 // Safe Area Top 부터 프로필 이미지까지의 거리
@@ -82,26 +85,50 @@ public struct MyPageView: View {
     public var body: some View {
         GeometryReader { geometry in
             let safeAreaTop = geometry.safeAreaInsets.top
+            let safeAreaBottom = geometry.safeAreaInsets.bottom
             
-            ScrollView {
-                VStack(spacing: 0) {
-                    // 1. 헤더 영역
-                    profileHeaderView(safeAreaTop: safeAreaTop)
-                        .zIndex(0) // 배경
+            ScrollView(showsIndicators: false) {
+                ZStack(alignment: .bottom) {
+                    // 메인 콘텐츠
+                    VStack(spacing: 0) {
+                        // 1. 헤더 영역
+                        profileHeaderView(safeAreaTop: safeAreaTop)
+                            .zIndex(0) // 배경
+                        
+                        // 2. 카드 영역 (Offset으로 겹침 효과 구현)
+                        beltWeightCardView
+                            .offset(y: -Style.Card.overlapHeight) // 위로 끌어올림
+                            .padding(.bottom, -Style.Card.overlapHeight) // 끌어올린 만큼 공간 제거
+                            .zIndex(1) // 헤더 위에 표시
+                        
+                        // 3. 스타일 영역
+                        styleSectionView
+                            .padding(.top, 72) // 카드와의 간격
+                            .padding(.bottom, 18)
+                    }
                     
-                    // 2. 카드 영역 (Offset으로 겹침 효과 구현)
-                    beltWeightCardView
-                        .offset(y: -Style.Card.overlapHeight) // 위로 끌어올림
-                        .padding(.bottom, -Style.Card.overlapHeight) // 끌어올린 만큼 공간 제거
-                        .zIndex(1) // 헤더 위에 표시
-                    
-                    // 3. 스타일 영역
-                    styleSectionView
-                        .padding(.top, 30) // 카드와의 간격
-                        .padding(.bottom, 50)
+                    // 배경 그라데이션 (최하위 레이어)
+                    VStack {
+                        Spacer()
+                        LinearGradient(
+                            gradient: Gradient(stops: [
+                                .init(color: Color(hex: "0090FF").opacity(0), location: 0),
+                                .init(color: Color(hex: "0090FF").opacity(0.4), location: 1)
+                            ]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 433)
+                    }
+                    .offset(y: 58 + safeAreaBottom) // bottom 기준으로 위로 올림
+                    .allowsHitTesting(false) // 터치 이벤트가 뒤의 콘텐츠로 전달되도록
+                    .zIndex(-1)
                 }
             }
-            .scrollBounceBehavior(.basedOnSize)
+            .scrollDisabled(false)
+            .onAppear {
+                UIScrollView.appearance().bounces = false
+            }
             .background(Color.component.background.default)
             .ignoresSafeArea(edges: .top)
         }
@@ -204,6 +231,7 @@ public struct MyPageView: View {
         .frame(minHeight: Style.Card.minHeight)
         .background(Color.component.beltCard.default.bg)
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 4)
         .padding(.horizontal, 20)
     }
     
