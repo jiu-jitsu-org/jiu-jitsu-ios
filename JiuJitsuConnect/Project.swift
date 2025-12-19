@@ -24,7 +24,7 @@ let swiftlintScript: TargetScript = .pre(
 // MARK: - Info Plist
 let appInfoPlist: [String: Plist.Value] = {
     var base: [String: Plist.Value] = [
-        "CFBundleDisplayName": "JiuJitsuLab",
+        "CFBundleDisplayName": "Oss",
         "CFBundleShortVersionString": Plist.Value(stringLiteral: version),
         "UILaunchStoryboardName": "Launch Screen",
         "UIApplicationSceneManifest": [

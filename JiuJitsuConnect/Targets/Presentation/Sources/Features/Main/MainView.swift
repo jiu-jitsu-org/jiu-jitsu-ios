@@ -16,7 +16,7 @@ public struct MainView: View {
                 Color.blue.opacity(0.8).ignoresSafeArea()
                 
                 VStack(spacing: 40) {
-                    Text("JiuJitsuConnect")
+                    Text("Oss")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundStyle(.white)

@@ -12,7 +12,7 @@ public struct SplashView: View {
         ZStack {
             // TODO: 스플래쉬 배경 및 로고 이미지 추가
             Color.blue.ignoresSafeArea()
-            Text("JiuJitsuConnect")
+            Text("Oss")
                 .font(.largeTitle)
                 .foregroundStyle(.white)
         }

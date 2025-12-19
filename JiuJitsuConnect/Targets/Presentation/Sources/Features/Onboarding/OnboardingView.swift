@@ -11,7 +11,7 @@ public struct OnboardingView: View {
     public var body: some View {
         ZStack {
             Color.blue.ignoresSafeArea()
-            Text("JiuJitsuConnect")
+            Text("Oss")
                 .font(.largeTitle)
                 .foregroundStyle(.white)
         }
