@@ -31,20 +31,24 @@ public struct AppTabView: View {
                 .tag(AppTabFeature.Tab.main)
             
             // 탭 2: 커뮤니티
-            CommunityView(store: store.scope(state: \.community, action: \.community))
-                .tabItem {
-                    Image(systemName: "bubble.left.and.bubble.right")
-                    Text("커뮤니티")
-                }
-                .tag(AppTabFeature.Tab.community)
+            NavigationStack {
+                CommunityView(store: store.scope(state: \.community, action: \.community))
+            }
+            .tabItem {
+                Image(systemName: "bubble.left.and.bubble.right")
+                Text("커뮤니티")
+            }
+            .tag(AppTabFeature.Tab.community)
             
             // 탭 3: 마이페이지
-            MyPageView(store: store.scope(state: \.myPage, action: \.myPage))
-                .tabItem {
-                    Image(systemName: "person")
-                    Text("MY")
-                }
-                .tag(AppTabFeature.Tab.myPage)
+            NavigationStack {
+                MyProfileView(store: store.scope(state: \.myPage, action: \.myPage))
+            }
+            .tabItem {
+                Image(systemName: "person")
+                Text("MY")
+            }
+            .tag(AppTabFeature.Tab.myPage)
         }
         .tint(.blue) // 선택된 탭 색상
         .onAppear {

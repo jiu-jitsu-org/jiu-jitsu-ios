@@ -26,13 +26,13 @@ public struct AppTabFeature: Sendable {
         // 각 탭의 독립적인 State
         var main: MainFeature.State
         var community: CommunityFeature.State
-        var myPage: MyPageFeature.State
+        var myPage: MyPrpfileFeature.State
         
         // 초기화 시 필요한 정보 주입 (예: AuthInfo)
         public init(authInfo: AuthInfo) {
             self.main = MainFeature.State(authInfo: authInfo)
             self.community = CommunityFeature.State()
-            self.myPage = MyPageFeature.State(authInfo: authInfo)
+            self.myPage = MyPrpfileFeature.State(authInfo: authInfo)
         }
     }
     
@@ -42,7 +42,7 @@ public struct AppTabFeature: Sendable {
         // 자식 Feature 액션 연결
         case main(MainFeature.Action)
         case community(CommunityFeature.Action)
-        case myPage(MyPageFeature.Action)
+        case myPage(MyPrpfileFeature.Action)
     }
     
     public var body: some ReducerOf<Self> {
@@ -54,7 +54,7 @@ public struct AppTabFeature: Sendable {
             CommunityFeature()
         }
         Scope(state: \.myPage, action: \.myPage) {
-            MyPageFeature()
+            MyPrpfileFeature()
         }
         
         // 2. 탭 바 자체 로직 처리

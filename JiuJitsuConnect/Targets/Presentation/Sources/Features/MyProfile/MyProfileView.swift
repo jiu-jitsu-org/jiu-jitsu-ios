@@ -1,5 +1,5 @@
 //
-//  MyPageView.swift
+//  MyProfileView.swift
 //  Presentation
 //
 //  Created by suni on 12/7/25.
@@ -75,10 +75,10 @@ private enum Style {
     }
 }
 
-public struct MyPageView: View {
-    let store: StoreOf<MyPageFeature>
+public struct MyProfileView: View {
+    @Bindable var store: StoreOf<MyPrpfileFeature>
     
-    public init(store: StoreOf<MyPageFeature>) {
+    public init(store: StoreOf<MyPrpfileFeature>) {
         self.store = store
     }
     
@@ -131,6 +131,12 @@ public struct MyPageView: View {
             }
             .background(Color.component.background.default)
             .ignoresSafeArea(edges: .top)
+            // 네비게이션 목적지 처리
+            .navigationDestination(
+                item: $store.scope(state: \.destination?.academySetting, action: \.destination.academySetting)
+            ) { academySettingStore in
+                MyAcademySettingView(store: academySettingStore)
+            }
         }
     }
     
@@ -290,9 +296,9 @@ public struct MyPageView: View {
 }
 
 #Preview {
-    MyPageView(
+    MyProfileView(
         store: Store(
-            initialState: MyPageFeature.State(
+            initialState: MyPrpfileFeature.State(
                 authInfo: AuthInfo(
                     accessToken: "sample_token",
                     refreshToken: "sample_refresh",
@@ -309,7 +315,7 @@ public struct MyPageView: View {
                 )
             )
         ) {
-            MyPageFeature()
+            MyPrpfileFeature()
         }
     )
 }
