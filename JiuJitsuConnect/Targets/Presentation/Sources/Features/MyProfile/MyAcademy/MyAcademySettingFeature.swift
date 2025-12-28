@@ -9,11 +9,22 @@ import Foundation
 import SwiftUI
 import ComposableArchitecture
 import DesignSystem
+import CoreKit
+import OSLog
 
 @Reducer
 public struct MyAcademySettingFeature: Sendable {
     
     public init() {}
+    
+    private enum CancelID { case apiCall }
+    
+    // 정규식 객체 재사용을 위한 Static 선언
+    // 닉네임과 다른 점: 띄어쓰기(\s) 추가
+    private static let academyNameRegex: NSRegularExpression? = {
+        let pattern = "^[a-zA-Z0-9가-힣\\s]*$"
+        return try? NSRegularExpression(pattern: pattern, options: .caseInsensitive)
+    }()
     
     @ObservableState
     public struct State: Equatable, Sendable {
@@ -38,13 +49,24 @@ public struct MyAcademySettingFeature: Sendable {
         case doneButtonTapped
         case alert(PresentationAction<Alert>)
         
+        // Internal Actions
+        case _saveAcademyResponse(TaskResult<Bool>)
+        
+        // Delegate Actions
+        case delegate(Delegate)
+        
         public enum Alert: Equatable, Sendable {}
         
         public enum Delegate: Equatable, Sendable {
             case didSaveAcademyName(String)
+            case saveFailed(message: String)
         }
-        case delegate(Delegate)
     }
+    
+    // MARK: - Dependencies
+    
+    // TODO: 실제 AcademyClient나 UserClient dependency 추가 필요
+    // @Dependency(\.academyClient) var academyClient
     
     public var body: some ReducerOf<Self> {
         BindingReducer()
@@ -61,7 +83,7 @@ public struct MyAcademySettingFeature: Sendable {
                 }
                 state.isCtaButtonEnabled = true
                 
-                // 입력 값이 변경되면 검증 상태 초기화
+                // 입력 값이 변경되면 이전 검증 상태 초기화
                 if state.validationState == .valid {
                     state.validationState = .idle
                 }
@@ -70,22 +92,50 @@ public struct MyAcademySettingFeature: Sendable {
             case .doneButtonTapped:
                 guard state.isCtaButtonEnabled else { return .none }
                 
-                // TODO: 도장 정보 입력 - 유효성 검사
-                if state.academyName.trimmingCharacters(in: .whitespaces).isEmpty {
-                    state.validationState = .empty
+                // 1단계: 로컬 유효성 검사
+                // 글자 수 체크 (1~30자)
+                if !(1...30).contains(state.academyName.count) {
+                    state.validationState = .invalidLength
                     state.isCtaButtonEnabled = false
                     return .none
                 }
                 
-                if state.academyName.count > 30 {
-                    state.validationState = .tooLong
+                // 허용된 문자 체크 (한글/영문/숫자/띄어쓰기)
+                if !isValid(academyName: state.academyName) {
+                    state.validationState = .invalidCharacters
                     state.isCtaButtonEnabled = false
                     return .none
                 }
                 
-                // 유효성 검사 통과
+                // 유효성 검사 통과 - valid 상태로 변경하고 서버 통신 시작
                 state.validationState = .valid
+                
+                // 2단계: 서버에 도장 정보 저장
+                return .run { send in
+                    await send(._saveAcademyResponse(
+                        await TaskResult {
+                            // TODO: 실제 서버 API 호출
+                            // let academyName = state.academyName
+                            // try await academyClient.updateAcademyInfo(.init(name: academyName))
+                            
+                            // 임시로 성공 처리 (실제 구현 시 제거)
+                            try await Task.sleep(for: .milliseconds(500))
+                            return true
+                        }
+                    ))
+                }
+                .cancellable(id: CancelID.apiCall)
+                
+            case ._saveAcademyResponse(.success):
+                // 저장 성공 - Delegate로 성공 알림 (뒤로가기 + 토스트 메시지 처리)
                 return .send(.delegate(.didSaveAcademyName(state.academyName)))
+                
+            case let ._saveAcademyResponse(.failure(error)):
+                // 저장 실패 처리
+                Log.trace("Failed to save academy info: \(error)", category: .network, level: .error)
+                state.validationState = .saveFailed
+                state.isCtaButtonEnabled = false
+                return .send(.delegate(.saveFailed(message: "도장 정보 저장에 실패했습니다.\n다시 시도해주세요.")))
                 
             case .viewTapped:
                 state.isKeyboardVisible = false
@@ -97,6 +147,19 @@ public struct MyAcademySettingFeature: Sendable {
         }
         .ifLet(\.$alert, action: \.alert)
     }
+    
+    // 정규식 검사 최적화 (NicknameSettingFeature 방식)
+    private func isValid(academyName: String) -> Bool {
+        guard let regex = Self.academyNameRegex else {
+            // Fallback: 정규식 생성 실패 시 기본 검증
+            return academyName.allSatisfy { character in
+                character.isLetter || character.isNumber || character.isWhitespace
+            }
+        }
+        
+        let range = NSRange(location: 0, length: academyName.utf16.count)
+        return regex.firstMatch(in: academyName, options: [], range: range) != nil
+    }
 }
 
 // MARK: - Validation State & View Helpers
@@ -104,10 +167,12 @@ public extension MyAcademySettingFeature {
     enum ValidationState: Equatable, Sendable {
         case idle
         case valid
-        case empty
-        case tooLong
+        case invalidLength
+        case invalidCharacters
+        case saveFailed
     }
 }
+
 public extension MyAcademySettingFeature.ValidationState {
     var message: String {
         switch self {
@@ -115,10 +180,10 @@ public extension MyAcademySettingFeature.ValidationState {
             return "도장 이름을 입력해주세요"
         case .valid:
             return "도장 이름이 설정되었습니다"
-        case .empty:
-            return "도장 이름을 입력해주세요"
-        case .tooLong:
-            return "도장 이름은 30자\n이내로 작성해주세요"
+        case .invalidLength, .invalidCharacters:
+            return "한글/영문/숫자,\n1~30자로 작성해주세요"
+        case .saveFailed:
+            return "저장에 실패했습니다.\n다시 시도해주세요"
         }
     }
     
@@ -133,7 +198,7 @@ public extension MyAcademySettingFeature.ValidationState {
         switch self {
         case .idle, .valid:
             return Color.component.textfieldDisplay.focus.text
-        case .empty, .tooLong:
+        case .invalidLength, .invalidCharacters, .saveFailed:
             return Color.component.textfieldDisplay.default.placeholder
         }
     }

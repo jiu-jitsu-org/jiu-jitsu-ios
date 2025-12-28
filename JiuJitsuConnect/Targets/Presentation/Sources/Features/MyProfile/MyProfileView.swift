@@ -137,6 +137,19 @@ public struct MyProfileView: View {
             ) { academySettingStore in
                 MyAcademySettingView(store: academySettingStore)
             }
+            // 토스트 메시지 표시
+            .overlay(alignment: .bottom) {
+                if let toastState = store.toast {
+                    ToastView(
+                        state: toastState,
+                        onSwipe: { store.send(.toastDismissed, animation: .default) },
+                        onButtonTapped: { store.send(.toastButtonTapped($0), animation: .default) }
+                    )
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, toastState.bottomPadding)
+                }
+            }
+            .animation(.default, value: store.toast)
         }
     }
     
