@@ -9,6 +9,11 @@ import SwiftUI
 import ComposableArchitecture
 import DesignSystem
 
+private enum Style {
+    static let headerHeight: CGFloat = 44
+    static let horizontalPadding: CGFloat = 20
+}
+
 public struct MyAcademySettingView: View {
     
     @Bindable var store: StoreOf<MyAcademySettingFeature>
@@ -20,6 +25,7 @@ public struct MyAcademySettingView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
+            headerView
             titleSection
             textFieldSection
             Spacer()
@@ -41,6 +47,38 @@ public struct MyAcademySettingView: View {
 
 // MARK: - Private Views
 private extension MyAcademySettingView {
+    
+    var headerView: some View {
+        HStack {
+            Button(action: { store.send(.backButtonTapped) }) {
+                ZStack {
+                    Assets.Common.Icon.chevronLeft.swiftUIImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
+                        .foregroundStyle(Color.component.bottomSheet.unselected.listItem.followingIcon)
+                }
+                .frame(width: 32, height: 32)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            
+            Spacer()
+            
+            Text("도장명 설정")
+                .font(Font.pretendard.title3)
+                .foregroundStyle(Color.component.header.text)
+            
+            Spacer()
+            
+            Rectangle()
+                .fill(.clear)
+                .frame(width: 32, height: 32)
+        }
+        .padding(.horizontal, Style.horizontalPadding)
+        .frame(height: Style.headerHeight)
+        .background(Color.component.background.default.ignoresSafeArea(edges: .top))
+    }
     
     var titleSection: some View {
         Text(store.validationState.message)

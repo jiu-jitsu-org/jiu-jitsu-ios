@@ -89,8 +89,10 @@ public struct NicknameSettingFeature: Sendable {
                 }
                 state.isCtaButtonEnabled = true
                 
-                // 입력 값이 변경되면 이전 검증 상태 초기화
-                if state.validationState == .available {
+                // 입력 값이 변경되면 검증 상태 초기화
+                // 에러 상태(.invalidLength, .invalidCharacters, .saveFailed)나
+                // 성공 상태(.valid)에서 다시 입력하면 idle로 리셋
+                if state.validationState != .idle {
                     state.validationState = .idle
                     state.validatedNickname = nil
                 }

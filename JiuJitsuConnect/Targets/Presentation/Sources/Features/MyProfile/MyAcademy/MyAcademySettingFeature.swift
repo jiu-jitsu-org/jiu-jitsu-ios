@@ -31,6 +31,7 @@ public struct MyAcademySettingFeature: Sendable {
         // MARK: - Core State
         @Presents var alert: AlertState<Action.Alert>?
         
+        var mode: Mode
         var academyName: String = ""
         var validationState: ValidationState = .idle
         
@@ -39,7 +40,15 @@ public struct MyAcademySettingFeature: Sendable {
         var isCtaButtonEnabled: Bool = true
         var isTextFieldActive: Bool = false
         
-        public init() {}
+        public init(mode: Mode = .add, academyName: String = "") {
+            self.mode = mode
+            self.academyName = academyName
+            
+            // 수정 모드이고 기존 도장명이 있으면 텍스트필드를 활성화 상태로 시작
+            if mode == .edit && !academyName.isEmpty {
+                self.isTextFieldActive = true
+            }
+        }
     }
     
     public enum Action: BindableAction, Equatable, Sendable {
@@ -47,6 +56,7 @@ public struct MyAcademySettingFeature: Sendable {
         case onAppear
         case viewTapped
         case doneButtonTapped
+        case backButtonTapped
         case alert(PresentationAction<Alert>)
         
         // Internal Actions
@@ -60,6 +70,7 @@ public struct MyAcademySettingFeature: Sendable {
         public enum Delegate: Equatable, Sendable {
             case didSaveAcademyName(String)
             case saveFailed(message: String)
+            case didTapBackButton
         }
     }
     
@@ -83,8 +94,10 @@ public struct MyAcademySettingFeature: Sendable {
                 }
                 state.isCtaButtonEnabled = true
                 
-                // 입력 값이 변경되면 이전 검증 상태 초기화
-                if state.validationState == .valid {
+                // 입력 값이 변경되면 검증 상태 초기화
+                // 에러 상태(.invalidLength, .invalidCharacters, .saveFailed)나
+                // 성공 상태(.valid)에서 다시 입력하면 idle로 리셋
+                if state.validationState != .idle {
                     state.validationState = .idle
                 }
                 return .none
@@ -112,11 +125,18 @@ public struct MyAcademySettingFeature: Sendable {
                 
                 // 2단계: 서버에 도장 정보 저장
                 return .run { send in
+                    // TODO: 실제 구현 시 mode와 academyName을 캡처하여 사용
+                    // return .run { [mode = state.mode, academyName = state.academyName] send in
                     await send(._saveAcademyResponse(
                         await TaskResult {
                             // TODO: 실제 서버 API 호출
-                            // let academyName = state.academyName
-                            // try await academyClient.updateAcademyInfo(.init(name: academyName))
+                            // mode에 따라 다른 API 호출
+                            // switch mode {
+                            // case .add:
+                            //     try await academyClient.createAcademy(.init(name: academyName))
+                            // case .edit:
+                            //     try await academyClient.updateAcademy(.init(name: academyName))
+                            // }
                             
                             // 임시로 성공 처리 (실제 구현 시 제거)
                             try await Task.sleep(for: .milliseconds(500))
@@ -141,6 +161,9 @@ public struct MyAcademySettingFeature: Sendable {
                 state.isKeyboardVisible = false
                 return .none
                 
+            case .backButtonTapped:
+                return .send(.delegate(.didTapBackButton))
+                
             case .binding, .alert, .delegate:
                 return .none
             }
@@ -164,6 +187,20 @@ public struct MyAcademySettingFeature: Sendable {
 
 // MARK: - Validation State & View Helpers
 public extension MyAcademySettingFeature {
+    enum Mode: Equatable, Sendable {
+        case add
+        case edit
+        
+        var headerTitle: String {
+            switch self {
+            case .add:
+                return "도장 정보 추가"
+            case .edit:
+                return "도장 정보 수정"
+            }
+        }
+    }
+    
     enum ValidationState: Equatable, Sendable {
         case idle
         case valid

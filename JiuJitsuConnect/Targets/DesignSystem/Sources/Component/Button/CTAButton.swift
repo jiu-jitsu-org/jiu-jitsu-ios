@@ -73,7 +73,7 @@ private struct CTAButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(colors.background)
             } else {
-                Rectangle()
+                RoundedRectangle(cornerRadius: 16)
                     .fill(colors.background)
             }
         }
@@ -83,6 +83,8 @@ private struct CTAButtonStyle: ButtonStyle {
         )
         .frame(maxWidth: .infinity)
         .frame(height: height)
+        .padding(.horizontal, style == .keypad ? 12 : 0)
+        .padding(.bottom, style == .keypad ? 12 : 0)
         .animation(.easeInOut(duration: 0.1), value: isPressed)
         .animation(.easeInOut(duration: 0.2), value: isEnabled)
     }
