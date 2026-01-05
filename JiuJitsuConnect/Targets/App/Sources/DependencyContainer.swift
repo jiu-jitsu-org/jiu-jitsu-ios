@@ -24,6 +24,7 @@ public final class DependencyContainer {
     // MARK: - Repositories
     private lazy var authRepository: AuthRepository = AuthRepositoryImpl()
     private lazy var userRepository: UserRepository = UserRepositoryImpl()
+    private lazy var communityRepository: CommunityRepository = CommunityRepositoryImpl()
     
     // MARK: - Public Methods
     
@@ -57,6 +58,17 @@ public final class DependencyContainer {
             },
             withdrawal: {
                 try await self.userRepository.withdrawal()
+            }
+        )
+    }
+    
+    public func configureCommunityClient() -> CommunityClient {
+        return CommunityClient(
+            fetchProfile: {
+                try await self.communityRepository.fetchProfile()
+            },
+            postProfile: { profile in
+                try await self.communityRepository.postProfile(profile)
             }
         )
     }

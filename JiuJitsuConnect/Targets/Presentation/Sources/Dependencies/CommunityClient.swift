@@ -29,34 +29,48 @@ public struct CommunityClient: Sendable {
 extension CommunityClient: DependencyKey {
     public static let liveValue: Self = .unimplemented
     
-    /// Live 구현 (실제 API 통신)
-    public static let liveValue: CommunityClient = {
-        let repository: CommunityRepository = CommunityRepositoryImpl()
-        
-        return CommunityClient(
-            fetchProfile: {
-                try await repository.fetchProfile()
-            },
-            updateProfile: { profile in
-                try await repository.updateProfile(profile)
-            }
-        )
-    }()
-}
-    
-// MARK: - TestDependencyKey
-
-extension CommunityClient: TestDependencyKey {
     /// Test 구현 (테스트용 Mock)
     public static let testValue: CommunityClient = CommunityClient(
         fetchProfile: {
-            unimplemented("CommunityClient.fetchProfile")
+            CommunityProfile(
+                nickname: "홍길동",
+                profileImageUrl: "https://example.com/profile.jpg",
+                beltRank: .blue,
+                beltStripe: .two,
+                gender: .male,
+                weightKg: 76.5,
+                academyName: "Gracie Barra Seoul",
+                competitions: [
+                    Competition(
+                        competitionYear: 2024,
+                        competitionMonth: 12,
+                        competitionName: "서울 주짓수 챔피언십",
+                        competitionRank: .gold
+                    ),
+                    Competition(
+                        competitionYear: 2024,
+                        competitionMonth: 6,
+                        competitionName: "전국 주짓수 대회",
+                        competitionRank: .silver
+                    )
+                ],
+                bestSubmission: .chokes,
+                favoriteSubmission: .armLocks,
+                bestTechnique: .sweeps,
+                favoriteTechnique: .guardPasses,
+                bestPosition: .top,
+                favoritePosition: .guard,
+                isWeightHidden: false,
+                isOwner: true,
+                teachingPhilosophy: "기본기를 탄탄히, 안전하게 훈련하는 것을 최우선으로 합니다.",
+                teachingStartDate: "2020-03-15",
+                teachingDetail: "10년 이상의 주짓수 경력과 5년의 지도 경력을 보유하고 있습니다."
+            )
         },
-        postProfile: { _ in
-            unimplemented("CommunityClient.postProfile")
+        postProfile: { update in
+            update
         }
     )
-    
     /// Preview 구현 (SwiftUI 프리뷰용)
     public static let previewValue: CommunityClient = CommunityClient(
         fetchProfile: {
@@ -96,7 +110,7 @@ extension CommunityClient: TestDependencyKey {
                 teachingDetail: "10년 이상의 주짓수 경력과 5년의 지도 경력을 보유하고 있습니다."
             )
         },
-        updateProfile: { profile in
+        postProfile: { profile in
             // 프리뷰에서는 그대로 반환
             profile
         }
@@ -111,4 +125,16 @@ extension DependencyValues {
         get { self[CommunityClient.self] }
         set { self[CommunityClient.self] = newValue }
     }
+}
+
+
+extension CommunityClient {
+    static let unimplemented: Self = Self(
+        fetchProfile: {
+            fatalError("CommunityClient.fetchProfile is not implemented")
+        },
+        postProfile: { _ in
+            fatalError("CommunityClient.postProfile is not implemented")
+        }
+    )
 }

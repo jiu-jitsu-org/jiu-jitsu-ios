@@ -18,5 +18,5 @@ public protocol CommunityRepository: Sendable {
     /// - Parameter profile: 업데이트할 프로필 정보
     /// - Returns: 업데이트된 프로필 정보
     /// - Throws: DomainError
-    func updateProfile(_ profile: CommunityProfile) async throws -> CommunityProfile
+    func postProfile(_ profile: CommunityProfile) async throws -> CommunityProfile
 }

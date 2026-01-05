@@ -29,7 +29,7 @@ public final class CommunityRepositoryImpl: CommunityRepository {
         }
     }
     
-    public func updateProfile(_ profile: CommunityProfile) async throws -> CommunityProfile {
+    public func postProfile(_ profile: CommunityProfile) async throws -> CommunityProfile {
         do {
             let requestDTO = PostCommunityProfileRequestDTO(from: profile)
             let endpoint = CommunityEndpoint.postProfile(requestDTO)
