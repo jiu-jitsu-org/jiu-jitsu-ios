@@ -13,14 +13,14 @@ public struct CommunityClient: Sendable {
     public var fetchProfile: @Sendable () async throws -> CommunityProfile
     
     /// 프로필 정보를 업데이트하는 클로저
-    public var postProfile: @Sendable (CommunityProfile) async throws -> CommunityProfile
+    public var updateProfile: @Sendable (CommunityProfile) async throws -> CommunityProfile
     
     public init(
         fetchProfile: @escaping @Sendable () async throws -> CommunityProfile,
-        postProfile: @escaping @Sendable (CommunityProfile) async throws -> CommunityProfile
+        updateProfile: @escaping @Sendable (CommunityProfile) async throws -> CommunityProfile
     ) {
         self.fetchProfile = fetchProfile
-        self.postProfile = postProfile
+        self.updateProfile = updateProfile
     }
 }
 
@@ -67,7 +67,7 @@ extension CommunityClient: DependencyKey {
                 teachingDetail: "10년 이상의 주짓수 경력과 5년의 지도 경력을 보유하고 있습니다."
             )
         },
-        postProfile: { update in
+        updateProfile: { update in
             update
         }
     )
@@ -110,7 +110,7 @@ extension CommunityClient: DependencyKey {
                 teachingDetail: "10년 이상의 주짓수 경력과 5년의 지도 경력을 보유하고 있습니다."
             )
         },
-        postProfile: { profile in
+        updateProfile: { profile in
             // 프리뷰에서는 그대로 반환
             profile
         }
@@ -133,8 +133,8 @@ extension CommunityClient {
         fetchProfile: {
             fatalError("CommunityClient.fetchProfile is not implemented")
         },
-        postProfile: { _ in
-            fatalError("CommunityClient.postProfile is not implemented")
+        updateProfile: { _ in
+            fatalError("CommunityClient.updateProfile is not implemented")
         }
     )
 }

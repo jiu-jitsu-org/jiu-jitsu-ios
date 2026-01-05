@@ -23,11 +23,16 @@ public struct MyPrpfileFeature {
         
         var authInfo: AuthInfo
         
+        // 커뮤니티 프로필 정보
+        var communityProfile: CommunityProfile?
+        var isLoadingProfile: Bool = false
+        
         // 토스트 메시지 상태
         var toast: ToastState?
         
-        public init(authInfo: AuthInfo) {
+        public init(authInfo: AuthInfo, communityProfile: CommunityProfile? = nil) {
             self.authInfo = authInfo
+            self.communityProfile = communityProfile
         }
     }
     
@@ -38,10 +43,17 @@ public struct MyPrpfileFeature {
     
     @CasePathable
     public enum Action: Equatable, Sendable {
+        // View Lifecycle Actions
+        case onAppear
+        
         // View UI Actions
         case gymInfoButtonTapped
         case registerBeltButtonTapped
         case registerStyleButtonTapped
+        
+        // API Actions
+        case loadProfile
+        case _profileResponse(TaskResult<CommunityProfile>)
         
         // 네비게이션 액션
         case destination(PresentationAction<Destination.Action>)
@@ -54,10 +66,32 @@ public struct MyPrpfileFeature {
     
     // MARK: - Dependencies
     @Dependency(\.continuousClock) var clock
+    @Dependency(\.communityClient) var communityClient
     
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
+            case .onAppear:
+                return .send(.loadProfile)
+                
+            case .loadProfile:
+                state.isLoadingProfile = true
+                return .run { send in
+                    await send(._profileResponse(
+                        await TaskResult { try await communityClient.fetchProfile() }
+                    ))
+                }
+                
+            case let ._profileResponse(.success(profile)):
+                state.isLoadingProfile = false
+                state.communityProfile = profile
+                return .none
+                
+            case let ._profileResponse(.failure(error)):
+                state.isLoadingProfile = false
+                Log.trace("Failed to load profile: \(error)", category: .network, level: .error)
+                return .send(.showToast(.init(message: "프로필을 불러오는데 실패했어요", style: .info)))
+                
             case .gymInfoButtonTapped:
                 // 도장 정보 입력 화면으로 네비게이션
                 state.destination = .academySetting(MyAcademySettingFeature.State())
@@ -103,6 +137,7 @@ public struct MyPrpfileFeature {
                 
             case .destination:
                 return .none
+                
             }
         }
         .ifLet(\.$destination, action: \.destination)

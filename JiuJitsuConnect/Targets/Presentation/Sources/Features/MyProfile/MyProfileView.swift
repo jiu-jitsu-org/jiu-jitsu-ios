@@ -128,6 +128,7 @@ public struct MyProfileView: View {
             .scrollDisabled(false)
             .onAppear {
                 UIScrollView.appearance().bounces = false
+                store.send(.onAppear)
             }
             .background(Color.component.background.default)
             .ignoresSafeArea(edges: .top)
@@ -169,27 +170,63 @@ public struct MyProfileView: View {
                         .fill(Color.component.list.setting.background)
                         .frame(width: 90, height: 90)
                     
-                    Assets.Common.Icon.profile.swiftUIImage
-                        .resizable()
-                        .foregroundStyle(Color.component.myProfileHeader.profileImageDefaultIcon)
-                        .frame(width: 64, height: 64)
+                    if let profileImageUrl = store.communityProfile?.profileImageUrl,
+                       let url = URL(string: profileImageUrl) {
+                        // 실제 프로필 이미지가 있는 경우
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 90, height: 90)
+                                    .clipShape(RoundedRectangle(cornerRadius: 24))
+                            case .failure, .empty:
+                                // 로딩 실패 시 기본 아이콘 표시
+                                Assets.Common.Icon.profile.swiftUIImage
+                                    .resizable()
+                                    .foregroundStyle(Color.component.myProfileHeader.profileImageDefaultIcon)
+                                    .frame(width: 64, height: 64)
+                            @unknown default:
+                                Assets.Common.Icon.profile.swiftUIImage
+                                    .resizable()
+                                    .foregroundStyle(Color.component.myProfileHeader.profileImageDefaultIcon)
+                                    .frame(width: 64, height: 64)
+                            }
+                        }
+                    } else {
+                        // 프로필 이미지가 없는 경우 기본 아이콘 표시
+                        Assets.Common.Icon.profile.swiftUIImage
+                            .resizable()
+                            .foregroundStyle(Color.component.myProfileHeader.profileImageDefaultIcon)
+                            .frame(width: 64, height: 64)
+                    }
                 }
                 
                 // 닉네임
-                Text(store.authInfo.userInfo?.nickname ?? "")
+                Text(store.communityProfile?.nickname ?? store.authInfo.userInfo?.nickname ?? "")
                     .font(Font.pretendard.title3)
                     .foregroundStyle(Color.component.list.setting.background)
                     .frame(height: 24)
                 
-                // 버튼
-                Button {
-                    store.send(.gymInfoButtonTapped)
-                } label: {
-                    AppButtonConfiguration(title: "도장 정보 입력하기", size: .small)
+                // 도장 이름 표시 (있는 경우)
+                if let academyName = store.communityProfile?.academyName {
+                    Text(academyName)
+                        .font(Font.pretendard.bodyS)
+                        .foregroundStyle(Color.component.list.setting.background.opacity(0.8))
                 }
-                .appButtonStyle(.tint, size: .small)
-                .frame(height: 32)
-                .padding(.top, 7)
+                
+                // 버튼 - 도장 정보 유무에 따라 다른 버튼 표시
+                if store.communityProfile?.academyName == nil {
+                    Button {
+                        store.send(.gymInfoButtonTapped)
+                    } label: {
+                        AppButtonConfiguration(title: "도장 정보 입력하기", size: .small)
+                    }
+                    .appButtonStyle(.tint, size: .small)
+                    .frame(height: 32)
+                    .padding(.top, 7)
+                }
                 
                 // 헤더 내용물 아래의 여백 (이 공간 위로 카드가 겹쳐짐)
                 Spacer().frame(height: Style.Header.bottomPadding)
@@ -198,15 +235,28 @@ public struct MyProfileView: View {
     }
     
     private var beltWeightCardView: some View {
-        VStack(spacing: 24) {
+        let profile = store.communityProfile
+        let hasBeltInfo = profile?.beltRank != nil
+        let hasWeightInfo = profile?.weightKg != nil && !(profile?.isWeightHidden ?? false)
+        
+        return VStack(spacing: 24) {
             VStack(spacing: 8) {
                 HStack(spacing: 5) {
                     // 왼쪽 (벨트)
                     VStack {
-                        Assets.MyProfile.Icon.beltBlue.swiftUIImage
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 40, height: 40)
+                        if let beltRank = profile?.beltRank {
+                            // 벨트 아이콘 표시 (실제 벨트 등급에 따라)
+                            beltIcon(for: beltRank)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 40, height: 40)
+                        } else {
+                            // 기본 아이콘
+                            Assets.MyProfile.Icon.beltBlue.swiftUIImage
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 40, height: 40)
+                        }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .padding(.top, 13)
@@ -214,14 +264,26 @@ public struct MyProfileView: View {
                     
                     // 오른쪽 (체급)
                     VStack {
-                        HStack(alignment: .firstTextBaseline, spacing: 2) {
-                            Text("??")
-                                .font(Font.pretendard.title2)
-                                .foregroundStyle(Color.primitive.coolGray.cg700)
-                            
-                            Text("kg")
-                                .font(Font.pretendard.bodyS)
-                                .foregroundStyle(Color.primitive.coolGray.cg400)
+                        if let weightKg = profile?.weightKg, !profile!.isWeightHidden {
+                            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                                Text(String(format: "%.0f", weightKg))
+                                    .font(Font.pretendard.title2)
+                                    .foregroundStyle(Color.primitive.coolGray.cg700)
+                                
+                                Text("kg")
+                                    .font(Font.pretendard.bodyS)
+                                    .foregroundStyle(Color.primitive.coolGray.cg400)
+                            }
+                        } else {
+                            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                                Text("??")
+                                    .font(Font.pretendard.title2)
+                                    .foregroundStyle(Color.primitive.coolGray.cg700)
+                                
+                                Text("kg")
+                                    .font(Font.pretendard.bodyS)
+                                    .foregroundStyle(Color.primitive.coolGray.cg400)
+                            }
                         }
                     }
                     .frame(width: 55, height: 42)
@@ -232,18 +294,49 @@ public struct MyProfileView: View {
                 }
                 .frame(height: 56)
                 
-                Text("벨트와 체급이 어떻게 되세요?")
-                    .font(Font.pretendard.title3)
-                    .foregroundStyle(Color.component.beltCard.default.text)
+                // 벨트 및 체급 정보 텍스트
+                if hasBeltInfo || hasWeightInfo {
+                    HStack(spacing: 4) {
+                        if let beltRank = profile?.beltRank {
+                            Text(beltRank.displayName)
+                                .font(Font.pretendard.title3)
+                                .foregroundStyle(Color.component.beltCard.default.text)
+                            
+                            if let beltStripe = profile?.beltStripe, beltStripe != .none {
+                                Text(beltStripe.displayName)
+                                    .font(Font.pretendard.bodyM)
+                                    .foregroundStyle(Color.component.beltCard.default.text.opacity(0.8))
+                            }
+                        }
+                        
+                        if hasBeltInfo && hasWeightInfo {
+                            Text("•")
+                                .font(Font.pretendard.bodyM)
+                                .foregroundStyle(Color.component.beltCard.default.text.opacity(0.6))
+                        }
+                        
+                        if let weightKg = profile?.weightKg, !profile!.isWeightHidden {
+                            Text("\(String(format: "%.1f", weightKg))kg급")
+                                .font(Font.pretendard.title3)
+                                .foregroundStyle(Color.component.beltCard.default.text)
+                        }
+                    }
+                } else {
+                    Text("벨트와 체급이 어떻게 되세요?")
+                        .font(Font.pretendard.title3)
+                        .foregroundStyle(Color.component.beltCard.default.text)
+                }
             }
             
-            Button {
-                store.send(.registerBeltButtonTapped)
-            } label: {
-                AppButtonConfiguration(title: "벨트/체급 등록하기", size: .medium)
+            if !hasBeltInfo || !hasWeightInfo {
+                Button {
+                    store.send(.registerBeltButtonTapped)
+                } label: {
+                    AppButtonConfiguration(title: "벨트/체급 등록하기", size: .medium)
+                }
+                .appButtonStyle(.primary, size: .medium)
+                .frame(height: 38)
             }
-            .appButtonStyle(.primary, size: .medium)
-            .frame(height: 38)
         }
         .padding(.vertical, 24)
         .frame(maxWidth: .infinity)
@@ -254,26 +347,91 @@ public struct MyProfileView: View {
         .padding(.horizontal, 20)
     }
     
+    // 벨트 등급에 따른 아이콘 반환
+    private func beltIcon(for beltRank: BeltRank) -> Image {
+        switch beltRank {
+        case .white:
+            return Assets.MyProfile.Icon.beltBlue.swiftUIImage // TODO: 실제 화이트 벨트 아이콘으로 교체
+        case .blue:
+            return Assets.MyProfile.Icon.beltBlue.swiftUIImage
+        case .purple:
+            return Assets.MyProfile.Icon.beltBlue.swiftUIImage // TODO: 실제 퍼플 벨트 아이콘으로 교체
+        case .brown:
+            return Assets.MyProfile.Icon.beltBlue.swiftUIImage // TODO: 실제 브라운 벨트 아이콘으로 교체
+        case .black:
+            return Assets.MyProfile.Icon.beltBlue.swiftUIImage // TODO: 실제 블랙 벨트 아이콘으로 교체
+        case .redBlack:
+            return Assets.MyProfile.Icon.beltBlue.swiftUIImage // TODO: 실제 레드블랙 벨트 아이콘으로 교체
+        case .red:
+            return Assets.MyProfile.Icon.beltBlue.swiftUIImage // TODO: 실제 레드 벨트 아이콘으로 교체
+        }
+    }
+    
     private var styleSectionView: some View {
-        VStack(spacing: 0) {
+        let profile = store.communityProfile
+        let hasStyleInfo = profile?.bestSubmission != nil ||
+                          profile?.favoritePosition != nil ||
+                          profile?.bestTechnique != nil
+        
+        return VStack(spacing: 0) {
             VStack(spacing: 8) {
                 Text("나의 주짓수를 보여주세요")
                     .font(Font.pretendard.title3)
                     .foregroundStyle(Color.component.sectionHeader.title)
                 
-                Text("특기와 최애 포지션, 기술 등을 등록해보세요.")
-                    .font(Font.pretendard.bodyM)
-                    .foregroundStyle(Color.component.sectionHeader.subTitle)
+                if hasStyleInfo {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let bestSubmission = profile?.bestSubmission {
+                            HStack {
+                                Text("최고 서브미션:")
+                                    .font(Font.pretendard.bodyM)
+                                    .foregroundStyle(Color.component.sectionHeader.subTitle)
+                                Text(bestSubmission.displayName)
+                                    .font(Font.pretendard.bodyM.bold())
+                                    .foregroundStyle(Color.component.sectionHeader.title)
+                            }
+                        }
+                        
+                        if let favoritePosition = profile?.favoritePosition {
+                            HStack {
+                                Text("선호 포지션:")
+                                    .font(Font.pretendard.bodyM)
+                                    .foregroundStyle(Color.component.sectionHeader.subTitle)
+                                Text(favoritePosition.displayName)
+                                    .font(Font.pretendard.bodyM.bold())
+                                    .foregroundStyle(Color.component.sectionHeader.title)
+                            }
+                        }
+                        
+                        if let bestTechnique = profile?.bestTechnique {
+                            HStack {
+                                Text("최고 기술:")
+                                    .font(Font.pretendard.bodyM)
+                                    .foregroundStyle(Color.component.sectionHeader.subTitle)
+                                Text(bestTechnique.displayName)
+                                    .font(Font.pretendard.bodyM.bold())
+                                    .foregroundStyle(Color.component.sectionHeader.title)
+                            }
+                        }
+                    }
+                    .padding(.top, 8)
+                } else {
+                    Text("특기와 최애 포지션, 기술 등을 등록해보세요.")
+                        .font(Font.pretendard.bodyM)
+                        .foregroundStyle(Color.component.sectionHeader.subTitle)
+                }
             }
             
-            Button {
-                store.send(.gymInfoButtonTapped)
-            } label: {
-                AppButtonConfiguration(title: "내 스타일 등록하기", size: .medium)
+            if !hasStyleInfo {
+                Button {
+                    store.send(.registerStyleButtonTapped)
+                } label: {
+                    AppButtonConfiguration(title: "내 스타일 등록하기", size: .medium)
+                }
+                .appButtonStyle(.tint, size: .medium)
+                .frame(height: 38)
+                .padding(.top, 24)
             }
-            .appButtonStyle(.tint, size: .medium)
-            .frame(height: 38)
-            .padding(.top, 24)
             
             decorativeCardsView
                 .padding(.top, 16)
