@@ -10,8 +10,8 @@ import ComposableArchitecture
 import DesignSystem
 
 private enum Style {
-    static let headerHeight: CGFloat = 44
-    static let horizontalPadding: CGFloat = 20
+    static let headerHeight: CGFloat = 60
+    static let horizontalPadding: CGFloat = 16
 }
 
 public struct MyAcademySettingView: View {
@@ -39,7 +39,6 @@ public struct MyAcademySettingView: View {
         }
         .bind($store.isKeyboardVisible, to: $isKeyboardVisible)
         .alert($store.scope(state: \.alert, action: \.alert))
-        .navigationBarBackButtonHidden(true)
         .navigationBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
     }
@@ -52,20 +51,25 @@ private extension MyAcademySettingView {
         HStack {
             Button(action: { store.send(.backButtonTapped) }) {
                 ZStack {
-                    Assets.Common.Icon.chevronLeft.swiftUIImage
+                    // 라운드 배경
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.primitive.blue.b50)
+                    
+                    // 화살표 아이콘
+                    Assets.Common.Icon.arrowLeft.swiftUIImage
                         .resizable()
                         .scaledToFit()
                         .frame(width: 24, height: 24)
                         .foregroundStyle(Color.component.bottomSheet.unselected.listItem.followingIcon)
                 }
-                .frame(width: 32, height: 32)
+                .frame(width: 36, height: 36)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             
             Spacer()
             
-            Text("도장명 설정")
+            Text("도장 정보 추가")
                 .font(Font.pretendard.title3)
                 .foregroundStyle(Color.component.header.text)
             
@@ -77,7 +81,6 @@ private extension MyAcademySettingView {
         }
         .padding(.horizontal, Style.horizontalPadding)
         .frame(height: Style.headerHeight)
-        .background(Color.component.background.default.ignoresSafeArea(edges: .top))
     }
     
     var titleSection: some View {
