@@ -70,11 +70,11 @@ public struct MyAcademySettingFeature: Sendable {
         public enum Delegate: Equatable, Sendable {
             case didSaveAcademyName(String)
             case saveFailed(message: String)
-            case didTapBackButton
         }
     }
     
     // MARK: - Dependencies
+    @Dependency(\.dismiss) var dismiss
     
     // TODO: 실제 AcademyClient나 UserClient dependency 추가 필요
     // @Dependency(\.academyClient) var academyClient
@@ -162,7 +162,7 @@ public struct MyAcademySettingFeature: Sendable {
                 return .none
                 
             case .backButtonTapped:
-                return .send(.delegate(.didTapBackButton))
+                return .run { _ in await self.dismiss() }
                 
             case .binding, .alert, .delegate:
                 return .none

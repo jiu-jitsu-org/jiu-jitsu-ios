@@ -60,7 +60,7 @@ private extension MyAcademySettingView {
                         .resizable()
                         .scaledToFit()
                         .frame(width: 24, height: 24)
-                        .foregroundStyle(Color.component.bottomSheet.unselected.listItem.followingIcon)
+                        .foregroundStyle(Color.primitive.blue.b500p)
                 }
                 .frame(width: 36, height: 36)
                 .contentShape(Rectangle())
