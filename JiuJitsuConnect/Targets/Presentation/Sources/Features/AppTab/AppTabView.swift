@@ -59,6 +59,11 @@ public struct AppTabView: View {
             UITabBar.appearance().standardAppearance = appearance
             UITabBar.appearance().scrollEdgeAppearance = appearance
         }
+        .fullScreenCover(
+            item: $store.scope(state: \.loginModal, action: \.loginModal)
+        ) { loginStore in
+            LoginView(store: loginStore)
+        }
     }
 }
 

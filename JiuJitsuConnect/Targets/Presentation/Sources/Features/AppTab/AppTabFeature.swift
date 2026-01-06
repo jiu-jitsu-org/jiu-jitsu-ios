@@ -28,8 +28,14 @@ public struct AppTabFeature: Sendable {
         var community: CommunityFeature.State
         var myPage: MyPrpfileFeature.State
         
+        // 로그인 모달
+        @Presents var loginModal: LoginFeature.State?
+        
+        var authInfo: AuthInfo
+        
         // 초기화 시 필요한 정보 주입 (예: AuthInfo)
         public init(authInfo: AuthInfo) {
+            self.authInfo = authInfo
             self.main = MainFeature.State(authInfo: authInfo)
             self.community = CommunityFeature.State()
             self.myPage = MyPrpfileFeature.State(authInfo: authInfo)
@@ -43,6 +49,9 @@ public struct AppTabFeature: Sendable {
         case main(MainFeature.Action)
         case community(CommunityFeature.Action)
         case myPage(MyPrpfileFeature.Action)
+        
+        case showLoginModal
+        case loginModal(PresentationAction<LoginFeature.Action>)
     }
     
     public var body: some ReducerOf<Self> {
@@ -61,12 +70,46 @@ public struct AppTabFeature: Sendable {
         Reduce { state, action in
             switch action {
             case let .tabSelected(tab):
-                state.selectedTab = tab
+                if state.authInfo.isGuest {
+                    switch tab {
+                    case .main, .community:
+                        state.selectedTab = tab
+                    case .myPage:
+                        return .send(.showLoginModal)
+                    }
+                } else {
+                    state.selectedTab = tab
+                }
                 return .none
                 
             case .main, .community, .myPage:
                 return .none
+                
+                // MARK: - Login Logic
+            case .showLoginModal:
+                state.loginModal = LoginFeature.State()
+                return .none
+                
+            case let .loginModal(.presented(.delegate(delegateAction))):
+                switch delegateAction {
+                case let .didLogin(newAuthInfo):
+                    state.authInfo = newAuthInfo
+                    state.selectedTab = .myPage
+                    state.loginModal = nil
+                    return .none
+                    
+                case .skipLogin:
+                    state.loginModal = nil
+                    return .none
+                }
+                
+            case .loginModal:
+                return .none
+                
             }
+        }
+        .ifLet(\.$loginModal, action: \.loginModal) {
+            LoginFeature()
         }
     }
 }
