@@ -67,6 +67,7 @@ struct JiuJitsuConnectApp: App {
                 withDependencies: {
                     $0.authClient = DependencyContainer.shared.configureAuthClient()
                     $0.userClient = DependencyContainer.shared.configureUserClient()
+                    $0.communityClient = DependencyContainer.shared.configureCommunityClient()
                 }
             )
         } else {
