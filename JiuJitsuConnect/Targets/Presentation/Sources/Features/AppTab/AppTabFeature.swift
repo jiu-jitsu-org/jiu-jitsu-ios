@@ -26,7 +26,7 @@ public struct AppTabFeature: Sendable {
         // 각 탭의 독립적인 State
         var main: MainFeature.State
         var community: CommunityFeature.State
-        var myPage: MyPrpfileFeature.State
+        var myPage: MyProfileFeature.State
         
         // 로그인 모달
         @Presents var loginModal: LoginFeature.State?
@@ -38,7 +38,7 @@ public struct AppTabFeature: Sendable {
             self.authInfo = authInfo
             self.main = MainFeature.State(authInfo: authInfo)
             self.community = CommunityFeature.State()
-            self.myPage = MyPrpfileFeature.State(authInfo: authInfo)
+            self.myPage = MyProfileFeature.State(authInfo: authInfo)
         }
     }
     
@@ -48,7 +48,7 @@ public struct AppTabFeature: Sendable {
         // 자식 Feature 액션 연결
         case main(MainFeature.Action)
         case community(CommunityFeature.Action)
-        case myPage(MyPrpfileFeature.Action)
+        case myPage(MyProfileFeature.Action)
         
         case showLoginModal
         case loginModal(PresentationAction<LoginFeature.Action>)
@@ -63,7 +63,7 @@ public struct AppTabFeature: Sendable {
             CommunityFeature()
         }
         Scope(state: \.myPage, action: \.myPage) {
-            MyPrpfileFeature()
+            MyProfileFeature()
         }
         
         // 2. 탭 바 자체 로직 처리

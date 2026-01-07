@@ -78,9 +78,9 @@ private enum Style {
 }
 
 public struct MyProfileView: View {
-    @Bindable var store: StoreOf<MyPrpfileFeature>
+    @Bindable var store: StoreOf<MyProfileFeature>
     
-    public init(store: StoreOf<MyPrpfileFeature>) {
+    public init(store: StoreOf<MyProfileFeature>) {
         self.store = store
     }
     
@@ -144,6 +144,11 @@ public struct MyProfileView: View {
                 item: $store.scope(state: \.destination?.academySetting, action: \.destination.academySetting)
             ) { academySettingStore in
                 MyAcademySettingView(store: academySettingStore)
+            }
+            .navigationDestination(
+                item: $store.scope(state: \.destination?.nicknameSetting, action: \.destination.nicknameSetting)
+            ) { nicknameSettingStore in
+                NicknameSettingView(store: nicknameSettingStore)
             }
             // 토스트 메시지 표시
             .overlay(alignment: .bottom) {
@@ -211,14 +216,13 @@ public struct MyProfileView: View {
                 }
                 
                 // 닉네임
-                HStack(spacing: 0) {
+                HStack(spacing: 4) {
                     Text(store.communityProfile?.nickname ?? store.authInfo.userInfo?.nickname ?? "")
                         .font(Font.pretendard.title3)
                         .foregroundStyle(Color.component.list.setting.background)
-                        .frame(height: 24)
                     
                     // 수정 버튼
-                    Button(action: { store.send(.gymInfoButtonTapped) }) {
+                    Button(action: { store.send(.nicknameEditButtonTapped) }) {
                         ZStack {
                             Assets.Common.Icon.pencil.swiftUIImage
                                 .resizable()
@@ -512,7 +516,7 @@ public struct MyProfileView: View {
 #Preview {
     MyProfileView(
         store: Store(
-            initialState: MyPrpfileFeature.State(
+            initialState: MyProfileFeature.State(
                 authInfo: AuthInfo(
                     accessToken: "sample_token",
                     refreshToken: "sample_refresh",
@@ -529,7 +533,7 @@ public struct MyProfileView: View {
                 )
             )
         ) {
-            MyPrpfileFeature()
+            MyProfileFeature()
         }
     )
 }

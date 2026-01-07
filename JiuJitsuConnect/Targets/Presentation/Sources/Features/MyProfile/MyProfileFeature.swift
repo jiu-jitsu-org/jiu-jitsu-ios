@@ -1,5 +1,5 @@
 //
-//  MyPrpfileFeature.swift
+//  MyProfileFeature.swift
 //  Presentation
 //
 //  Created by suni on 12/7/25.
@@ -12,7 +12,7 @@ import DesignSystem
 import CoreKit
 
 @Reducer
-public struct MyPrpfileFeature {
+public struct MyProfileFeature {
     public init() {}
     
     private enum CancelID { case toast }
@@ -39,6 +39,7 @@ public struct MyPrpfileFeature {
     @Reducer(state: .equatable, action: .equatable, .sendable)
     public enum Destination {
         case academySetting(MyAcademySettingFeature)
+        case nicknameSetting(NicknameSettingFeature)
     }
     
     @CasePathable
@@ -48,6 +49,7 @@ public struct MyPrpfileFeature {
         
         // View UI Actions
         case gymInfoButtonTapped
+        case nicknameEditButtonTapped
         case registerBeltButtonTapped
         case registerStyleButtonTapped
         
@@ -103,6 +105,14 @@ public struct MyPrpfileFeature {
                 )
                 return .none
                 
+            case .nicknameEditButtonTapped:
+                // 닉네임 수정 화면으로 네비게이션
+                let currentNickname = state.communityProfile?.nickname ?? ""
+                state.destination = .nicknameSetting(
+                    NicknameSettingFeature.State(mode: .edit, nickname: currentNickname)
+                )
+                return .none
+                
             case .registerBeltButtonTapped:
                 // 벨트/체급 등록 화면 이동 로직
                 return .none
@@ -118,6 +128,16 @@ public struct MyPrpfileFeature {
                 return .send(.updateProfileSection(.academy, academyName))
                 
             case .destination(.presented(.academySetting(.delegate(.cancel)))):
+                // 취소 - 아무것도 하지 않음
+                return .none
+                
+            case let .destination(.presented(.nicknameSetting(.delegate(.saveNickname(nickname))))):
+                // 닉네임 저장 요청 받음 → TODO: API 호출 구현 필요
+                Log.trace("닉네임 저장 요청: \(nickname)", category: .debug, level: .info)
+                state.destination = nil
+                return .send(.showToast(.init(message: "닉네임 수정을 완료했어요", style: .info)))
+                
+            case .destination(.presented(.nicknameSetting(.delegate(.cancel)))):
                 // 취소 - 아무것도 하지 않음
                 return .none
                 
@@ -173,7 +193,7 @@ public struct MyPrpfileFeature {
                 state.isLoadingProfile = false
                 state.communityProfile = updatedProfile  // ← 업데이트된 프로필로 교체!
                 state.destination = nil  // 화면 닫기
-                return .send(.showToast(.init(message: "도장 정보 인력을 완료했어요", style: .info)))
+                return .send(.showToast(.init(message: "도장 정보 입력을 완료했어요", style: .info)))
                 
             case let ._updateProfileResponse(.failure(error)):
                 state.isLoadingProfile = false

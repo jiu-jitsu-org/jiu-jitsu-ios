@@ -69,7 +69,7 @@ private extension MyAcademySettingView {
             
             Spacer()
             
-            Text("도장 정보 추가")
+            Text(store.mode.headerTitle)
                 .font(Font.pretendard.title3)
                 .foregroundStyle(Color.component.header.text)
             
