@@ -64,6 +64,7 @@ public struct PrimitiveColors {
 
     public struct Opacity {
         public let black40 = Color("Opacity/Black-40", bundle: .module)
+        public let white20 = Color("Opacity/White-20", bundle: .module)
         public let white40 = Color("Opacity/White-40", bundle: .module)
         public let blue10 = Color("Opacity/Blue-10", bundle: .module)
         public let blue40 = Color("Opacity/Blue-40", bundle: .module)

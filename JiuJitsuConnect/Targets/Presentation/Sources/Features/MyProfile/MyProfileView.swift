@@ -16,11 +16,13 @@ extension Color {
 private enum Style {
     enum Header {
         static let topPadding: CGFloat = 68 // Safe Area Top 부터 프로필 이미지까지의 거리
-        static let bottomPadding: CGFloat = 82.49
+        static let bottomPaddingWithButton: CGFloat = 82.49
+        static let bottomPaddingWithAcademyName: CGFloat = 99
     }
     
     enum Card {
-        static let overlapHeight: CGFloat = 46     // 카드가 헤더와 겹치는 높이
+        static let overlapHeightWithButton: CGFloat = 46.49     // 버튼이 있을 때 (도장 정보 없음)
+        static let overlapHeightWithAcademyName: CGFloat = 71   // 도장 이름이 있을 때
         static let minHeight: CGFloat = 195        // 카드 최소 높이
     }
     
@@ -87,6 +89,11 @@ public struct MyProfileView: View {
             let safeAreaTop = geometry.safeAreaInsets.top
             let safeAreaBottom = geometry.safeAreaInsets.bottom
             
+            // 도장 이름 유무에 따라 동적으로 overlap 높이 결정
+            let cardOverlapHeight = store.communityProfile?.academyName != nil 
+                ? Style.Card.overlapHeightWithAcademyName 
+                : Style.Card.overlapHeightWithButton
+            
             ScrollView(showsIndicators: false) {
                 ZStack(alignment: .bottom) {
                     // 메인 콘텐츠
@@ -97,8 +104,8 @@ public struct MyProfileView: View {
                         
                         // 2. 카드 영역 (Offset으로 겹침 효과 구현)
                         beltWeightCardView
-                            .offset(y: -Style.Card.overlapHeight) // 위로 끌어올림
-                            .padding(.bottom, -Style.Card.overlapHeight) // 끌어올린 만큼 공간 제거
+                            .offset(y: -cardOverlapHeight) // 위로 끌어올림
+                            .padding(.bottom, -cardOverlapHeight) // 끌어올린 만큼 공간 제거
                             .zIndex(1) // 헤더 위에 표시
                         
                         // 3. 스타일 영역
@@ -160,7 +167,7 @@ public struct MyProfileView: View {
         ZStack(alignment: .top) {
             Color.component.myProfileHeader.bg.default
             
-            VStack(spacing: 8) {
+            VStack(spacing: 0) {
                 // 상단 여백 (Safe Area + 지정된 여백)
                 Spacer().frame(height: safeAreaTop + Style.Header.topPadding)
                 
@@ -204,16 +211,52 @@ public struct MyProfileView: View {
                 }
                 
                 // 닉네임
-                Text(store.communityProfile?.nickname ?? store.authInfo.userInfo?.nickname ?? "")
-                    .font(Font.pretendard.title3)
-                    .foregroundStyle(Color.component.list.setting.background)
-                    .frame(height: 24)
+                HStack(spacing: 0) {
+                    Text(store.communityProfile?.nickname ?? store.authInfo.userInfo?.nickname ?? "")
+                        .font(Font.pretendard.title3)
+                        .foregroundStyle(Color.component.list.setting.background)
+                        .frame(height: 24)
+                    
+                    // 수정 버튼
+                    Button(action: { store.send(.gymInfoButtonTapped) }) {
+                        ZStack {
+                            Assets.Common.Icon.pencil.swiftUIImage
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 16, height: 16)
+                                .foregroundStyle(Color(hex: "#FFFFFF").opacity(0.5))
+                        }
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.top, 8)
                 
                 // 도장 이름 표시 (있는 경우)
                 if let academyName = store.communityProfile?.academyName {
-                    Text(academyName)
-                        .font(Font.pretendard.bodyS)
-                        .foregroundStyle(Color.component.list.setting.background.opacity(0.8))
+                    HStack(spacing: 0) {
+                        Text(academyName)
+                            .font(Font.pretendard.bodyS)
+                            .foregroundStyle(Color.component.list.setting.background.opacity(0.7))
+                        
+                        // 수정 버튼
+                        Button(action: { store.send(.gymInfoButtonTapped) }) {
+                            ZStack {
+                                Assets.Common.Icon.pencil.swiftUIImage
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 16, height: 16)
+                                    .foregroundStyle(Color(hex: "#FFFFFF").opacity(0.5))
+                            }
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.top, 7.5)
+                    
+                    Spacer().frame(height: Style.Header.bottomPaddingWithAcademyName)
                 }
                 
                 // 버튼 - 도장 정보 유무에 따라 다른 버튼 표시
@@ -225,11 +268,11 @@ public struct MyProfileView: View {
                     }
                     .appButtonStyle(.tint, size: .small)
                     .frame(height: 32)
-                    .padding(.top, 7)
+                    .padding(.top, 15)
+                    
+                    // 헤더 내용물 아래의 여백 (이 공간 위로 카드가 겹쳐짐)
+                    Spacer().frame(height: Style.Header.bottomPaddingWithButton)
                 }
-                
-                // 헤더 내용물 아래의 여백 (이 공간 위로 카드가 겹쳐짐)
-                Spacer().frame(height: Style.Header.bottomPadding)
             }
         }
     }

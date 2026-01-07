@@ -35,6 +35,7 @@ public struct SemanticColors {
         public let primaryPressed = Color.primitive.blue.b200
         public let overlaySurface = Color.primitive.coolGray.cg700
         public let overlaySurfacePressed = Color.primitive.coolGray.cg800
+        public let onDarkPressedBg = Color.primitive.opacity.white20
     }
     
     // MARK: - Text (텍스트)
@@ -77,6 +78,7 @@ public struct SemanticColors {
         public let onInactive = Color.primitive.bw.white
         public let onInactive2 = Color.primitive.bw.white
         public let onOverlay = Color.primitive.bw.white
+        public let disabledOnDark = Color.primitive.opacity.white40
     }
 
     // MARK: - Interactive (상호작용)
