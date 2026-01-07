@@ -29,9 +29,9 @@ public final class CommunityRepositoryImpl: CommunityRepository {
         }
     }
     
-    public func updateProfile(_ profile: CommunityProfile) async throws -> CommunityProfile {
+    public func updateProfile(_ profile: CommunityProfile, section: ProfileSection = .academy) async throws -> CommunityProfile {
         do {
-            let requestDTO = PostCommunityProfileRequestDTO(from: profile)
+            let requestDTO = PostCommunityProfileRequestDTO(from: profile, section: section)
             let endpoint = CommunityEndpoint.postProfile(requestDTO)
             let responseDTO: CommunityProfileResponseDTO = try await networkService.request(endpoint: endpoint)
             return responseDTO.toDomain()

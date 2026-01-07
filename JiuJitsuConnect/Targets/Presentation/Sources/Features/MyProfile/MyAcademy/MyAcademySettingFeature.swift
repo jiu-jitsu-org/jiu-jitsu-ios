@@ -59,17 +59,14 @@ public struct MyAcademySettingFeature: Sendable {
         case backButtonTapped
         case alert(PresentationAction<Alert>)
         
-        // Internal Actions
-        case _saveAcademyResponse(TaskResult<Bool>)
-        
         // Delegate Actions
         case delegate(Delegate)
         
         public enum Alert: Equatable, Sendable {}
         
         public enum Delegate: Equatable, Sendable {
-            case didSaveAcademyName(String)
-            case saveFailed(message: String)
+            case saveAcademyName(String)  // 저장 요청만 위임
+            case cancel
         }
     }
     
@@ -106,8 +103,8 @@ public struct MyAcademySettingFeature: Sendable {
                 guard state.isCtaButtonEnabled else { return .none }
                 
                 // 1단계: 로컬 유효성 검사
-                // 글자 수 체크 (1~30자)
-                if !(1...30).contains(state.academyName.count) {
+                // 글자 수 체크 (1~100자)
+                if !(1...100).contains(state.academyName.count) {
                     state.validationState = .invalidLength
                     state.isCtaButtonEnabled = false
                     return .none
@@ -120,49 +117,19 @@ public struct MyAcademySettingFeature: Sendable {
                     return .none
                 }
                 
-                // 유효성 검사 통과 - valid 상태로 변경하고 서버 통신 시작
+                // 유효성 검사 통과 - 부모 Feature에게 저장 요청 위임
                 state.validationState = .valid
+                return .send(.delegate(.saveAcademyName(state.academyName)))
                 
-                // 2단계: 서버에 도장 정보 저장
-                return .run { send in
-                    // TODO: 실제 구현 시 mode와 academyName을 캡처하여 사용
-                    // return .run { [mode = state.mode, academyName = state.academyName] send in
-                    await send(._saveAcademyResponse(
-                        await TaskResult {
-                            // TODO: 실제 서버 API 호출
-                            // mode에 따라 다른 API 호출
-                            // switch mode {
-                            // case .add:
-                            //     try await academyClient.createAcademy(.init(name: academyName))
-                            // case .edit:
-                            //     try await academyClient.updateAcademy(.init(name: academyName))
-                            // }
-                            
-                            // 임시로 성공 처리 (실제 구현 시 제거)
-                            try await Task.sleep(for: .milliseconds(500))
-                            return true
-                        }
-                    ))
-                }
-                .cancellable(id: CancelID.apiCall)
-                
-            case ._saveAcademyResponse(.success):
-                // 저장 성공 - Delegate로 성공 알림 (뒤로가기 + 토스트 메시지 처리)
-                return .send(.delegate(.didSaveAcademyName(state.academyName)))
-                
-            case let ._saveAcademyResponse(.failure(error)):
-                // 저장 실패 처리
-                Log.trace("Failed to save academy info: \(error)", category: .network, level: .error)
-                state.validationState = .saveFailed
-                state.isCtaButtonEnabled = false
-                return .send(.delegate(.saveFailed(message: "도장 정보 저장에 실패했습니다.\n다시 시도해주세요.")))
+            case .backButtonTapped:
+                return .concatenate(
+                    .send(.delegate(.cancel)),
+                    .run { _ in await self.dismiss() }
+                )
                 
             case .viewTapped:
                 state.isKeyboardVisible = false
                 return .none
-                
-            case .backButtonTapped:
-                return .run { _ in await self.dismiss() }
                 
             case .binding, .alert, .delegate:
                 return .none
@@ -218,7 +185,7 @@ public extension MyAcademySettingFeature.ValidationState {
         case .valid:
             return "도장 이름이 설정되었습니다"
         case .invalidLength, .invalidCharacters:
-            return "한글/영문/숫자,\n1~30자로 작성해주세요"
+            return "한글/영문/숫자로 작성해주세요"
         case .saveFailed:
             return "저장에 실패했습니다.\n다시 시도해주세요"
         }

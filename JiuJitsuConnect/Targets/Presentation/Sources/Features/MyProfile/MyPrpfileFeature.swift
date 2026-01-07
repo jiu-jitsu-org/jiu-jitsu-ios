@@ -54,6 +54,8 @@ public struct MyPrpfileFeature {
         // API Actions
         case loadProfile
         case _profileResponse(TaskResult<CommunityProfile>)
+        case updateProfileSection(ProfileSection, String?)  // 섹션별 업데이트
+        case _updateProfileResponse(TaskResult<CommunityProfile>)
         
         // 네비게이션 액션
         case destination(PresentationAction<Destination.Action>)
@@ -94,7 +96,11 @@ public struct MyPrpfileFeature {
                 
             case .gymInfoButtonTapped:
                 // 도장 정보 입력 화면으로 네비게이션
-                state.destination = .academySetting(MyAcademySettingFeature.State())
+                let currentAcademyName = state.communityProfile?.academyName ?? ""
+                let mode: MyAcademySettingFeature.Mode = currentAcademyName.isEmpty ? .add : .edit
+                state.destination = .academySetting(
+                    MyAcademySettingFeature.State(mode: mode, academyName: currentAcademyName)
+                )
                 return .none
                 
             case .registerBeltButtonTapped:
@@ -105,20 +111,74 @@ public struct MyPrpfileFeature {
                 // 스타일 등록 화면 이동 로직
                 return .none
                 
-            case .destination(.presented(.academySetting(.delegate(.didSaveAcademyName)))):
-                // 도장 이름 저장 성공 처리
-                // TODO: authInfo 또는 사용자 프로필 정보 업데이트
-                // state.authInfo.academyName = academyName
+            // MARK: - Delegate 처리 (자식 Feature로부터)
                 
-                // 화면 닫기
-                state.destination = nil
+            case let .destination(.presented(.academySetting(.delegate(.saveAcademyName(academyName))))):
+                // 도장 이름 저장 요청 받음 → API 호출
+                return .send(.updateProfileSection(.academy, academyName))
                 
-                // 토스트 메시지 표시
-                return .send(.showToast(.init(message: "도장 정보 입력을 완료했어요", style: .info)))
-                
-            case .destination(.presented(.academySetting(.delegate(.saveFailed)))):
-                // 저장 실패 시 화면은 유지 (사용자가 다시 시도할 수 있도록)
+            case .destination(.presented(.academySetting(.delegate(.cancel)))):
+                // 취소 - 아무것도 하지 않음
                 return .none
+                
+            // MARK: - API 호출: 프로필 섹션 업데이트
+                
+            case let .updateProfileSection(section, value):
+                guard var profile = state.communityProfile else {
+                    return .send(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info)))
+                }
+                
+                // 섹션별로 업데이트할 필드 설정
+                switch section {
+                case .academy:
+                    profile = CommunityProfile(
+                        nickname: profile.nickname,
+                        profileImageUrl: profile.profileImageUrl,
+                        beltRank: profile.beltRank,
+                        beltStripe: profile.beltStripe,
+                        gender: profile.gender,
+                        weightKg: profile.weightKg,
+                        academyName: value,  // ← 업데이트!
+                        competitions: profile.competitions,
+                        bestSubmission: profile.bestSubmission,
+                        favoriteSubmission: profile.favoriteSubmission,
+                        bestTechnique: profile.bestTechnique,
+                        favoriteTechnique: profile.favoriteTechnique,
+                        bestPosition: profile.bestPosition,
+                        favoritePosition: profile.favoritePosition,
+                        isWeightHidden: profile.isWeightHidden,
+                        isOwner: profile.isOwner,
+                        teachingPhilosophy: profile.teachingPhilosophy,
+                        teachingStartDate: profile.teachingStartDate,
+                        teachingDetail: profile.teachingDetail
+                    )
+                    
+                case .beltWeight, .position, .submission, .technique, .competition, .instructorInfo:
+                    // TODO: 다른 섹션 업데이트 구현
+                    break
+                }
+                
+                state.isLoadingProfile = true
+                
+                return .run { [profile, section] send in
+                    await send(._updateProfileResponse(
+                        await TaskResult {
+                            // CommunityClient에 섹션 정보도 전달
+                            try await communityClient.updateProfile(profile, section)
+                        }
+                    ))
+                }
+                
+            case let ._updateProfileResponse(.success(updatedProfile)):
+                state.isLoadingProfile = false
+                state.communityProfile = updatedProfile  // ← 업데이트된 프로필로 교체!
+                state.destination = nil  // 화면 닫기
+                return .send(.showToast(.init(message: "도장 정보 인력을 완료했어요", style: .info)))
+                
+            case let ._updateProfileResponse(.failure(error)):
+                state.isLoadingProfile = false
+                Log.trace("Failed to update profile: \(error)", category: .network, level: .error)
+                return .send(.showToast(.init(message: "저장에 실패했어요. 다시 시도해주세요", style: .info)))
                 
             case let .showToast(toastState):
                 state.toast = toastState

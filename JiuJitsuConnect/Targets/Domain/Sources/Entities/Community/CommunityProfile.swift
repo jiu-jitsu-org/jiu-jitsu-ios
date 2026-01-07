@@ -111,6 +111,53 @@ public struct CommunityProfile: Codable, Equatable, Sendable {
 
 // MARK: - Enums
 
+/// 프로필 섹션 (수정/조회 단위)
+///
+/// 사용자 프로필의 논리적 구분 단위를 나타냅니다.
+/// UI에서 섹션별 수정이 가능하며, 각 섹션은 독립적으로 업데이트됩니다.
+public enum ProfileSection: String, Codable, Sendable, CaseIterable, Equatable {
+    /// 도장 정보 (academyName)
+    case academy = "ACADEMY"
+    
+    /// 벨트/체급 정보 (beltRank, beltStripe, gender, weightKg)
+    case beltWeight = "BELT_WEIGHT"
+    
+    /// 포지션 정보 (bestPosition, favoritePosition)
+    case position = "POSITION"
+    
+    /// 서브미션 정보 (bestSubmission, favoriteSubmission)
+    case submission = "SUBMISSION"
+    
+    /// 기술 정보 (bestTechnique, favoriteTechnique)
+    case technique = "TECHNIQUE"
+    
+    /// 대회 정보 (competitions)
+    case competition = "COMPETITION"
+    
+    /// 지도자 정보 (teachingPhilosophy, teachingStartDate, teachingDetail)
+    case instructorInfo = "OWNER_INFO"
+    
+    /// 섹션의 한글 이름
+    public var displayName: String {
+        switch self {
+        case .academy:
+            return "도장 정보"
+        case .beltWeight:
+            return "벨트/체급"
+        case .position:
+            return "포지션"
+        case .submission:
+            return "서브미션"
+        case .technique:
+            return "기술"
+        case .competition:
+            return "대회 기록"
+        case .instructorInfo:
+            return "지도자 정보"
+        }
+    }
+}
+
 /// 주짓수 벨트 등급
 public enum BeltRank: String, Codable, Equatable, Sendable {
     case white = "WHITE"

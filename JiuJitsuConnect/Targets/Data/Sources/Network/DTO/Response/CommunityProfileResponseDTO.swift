@@ -17,15 +17,15 @@ struct CommunityProfileResponseDTO: Codable {
     let gender: String?
     let weightKg: Double?
     let academyName: String?
-    let competitions: [CompetitionDTO]
+    let competitions: [CompetitionDTO]?
     let bestSubmission: String?
     let favoriteSubmission: String?
     let bestTechnique: String?
     let favoriteTechnique: String?
     let bestPosition: String?
     let favoritePosition: String?
-    let isWeightHidden: Bool
-    let isOwner: Bool
+    let isWeightHidden: Bool?
+    let isOwner: Bool?
     let teachingPhilosophy: String?
     let teachingStartDate: String?
     let teachingDetail: String?
@@ -40,15 +40,15 @@ struct CommunityProfileResponseDTO: Codable {
             gender: gender.flatMap { Gender(rawValue: $0) },
             weightKg: weightKg,
             academyName: academyName,
-            competitions: competitions.map { $0.toDomain() },
+            competitions: competitions?.map { $0.toDomain() } ?? [],
             bestSubmission: bestSubmission.flatMap { SubmissionType(rawValue: $0) },
             favoriteSubmission: favoriteSubmission.flatMap { SubmissionType(rawValue: $0) },
             bestTechnique: bestTechnique.flatMap { TechniqueType(rawValue: $0) },
             favoriteTechnique: favoriteTechnique.flatMap { TechniqueType(rawValue: $0) },
             bestPosition: bestPosition.flatMap { PositionType(rawValue: $0) },
             favoritePosition: favoritePosition.flatMap { PositionType(rawValue: $0) },
-            isWeightHidden: isWeightHidden,
-            isOwner: isOwner,
+            isWeightHidden: isWeightHidden ?? false,
+            isOwner: isOwner ?? false,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
             teachingDetail: teachingDetail
