@@ -31,6 +31,7 @@ public struct NicknameSettingFeature: Sendable {
         // MARK: - Core State
         @Presents var alert: AlertState<Action.Alert>?
         
+        var mode: Mode
         var nickname: String = ""
         var validationState: ValidationState = .idle
         var validatedNickname: String? = nil
@@ -40,13 +41,28 @@ public struct NicknameSettingFeature: Sendable {
         var isCtaButtonEnabled: Bool = true
         var isTextFieldActive: Bool = false
         
-        // MARK: - Passed Data
-        let tempToken: String
-        let isMarketingAgreed: Bool
+        // MARK: - Passed Data (초기 설정 모드에만 사용)
+        let tempToken: String?
+        let isMarketingAgreed: Bool?
         
+        // 초기 설정 모드 생성자
         public init(tempToken: String, isMarketingAgreed: Bool) {
+            self.mode = .initial
             self.tempToken = tempToken
             self.isMarketingAgreed = isMarketingAgreed
+        }
+        
+        // 수정 모드 생성자
+        public init(mode: Mode = .edit, nickname: String = "") {
+            self.mode = mode
+            self.nickname = nickname
+            self.tempToken = nil
+            self.isMarketingAgreed = nil
+            
+            // 수정 모드이고 기존 닉네임이 있으면 텍스트필드를 활성화 상태로 시작
+            if mode == .edit && !nickname.isEmpty {
+                self.isTextFieldActive = true
+            }
         }
     }
     
@@ -55,6 +71,7 @@ public struct NicknameSettingFeature: Sendable {
         case onAppear
         case viewTapped
         case doneButtonTapped
+        case backButtonTapped
         case alert(PresentationAction<Alert>)
         
         // Internal Actions
@@ -66,6 +83,8 @@ public struct NicknameSettingFeature: Sendable {
         public enum Delegate: Equatable, Sendable {
             case signupSuccessful(info: AuthInfo)
             case signupFailed(message: String)
+            case saveNickname(String)  // 닉네임 수정 요청
+            case cancel
         }
         case delegate(Delegate)
     }
@@ -114,30 +133,47 @@ public struct NicknameSettingFeature: Sendable {
                     return .none
                 }
                 
-                // 2단계: 상태에 따른 API 호출
-                if state.validationState == .available && state.nickname == state.validatedNickname {
-                    // 이미 검증 완료된 닉네임 -> 회원가입 시도
-                    let info = SignupInfo(
-                        tempToken: state.tempToken,
-                        nickname: state.nickname,
-                        isMarketingAgreed: state.isMarketingAgreed
-                    )
-                    return .run { send in
-                        await send(._signupResponse(
-                            await TaskResult { try await userClient.signup(info) }
-                        ))
-                    }
-                    .cancellable(id: CancelID.apiCall)
+                // 2단계: 모드에 따른 분기
+                switch state.mode {
+                case .edit:
+                    // 수정 모드: 부모 Feature에게 저장 요청 위임
+                    state.validationState = .valid
+                    return .send(.delegate(.saveNickname(state.nickname)))
                     
-                } else {
-                    // 검증되지 않은 닉네임 -> 중복 검사 시도
-                    return .run { [nickname = state.nickname] send in
-                        await send(._checkNicknameResponse(
-                            await TaskResult { try await userClient.checkNickname(.init(nickname: nickname)) }
-                        ))
+                case .initial:
+                    // 초기 설정 모드: 기존 회원가입 플로우
+                    if state.validationState == .available && state.nickname == state.validatedNickname {
+                        // 이미 검증 완료된 닉네임 -> 회원가입 시도
+                        guard let tempToken = state.tempToken,
+                              let isMarketingAgreed = state.isMarketingAgreed else {
+                            return .none
+                        }
+                        
+                        let info = SignupInfo(
+                            tempToken: tempToken,
+                            nickname: state.nickname,
+                            isMarketingAgreed: isMarketingAgreed
+                        )
+                        return .run { send in
+                            await send(._signupResponse(
+                                await TaskResult { try await userClient.signup(info) }
+                            ))
+                        }
+                        .cancellable(id: CancelID.apiCall)
+                        
+                    } else {
+                        // 검증되지 않은 닉네임 -> 중복 검사 시도
+                        return .run { [nickname = state.nickname] send in
+                            await send(._checkNicknameResponse(
+                                await TaskResult { try await userClient.checkNickname(.init(nickname: nickname)) }
+                            ))
+                        }
+                        .cancellable(id: CancelID.apiCall)
                     }
-                    .cancellable(id: CancelID.apiCall)
                 }
+                
+            case .backButtonTapped:
+                return .send(.delegate(.cancel))
                 
             case let ._checkNicknameResponse(.success(isAvailable)):
                 if isAvailable {
@@ -209,6 +245,20 @@ public struct NicknameSettingFeature: Sendable {
 
 // MARK: - Validation State & View Helpers
 public extension NicknameSettingFeature {
+    enum Mode: Equatable, Sendable {
+        case initial  // 최초 설정 (회원가입)
+        case edit     // 수정
+        
+        var headerTitle: String {
+            switch self {
+            case .initial:
+                return ""  // 최초 설정에는 헤더 없음
+            case .edit:
+                return "닉네임 수정"
+            }
+        }
+    }
+    
     enum ValidationState: Equatable, Sendable {
         case idle
         case available
@@ -216,6 +266,7 @@ public extension NicknameSettingFeature {
         case invalidLength
         case invalidCharacters
         case networkError
+        case valid  // 수정 모드에서 사용
     }
 }
 
@@ -230,6 +281,8 @@ public extension NicknameSettingFeature.ValidationState {
             return "이미 사용 중인 닉네임입니다."
         case .invalidLength, .invalidCharacters:
             return "한글/영문/숫자,\n2~12자로 작성해주세요"
+        case .valid:
+            return "닉네임이 설정되었습니다"
         }
     }
     
@@ -242,7 +295,7 @@ public extension NicknameSettingFeature.ValidationState {
     
     var textColor: Color {
         switch self {
-        case .idle, .available:
+        case .idle, .available, .valid:
             return Color.component.textfieldDisplay.focus.text
         case .unavailable, .invalidLength, .invalidCharacters, .networkError:
             return Color.component.textfieldDisplay.default.placeholder
