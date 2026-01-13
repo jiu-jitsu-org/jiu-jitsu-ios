@@ -19,10 +19,10 @@ public struct NicknameSettingView: View {
             ctaButtonSection
         }
         .onAppear {
-            store.send(.onAppear)
+            store.send(.view(.onAppear))
         }
         .onTapGesture {
-            store.send(.viewTapped)
+            store.send(.view(.viewTapped))
         }
         .bind($store.isKeyboardVisible, to: $isKeyboardVisible)
         .alert($store.scope(state: \.alert, action: \.alert))
@@ -95,7 +95,7 @@ private extension NicknameSettingView {
             style: .keypad,
             height: 56,
             action: {
-                store.send(.doneButtonTapped)
+                store.send(.view(.doneButtonTapped))
             }
         )
         .disabled(!store.isCtaButtonEnabled)

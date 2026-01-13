@@ -26,7 +26,7 @@ public struct MainView: View {
                     // 임시 버튼 목록
                     VStack(spacing: 20) {
                         Button {
-                            store.send(.profileButtonTapped)
+                            store.send(.view(.profileButtonTapped))
                         } label: {
                             Text("프로필 이동")
                                 .font(.headline)
@@ -38,7 +38,7 @@ public struct MainView: View {
                         }
                         
                         Button {
-                            store.send(.settingsButtonTapped)
+                            store.send(.view(.settingsButtonTapped))
                         } label: {
                             Text("설정 화면 이동")
                                 .font(.headline)

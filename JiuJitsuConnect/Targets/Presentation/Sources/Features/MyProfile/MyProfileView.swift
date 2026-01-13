@@ -135,7 +135,7 @@ public struct MyProfileView: View {
             .scrollDisabled(false)
             .onAppear {
                 UIScrollView.appearance().bounces = false
-                store.send(.onAppear)
+                store.send(.view(.onAppear))
             }
             .background(Color.component.background.default)
             .ignoresSafeArea(edges: .top)
@@ -155,8 +155,8 @@ public struct MyProfileView: View {
                 if let toastState = store.toast {
                     ToastView(
                         state: toastState,
-                        onSwipe: { store.send(.toastDismissed, animation: .default) },
-                        onButtonTapped: { store.send(.toastButtonTapped($0), animation: .default) }
+                        onSwipe: { store.send(.internal(.toastDismissed), animation: .default) },
+                        onButtonTapped: { store.send(.view(.toastButtonTapped($0)), animation: .default) }
                     )
                     .padding(.horizontal, 24)
                     .padding(.bottom, toastState.bottomPadding)
@@ -222,7 +222,7 @@ public struct MyProfileView: View {
                         .foregroundStyle(Color.component.list.setting.background)
                     
                     // 수정 버튼
-                    Button(action: { store.send(.nicknameEditButtonTapped) }) {
+                    Button(action: { store.send(.view(.nicknameEditButtonTapped)) }) {
                         ZStack {
                             Assets.Common.Icon.pencil.swiftUIImage
                                 .resizable()
@@ -245,7 +245,7 @@ public struct MyProfileView: View {
                             .foregroundStyle(Color.component.list.setting.background.opacity(0.7))
                         
                         // 수정 버튼
-                        Button(action: { store.send(.gymInfoButtonTapped) }) {
+                        Button(action: { store.send(.view(.gymInfoButtonTapped)) }) {
                             ZStack {
                                 Assets.Common.Icon.pencil.swiftUIImage
                                     .resizable()
@@ -266,7 +266,7 @@ public struct MyProfileView: View {
                 // 버튼 - 도장 정보 유무에 따라 다른 버튼 표시
                 if store.communityProfile?.academyName == nil {
                     Button {
-                        store.send(.gymInfoButtonTapped)
+                        store.send(.view(.gymInfoButtonTapped))
                     } label: {
                         AppButtonConfiguration(title: "도장 정보 입력하기", size: .small)
                     }
@@ -377,7 +377,7 @@ public struct MyProfileView: View {
             
             if !hasBeltInfo || !hasWeightInfo {
                 Button {
-                    store.send(.registerBeltButtonTapped)
+                    store.send(.view(.registerBeltButtonTapped))
                 } label: {
                     AppButtonConfiguration(title: "벨트/체급 등록하기", size: .medium)
                 }
@@ -471,7 +471,7 @@ public struct MyProfileView: View {
             
             if !hasStyleInfo {
                 Button {
-                    store.send(.registerStyleButtonTapped)
+                    store.send(.view(.registerStyleButtonTapped))
                 } label: {
                     AppButtonConfiguration(title: "내 스타일 등록하기", size: .medium)
                 }

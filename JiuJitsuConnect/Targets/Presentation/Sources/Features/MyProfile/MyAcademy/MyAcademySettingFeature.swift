@@ -53,18 +53,20 @@ public struct MyAcademySettingFeature: Sendable {
     
     public enum Action: BindableAction, Equatable, Sendable {
         case binding(BindingAction<State>)
-        case onAppear
-        case viewTapped
-        case doneButtonTapped
-        case backButtonTapped
+        case view(ViewAction)
+        case delegate(DelegateAction)
         case alert(PresentationAction<Alert>)
         
-        // Delegate Actions
-        case delegate(Delegate)
+        public enum ViewAction: Equatable, Sendable {
+            case onAppear
+            case viewTapped
+            case doneButtonTapped
+            case backButtonTapped
+        }
         
         public enum Alert: Equatable, Sendable {}
         
-        public enum Delegate: Equatable, Sendable {
+        public enum DelegateAction: Equatable, Sendable {
             case saveAcademyName(String)  // 저장 요청만 위임
             case cancel
         }
@@ -81,7 +83,7 @@ public struct MyAcademySettingFeature: Sendable {
         
         Reduce { state, action in
             switch action {
-            case .onAppear:
+            case .view(.onAppear):
                 state.isKeyboardVisible = true
                 return .none
                 
@@ -99,7 +101,7 @@ public struct MyAcademySettingFeature: Sendable {
                 }
                 return .none
                 
-            case .doneButtonTapped:
+            case .view(.doneButtonTapped):
                 guard state.isCtaButtonEnabled else { return .none }
                 
                 // 1단계: 로컬 유효성 검사
@@ -121,17 +123,17 @@ public struct MyAcademySettingFeature: Sendable {
                 state.validationState = .valid
                 return .send(.delegate(.saveAcademyName(state.academyName)))
                 
-            case .backButtonTapped:
+            case .view(.backButtonTapped):
                 return .concatenate(
                     .send(.delegate(.cancel)),
                     .run { _ in await self.dismiss() }
                 )
                 
-            case .viewTapped:
+            case .view(.viewTapped):
                 state.isKeyboardVisible = false
                 return .none
                 
-            case .binding, .alert, .delegate:
+            case .binding, .alert, .delegate, .view:
                 return .none
             }
         }

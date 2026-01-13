@@ -73,7 +73,7 @@ public struct SignupCompleteView: View {
             .zIndex(2) // 맨 위에 위치 (터치 보장)
         }
         .onAppear {
-            store.send(.onAppear)
+            store.send(.view(.onAppear))
         }
         .navigationBarBackButtonHidden(true)
         .navigationBarHidden(true)
@@ -88,7 +88,7 @@ private extension SignupCompleteView {
         CTAButton(
             title: "홈으로",
             action: {
-                store.send(.homeButtonTapped)
+                store.send(.view(.homeButtonTapped))
             }
         )
         .padding(.horizontal, 20)

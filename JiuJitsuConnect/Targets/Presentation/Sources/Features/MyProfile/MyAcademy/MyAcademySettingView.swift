@@ -32,10 +32,10 @@ public struct MyAcademySettingView: View {
             ctaButtonSection
         }
         .onAppear {
-            store.send(.onAppear)
+            store.send(.view(.onAppear))
         }
         .onTapGesture {
-            store.send(.viewTapped)
+            store.send(.view(.viewTapped))
         }
         .bind($store.isKeyboardVisible, to: $isKeyboardVisible)
         .alert($store.scope(state: \.alert, action: \.alert))
@@ -49,7 +49,7 @@ private extension MyAcademySettingView {
     
     var headerView: some View {
         HStack {
-            Button(action: { store.send(.backButtonTapped) }) {
+            Button(action: { store.send(.view(.backButtonTapped)) }) {
                 ZStack {
                     // 라운드 배경
                     RoundedRectangle(cornerRadius: 10)
@@ -144,7 +144,7 @@ private extension MyAcademySettingView {
             style: .keypad,
             height: 56,
             action: {
-                store.send(.doneButtonTapped)
+                store.send(.view(.doneButtonTapped))
             }
         )
         .disabled(!store.isCtaButtonEnabled)

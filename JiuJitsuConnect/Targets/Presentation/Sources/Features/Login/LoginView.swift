@@ -17,7 +17,7 @@ public struct LoginView: View {
                     // MARK: - 소셜 로그인 버튼
                     VStack(spacing: 10) {
                         // 카카오 로그인 버튼
-                        Button(action: { store.send(.kakaoButtonTapped) }) {
+                        Button(action: { store.send(.view(.kakaoButtonTapped)) }) {
                             SocialLoginButton(
                                 asset: Assets.Login.Logo.kakao,
                                 text: "카카오 계속하기",
@@ -28,7 +28,7 @@ public struct LoginView: View {
                         .frame(height: 52)
                         
                         // 구글 로그인 버튼
-                        Button(action: { store.send(.googleButtonTapped) }) {
+                        Button(action: { store.send(.view(.googleButtonTapped)) }) {
                             SocialLoginButton(
                                 asset: Assets.Login.Logo.google,
                                 text: "구글로 계속하기",
@@ -39,7 +39,7 @@ public struct LoginView: View {
                         .frame(height: 52)
                         
                         // 애플 로그인 버튼
-                        Button(action: { store.send(.appleButtonTapped) }) {
+                        Button(action: { store.send(.view(.appleButtonTapped)) }) {
                             SocialLoginButton(
                                 asset: Assets.Login.Logo.apple,
                                 text: "애플로 계속하기",
@@ -50,7 +50,7 @@ public struct LoginView: View {
                         .frame(height: 52)
                         
                         // 둘러보기 버튼
-                        Button(action: { store.send(.aroundButtonTapped) }) {
+                        Button(action: { store.send(.view(.aroundButtonTapped)) }) {
                             Text("로그인 없이 둘러보기")
                                 .font(Font.pretendard.custom(weight: .semiBold, size: 16))
                                 .foregroundStyle(Color.primitive.bw.white)
@@ -74,8 +74,8 @@ public struct LoginView: View {
             if let toastState = store.toast {
                 ToastView(
                     state: toastState,
-                    onSwipe: { store.send(.toastDismissed, animation: .default) },
-                    onButtonTapped: { store.send(.toastButtonTapped($0), animation: .default) }
+                    onSwipe: { store.send(.internal(.toastDismissed), animation: .default) },
+                    onButtonTapped: { store.send(.view(.toastButtonTapped($0)), animation: .default) }
                 )
                 .padding(.horizontal, 24)
                 .padding(.bottom, toastState.bottomPadding)

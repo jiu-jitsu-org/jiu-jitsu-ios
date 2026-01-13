@@ -7,56 +7,62 @@ public struct MainFeature {
     public init() {}
     
     @ObservableState
-    public struct State: Equatable {
-        @Presents var destination: Destination.State?
-        @Presents var loginModal: LoginFeature.State?
+    public struct State: Equatable, Sendable {
+        @Presents public var destination: Destination.State?
+        @Presents public var loginModal: LoginFeature.State?
         
-        var authInfo: AuthInfo
+        public var authInfo: AuthInfo
         
         public init(authInfo: AuthInfo) {
             self.authInfo = authInfo
         }
     }
     
-    @Reducer(state: .equatable, action: .equatable, .sendable)
-    public enum Destination {
+    public enum Destination: Equatable, Sendable {
         case settings(SettingsFeature)
 //        case profile(ProfileFeature)
     }
     
     @CasePathable
     public enum Action: Equatable, Sendable {
-        case settingsButtonTapped
-        case profileButtonTapped
-        
-        case showLoginModal
+        case view(ViewAction)
+        case `internal`(InternalAction)
         
         // 네비게이션 액션
         case loginModal(PresentationAction<LoginFeature.Action>)
         case destination(PresentationAction<Destination.Action>)
+        
+        public enum ViewAction: Equatable, Sendable {
+            case settingsButtonTapped
+            case profileButtonTapped
+        }
+        
+        public enum InternalAction: Equatable, Sendable {
+            case showLoginModal
+        }
     }
     
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
-            case .settingsButtonTapped:
+            case .view(.settingsButtonTapped):
                 if state.authInfo.isGuest {
-                    return .send(.showLoginModal)
+                    return .send(.internal(.showLoginModal))
                 } else {
                     state.destination = .settings(.init(authInfo: state.authInfo))
                     return .none
                 }
                 
-            case .profileButtonTapped:
+            case .view(.profileButtonTapped):
                 if state.authInfo.isGuest {
-                    return .send(.showLoginModal)
+                    return .send(.internal(.showLoginModal))
                 } else {
                     state.destination = .settings(.init(authInfo: state.authInfo))
                     return .none
                 }
                 
                 // MARK: - Login Logic
-            case .showLoginModal:
+            case .internal(.showLoginModal):
                 state.loginModal = LoginFeature.State()
                 return .none
                 
@@ -92,10 +98,10 @@ public struct MainFeature {
                     state.authInfo = .guest
                     state.destination = nil
                     
-                    return .send(.showLoginModal)
+                    return .send(.internal(.showLoginModal))
                 }
                 
-            case .destination:
+            case .destination, .view, .internal:
                 return .none
             }
         }

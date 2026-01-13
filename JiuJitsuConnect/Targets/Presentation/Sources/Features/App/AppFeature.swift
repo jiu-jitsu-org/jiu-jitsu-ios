@@ -31,7 +31,7 @@ public struct AppFeature {
         Reduce { state, action in
             switch action {
                 // MARK: - Navigation Logic
-            case .destination(.presented(.splash(.didFinishInitLaunch))):
+            case .destination(.presented(.splash(.internal(.didFinishInitLaunch)))):
                 state.destination = .login(.init())
                 return .none
                 

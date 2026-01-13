@@ -68,25 +68,31 @@ public struct NicknameSettingFeature: Sendable {
     
     public enum Action: BindableAction, Equatable, Sendable {
         case binding(BindingAction<State>)
-        case onAppear
-        case viewTapped
-        case doneButtonTapped
-        case backButtonTapped
+        case view(ViewAction)
+        case `internal`(InternalAction)
+        case delegate(DelegateAction)
         case alert(PresentationAction<Alert>)
         
-        // Internal Actions
-        case _checkNicknameResponse(TaskResult<Bool>)
-        case _signupResponse(TaskResult<AuthInfo>)
+        public enum ViewAction: Equatable, Sendable {
+            case onAppear
+            case viewTapped
+            case doneButtonTapped
+            case backButtonTapped
+        }
+        
+        public enum InternalAction: Equatable, Sendable {
+            case checkNicknameResponse(TaskResult<Bool>)
+            case signupResponse(TaskResult<AuthInfo>)
+        }
         
         public enum Alert: Equatable, Sendable {}
         
-        public enum Delegate: Equatable, Sendable {
+        public enum DelegateAction: Equatable, Sendable {
             case signupSuccessful(info: AuthInfo)
             case signupFailed(message: String)
             case saveNickname(String)  // 닉네임 수정 요청
             case cancel
         }
-        case delegate(Delegate)
     }
     
     // MARK: - Dependencies
@@ -98,7 +104,7 @@ public struct NicknameSettingFeature: Sendable {
         
         Reduce { state, action in
             switch action {
-            case .onAppear:
+            case .view(.onAppear):
                 state.isKeyboardVisible = true
                 return .none
                 
@@ -117,7 +123,7 @@ public struct NicknameSettingFeature: Sendable {
                 }
                 return .none
                 
-            case .doneButtonTapped:
+            case .view(.doneButtonTapped):
                 guard state.isCtaButtonEnabled else { return .none }
                 
                 // 1단계: 로컬 유효성 검사
@@ -155,27 +161,27 @@ public struct NicknameSettingFeature: Sendable {
                             isMarketingAgreed: isMarketingAgreed
                         )
                         return .run { send in
-                            await send(._signupResponse(
+                            await send(.internal(.signupResponse(
                                 await TaskResult { try await userClient.signup(info) }
-                            ))
+                            )))
                         }
                         .cancellable(id: CancelID.apiCall)
                         
                     } else {
                         // 검증되지 않은 닉네임 -> 중복 검사 시도
                         return .run { [nickname = state.nickname] send in
-                            await send(._checkNicknameResponse(
+                            await send(.internal(.checkNicknameResponse(
                                 await TaskResult { try await userClient.checkNickname(.init(nickname: nickname)) }
-                            ))
+                            )))
                         }
                         .cancellable(id: CancelID.apiCall)
                     }
                 }
                 
-            case .backButtonTapped:
+            case .view(.backButtonTapped):
                 return .send(.delegate(.cancel))
                 
-            case let ._checkNicknameResponse(.success(isAvailable)):
+            case let .internal(.checkNicknameResponse(.success(isAvailable))):
                 if isAvailable {
                     state.validationState = .available
                     state.validatedNickname = state.nickname
@@ -185,20 +191,20 @@ public struct NicknameSettingFeature: Sendable {
                 }
                 return .none
                 
-            case let ._checkNicknameResponse(.failure(error)):
+            case let .internal(.checkNicknameResponse(.failure(error))):
                 return handleApiFailure(state: &state, error: error)
                 
-            case let ._signupResponse(.success(info)):
+            case let .internal(.signupResponse(.success(info))):
                 return .send(.delegate(.signupSuccessful(info: info)))
                 
-            case let ._signupResponse(.failure(error)):
+            case let .internal(.signupResponse(.failure(error))):
                 return handleApiFailure(state: &state, error: error)
                 
-            case .viewTapped:
+            case .view(.viewTapped):
                 state.isKeyboardVisible = false
                 return .none
                 
-            case .binding, .alert, .delegate:
+            case .binding, .alert, .delegate, .view, .internal:
                 return .none
             }
         }

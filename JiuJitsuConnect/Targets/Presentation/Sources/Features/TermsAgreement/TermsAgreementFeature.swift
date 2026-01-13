@@ -49,12 +49,16 @@ public struct TermsAgreementFeature: Sendable {
     
     public enum Action: Equatable, Sendable {
         case rows(IdentifiedAction<TermsAgreementRowFeature.State.ID, TermsAgreementRowFeature.Action>)
-        case mainButtonTapped
+        case view(ViewAction)
+        case delegate(DelegateAction)
         
-        public enum Delegate: Equatable, Sendable {
+        public enum ViewAction: Equatable, Sendable {
+            case mainButtonTapped
+        }
+        
+        public enum DelegateAction: Equatable, Sendable {
             case didFinishAgreement(isMarketingAgreed: Bool)
         }
-        case delegate(Delegate)
     }
     
     @Dependency(\.openURL) var openURL
@@ -62,7 +66,7 @@ public struct TermsAgreementFeature: Sendable {
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
-            case .mainButtonTapped:
+            case .view(.mainButtonTapped):
                 if state.didAgreeToAllRequired {
                     Log.trace("필수 약관 동의 완료 -> 다음 화면 이동", category: .view, level: .debug)
                     return .send(.delegate(.didFinishAgreement(isMarketingAgreed: state.isMarketingAgreed)))

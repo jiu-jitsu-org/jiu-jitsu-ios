@@ -51,7 +51,7 @@ public struct TermsAgreementView: View {
             // TODO: - 공통 CTA 컴포넌트로 변경
             // 메인 액션 버튼
             CTAButton(title: store.buttonTitle, action: {
-                store.send(.mainButtonTapped)
+                store.send(.view(.mainButtonTapped))
             })
             .padding(.horizontal, 20)
             .padding(.top, 8)

@@ -16,9 +16,22 @@ public struct SplashFeature {
     
     @CasePathable
     public enum Action: Equatable {
-        case onAppear
-        case didFinishInitLaunch
+        case view(ViewAction)
+        case `internal`(InternalAction)
+        case delegate(DelegateAction)
         case alert(PresentationAction<Alert>)
+        
+        public enum ViewAction: Equatable {
+            case onAppear
+        }
+        
+        public enum InternalAction: Equatable {
+            case didFinishInitLaunch
+        }
+        
+        public enum DelegateAction: Equatable {
+            case finishedLaunch
+        }
         
         public enum Alert: Equatable {
             case goToUpdateTapped
@@ -28,17 +41,21 @@ public struct SplashFeature {
     public var body: some ReducerOf<Self> {
         Reduce { _, action in
             switch action {
-            case .onAppear:
+            case .view(.onAppear):
                 return .run { send in
                     try await clock.sleep(for: .seconds(2))
-                    await send(.didFinishInitLaunch)
+                    await send(.internal(.didFinishInitLaunch))
                 }
+                
+            case .internal(.didFinishInitLaunch):
+                return .send(.delegate(.finishedLaunch))
                 
             case .alert(.presented(.goToUpdateTapped)):
                 // TODO: - 추후 업데이트 로직 구현 필요
                 return .none
                 
-            default: return .none
+            case .alert, .delegate, .view, .internal:
+                return .none
             }
         }
         .ifLet(\.$alert, action: \.alert)

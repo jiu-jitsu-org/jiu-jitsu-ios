@@ -20,7 +20,7 @@ public struct AppTabFeature: Sendable {
     }
     
     @ObservableState
-    public struct State: Equatable {
+    public struct State: Equatable, Sendable {
         var selectedTab: Tab = .main
         
         // 각 탭의 독립적인 State
@@ -43,15 +43,24 @@ public struct AppTabFeature: Sendable {
     }
     
     public enum Action: Equatable, Sendable {
-        case tabSelected(Tab)
+        case view(ViewAction)
+        case `internal`(InternalAction)
         
         // 자식 Feature 액션 연결
         case main(MainFeature.Action)
         case community(CommunityFeature.Action)
         case myPage(MyProfileFeature.Action)
         
-        case showLoginModal
         case loginModal(PresentationAction<LoginFeature.Action>)
+        
+        @CasePathable
+        public enum ViewAction: Equatable, Sendable {
+            case tabSelected(Tab)
+        }
+        
+        public enum InternalAction: Equatable, Sendable {
+            case showLoginModal
+        }
     }
     
     public var body: some ReducerOf<Self> {
@@ -69,13 +78,13 @@ public struct AppTabFeature: Sendable {
         // 2. 탭 바 자체 로직 처리
         Reduce { state, action in
             switch action {
-            case let .tabSelected(tab):
+            case let .view(.tabSelected(tab)):
                 if state.authInfo.isGuest {
                     switch tab {
                     case .main, .community:
                         state.selectedTab = tab
                     case .myPage:
-                        return .send(.showLoginModal)
+                        return .send(.internal(.showLoginModal))
                     }
                 } else {
                     state.selectedTab = tab
@@ -86,7 +95,7 @@ public struct AppTabFeature: Sendable {
                 return .none
                 
                 // MARK: - Login Logic
-            case .showLoginModal:
+            case .internal(.showLoginModal):
                 state.loginModal = LoginFeature.State()
                 return .none
                 
@@ -103,7 +112,7 @@ public struct AppTabFeature: Sendable {
                     return .none
                 }
                 
-            case .loginModal:
+            case .loginModal, .view, .internal:
                 return .none
                 
             }

@@ -20,7 +20,7 @@ public struct AppTabView: View {
     public var body: some View {
         // iOS 18+ 혹은 최신 SwiftUI에서는 $store.selectedTab.sending(\.tabSelected) 사용 가능
         // 하위 호환성을 위해 Binding(get:set:)을 명시적으로 사용할 수도 있습니다.
-        TabView(selection: $store.selectedTab.sending(\.tabSelected)) {
+        TabView(selection: $store.selectedTab.sending(\.view.tabSelected)) {
             
             // 탭 1: 메인
             MainView(store: store.scope(state: \.main, action: \.main))

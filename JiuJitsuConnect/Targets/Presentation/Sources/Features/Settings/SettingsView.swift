@@ -42,10 +42,10 @@ public struct SettingsView: View {
                     // MARK: - 약관 및 정책 섹션
                     SettingsSection {
                         SettingsInteractiveRow(asset: Assets.Common.Icon.documents, text: "서비스 이용 약관") {
-                            store.send(.termsButtonTapped)
+                            store.send(.view(.termsButtonTapped))
                         }
                         SettingsInteractiveRow(asset: Assets.Common.Icon.documents, text: "개인정보 처리 방침") {
-                            store.send(.privacyPolicyButtonTapped)
+                            store.send(.view(.privacyPolicyButtonTapped))
                         }
                     }
                     
@@ -65,10 +65,10 @@ public struct SettingsView: View {
                     // MARK: - 계정 관리 섹션
                     SettingsSection {
                         SettingsInteractiveRow(asset: Assets.Common.Icon.logOut, text: "로그아웃") {
-                            store.send(.logoutButtonTapped)
+                            store.send(.view(.logoutButtonTapped))
                         }
                         SettingsInteractiveRow(asset: Assets.Common.Icon.secession, text: "회원 탈퇴") {
-                            store.send(.withdrawalButtonTapped)
+                            store.send(.view(.withdrawalButtonTapped))
                         }
                     }
                 }
@@ -81,8 +81,8 @@ public struct SettingsView: View {
             if let toastState = store.toast {
                 ToastView(
                     state: toastState,
-                    onSwipe: { store.send(.toastDismissed, animation: .default) },
-                    onButtonTapped: { store.send(.toastButtonTapped($0), animation: .default) }
+                    onSwipe: { store.send(.internal(.toastDismissed), animation: .default) },
+                    onButtonTapped: { store.send(.view(.toastButtonTapped($0)), animation: .default) }
                 )
                 .padding(.horizontal, 24)
                 .padding(.bottom, toastState.bottomPadding)
@@ -102,7 +102,7 @@ public struct SettingsView: View {
     
     private var headerView: some View {
         HStack {
-            Button(action: { store.send(.backButtonTapped) }) {
+            Button(action: { store.send(.view(.backButtonTapped)) }) {
                 ZStack {
                     Assets.Common.Icon.chevronLeft.swiftUIImage
                         .resizable()
@@ -139,15 +139,15 @@ public struct SettingsView: View {
             return .init(
                 title: "로그아웃",
                 message: "로그아웃 하시겠습니까?",
-                primaryButton: .init(title: "로그아웃", style: .primary, action: { store.send(.confirmLogout) }),
-                secondaryButton: .init(title: "취소", style: .neutral, action: { store.send(.alertDismissed) })
+                primaryButton: .init(title: "로그아웃", style: .primary, action: { store.send(.view(.confirmLogout)) }),
+                secondaryButton: .init(title: "취소", style: .neutral, action: { store.send(.view(.alertDismissed)) })
             )
         case .withdrawal:
             return .init(
                 title: "회원 탈퇴",
                 message: "30일 뒤 계정이 영구 삭제됩니다. 작성한 게시물과 댓글은 익명으로 남으며, 기간 내 재로그인 시 탈퇴가 취소됩니다.",
-                primaryButton: .init(title: "탈퇴하기", style: .destructive, action: { store.send(.confirmWithdrawal) }),
-                secondaryButton: .init(title: "취소", style: .neutral, action: { store.send(.alertDismissed) })
+                primaryButton: .init(title: "탈퇴하기", style: .destructive, action: { store.send(.view(.confirmWithdrawal)) }),
+                secondaryButton: .init(title: "취소", style: .neutral, action: { store.send(.view(.alertDismissed)) })
             )
         case .none:
             // Alert가 보이지 않을 때를 위한 기본값. 내용은 중요하지 않습니다.
