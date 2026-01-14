@@ -13,7 +13,7 @@ import Domain
 public struct SignupCompleteFeature: Sendable {
     
     @ObservableState
-    public struct State: Equatable, Sendable {
+    public struct State: Equatable {
         // MARK: - Passed Data
         let authInfo: AuthInfo
         
@@ -26,21 +26,21 @@ public struct SignupCompleteFeature: Sendable {
         }
     }
     
-    public enum Action: Equatable, Sendable {
+    public enum Action: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
         case delegate(DelegateAction)
         
-        public enum ViewAction: Equatable, Sendable {
+        public enum ViewAction: Sendable {
             case onAppear
             case homeButtonTapped
         }
         
-        public enum InternalAction: Equatable, Sendable {
+        public enum InternalAction: Sendable {
             case setContentVisible(Bool)
         }
         
-        public enum DelegateAction: Equatable, Sendable {
+        public enum DelegateAction: Sendable {
             // 회원가입/설정 흐름이 모두 완료되었음을 부모에게 알림
             case completeSignupFlow(info: AuthInfo)
         }

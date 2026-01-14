@@ -40,13 +40,12 @@ public struct SettingsFeature: Sendable {
         }
     }
     
-    @CasePathable
-    public enum Action: Equatable, Sendable {
+    public enum Action: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
         case delegate(DelegateAction)
         
-        public enum ViewAction: Equatable, Sendable {
+        public enum ViewAction: Sendable {
             case backButtonTapped
             case termsButtonTapped
             case privacyPolicyButtonTapped
@@ -58,14 +57,14 @@ public struct SettingsFeature: Sendable {
             case toastButtonTapped(ToastState.Action)
         }
         
-        public enum InternalAction: Equatable, Sendable {
+        public enum InternalAction: Sendable {
             case logoutResponse(TaskResult<Bool>)
             case withdrawalResponse(TaskResult<Bool>)
             case showToast(ToastState)
             case toastDismissed
         }
         
-        public enum DelegateAction: Equatable, Sendable {
+        public enum DelegateAction: Sendable {
             case didLogoutSuccessfully
             case didWithdrawSuccessfully
         }

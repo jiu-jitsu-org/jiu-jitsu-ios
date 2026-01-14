@@ -3,39 +3,39 @@ import CoreKit
 import Foundation
 
 @Reducer
-public struct SplashFeature {
+public struct SplashFeature: Sendable {
     public init() {}
 
     @Dependency(\.continuousClock) var clock
     
     @ObservableState
     public struct State: Equatable {
-        @Presents public var alert: AlertState<Action.Alert>?
+        @Presents public var alert: AlertState<Alert>?
+        
         public init() {}
     }
     
-    @CasePathable
-    public enum Action: Equatable {
+    public enum Action: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
         case delegate(DelegateAction)
         case alert(PresentationAction<Alert>)
         
-        public enum ViewAction: Equatable {
+        public enum ViewAction: Sendable {
             case onAppear
         }
         
-        public enum InternalAction: Equatable {
+        public enum InternalAction: Sendable {
             case didFinishInitLaunch
         }
         
-        public enum DelegateAction: Equatable {
+        public enum DelegateAction: Sendable {
             case finishedLaunch
         }
-        
-        public enum Alert: Equatable {
-            case goToUpdateTapped
-        }
+    }
+    
+    public enum Alert: Sendable {
+        case goToUpdateTapped
     }
     
     public var body: some ReducerOf<Self> {

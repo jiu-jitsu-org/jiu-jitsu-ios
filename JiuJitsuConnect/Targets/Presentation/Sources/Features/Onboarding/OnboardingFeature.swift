@@ -2,7 +2,7 @@ import ComposableArchitecture
 import Foundation
 
 @Reducer
-public struct OnboardingFeature {
+public struct OnboardingFeature: Sendable {
     public init() {}
     
     @ObservableState
@@ -10,8 +10,7 @@ public struct OnboardingFeature {
         
     }
     
-    @CasePathable
-    public enum Action: Equatable {
+    public enum Action: Sendable {
 
     }
 }

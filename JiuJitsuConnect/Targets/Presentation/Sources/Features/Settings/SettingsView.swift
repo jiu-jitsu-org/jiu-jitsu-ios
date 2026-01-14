@@ -92,7 +92,7 @@ public struct SettingsView: View {
         .appAlert(
             isPresented: Binding(
                 get: { store.alert != nil },
-                set: { if !$0 { store.send(.alertDismissed) } }
+                set: { if !$0 { store.send(.view(.alertDismissed)) } }
             ),
             configuration: alertConfiguration(for: store.alert)
         )

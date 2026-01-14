@@ -3,11 +3,11 @@ import Foundation
 import Domain
 
 @Reducer
-public struct AppFeature {
+public struct AppFeature: Sendable {
     public init() { }
     
-    @Reducer(state: .equatable, action: .equatable)
-    public enum Destination {
+    @Reducer(state: .equatable)
+    public enum Destination: Sendable {
         case splash(SplashFeature)
         case onboarding(OnboardingFeature)
         case main(MainFeature)
@@ -22,9 +22,8 @@ public struct AppFeature {
         public init() {}
     }
     
-    @CasePathable
-    public enum Action {
-        case destination(PresentationAction<Destination.Action>)
+    public enum Action: Sendable {
+        case destination(PresentationAction<Destination.Action>) // Associated value 'destination' of 'Sendable'-conforming enum 'Action' contains non-Sendable type 'AppFeature.Destination.Action'; this is an error in the Swift 6 language mode
     }
     
     public var body: some ReducerOf<Self> {

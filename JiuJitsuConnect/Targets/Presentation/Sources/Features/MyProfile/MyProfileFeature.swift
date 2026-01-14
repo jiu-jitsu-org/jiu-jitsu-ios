@@ -12,13 +12,13 @@ import DesignSystem
 import CoreKit
 
 @Reducer
-public struct MyProfileFeature {
+public struct MyProfileFeature: Sendable {
     public init() {}
     
     private enum CancelID { case toast }
     
     @ObservableState
-    public struct State: Sendable {
+    public struct State: Equatable {
         @Presents var destination: Destination.State?
         
         var authInfo: AuthInfo
@@ -36,21 +36,20 @@ public struct MyProfileFeature {
         }
     }
     
-    @Reducer
-    public enum Destination {
+    @Reducer(state: .equatable)
+    public enum Destination: Sendable {
         case academySetting(MyAcademySettingFeature)
         case nicknameSetting(NicknameSettingFeature)
     }
     
-    @CasePathable
-    public enum Action: Equatable, Sendable {
+    public enum Action: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
         
         // 네비게이션 액션
         case destination(PresentationAction<Destination.Action>)
         
-        public enum ViewAction: Equatable, Sendable {
+        public enum ViewAction: Sendable {
             case onAppear
             case gymInfoButtonTapped
             case nicknameEditButtonTapped
@@ -59,7 +58,7 @@ public struct MyProfileFeature {
             case toastButtonTapped(ToastState.Action)
         }
         
-        public enum InternalAction: Equatable, Sendable {
+        public enum InternalAction: Sendable {
             case loadProfile
             case profileResponse(TaskResult<CommunityProfile>)
             case updateProfileSection(ProfileSection, String?)

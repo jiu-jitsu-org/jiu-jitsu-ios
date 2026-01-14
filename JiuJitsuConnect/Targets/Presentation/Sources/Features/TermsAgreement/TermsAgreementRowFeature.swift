@@ -14,7 +14,7 @@ public struct TermsAgreementRowFeature: Sendable {
     public init() {}
     
     @ObservableState
-    public struct State: Equatable, Identifiable, Sendable {
+    public struct State: Equatable, Identifiable {
         public var id: UUID { term.id }
         
         let term: TermItem
@@ -30,7 +30,7 @@ public struct TermsAgreementRowFeature: Sendable {
         }
     }
     
-    public enum Action: Equatable, Sendable {
+    public enum Action: Sendable {
         case checkTapped
         case seeDetailsTapped
     }

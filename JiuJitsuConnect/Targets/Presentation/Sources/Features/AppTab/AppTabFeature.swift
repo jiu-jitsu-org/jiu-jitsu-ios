@@ -20,7 +20,7 @@ public struct AppTabFeature: Sendable {
     }
     
     @ObservableState
-    public struct State: Equatable, Sendable {
+    public struct State: Equatable {
         var selectedTab: Tab = .main
         
         // 각 탭의 독립적인 State
@@ -42,7 +42,7 @@ public struct AppTabFeature: Sendable {
         }
     }
     
-    public enum Action: Equatable, Sendable {
+    public enum Action: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
         
@@ -53,12 +53,11 @@ public struct AppTabFeature: Sendable {
         
         case loginModal(PresentationAction<LoginFeature.Action>)
         
-        @CasePathable
-        public enum ViewAction: Equatable, Sendable {
+        public enum ViewAction: Sendable {
             case tabSelected(Tab)
         }
         
-        public enum InternalAction: Equatable, Sendable {
+        public enum InternalAction: Sendable {
             case showLoginModal
         }
     }
@@ -127,7 +126,9 @@ public struct AppTabFeature: Sendable {
 @Reducer
 public struct CommunityFeature: Sendable {
     public init() {}
-    @ObservableState public struct State: Equatable { public init() {} }
-    public enum Action: Equatable, Sendable {}
+    
+    @ObservableState
+    public struct State: Equatable { public init() {} }
+    public enum Action: Sendable {}
     public var body: some ReducerOf<Self> { EmptyReducer() }
 }

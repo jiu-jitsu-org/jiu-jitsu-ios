@@ -3,11 +3,17 @@ import Foundation
 import Domain
 
 @Reducer
-public struct MainFeature {
+public struct MainFeature: Sendable {
     public init() {}
     
+    @Reducer(state: .equatable)
+    public enum Destination: Sendable {
+        case settings(SettingsFeature)
+//        case profile(ProfileFeature)
+    }
+    
     @ObservableState
-    public struct State: Equatable, Sendable {
+    public struct State: Equatable { // Type 'MainFeature.State' does not conform to protocol 'Equatable'
         @Presents public var destination: Destination.State?
         @Presents public var loginModal: LoginFeature.State?
         
@@ -18,13 +24,7 @@ public struct MainFeature {
         }
     }
     
-    public enum Destination: Equatable, Sendable {
-        case settings(SettingsFeature)
-//        case profile(ProfileFeature)
-    }
-    
-    @CasePathable
-    public enum Action: Equatable, Sendable {
+    public enum Action: Sendable { // Type 'MainFeature.Action' does not conform to protocol 'Equatable'
         case view(ViewAction)
         case `internal`(InternalAction)
         
@@ -32,12 +32,12 @@ public struct MainFeature {
         case loginModal(PresentationAction<LoginFeature.Action>)
         case destination(PresentationAction<Destination.Action>)
         
-        public enum ViewAction: Equatable, Sendable {
+        public enum ViewAction: Sendable {
             case settingsButtonTapped
             case profileButtonTapped
         }
         
-        public enum InternalAction: Equatable, Sendable {
+        public enum InternalAction: Sendable {
             case showLoginModal
         }
     }
@@ -111,3 +111,5 @@ public struct MainFeature {
         }
     }
 }
+
+extension MainFeature.Destination: Sendable {}

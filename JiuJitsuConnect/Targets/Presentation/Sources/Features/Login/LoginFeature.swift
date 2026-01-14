@@ -4,7 +4,7 @@ import DesignSystem
 import CoreKit
 
 @Reducer
-public struct LoginFeature {
+public struct LoginFeature: Sendable {
     
     private enum CancelID { case toast }
     
@@ -23,7 +23,7 @@ public struct LoginFeature {
     }
     
     @CasePathable
-    public enum Action: Equatable, Sendable {
+    public enum Action: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
         case delegate(DelegateAction)
@@ -31,7 +31,7 @@ public struct LoginFeature {
         case sheet(PresentationAction<Destination.Action>)
         case path(StackAction<Path.State, Path.Action>)
         
-        public enum ViewAction: Equatable, Sendable {
+        public enum ViewAction: Sendable {
             case kakaoButtonTapped
             case googleButtonTapped
             case appleButtonTapped
@@ -39,25 +39,27 @@ public struct LoginFeature {
             case toastButtonTapped(ToastState.Action)
         }
         
-        public enum InternalAction: Equatable, Sendable {
+        public enum InternalAction: Sendable {
             case socialLoginResponse(TaskResult<SNSUser>)
             case serverLoginResponse(TaskResult<AuthInfo>)
             case showToast(ToastState)
             case toastDismissed
         }
         
-        public enum DelegateAction: Equatable, Sendable {
+        public enum DelegateAction: Sendable {
             case didLogin(AuthInfo)
             case skipLogin
         }
     }
     
-    public enum Path: Equatable, Sendable {
+    @Reducer(state: .equatable)
+    public enum Path: Sendable {
         case nicknameSetting(NicknameSettingFeature)
         case signupComplete(SignupCompleteFeature)
     }
     
-    public enum Destination: Equatable, Sendable {
+    @Reducer(state: .equatable)
+    public enum Destination: Sendable {
         case termsAgreement(TermsAgreementFeature)
     }
     
@@ -217,3 +219,6 @@ public struct LoginFeature {
             }
         }
 }
+
+extension LoginFeature.Destination: Sendable {}
+extension LoginFeature.Path: Sendable {}

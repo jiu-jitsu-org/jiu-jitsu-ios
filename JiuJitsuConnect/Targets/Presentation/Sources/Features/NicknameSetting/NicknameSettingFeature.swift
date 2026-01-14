@@ -27,9 +27,9 @@ public struct NicknameSettingFeature: Sendable {
     }()
     
     @ObservableState
-    public struct State: Equatable, Sendable {
+    public struct State: Equatable {
         // MARK: - Core State
-        @Presents var alert: AlertState<Action.Alert>?
+        @Presents var alert: AlertState<Alert>?
         
         var mode: Mode
         var nickname: String = ""
@@ -66,34 +66,34 @@ public struct NicknameSettingFeature: Sendable {
         }
     }
     
-    public enum Action: BindableAction, Equatable, Sendable {
+    public enum Action: BindableAction, Sendable {
         case binding(BindingAction<State>)
         case view(ViewAction)
         case `internal`(InternalAction)
         case delegate(DelegateAction)
         case alert(PresentationAction<Alert>)
         
-        public enum ViewAction: Equatable, Sendable {
+        public enum ViewAction: Sendable {
             case onAppear
             case viewTapped
             case doneButtonTapped
             case backButtonTapped
         }
         
-        public enum InternalAction: Equatable, Sendable {
+        public enum InternalAction: Sendable {
             case checkNicknameResponse(TaskResult<Bool>)
             case signupResponse(TaskResult<AuthInfo>)
         }
         
-        public enum Alert: Equatable, Sendable {}
-        
-        public enum DelegateAction: Equatable, Sendable {
+        public enum DelegateAction: Sendable {
             case signupSuccessful(info: AuthInfo)
             case signupFailed(message: String)
             case saveNickname(String)  // 닉네임 수정 요청
             case cancel
         }
     }
+    
+    public enum Alert: Equatable, Sendable {}
     
     // MARK: - Dependencies
     

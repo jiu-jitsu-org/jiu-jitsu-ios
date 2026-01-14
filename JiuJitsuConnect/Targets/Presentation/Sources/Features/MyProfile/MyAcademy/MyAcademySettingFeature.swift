@@ -27,7 +27,7 @@ public struct MyAcademySettingFeature: Sendable {
     }()
     
     @ObservableState
-    public struct State: Equatable, Sendable {
+    public struct State: Equatable {
         // MARK: - Core State
         @Presents var alert: AlertState<Action.Alert>?
         
@@ -51,7 +51,7 @@ public struct MyAcademySettingFeature: Sendable {
         }
     }
     
-    public enum Action: BindableAction, Equatable, Sendable {
+    public enum Action: BindableAction, Sendable {
         case binding(BindingAction<State>)
         case view(ViewAction)
         case delegate(DelegateAction)

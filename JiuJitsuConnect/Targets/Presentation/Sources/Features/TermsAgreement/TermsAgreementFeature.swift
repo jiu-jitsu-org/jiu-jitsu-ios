@@ -16,7 +16,7 @@ public struct TermsAgreementFeature: Sendable {
     public init() {}
     
     @ObservableState
-    public struct State: Equatable, Sendable {
+    public struct State: Equatable {
         var rows: IdentifiedArrayOf<TermsAgreementRowFeature.State>
         
         // Derived State
@@ -47,16 +47,16 @@ public struct TermsAgreementFeature: Sendable {
         }
     }
     
-    public enum Action: Equatable, Sendable {
+    public enum Action: Sendable {
         case rows(IdentifiedAction<TermsAgreementRowFeature.State.ID, TermsAgreementRowFeature.Action>)
         case view(ViewAction)
         case delegate(DelegateAction)
         
-        public enum ViewAction: Equatable, Sendable {
+        public enum ViewAction: Sendable {
             case mainButtonTapped
         }
         
-        public enum DelegateAction: Equatable, Sendable {
+        public enum DelegateAction: Sendable {
             case didFinishAgreement(isMarketingAgreed: Bool)
         }
     }
