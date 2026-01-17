@@ -27,7 +27,7 @@ public struct NicknameSettingFeature: Sendable {
     }()
     
     @ObservableState
-    public struct State: Equatable {
+    public struct State: Equatable, Sendable {
         // MARK: - Core State
         @Presents var alert: AlertState<Alert>?
         

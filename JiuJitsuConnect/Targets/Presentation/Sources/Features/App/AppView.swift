@@ -16,11 +16,6 @@ public struct AppView: View {
         SplashView(store: splashStore)
       }
       
-    case .onboarding:
-      if let onboardingStore = store.scope(state: \.destination?.onboarding, action: \.destination.onboarding) {
-        OnboardingView(store: onboardingStore)
-      }
-      
     case .main:
       if let mainStore = store.scope(state: \.destination?.main, action: \.destination.main) {
         MainView(store: mainStore)

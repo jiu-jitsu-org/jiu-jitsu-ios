@@ -6,14 +6,14 @@ import Domain
 public struct MainFeature: Sendable {
     public init() {}
     
-    @Reducer(state: .equatable)
+    @Reducer(state: .equatable, action: .sendable)
     public enum Destination: Sendable {
         case settings(SettingsFeature)
-//        case profile(ProfileFeature)
+        //        case profile(ProfileFeature)
     }
     
     @ObservableState
-    public struct State: Equatable { // Type 'MainFeature.State' does not conform to protocol 'Equatable'
+    public struct State: Equatable {
         @Presents public var destination: Destination.State?
         @Presents public var loginModal: LoginFeature.State?
         
@@ -24,7 +24,7 @@ public struct MainFeature: Sendable {
         }
     }
     
-    public enum Action: Sendable { // Type 'MainFeature.Action' does not conform to protocol 'Equatable'
+    public enum Action: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
         
@@ -111,5 +111,3 @@ public struct MainFeature: Sendable {
         }
     }
 }
-
-extension MainFeature.Destination: Sendable {}

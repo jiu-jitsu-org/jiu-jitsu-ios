@@ -53,10 +53,12 @@ public struct AppTabFeature: Sendable {
         
         case loginModal(PresentationAction<LoginFeature.Action>)
         
+        @CasePathable
         public enum ViewAction: Sendable {
             case tabSelected(Tab)
         }
         
+        @CasePathable
         public enum InternalAction: Sendable {
             case showLoginModal
         }

@@ -36,7 +36,7 @@ public struct MyProfileFeature: Sendable {
         }
     }
     
-    @Reducer(state: .equatable)
+    @Reducer(state: .equatable, action: .sendable)
     public enum Destination: Sendable {
         case academySetting(MyAcademySettingFeature)
         case nicknameSetting(NicknameSettingFeature)

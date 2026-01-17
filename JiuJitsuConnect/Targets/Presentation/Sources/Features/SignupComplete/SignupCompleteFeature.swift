@@ -13,7 +13,7 @@ import Domain
 public struct SignupCompleteFeature: Sendable {
     
     @ObservableState
-    public struct State: Equatable {
+    public struct State: Equatable, Sendable {
         // MARK: - Passed Data
         let authInfo: AuthInfo
         

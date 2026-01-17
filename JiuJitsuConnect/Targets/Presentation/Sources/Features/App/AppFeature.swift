@@ -6,10 +6,10 @@ import Domain
 public struct AppFeature: Sendable {
     public init() { }
     
-    @Reducer(state: .equatable)
+    @Reducer(state: .equatable, action: .sendable)
     public enum Destination: Sendable {
         case splash(SplashFeature)
-        case onboarding(OnboardingFeature)
+//        case onboarding(OnboardingFeature)
         case main(MainFeature)
         case appTab(AppTabFeature)
         case login(LoginFeature)
@@ -23,7 +23,7 @@ public struct AppFeature: Sendable {
     }
     
     public enum Action: Sendable {
-        case destination(PresentationAction<Destination.Action>) // Associated value 'destination' of 'Sendable'-conforming enum 'Action' contains non-Sendable type 'AppFeature.Destination.Action'; this is an error in the Swift 6 language mode
+        case destination(PresentationAction<Destination.Action>)
     }
     
     public var body: some ReducerOf<Self> {
