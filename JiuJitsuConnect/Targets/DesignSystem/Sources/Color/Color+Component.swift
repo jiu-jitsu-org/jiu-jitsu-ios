@@ -415,4 +415,15 @@ public struct ComponentColors {
         public let subTitle = Color.semantic.text.secondary
         public let label = Color.semantic.text.secondary
     }
+    
+    // MARK: - Section Header
+    public let picker = Picker()
+    
+    public struct Picker {
+        public let itemSelectedBg = Color.semantic.surface.secondary
+        public let itemSelectedText = Color.semantic.text.primary
+        public let itemUnselectedText = Color.semantic.text.tertiary
+        public let unit = Color.semantic.text.primary
+    }
+    
 }
