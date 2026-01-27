@@ -8,6 +8,7 @@
 import SwiftUI
 import ComposableArchitecture
 import DesignSystem
+import Domain
 
 public struct BeltSettingView: View {
     
@@ -44,19 +45,19 @@ public struct BeltSettingView: View {
                 Spacer()
                 // 색상 피커
                 BeltPickerView(
-                    items: BeltSettingFeature.BeltColor.allCases,
-                    selectedItem: store.selectedColor,
-                    onSelect: { color in
-                        store.send(.view(.colorSelected(color)))
+                    items: BeltRank.allCases.reversed(),
+                    selectedItem: store.selectedRank,
+                    onSelect: { rank in
+                        store.send(.view(.rankSelected(rank)))
                     }
                 )
                 
                 // 그랄 피커
                 BeltPickerView(
-                    items: BeltSettingFeature.BeltDegree.allCases,
-                    selectedItem: store.selectedDegree,
-                    onSelect: { degree in
-                        store.send(.view(.degreeSelected(degree)))
+                    items: BeltStripe.allCases.reversed(),
+                    selectedItem: store.selectedStripe,
+                    onSelect: { stripe in
+                        store.send(.view(.stripeSelected(stripe)))
                     }
                 )
                 Spacer()
@@ -79,7 +80,15 @@ public struct BeltSettingView: View {
 
 // MARK: - BeltPickerView
 
-private struct BeltPickerView<Item: RawRepresentable & Hashable & CaseIterable>: View where Item.RawValue == String {
+/// Belt 관련 타입을 위한 프로토콜
+private protocol BeltDisplayable {
+    var displayName: String { get }
+}
+
+extension BeltRank: BeltDisplayable {}
+extension BeltStripe: BeltDisplayable {}
+
+private struct BeltPickerView<Item: Hashable & CaseIterable & BeltDisplayable>: View {
     let items: [Item]
     let selectedItem: Item
     let onSelect: (Item) -> Void
@@ -110,7 +119,7 @@ private struct BeltPickerView<Item: RawRepresentable & Hashable & CaseIterable>:
                             onSelect(item)
                         }
                     }) {
-                        Text(item.rawValue)
+                        Text(item.displayName)
                             .font(selectedItem == item ? .pretendard.custom(weight: .medium, size: 24) : .pretendard.custom(weight: .medium, size: 20))
                             .foregroundStyle(selectedItem == item ? Color.component.picker.itemSelectedText : Color.component.picker.itemUnselectedText)
                             .frame(maxWidth: .infinity)

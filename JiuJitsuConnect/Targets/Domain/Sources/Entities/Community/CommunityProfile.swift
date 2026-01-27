@@ -159,7 +159,7 @@ public enum ProfileSection: String, Codable, Sendable, CaseIterable, Equatable {
 }
 
 /// 주짓수 벨트 등급
-public enum BeltRank: String, Codable, Equatable, Sendable {
+public enum BeltRank: String, Codable, Equatable, Sendable, CaseIterable {
     case white = "WHITE"
     case blue = "BLUE"
     case purple = "PURPLE"
@@ -183,7 +183,7 @@ public enum BeltRank: String, Codable, Equatable, Sendable {
 }
 
 /// 벨트 띠 개수
-public enum BeltStripe: String, Codable, Equatable, Sendable {
+public enum BeltStripe: String, Codable, Equatable, Sendable, CaseIterable {
     case none = "STRIPE_0"
     case one = "STRIPE_1"
     case two = "STRIPE_2"
