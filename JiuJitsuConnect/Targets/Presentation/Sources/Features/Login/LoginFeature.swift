@@ -16,7 +16,7 @@ public struct LoginFeature: Sendable {
         
         var tempToken: String?
         
-        @Presents var sheet: Destination.State?
+        @Presents var sheet: Sheet.State?
         var path = StackState<Path.State>()
         
         public init() {}
@@ -28,7 +28,7 @@ public struct LoginFeature: Sendable {
         case `internal`(InternalAction)
         case delegate(DelegateAction)
         
-        case sheet(PresentationAction<Destination.Action>)
+        case sheet(PresentationAction<Sheet.Action>)
         case path(StackAction<Path.State, Path.Action>)
         
         public enum ViewAction: Sendable {
@@ -59,7 +59,7 @@ public struct LoginFeature: Sendable {
     }
     
     @Reducer(state: .equatable, action: .sendable)
-    public enum Destination: Sendable {
+    public enum Sheet: Sendable {
         case termsAgreement(TermsAgreementFeature)
     }
     
