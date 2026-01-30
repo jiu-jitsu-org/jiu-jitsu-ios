@@ -163,6 +163,19 @@ public struct MyProfileView: View {
                 }
             }
             .animation(.default, value: store.toast)
+            // 시트 처리
+            .sheet(item: $store.scope(state: \.sheet, action: \.sheet)) { store in
+                switch store.case {
+                case let .beltSetting(beltSettingStore):
+                    BeltSettingView(store: beltSettingStore)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .presentationDragIndicator(.hidden)
+                        .presentationDetents([.height(336)])
+                        .presentationBackground(
+                            Color.component.bottomSheet.selected.container.background
+                        )
+                }
+            }
         }
     }
     

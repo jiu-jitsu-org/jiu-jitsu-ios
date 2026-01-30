@@ -20,6 +20,7 @@ public struct MyProfileFeature: Sendable {
     @ObservableState
     public struct State: Equatable {
         @Presents var destination: Destination.State?
+        @Presents var sheet: Sheet.State?
         
         var authInfo: AuthInfo
         
@@ -42,12 +43,19 @@ public struct MyProfileFeature: Sendable {
         case nicknameSetting(NicknameSettingFeature)
     }
     
+    @Reducer(state: .equatable, action: .sendable)
+    public enum Sheet: Sendable {
+        case beltSetting(BeltSettingFeature)
+    }
+    
     public enum Action: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
         
         // 네비게이션 액션
         case destination(PresentationAction<Destination.Action>)
+        // 시트 액션
+        case sheet(PresentationAction<Sheet.Action>)
         
         public enum ViewAction: Sendable {
             case onAppear
@@ -114,7 +122,15 @@ public struct MyProfileFeature: Sendable {
                 return .none
                 
             case .view(.registerBeltButtonTapped):
-                // 벨트/체급 등록 화면 이동 로직
+                // 벨트/체급 등록 화면을 시트로 노출
+                let currentRank = state.communityProfile?.beltRank ?? .white
+                let currentStripe = state.communityProfile?.beltStripe ?? .none
+                state.sheet = .beltSetting(
+                    BeltSettingFeature.State(
+                        selectedRank: currentRank,
+                        selectedStripe: currentStripe
+                    )
+                )
                 return .none
                 
             case .view(.registerStyleButtonTapped):
@@ -140,6 +156,15 @@ public struct MyProfileFeature: Sendable {
             case .destination(.presented(.nicknameSetting(.delegate(.cancel)))):
                 // 취소 - 아무것도 하지 않음
                 return .none
+                
+            // MARK: - Sheet Delegate 처리
+                
+            case let .sheet(.presented(.beltSetting(.delegate(.didConfirmBelt(rank, stripe))))):
+                // 벨트 정보 저장 요청 받음
+                Log.trace("벨트 저장 요청: \(rank.displayName) \(stripe.displayName)", category: .debug, level: .info)
+                // TODO: API 호출 구현 필요
+                state.sheet = nil
+                return .send(.internal(.showToast(.init(message: "벨트 정보 입력을 완료했어요", style: .info))))
                 
             // MARK: - API 호출: 프로필 섹션 업데이트
                 
@@ -215,13 +240,16 @@ public struct MyProfileFeature: Sendable {
             case .view(.toastButtonTapped):
                 return .send(.internal(.toastDismissed))
                 
-            case .destination, .view, .internal:
+            case .destination, .sheet, .view, .internal:
                 return .none
                 
             }
         }
         .ifLet(\.$destination, action: \.destination) {
             Destination.body
+        }
+        .ifLet(\.$sheet, action: \.sheet) {
+            Sheet.body
         }
     }
 }
