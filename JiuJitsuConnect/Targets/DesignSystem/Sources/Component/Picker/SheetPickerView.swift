@@ -55,7 +55,8 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
     
     // MARK: - State
     
-    @State private var scrollPosition: Item.ID?
+    @State private var currentSelectedId: Item.ID
+    @State private var scrollOffset: CGFloat = 0
     
     // MARK: - Initialization
     
@@ -84,83 +85,163 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
         self.itemHeight = itemHeight
         self.itemSpacing = itemSpacing
         self.onSelect = onSelect
-        self._scrollPosition = State(initialValue: selectedItem.id)
+        self._currentSelectedId = State(initialValue: selectedItem.id)
     }
     
     // MARK: - Body
     
     public var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            LazyVStack(spacing: itemSpacing) {
-                // 상단 여백 (투명한 spacer 역할)
-                Color.clear
-                    .frame(height: itemHeight + itemSpacing)
-                
-                ForEach(items) { item in
-                    pickerItemView(item)
-                }
-                
-                // 하단 여백 (투명한 spacer 역할)
-                Color.clear
-                    .frame(height: itemHeight + itemSpacing)
-            }
-            .scrollTargetLayout()
+        ScrollViewReader { proxy in
+            contentView(proxy: proxy)
         }
-        .scrollTargetBehavior(.viewAligned)
-        .scrollPosition(id: $scrollPosition, anchor: .center)
-        .frame(width: width, height: itemHeight * 3 + itemSpacing * 2) // 정확히 3개 항목 노출
+    }
+    
+    @ViewBuilder
+    private func contentView(proxy: ScrollViewProxy) -> some View {
+        GeometryReader { geometry in
+            ScrollView(.vertical, showsIndicators: false) {
+                LazyVStack(spacing: itemSpacing) {
+                    // 상단 여백 (투명한 spacer 역할)
+                    Color.clear
+                        .frame(height: itemHeight + itemSpacing)
+                    
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                        pickerItemView(item, index: index, proxy: proxy, geometryProxy: geometry)
+                    }
+                    
+                    // 하단 여백 (투명한 spacer 역할)
+                    Color.clear
+                        .frame(height: itemHeight + itemSpacing)
+                }
+            }
+            .frame(width: width, height: itemHeight * 3 + itemSpacing * 2) // 정확히 3개 항목 노출
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0)
+                    .onEnded { _ in
+                        // 드래그 종료 시 가장 가까운 항목으로 스냅
+                        snapToNearestItem(proxy: proxy, geometry: geometry)
+                    }
+            )
+        }
+        .frame(width: width, height: itemHeight * 3 + itemSpacing * 2)
         .onAppear {
-            scrollPosition = selectedItem.id
+            currentSelectedId = selectedItem.id
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                proxy.scrollTo(selectedItem.id, anchor: .center)
+            }
         }
         .onChange(of: selectedItem.id) { _, newValue in
+            currentSelectedId = newValue
             withAnimation(.easeInOut(duration: 0.3)) {
-                scrollPosition = newValue
+                proxy.scrollTo(newValue, anchor: .center)
             }
         }
-        .onChange(of: scrollPosition) { _, newItemId in
-            guard let newItemId,
-                  let newItem = items.first(where: { $0.id == newItemId }),
-                  newItem.id != selectedItem.id else {
-                return
+    }
+    
+    // 가장 가까운 항목으로 스냅
+    private func snapToNearestItem(proxy: ScrollViewProxy, geometry: GeometryProxy) {
+        let centerY = geometry.size.height / 2
+        
+        var closestItem: Item?
+        var minDistance: CGFloat = .infinity
+        
+        for (index, item) in items.enumerated() {
+            let itemCenterY = CGFloat(index) * (itemHeight + itemSpacing) + itemHeight / 2
+            let distance = abs(itemCenterY - centerY - scrollOffset)
+            
+            if distance < minDistance {
+                minDistance = distance
+                closestItem = item
             }
-            onSelect(newItem)
+        }
+        
+        if let item = closestItem, item.id != currentSelectedId {
+            withAnimation(.easeOut(duration: 0.25)) {
+                proxy.scrollTo(item.id, anchor: .center)
+                currentSelectedId = item.id
+            }
+            onSelect(item)
         }
     }
     
     // MARK: - Private Views
     
     @ViewBuilder
-    private func pickerItemView(_ item: Item) -> some View {
-        let isSelected = item.id == selectedItem.id
-        
-        Button(action: {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                scrollPosition = item.id
+    private func pickerItemView(_ item: Item, index: Int, proxy: ScrollViewProxy, geometryProxy: GeometryProxy) -> some View {
+        GeometryReader { itemGeometry in
+            let globalFrame = itemGeometry.frame(in: .global)
+            let containerFrame = geometryProxy.frame(in: .global)
+            let containerCenter = containerFrame.midY
+            let itemCenter = globalFrame.midY
+            let distance = abs(containerCenter - itemCenter)
+            let isNearCenter = distance < itemHeight / 2
+            
+            Button(action: {
+                currentSelectedId = item.id
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    proxy.scrollTo(item.id, anchor: .center)
+                }
                 onSelect(item)
+            }) {
+                Text(displayText(item))
+                    .font(isNearCenter
+                          ? .pretendard.custom(weight: .medium, size: 24)
+                          : .pretendard.custom(weight: .medium, size: 20))
+                    .foregroundStyle(isNearCenter
+                                     ? Color.component.picker.itemSelectedText
+                                     : Color.component.picker.itemUnselectedText)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: itemHeight)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(isNearCenter
+                                  ? Color.component.picker.itemSelectedBg
+                                  : Color.clear)
+                    )
+                    .animation(.easeOut(duration: 0.15), value: isNearCenter)
             }
-        }) {
-            Text(displayText(item))
-                .font(isSelected 
-                      ? .pretendard.custom(weight: .medium, size: 24) 
-                      : .pretendard.custom(weight: .medium, size: 20))
-                .foregroundStyle(isSelected 
-                                 ? Color.component.picker.itemSelectedText 
-                                 : Color.component.picker.itemUnselectedText)
-                .frame(maxWidth: .infinity)
-                .frame(height: itemHeight)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(isSelected 
-                              ? Color.component.picker.itemSelectedBg 
-                              : Color.clear)
-                )
+            .buttonStyle(.plain)
+            .onChange(of: isNearCenter) { _, newValue in
+                if newValue && item.id != currentSelectedId {
+                    currentSelectedId = item.id
+                    onSelect(item)
+                }
+            }
         }
-        .buttonStyle(.plain)
+        .frame(height: itemHeight)
         .id(item.id)
     }
 }
 
 // MARK: - Preview
+
+#Preview("Belt Stripe - Default None") {
+    // BeltStripe는 import가 필요하므로 여기서는 wrapper 사용
+    struct StripeItem: Identifiable, Hashable {
+        let id: String
+        let name: String
+        
+        static let items = [
+            StripeItem(id: "STRIPE_4", name: "4그랄"),
+            StripeItem(id: "STRIPE_3", name: "3그랄"),
+            StripeItem(id: "STRIPE_2", name: "2그랄"),
+            StripeItem(id: "STRIPE_1", name: "1그랄"),
+            StripeItem(id: "STRIPE_0", name: "무그랄")
+        ]
+    }
+    
+    // .none (STRIPE_0)이 맨 마지막에 있음 (reversed)
+    return SheetPickerView(
+        items: StripeItem.items,
+        selectedItem: StripeItem.items.last!, // STRIPE_0 선택
+        displayText: { $0.name },
+        onSelect: { item in
+            print("Selected: \(item.name)")
+        }
+    )
+    .background(Color.gray.opacity(0.1))
+    .frame(height: 300)
+}
 
 #Preview("Color Picker") {
     struct ColorItem: Identifiable, Hashable {
