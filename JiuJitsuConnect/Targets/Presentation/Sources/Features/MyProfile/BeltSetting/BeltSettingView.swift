@@ -45,6 +45,7 @@ public struct BeltSettingView: View {
             Spacer()
             Text("벨트")
                 .font(Font.pretendard.title2)
+                .foregroundStyle(Color.component.sectionHeader.title)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity)
@@ -82,9 +83,12 @@ public struct BeltSettingView: View {
     }
     
     private var confirmButton: some View {
-        CTAButton(title: "체급도 입력하기", action: {
-            store.send(.view(.confirmButtonTapped))
-        })
+        CTAButton(
+            title: store.isInitialSetup ? "체급도 입력하기" : "확인",
+            action: {
+                store.send(.view(.confirmButtonTapped))
+            }
+        )
         .padding(.horizontal, 20)
         .padding(.top, 8)
         .padding(.bottom, 24)

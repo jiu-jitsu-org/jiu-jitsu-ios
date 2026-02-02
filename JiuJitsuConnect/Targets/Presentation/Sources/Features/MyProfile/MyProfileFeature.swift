@@ -31,9 +31,18 @@ public struct MyProfileFeature: Sendable {
         // 토스트 메시지 상태
         var toast: ToastState?
         
+        // 벨트 설정 임시 저장 (최초 설정 시 벨트 정보를 체급 설정으로 전달하기 위해)
+        var tempBeltInfo: TempBeltInfo?
+        
         public init(authInfo: AuthInfo, communityProfile: CommunityProfile? = nil) {
             self.authInfo = authInfo
             self.communityProfile = communityProfile
+        }
+        
+        // 임시 벨트 정보를 담는 구조체
+        public struct TempBeltInfo: Equatable {
+            let rank: BeltRank
+            let stripe: BeltStripe
         }
     }
     
@@ -46,6 +55,7 @@ public struct MyProfileFeature: Sendable {
     @Reducer(state: .equatable, action: .sendable)
     public enum Sheet: Sendable {
         case beltSetting(BeltSettingFeature)
+        case weightClassSetting(WeightClassSettingFeature)
     }
     
     public enum Action: Sendable {
@@ -70,6 +80,8 @@ public struct MyProfileFeature: Sendable {
             case loadProfile
             case profileResponse(TaskResult<CommunityProfile>)
             case updateProfileSection(ProfileSection, String?)
+            case saveBeltAndWeightInfo(rank: BeltRank, stripe: BeltStripe, gender: Gender, weightKg: Double, isWeightHidden: Bool)
+            case saveBeltInfoOnly(rank: BeltRank, stripe: BeltStripe)
             case updateProfileResponse(TaskResult<CommunityProfile>)
             case showToast(ToastState)
             case toastDismissed
@@ -125,10 +137,13 @@ public struct MyProfileFeature: Sendable {
                 // 벨트/체급 등록 화면을 시트로 노출
                 let currentRank = state.communityProfile?.beltRank ?? .white
                 let currentStripe = state.communityProfile?.beltStripe ?? .none
+                // 최초 설정인지 확인 (벨트 정보가 없으면 최초 설정)
+                let isInitialSetup = state.communityProfile?.beltRank == nil
                 state.sheet = .beltSetting(
                     BeltSettingFeature.State(
                         selectedRank: currentRank,
-                        selectedStripe: currentStripe
+                        selectedStripe: currentStripe,
+                        isInitialSetup: isInitialSetup
                     )
                 )
                 return .none
@@ -159,12 +174,121 @@ public struct MyProfileFeature: Sendable {
                 
             // MARK: - Sheet Delegate 처리
                 
+            case let .sheet(.presented(.beltSetting(.delegate(.proceedToWeightClassSetting(rank, stripe))))):
+                // 최초 설정: 벨트 정보를 임시 저장하고 체급 설정 화면으로 이동
+                state.tempBeltInfo = State.TempBeltInfo(rank: rank, stripe: stripe)
+                let currentGender = state.communityProfile?.gender ?? .male
+                let currentWeight = state.communityProfile?.weightKg ?? 70.0
+                let isWeightHidden = state.communityProfile?.isWeightHidden ?? false
+                
+                state.sheet = .weightClassSetting(
+                    WeightClassSettingFeature.State(
+                        selectedGender: currentGender,
+                        selectedWeightKg: currentWeight,
+                        isWeightHidden: isWeightHidden
+                    )
+                )
+                return .none
+                
             case let .sheet(.presented(.beltSetting(.delegate(.didConfirmBelt(rank, stripe))))):
-                // 벨트 정보 저장 요청 받음
-                Log.trace("벨트 저장 요청: \(rank.displayName) \(stripe.displayName)", category: .debug, level: .info)
-                // TODO: API 호출 구현 필요
+                // 벨트 수정: API 호출하고 토스트 표시
                 state.sheet = nil
-                return .send(.internal(.showToast(.init(message: "벨트 정보 입력을 완료했어요", style: .info))))
+                return .send(.internal(.saveBeltInfoOnly(rank: rank, stripe: stripe)))
+                
+            case let .sheet(.presented(.weightClassSetting(.delegate(.didConfirmWeightClass(gender, weightKg, isWeightHidden))))):
+                // 체급 설정 완료: 벨트 정보와 함께 API 호출
+                guard let beltInfo = state.tempBeltInfo else {
+                    state.sheet = nil
+                    return .send(.internal(.showToast(.init(message: "벨트 정보를 찾을 수 없어요", style: .info))))
+                }
+                
+                state.sheet = nil
+                state.tempBeltInfo = nil
+                return .send(.internal(.saveBeltAndWeightInfo(
+                    rank: beltInfo.rank,
+                    stripe: beltInfo.stripe,
+                    gender: gender,
+                    weightKg: weightKg,
+                    isWeightHidden: isWeightHidden
+                )))
+                
+            // MARK: - API 호출: 벨트/체급 정보 저장
+                
+            case let .internal(.saveBeltAndWeightInfo(rank, stripe, gender, weightKg, isWeightHidden)):
+                guard var profile = state.communityProfile else {
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                }
+                
+                // 벨트와 체급 정보 업데이트
+                profile = CommunityProfile(
+                    nickname: profile.nickname,
+                    profileImageUrl: profile.profileImageUrl,
+                    beltRank: rank,
+                    beltStripe: stripe,
+                    gender: gender,
+                    weightKg: weightKg,
+                    academyName: profile.academyName,
+                    competitions: profile.competitions,
+                    bestSubmission: profile.bestSubmission,
+                    favoriteSubmission: profile.favoriteSubmission,
+                    bestTechnique: profile.bestTechnique,
+                    favoriteTechnique: profile.favoriteTechnique,
+                    bestPosition: profile.bestPosition,
+                    favoritePosition: profile.favoritePosition,
+                    isWeightHidden: isWeightHidden,
+                    isOwner: profile.isOwner,
+                    teachingPhilosophy: profile.teachingPhilosophy,
+                    teachingStartDate: profile.teachingStartDate,
+                    teachingDetail: profile.teachingDetail
+                )
+                
+                state.isLoadingProfile = true
+                
+                return .run { [profile] send in
+                    await send(.internal(.updateProfileResponse(
+                        await TaskResult {
+                            try await communityClient.updateProfile(profile, .beltWeight)
+                        }
+                    )))
+                }
+                
+            case let .internal(.saveBeltInfoOnly(rank, stripe)):
+                guard var profile = state.communityProfile else {
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                }
+                
+                // 벨트 정보만 업데이트
+                profile = CommunityProfile(
+                    nickname: profile.nickname,
+                    profileImageUrl: profile.profileImageUrl,
+                    beltRank: rank,
+                    beltStripe: stripe,
+                    gender: profile.gender,
+                    weightKg: profile.weightKg,
+                    academyName: profile.academyName,
+                    competitions: profile.competitions,
+                    bestSubmission: profile.bestSubmission,
+                    favoriteSubmission: profile.favoriteSubmission,
+                    bestTechnique: profile.bestTechnique,
+                    favoriteTechnique: profile.favoriteTechnique,
+                    bestPosition: profile.bestPosition,
+                    favoritePosition: profile.favoritePosition,
+                    isWeightHidden: profile.isWeightHidden,
+                    isOwner: profile.isOwner,
+                    teachingPhilosophy: profile.teachingPhilosophy,
+                    teachingStartDate: profile.teachingStartDate,
+                    teachingDetail: profile.teachingDetail
+                )
+                
+                state.isLoadingProfile = true
+                
+                return .run { [profile] send in
+                    await send(.internal(.updateProfileResponse(
+                        await TaskResult {
+                            try await communityClient.updateProfile(profile, .beltWeight)
+                        }
+                    )))
+                }
                 
             // MARK: - API 호출: 프로필 섹션 업데이트
                 
@@ -216,9 +340,28 @@ public struct MyProfileFeature: Sendable {
                 
             case let .internal(.updateProfileResponse(.success(updatedProfile))):
                 state.isLoadingProfile = false
+                let previousProfile = state.communityProfile
                 state.communityProfile = updatedProfile  // ← 업데이트된 프로필로 교체!
                 state.destination = nil  // 화면 닫기
-                return .send(.internal(.showToast(.init(message: "도장 정보 입력을 완료했어요", style: .info))))
+                
+                // 어떤 섹션이 업데이트되었는지에 따라 다른 메시지 표시
+                let message: String
+                if previousProfile?.beltRank == nil && updatedProfile.beltRank != nil {
+                    // 최초 벨트/체급 설정
+                    message = "벨트와 체급 정보 입력을 완료했어요"
+                } else if previousProfile?.academyName == nil && updatedProfile.academyName != nil {
+                    // 도장 정보 추가
+                    message = "도장 정보 입력을 완료했어요"
+                } else if previousProfile?.beltRank != updatedProfile.beltRank || 
+                         previousProfile?.beltStripe != updatedProfile.beltStripe {
+                    // 벨트 정보 수정
+                    message = "벨트 정보 수정을 완료했어요"
+                } else {
+                    // 기타
+                    message = "프로필 수정을 완료했어요"
+                }
+                
+                return .send(.internal(.showToast(.init(message: message, style: .info))))
                 
             case let .internal(.updateProfileResponse(.failure(error))):
                 state.isLoadingProfile = false

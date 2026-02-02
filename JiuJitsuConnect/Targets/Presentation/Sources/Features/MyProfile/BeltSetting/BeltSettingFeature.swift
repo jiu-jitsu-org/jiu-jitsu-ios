@@ -17,13 +17,17 @@ public struct BeltSettingFeature: Sendable {
     public struct State: Equatable {
         var selectedRank: BeltRank
         var selectedStripe: BeltStripe
+        /// 최초 벨트 설정인지 여부 (true면 체급 설정으로 연결, false면 바로 저장)
+        var isInitialSetup: Bool
         
         public init(
             selectedRank: BeltRank = .white,
-            selectedStripe: BeltStripe = .none
+            selectedStripe: BeltStripe = .none,
+            isInitialSetup: Bool = false
         ) {
             self.selectedRank = selectedRank
             self.selectedStripe = selectedStripe
+            self.isInitialSetup = isInitialSetup
         }
     }
     
@@ -38,6 +42,9 @@ public struct BeltSettingFeature: Sendable {
         }
         
         public enum DelegateAction: Sendable {
+            /// 최초 설정 시: 벨트 정보를 전달하고 체급 설정 화면으로 이동
+            case proceedToWeightClassSetting(rank: BeltRank, stripe: BeltStripe)
+            /// 수정 시: 벨트 정보를 저장하고 완료
             case didConfirmBelt(rank: BeltRank, stripe: BeltStripe)
         }
     }
@@ -54,10 +61,19 @@ public struct BeltSettingFeature: Sendable {
                 return .none
                 
             case .view(.confirmButtonTapped):
-                return .send(.delegate(.didConfirmBelt(
-                    rank: state.selectedRank,
-                    stripe: state.selectedStripe
-                )))
+                if state.isInitialSetup {
+                    // 최초 설정: 체급 설정 화면으로 이동
+                    return .send(.delegate(.proceedToWeightClassSetting(
+                        rank: state.selectedRank,
+                        stripe: state.selectedStripe
+                    )))
+                } else {
+                    // 수정: 바로 저장
+                    return .send(.delegate(.didConfirmBelt(
+                        rank: state.selectedRank,
+                        stripe: state.selectedStripe
+                    )))
+                }
                 
             case .delegate:
                 return .none

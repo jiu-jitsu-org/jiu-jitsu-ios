@@ -174,6 +174,15 @@ public struct MyProfileView: View {
                         .presentationBackground(
                             Color.component.bottomSheet.selected.container.background
                         )
+                        
+                case let .weightClassSetting(weightClassSettingStore):
+                    WeightClassSettingView(store: weightClassSettingStore)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .presentationDragIndicator(.hidden)
+                        .presentationDetents([.height(480)])
+                        .presentationBackground(
+                            Color.component.bottomSheet.selected.container.background
+                        )
                 }
             }
         }
