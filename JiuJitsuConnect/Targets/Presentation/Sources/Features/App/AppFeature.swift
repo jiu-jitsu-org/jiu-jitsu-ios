@@ -6,8 +6,8 @@ import Domain
 public struct AppFeature: Sendable {
     public init() { }
     
-    @Reducer(state: .equatable, action: .sendable)
-    public enum Destination: Sendable {
+    @Reducer
+    public enum Destination {
         case splash(SplashFeature)
 //        case onboarding(OnboardingFeature)
         case main(MainFeature)
@@ -49,3 +49,6 @@ public struct AppFeature: Sendable {
         .ifLet(\.$destination, action: \.destination)
     }
 }
+// MARK: - Destination Conformances
+extension AppFeature.Destination.State: Equatable {}
+extension AppFeature.Destination.Action: Sendable {}

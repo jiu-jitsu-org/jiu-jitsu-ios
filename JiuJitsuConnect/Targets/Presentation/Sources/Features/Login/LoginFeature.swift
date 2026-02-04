@@ -52,13 +52,13 @@ public struct LoginFeature: Sendable {
         }
     }
     
-    @Reducer(state: .equatable, .sendable, action: .sendable)
+    @Reducer
     public enum Path: Sendable {
         case nicknameSetting(NicknameSettingFeature)
         case signupComplete(SignupCompleteFeature)
     }
     
-    @Reducer(state: .equatable, action: .sendable)
+    @Reducer
     public enum Sheet: Sendable {
         case termsAgreement(TermsAgreementFeature)
     }
@@ -219,3 +219,8 @@ public struct LoginFeature: Sendable {
             }
         }
 }
+
+extension LoginFeature.Path.State: Sendable, Equatable {}
+extension LoginFeature.Path.Action: Sendable {}
+extension LoginFeature.Sheet.State: Sendable, Equatable {}
+extension LoginFeature.Sheet.Action: Sendable {}

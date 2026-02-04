@@ -6,8 +6,8 @@ import Domain
 public struct MainFeature: Sendable {
     public init() {}
     
-    @Reducer(state: .equatable, action: .sendable)
-    public enum Destination: Sendable {
+    @Reducer
+    public enum Destination {
         case settings(SettingsFeature)
         //        case profile(ProfileFeature)
     }
@@ -111,3 +111,5 @@ public struct MainFeature: Sendable {
         }
     }
 }
+extension MainFeature.Destination.State: Equatable {}
+extension MainFeature.Destination.Action: Sendable {}

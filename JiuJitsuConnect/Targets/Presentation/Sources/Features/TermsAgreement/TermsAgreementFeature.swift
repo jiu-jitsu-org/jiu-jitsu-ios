@@ -16,7 +16,7 @@ public struct TermsAgreementFeature: Sendable {
     public init() {}
     
     @ObservableState
-    public struct State: Equatable {
+    public struct State: Equatable, Sendable {
         var rows: IdentifiedArrayOf<TermsAgreementRowFeature.State>
         
         // Derived State

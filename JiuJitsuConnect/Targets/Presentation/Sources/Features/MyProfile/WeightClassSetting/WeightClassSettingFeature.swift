@@ -14,7 +14,7 @@ public struct WeightClassSettingFeature: Sendable {
     public init() {}
     
     @ObservableState
-    public struct State: Equatable {
+    public struct State: Equatable, Sendable {
         var selectedGender: Gender
         var selectedWeightKg: Double
         var isWeightHidden: Bool
@@ -24,7 +24,7 @@ public struct WeightClassSettingFeature: Sendable {
         
         public init(
             selectedGender: Gender = .male,
-            selectedWeightKg: Double = 70.0,
+            selectedWeightKg: Double = 60.0,
             isWeightHidden: Bool = false
         ) {
             self.selectedGender = selectedGender

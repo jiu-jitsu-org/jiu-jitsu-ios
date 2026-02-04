@@ -14,7 +14,7 @@ public struct BeltSettingFeature: Sendable {
     public init() {}
     
     @ObservableState
-    public struct State: Equatable {
+    public struct State: Equatable, Sendable {
         var selectedRank: BeltRank
         var selectedStripe: BeltStripe
         /// 최초 벨트 설정인지 여부 (true면 체급 설정으로 연결, false면 바로 저장)

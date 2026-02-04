@@ -18,7 +18,7 @@ public struct MyProfileFeature: Sendable {
     private enum CancelID { case toast }
     
     @ObservableState
-    public struct State: Equatable {
+    public struct State: Equatable, Sendable {
         @Presents var destination: Destination.State?
         @Presents var sheet: Sheet.State?
         
@@ -40,20 +40,20 @@ public struct MyProfileFeature: Sendable {
         }
         
         // 임시 벨트 정보를 담는 구조체
-        public struct TempBeltInfo: Equatable {
+        public struct TempBeltInfo: Equatable, Sendable {
             let rank: BeltRank
             let stripe: BeltStripe
         }
     }
     
-    @Reducer(state: .equatable, action: .sendable)
-    public enum Destination: Sendable {
+    @Reducer
+    public enum Destination {
         case academySetting(MyAcademySettingFeature)
         case nicknameSetting(NicknameSettingFeature)
     }
     
-    @Reducer(state: .equatable, action: .sendable)
-    public enum Sheet: Sendable {
+    @Reducer
+    public enum Sheet {
         case beltSetting(BeltSettingFeature)
         case weightClassSetting(WeightClassSettingFeature)
     }
@@ -352,7 +352,7 @@ public struct MyProfileFeature: Sendable {
                 } else if previousProfile?.academyName == nil && updatedProfile.academyName != nil {
                     // 도장 정보 추가
                     message = "도장 정보 입력을 완료했어요"
-                } else if previousProfile?.beltRank != updatedProfile.beltRank || 
+                } else if previousProfile?.beltRank != updatedProfile.beltRank ||
                          previousProfile?.beltStripe != updatedProfile.beltStripe {
                     // 벨트 정보 수정
                     message = "벨트 정보 수정을 완료했어요"
@@ -396,3 +396,8 @@ public struct MyProfileFeature: Sendable {
         }
     }
 }
+// MARK: - Sendable Conformances
+extension MyProfileFeature.Destination.State: Sendable, Equatable {}
+extension MyProfileFeature.Destination.Action: Sendable {}
+extension MyProfileFeature.Sheet.State: Sendable, Equatable {}
+extension MyProfileFeature.Sheet.Action: Sendable {}
