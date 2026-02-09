@@ -46,6 +46,7 @@ public struct AppFeature: Sendable {
                 return .none
             }
         }
+        // ifLet runs AFTER parent logic to handle child state
         .ifLet(\.$destination, action: \.destination)
     }
 }

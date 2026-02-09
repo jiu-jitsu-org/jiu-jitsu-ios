@@ -219,6 +219,9 @@ public struct MyProfileFeature: Sendable {
                     return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
                 }
                 
+                // 체중을 소수점 첫째 자리로 반올림
+                let roundedWeight = round(weightKg * 10) / 10.0
+                
                 // 벨트와 체급 정보 업데이트
                 profile = CommunityProfile(
                     nickname: profile.nickname,
@@ -226,7 +229,7 @@ public struct MyProfileFeature: Sendable {
                     beltRank: rank,
                     beltStripe: stripe,
                     gender: gender,
-                    weightKg: weightKg,
+                    weightKg: roundedWeight,
                     academyName: profile.academyName,
                     competitions: profile.competitions,
                     bestSubmission: profile.bestSubmission,

@@ -429,10 +429,6 @@ public struct MyProfileView: View {
             return Assets.MyProfile.Icon.beltBlue.swiftUIImage // TODO: 실제 브라운 벨트 아이콘으로 교체
         case .black:
             return Assets.MyProfile.Icon.beltBlue.swiftUIImage // TODO: 실제 블랙 벨트 아이콘으로 교체
-        case .redBlack:
-            return Assets.MyProfile.Icon.beltBlue.swiftUIImage // TODO: 실제 레드블랙 벨트 아이콘으로 교체
-        case .red:
-            return Assets.MyProfile.Icon.beltBlue.swiftUIImage // TODO: 실제 레드 벨트 아이콘으로 교체
         }
     }
     

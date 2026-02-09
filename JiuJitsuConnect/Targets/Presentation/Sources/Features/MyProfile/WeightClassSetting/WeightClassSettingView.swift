@@ -124,7 +124,8 @@ public struct WeightClassSettingView: View {
                     width: 72,
                     onSelect: { item in
                         let newWeight = Double(item.value) + Double(selectedDecimal) / 10.0
-                        store.send(.view(.weightChanged(newWeight)))
+                        let roundedWeight = round(newWeight * 10) / 10.0
+                        store.send(.view(.weightChanged(roundedWeight)))
                     }
                 )
                 
@@ -147,7 +148,8 @@ public struct WeightClassSettingView: View {
                     width: 72,
                     onSelect: { item in
                         let newWeight = Double(selectedInteger) + Double(item.value) / 10.0
-                        store.send(.view(.weightChanged(newWeight)))
+                        let roundedWeight = round(newWeight * 10) / 10.0
+                        store.send(.view(.weightChanged(roundedWeight)))
                     }
                 )
                 

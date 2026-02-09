@@ -165,8 +165,6 @@ public enum BeltRank: String, Codable, Equatable, Sendable, CaseIterable, Identi
     case purple = "PURPLE"
     case brown = "BROWN"
     case black = "BLACK"
-    case redBlack = "RED_BLACK"
-    case red = "RED"
     
     /// Identifiable 준수를 위한 id
     public var id: String { rawValue }
@@ -179,8 +177,6 @@ public enum BeltRank: String, Codable, Equatable, Sendable, CaseIterable, Identi
         case .purple: return "퍼플"
         case .brown: return "브라운"
         case .black: return "블랙"
-        case .redBlack: return "레드블랙"
-        case .red: return "레드"
         }
     }
 }
