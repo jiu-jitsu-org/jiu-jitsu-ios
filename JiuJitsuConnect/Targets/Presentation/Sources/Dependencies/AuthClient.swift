@@ -8,19 +8,25 @@ public struct AuthClient {
     public var loginWithKakao: @Sendable () async throws -> Domain.SNSUser
     public var serverLogin: @Sendable (Domain.SNSUser) async throws -> Domain.AuthInfo
     public var serverLogout: @Sendable () async throws -> Bool
+    public var autoLogin: @Sendable () async throws -> Domain.AuthInfo?
+    public var hasValidToken: @Sendable () -> Bool
     
     public init(
         loginWithGoogle: @Sendable @escaping () async throws -> Domain.SNSUser,
         loginWithApple: @Sendable @escaping () async throws -> Domain.SNSUser,
         loginWithKakao: @Sendable @escaping () async throws -> Domain.SNSUser,
         serverLogin: @Sendable @escaping (Domain.SNSUser) async throws -> Domain.AuthInfo,
-        serverLogout: @Sendable @escaping () async throws -> Bool
+        serverLogout: @Sendable @escaping () async throws -> Bool,
+        autoLogin: @Sendable @escaping () async throws -> Domain.AuthInfo?,
+        hasValidToken: @Sendable @escaping () -> Bool
     ) {
         self.loginWithGoogle = loginWithGoogle
         self.loginWithApple = loginWithApple
         self.loginWithKakao = loginWithKakao
         self.serverLogin = serverLogin
         self.serverLogout = serverLogout
+        self.autoLogin = autoLogin
+        self.hasValidToken = hasValidToken
     }
 }
 
@@ -50,6 +56,16 @@ extension AuthClient: DependencyKey {
         },
         serverLogout: {
             true
+        },
+        autoLogin: {
+            Domain.AuthInfo(accessToken: nil,
+                            refreshToken: nil,
+                            tempToken: "test-temp-token",
+                            isNewUser: true,
+                            userInfo: nil)
+        },
+        hasValidToken: {
+            false
         }
     )
 }
@@ -78,6 +94,12 @@ extension AuthClient {
         },
         serverLogout: {
             fatalError("AuthClient.serverLogout is not implemented")
+        },
+        autoLogin: {
+            fatalError("AuthClient.autoLogin is not implemented")
+        },
+        hasValidToken: {
+            fatalError("AuthClient.hasValidToken is not implemented")
         }
     )
 }

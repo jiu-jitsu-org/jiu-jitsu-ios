@@ -30,8 +30,15 @@ public struct AppFeature: Sendable {
         Reduce { state, action in
             switch action {
                 // MARK: - Navigation Logic
-            case .destination(.presented(.splash(.internal(.didFinishInitLaunch)))):
-                state.destination = .login(.init())
+                
+            case let .destination(.presented(.splash(.delegate(.finishedLaunch(authInfo))))):
+                if let authInfo = authInfo {
+                    // 자동 로그인 성공 → 메인 화면으로
+                    state.destination = .main(.init(authInfo: authInfo))
+                } else {
+                    // 자동 로그인 실패 or 토큰 없음 → 로그인 화면으로
+                    state.destination = .login(.init())
+                }
                 return .none
                 
             case let .destination(.presented(.login(.delegate(.didLogin(authInfo))))):

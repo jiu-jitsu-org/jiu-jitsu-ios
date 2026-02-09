@@ -12,7 +12,6 @@ import Presentation
 import ComposableArchitecture
 import CoreKit
 
-@MainActor
 public final class DependencyContainer {
     public static let shared = DependencyContainer()
     
@@ -44,6 +43,12 @@ public final class DependencyContainer {
             },
             serverLogout: {
                 try await self.authRepository.serverLogout()
+            },
+            autoLogin: {
+                try await self.authRepository.autoLogin()
+            },
+            hasValidToken: {
+                self.authRepository.hasValidToken()
             }
         )
     }

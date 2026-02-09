@@ -12,10 +12,22 @@ public protocol TokenStorage: Sendable {
     func save(accessToken: String, refreshToken: String, provider: String)
     func getAccessToken() -> String?
     func getRefreshToken() -> String?
+    func getProvider() -> String?
     func clear()
+
+    func setAutoLoginEnabled(_ enabled: Bool)
+    func isAutoLoginEnabled() -> Bool
 }
 
 public final class DefaultTokenStorage: TokenStorage {
+    
+    private enum Keys {
+        static let accessToken = "accessToken"
+        static let refreshToken = "refreshToken"
+        static let provider = "provider"
+        static let autoLoginEnabled = "autoLoginEnabled"
+    }
+    
     public init() {}
     
     private var service: String {
@@ -23,23 +35,38 @@ public final class DefaultTokenStorage: TokenStorage {
     }
     
     public func save(accessToken: String, refreshToken: String, provider: String) {
-        saveToKeychain(key: "accessToken", value: accessToken)
-        saveToKeychain(key: "refreshToken", value: refreshToken)
-        UserDefaults.standard.set(provider, forKey: "snsProvider")
+        setAutoLoginEnabled(true)
+        saveToKeychain(key: Keys.accessToken, value: accessToken)
+        saveToKeychain(key: Keys.refreshToken, value: refreshToken)
+        UserDefaults.standard.set(provider, forKey: Keys.provider)
     }
     
     public func getAccessToken() -> String? {
-        return readFromKeychain(key: "accessToken")
+        return readFromKeychain(key: Keys.accessToken)
     }
     
     public func getRefreshToken() -> String? {
-        return readFromKeychain(key: "refreshToken")
+        return readFromKeychain(key: Keys.refreshToken)
+    }
+    
+    public func getProvider() -> String? {
+        return UserDefaults.standard.string(forKey: Keys.provider)
     }
     
     public func clear() {
-        deleteFromKeychain(key: "accessToken")
-        deleteFromKeychain(key: "refreshToken")
-        UserDefaults.standard.removeObject(forKey: "snsProvider")
+        deleteFromKeychain(key: Keys.accessToken)
+        deleteFromKeychain(key: Keys.refreshToken)
+        UserDefaults.standard.removeObject(forKey: Keys.provider)
+        UserDefaults.standard.removeObject(forKey: Keys.autoLoginEnabled)
+    }
+    
+    // MARK: - Auto Login
+    public func setAutoLoginEnabled(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: Keys.autoLoginEnabled)
+    }
+    
+    public func isAutoLoginEnabled() -> Bool {
+        return UserDefaults.standard.bool(forKey: Keys.autoLoginEnabled)
     }
     
     // MARK: - Keychain Helpers

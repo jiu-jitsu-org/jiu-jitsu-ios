@@ -17,6 +17,7 @@ import OSLog
 import CoreKit
 
 public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    
     private let networkService: NetworkService
     private let tokenStorage: TokenStorage
 
@@ -151,6 +152,51 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
         } catch {
             throw DomainError.unknown(error.localizedDescription)
         }
+    }
+    
+    // MARK: - Auto Login
+
+    public func autoLogin() async throws -> AuthInfo? {
+        // 1. 자동 로그인 설정 확인
+        guard tokenStorage.isAutoLoginEnabled() else {
+            return nil
+        }
+        
+        // 2. 저장된 토큰 확인
+        guard let refreshToken = tokenStorage.getRefreshToken() else {
+            tokenStorage.setAutoLoginEnabled(false)
+            return nil
+        }
+        
+        do {
+            // 3. Refresh Token으로 새 Access Token 발급
+            let requestDTO = RefreshRequestDTO(refreshToken: refreshToken)
+            let endpoint = AuthEndpoint.refresh(requestDTO)
+            let responseDTO: RefreshResponseDTO = try await networkService.request(endpoint: endpoint)
+            
+            // 4. 새 토큰 저장
+            if let accessToken = responseDTO.accessToken,
+               let refreshToken = responseDTO.refreshToken,
+               let provider = tokenStorage.getProvider() {
+                tokenStorage.save(
+                    accessToken: accessToken,
+                    refreshToken: refreshToken,
+                    provider: provider
+                )
+            }
+            return responseDTO.toDomain()
+            
+        } catch let error as NetworkError {
+            throw error.toDomainError()
+        } catch {
+            throw DomainError.unknown(error.localizedDescription)
+        }
+    }
+
+    public func hasValidToken() -> Bool {
+        return tokenStorage.getAccessToken() != nil &&
+               tokenStorage.getRefreshToken() != nil &&
+               tokenStorage.isAutoLoginEnabled()
     }
     
     // MARK: - ASAuthorizationControllerDelegate

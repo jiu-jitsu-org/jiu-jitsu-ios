@@ -11,6 +11,7 @@ import Domain
 enum AuthEndpoint {
     case serverLogin(LoginRequestDTO)
     case serverLogout(LogoutRequestDTO)
+    case refresh(RefreshRequestDTO)
 }
 
 extension AuthEndpoint: Endpoint {
@@ -28,12 +29,14 @@ extension AuthEndpoint: Endpoint {
             return "/api/auth/sns-login"
         case .serverLogout:
             return "/api/auth/logout"
+        case .refresh:
+            return "/api/auth/refresh"
         }
     }
     
     var method: HTTPMethod {
         switch self {
-        case .serverLogin, .serverLogout:
+        case .serverLogin, .serverLogout, .refresh:
             return .post
         }
     }
@@ -43,6 +46,8 @@ extension AuthEndpoint: Endpoint {
         case .serverLogin(let request):
             return try? JSONEncoder().encode(request)
         case .serverLogout(let request):
+            return try? JSONEncoder().encode(request)
+        case .refresh(let request):
             return try? JSONEncoder().encode(request)
         }
     }

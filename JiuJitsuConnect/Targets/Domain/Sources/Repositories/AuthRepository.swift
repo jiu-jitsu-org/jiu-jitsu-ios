@@ -15,4 +15,7 @@ public protocol AuthRepository {
     
     func serverLogin(user: SNSUser) async throws -> AuthInfo
     func serverLogout() async throws -> Bool
+    
+    func autoLogin() async throws -> AuthInfo?
+    func hasValidToken() -> Bool
 }
