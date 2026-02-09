@@ -227,8 +227,8 @@ public enum Gender: String, Codable, Equatable, Sendable {
     
     public var displayName: String {
         switch self {
-        case .male: return "남성"
-        case .female: return "여성"
+        case .male: return "남자"
+        case .female: return "여자"
         case .other: return "기타"
         }
     }

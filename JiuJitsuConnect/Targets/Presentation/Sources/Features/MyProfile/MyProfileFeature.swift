@@ -178,7 +178,7 @@ public struct MyProfileFeature: Sendable {
                 // 최초 설정: 벨트 정보를 임시 저장하고 체급 설정 화면으로 이동
                 state.tempBeltInfo = State.TempBeltInfo(rank: rank, stripe: stripe)
                 let currentGender = state.communityProfile?.gender ?? .male
-                let currentWeight = state.communityProfile?.weightKg ?? 70.0
+                let currentWeight = state.communityProfile?.weightKg ?? 60.0
                 let isWeightHidden = state.communityProfile?.isWeightHidden ?? false
                 
                 state.sheet = .weightClassSetting(

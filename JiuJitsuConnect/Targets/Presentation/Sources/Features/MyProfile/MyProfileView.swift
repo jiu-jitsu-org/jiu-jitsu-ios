@@ -179,7 +179,7 @@ public struct MyProfileView: View {
                     WeightClassSettingView(store: weightClassSettingStore)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .presentationDragIndicator(.hidden)
-                        .presentationDetents([.height(480)])
+                        .presentationDetents([.height(340)])
                         .presentationBackground(
                             Color.component.bottomSheet.selected.container.background
                         )

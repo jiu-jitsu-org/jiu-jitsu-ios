@@ -26,20 +26,17 @@ struct WeightComponent: Identifiable, Hashable {
 public struct WeightClassSettingView: View {
     @Bindable var store: StoreOf<WeightClassSettingFeature>
     
-    // 성별 아이템
+    // 성별 아이템 (여성 → 남성)
     private let genderItems = [
-        GenderItem(gender: .male),
-        GenderItem(gender: .female)
+        GenderItem(gender: .female),
+        GenderItem(gender: .male)
     ]
     
-    // 체중 정수 부분 (40~150)
-    private let integerWeights = (40...150).map { WeightComponent(value: $0) }
+    // 체중 정수 부분 (150~40, 큰 수부터)
+    private let integerWeights = (40...150).reversed().map { WeightComponent(value: $0) }
     
-    // 체중 소수 부분 (0, 5 → 0.0, 0.5)
-    private let decimalWeights = [
-        WeightComponent(value: 0),
-        WeightComponent(value: 5)
-    ]
+    // 체중 소수 부분 (9 → 0, 0.1 단위)
+    private let decimalWeights = (0...9).reversed().map { WeightComponent(value: $0) }
     
     public init(store: StoreOf<WeightClassSettingFeature>) {
         self.store = store
@@ -50,10 +47,10 @@ public struct WeightClassSettingView: View {
         Int(store.selectedWeightKg)
     }
     
-    // 현재 선택된 체중의 소수 부분 (0 또는 5)
+    // 현재 선택된 체중의 소수 부분 (0~9)
     private var selectedDecimal: Int {
         let decimal = store.selectedWeightKg - Double(selectedInteger)
-        return decimal >= 0.25 ? 5 : 0
+        return Int(round(decimal * 10))
     }
     
     public var body: some View {
@@ -79,7 +76,7 @@ public struct WeightClassSettingView: View {
     }
     
     private var titleAndToggleSection: some View {
-        HStack(alignment: .center) {
+        HStack(alignment: .top) {
             Text("체급")
                 .font(Font.pretendard.title2)
                 .foregroundStyle(Color.component.sectionHeader.title)
@@ -87,22 +84,24 @@ public struct WeightClassSettingView: View {
             Spacer()
             
             // 체급 숨기기 토글
-            HStack(spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
                 Text("체급 숨기기 켜짐")
                     .font(Font.pretendard.bodyS)
                     .foregroundStyle(Color.component.sectionHeader.subTitle)
                 
                 Toggle("", isOn: $store.isWeightHidden.sending(\.view.weightHiddenToggled))
                     .labelsHidden()
-                    .tint(Color.component.cta.primary.bg)
+                    .tint(Color.component.switch.on.bg)
             }
+            .frame(height: 28)
         }
-        .frame(height: 48)
+        .frame(height: 28)
         .padding(.horizontal, 20)
+        .padding(.top, 24)
     }
     
     private var pickerSection: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 24) {
             Spacer()
             
             // 성별 피커
@@ -116,45 +115,52 @@ public struct WeightClassSettingView: View {
                 }
             )
             
-            // 체중 정수 부분 피커
-            SheetPickerView(
-                items: integerWeights,
-                selectedItem: integerWeights.first(where: { $0.value == selectedInteger }) ?? integerWeights[20],
-                displayText: { "\($0.value)" },
-                width: 70,
-                onSelect: { item in
-                    let newWeight = Double(item.value) + Double(selectedDecimal) / 10.0
-                    store.send(.view(.weightChanged(newWeight)))
+            HStack(spacing: 8) {
+                // 체중 정수 부분 피커
+                SheetPickerView(
+                    items: integerWeights,
+                    selectedItem: integerWeights.first(where: { $0.value == selectedInteger }) ?? integerWeights[20],
+                    displayText: { "\($0.value)" },
+                    width: 72,
+                    onSelect: { item in
+                        let newWeight = Double(item.value) + Double(selectedDecimal) / 10.0
+                        store.send(.view(.weightChanged(newWeight)))
+                    }
+                )
+                
+                // 소수점
+                VStack(alignment: .center) {
+                    Spacer()
+                    
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.component.picker.unit)
+                        .frame(width: 6, height: 6)
+                        .padding(.bottom, 6)
                 }
-            )
-            
-            // 소수점
-            Text(".")
-                .font(Font.pretendard.custom(weight: .medium, size: 24))
-                .foregroundStyle(Color.component.picker.itemSelectedText)
-                .offset(y: -8)
-            
-            // 체중 소수 부분 피커
-            SheetPickerView(
-                items: decimalWeights,
-                selectedItem: decimalWeights.first(where: { $0.value == selectedDecimal }) ?? decimalWeights[0],
-                displayText: { "\($0.value)" },
-                width: 70,
-                onSelect: { item in
-                    let newWeight = Double(selectedInteger) + Double(item.value) / 10.0
-                    store.send(.view(.weightChanged(newWeight)))
-                }
-            )
-            
-            // kg 단위
-            Text("kg")
-                .font(Font.pretendard.custom(weight: .medium, size: 24))
-                .foregroundStyle(Color.component.picker.itemSelectedText)
-                .offset(y: -8)
+                .frame(width: 10, height: 56)
+                
+                // 체중 소수 부분 피커
+                SheetPickerView(
+                    items: decimalWeights,
+                    selectedItem: decimalWeights.first(where: { $0.value == selectedDecimal }) ?? decimalWeights[0],
+                    displayText: { "\($0.value)" },
+                    width: 72,
+                    onSelect: { item in
+                        let newWeight = Double(selectedInteger) + Double(item.value) / 10.0
+                        store.send(.view(.weightChanged(newWeight)))
+                    }
+                )
+                
+                // kg 단위
+                Text("kg")
+                    .font(Font.pretendard.custom(weight: .medium, size: 24))
+                    .foregroundStyle(Color.component.picker.itemSelectedText)
+            }
             
             Spacer()
         }
         .padding(.vertical, 28)
+        .padding(.top, 16)
     }
     
     private var confirmButton: some View {
@@ -167,10 +173,37 @@ public struct WeightClassSettingView: View {
     }
 }
 
-#Preview {
+#Preview("기본 상태") {
     WeightClassSettingView(
         store: Store(
             initialState: WeightClassSettingFeature.State()
+        ) {
+            WeightClassSettingFeature()
+        }
+    )
+}
+#Preview("여성 선택, 체급 숨김") {
+    WeightClassSettingView(
+        store: Store(
+            initialState: WeightClassSettingFeature.State(
+                selectedGender: .female,
+                selectedWeightKg: 55.5,
+                isWeightHidden: true
+            )
+        ) {
+            WeightClassSettingFeature()
+        }
+    )
+}
+
+#Preview("남성, 무거운 체급") {
+    WeightClassSettingView(
+        store: Store(
+            initialState: WeightClassSettingFeature.State(
+                selectedGender: .male,
+                selectedWeightKg: 120.5,
+                isWeightHidden: false
+            )
         ) {
             WeightClassSettingFeature()
         }
