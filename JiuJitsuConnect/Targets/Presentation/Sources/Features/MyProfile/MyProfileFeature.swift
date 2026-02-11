@@ -73,6 +73,7 @@ public struct MyProfileFeature: Sendable {
             case nicknameEditButtonTapped
             case registerBeltButtonTapped
             case registerStyleButtonTapped
+            case weightVisibilityToggleButtonTapped
             case toastButtonTapped(ToastState.Action)
         }
         
@@ -82,6 +83,7 @@ public struct MyProfileFeature: Sendable {
             case updateProfileSection(ProfileSection, String?)
             case saveBeltAndWeightInfo(rank: BeltRank, stripe: BeltStripe, gender: Gender, weightKg: Double, isWeightHidden: Bool)
             case saveBeltInfoOnly(rank: BeltRank, stripe: BeltStripe)
+            case toggleWeightVisibility
             case updateProfileResponse(TaskResult<CommunityProfile>)
             case showToast(ToastState)
             case toastDismissed
@@ -151,6 +153,10 @@ public struct MyProfileFeature: Sendable {
             case .view(.registerStyleButtonTapped):
                 // 스타일 등록 화면 이동 로직
                 return .none
+                
+            case .view(.weightVisibilityToggleButtonTapped):
+                // 체급 숨김/보기 토글
+                return .send(.internal(.toggleWeightVisibility))
                 
             // MARK: - Delegate 처리 (자식 Feature로부터)
                 
@@ -293,6 +299,45 @@ public struct MyProfileFeature: Sendable {
                     )))
                 }
                 
+            case .internal(.toggleWeightVisibility):
+                guard var profile = state.communityProfile else {
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                }
+                
+                // 체급 가시성만 토글
+                let newVisibility = !(profile.isWeightHidden)
+                profile = CommunityProfile(
+                    nickname: profile.nickname,
+                    profileImageUrl: profile.profileImageUrl,
+                    beltRank: profile.beltRank,
+                    beltStripe: profile.beltStripe,
+                    gender: profile.gender,
+                    weightKg: profile.weightKg,
+                    academyName: profile.academyName,
+                    competitions: profile.competitions,
+                    bestSubmission: profile.bestSubmission,
+                    favoriteSubmission: profile.favoriteSubmission,
+                    bestTechnique: profile.bestTechnique,
+                    favoriteTechnique: profile.favoriteTechnique,
+                    bestPosition: profile.bestPosition,
+                    favoritePosition: profile.favoritePosition,
+                    isWeightHidden: newVisibility,
+                    isOwner: profile.isOwner,
+                    teachingPhilosophy: profile.teachingPhilosophy,
+                    teachingStartDate: profile.teachingStartDate,
+                    teachingDetail: profile.teachingDetail
+                )
+                
+                state.isLoadingProfile = true
+                
+                return .run { [profile] send in
+                    await send(.internal(.updateProfileResponse(
+                        await TaskResult {
+                            try await communityClient.updateProfile(profile, .beltWeight)
+                        }
+                    )))
+                }
+                
             // MARK: - API 호출: 프로필 섹션 업데이트
                 
             case let .internal(.updateProfileSection(section, value)):
@@ -359,6 +404,9 @@ public struct MyProfileFeature: Sendable {
                          previousProfile?.beltStripe != updatedProfile.beltStripe {
                     // 벨트 정보 수정
                     message = "벨트 정보 수정을 완료했어요"
+                } else if previousProfile?.isWeightHidden != updatedProfile.isWeightHidden {
+                    // 체급 가시성 변경
+                    message = updatedProfile.isWeightHidden ? "체급을 숨겼어요" : "체급을 공개했어요"
                 } else {
                     // 기타
                     message = "프로필 수정을 완료했어요"
