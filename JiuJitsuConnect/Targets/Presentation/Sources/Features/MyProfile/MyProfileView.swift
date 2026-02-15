@@ -15,15 +15,24 @@ extension Color {
 
 private enum Style {
     enum Header {
-        static let topPadding: CGFloat = 68 // Safe Area Top 부터 프로필 이미지까지의 거리
-        static let bottomPaddingWithButton: CGFloat = 82.49
-        static let bottomPaddingWithAcademyName: CGFloat = 99
+        static let topPadding: CGFloat = 68         // Safe Area Top 부터 프로필 이미지까지의 거리
+        static let bottomPaddingWithButton: CGFloat = 82.49     // case1: '도장 정보 입력하기' 버튼 아래 ~ 헤더 하단
+        static let bottomPaddingWithAcademyName: CGFloat = 84   // case2,3: 도장명 아래 ~ 헤더 하단
     }
-    
+
     enum Card {
-        static let overlapHeightWithButton: CGFloat = 46.49     // 버튼이 있을 때 (도장 정보 없음)
-        static let overlapHeightWithAcademyName: CGFloat = 71   // 도장 이름이 있을 때
-        static let minHeight: CGFloat = 128        // 카드 최소 높이
+        static let topGapWithButton: CGFloat = 36   // case1: 버튼 bottom ~ 카드 top 간격
+        static let topGapWithAcademyName: CGFloat = 13  // case2,3: 도장명 bottom ~ 카드 top 간격
+        static let minHeight: CGFloat = 128         // 카드 최소 높이
+        
+        // overlap = headerBottomPadding - topGap
+        // case1: 82.49 - 36 = 46.49
+        // case2,3: 99 - 28 = 71
+        static let overlapWithButton: CGFloat = bottomPaddingWithButton - topGapWithButton       // 46.49
+        static let overlapWithAcademyName: CGFloat = bottomPaddingWithAcademyName - topGapWithAcademyName  // 71
+        
+        private static let bottomPaddingWithButton = Header.bottomPaddingWithButton
+        private static let bottomPaddingWithAcademyName = Header.bottomPaddingWithAcademyName
     }
     
     struct DecorativeCardConfiguration {
@@ -90,9 +99,11 @@ public struct MyProfileView: View {
             let safeAreaBottom = geometry.safeAreaInsets.bottom
             
             // 도장 이름 유무에 따라 동적으로 overlap 높이 결정
-            let cardOverlapHeight = store.communityProfile?.academyName != nil 
-                ? Style.Card.overlapHeightWithAcademyName 
-                : Style.Card.overlapHeightWithButton
+            // case1(닉네임만): 헤더 bottom 82.49 - 카드 top gap 36 = 46.49
+            // case2,3(도장명 있음): 헤더 bottom 99 - 카드 top gap 28 = 71
+            let cardOverlapHeight = store.communityProfile?.academyName != nil
+                ? Style.Card.overlapWithAcademyName
+                : Style.Card.overlapWithButton
             
             ScrollView(showsIndicators: false) {
                 ZStack(alignment: .bottom) {
@@ -238,7 +249,7 @@ public struct MyProfileView: View {
                 }
                 
                 // 닉네임
-                HStack(spacing: 4) {
+                HStack(alignment: .center, spacing: 0) {
                     Text(store.communityProfile?.nickname ?? store.authInfo.userInfo?.nickname ?? "")
                         .font(Font.pretendard.title3)
                         .foregroundStyle(Color.component.list.setting.background)
@@ -250,14 +261,14 @@ public struct MyProfileView: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 16, height: 16)
-                                .foregroundStyle(Color(hex: "#FFFFFF").opacity(0.5))
+                                .foregroundStyle(Color.white.opacity(0.5))
                         }
                         .frame(width: 32, height: 32)
-                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
-                .padding(.top, 8)
+                .frame(height: 29)
+                .padding(.top, 12)
                 
                 // 도장 이름 표시 (있는 경우)
                 if let academyName = store.communityProfile?.academyName {
@@ -273,19 +284,19 @@ public struct MyProfileView: View {
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: 16, height: 16)
-                                    .foregroundStyle(Color(hex: "#FFFFFF").opacity(0.5))
+                                    .foregroundStyle(Color.white.opacity(0.5))
                             }
                             .frame(width: 32, height: 32)
-                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
-                    .padding(.top, 7.5)
+                    .frame(height: 32)
                     
                     Spacer().frame(height: Style.Header.bottomPaddingWithAcademyName)
                 }
                 
-                // 버튼 - 도장 정보 유무에 따라 다른 버튼 표시
+                // 버튼 - 도장 정보 없을 때만 표시
+                // 닉네임 bottom ~ 버튼 top: 15, 버튼 bottom ~ 헤더 하단: 82.49
                 if store.communityProfile?.academyName == nil {
                     Button {
                         store.send(.view(.gymInfoButtonTapped))
@@ -296,7 +307,7 @@ public struct MyProfileView: View {
                     .frame(height: 32)
                     .padding(.top, 15)
                     
-                    // 헤더 내용물 아래의 여백 (이 공간 위로 카드가 겹쳐짐)
+                    // 헤더 하단 여백 (이 공간 위로 카드가 overlap됨)
                     Spacer().frame(height: Style.Header.bottomPaddingWithButton)
                 }
             }
@@ -378,7 +389,7 @@ public struct MyProfileView: View {
                                             .clipShape(RoundedRectangle(cornerRadius: 10))
                                     }
                                     .buttonStyle(.plain)
-                                    .frame(height: 22)
+                                    .frame(height: 12)
                                 }
                             } else {
                                 // 체급 표시 상태
