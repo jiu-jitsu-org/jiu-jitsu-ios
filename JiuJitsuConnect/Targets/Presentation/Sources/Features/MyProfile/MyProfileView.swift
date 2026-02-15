@@ -23,7 +23,7 @@ private enum Style {
     enum Card {
         static let overlapHeightWithButton: CGFloat = 46.49     // 버튼이 있을 때 (도장 정보 없음)
         static let overlapHeightWithAcademyName: CGFloat = 71   // 도장 이름이 있을 때
-        static let minHeight: CGFloat = 195        // 카드 최소 높이
+        static let minHeight: CGFloat = 128        // 카드 최소 높이
     }
     
     struct DecorativeCardConfiguration {
@@ -309,118 +309,100 @@ public struct MyProfileView: View {
         let hasWeightInfo = profile?.weightKg != nil
         
         return VStack(spacing: 24) {
-            if hasBeltInfo || hasWeightInfo {
+            if hasBeltInfo && hasWeightInfo {
                 // 정보가 있을 때: 좌우 레이아웃
                 HStack(spacing: 0) {
                     // 왼쪽: 벨트 섹션
-                    VStack(spacing: 16) {
+                    VStack(alignment: .center, spacing: 8) {
                         Text("벨트")
-                            .font(Font.pretendard.bodyM)
-                            .foregroundStyle(Color.component.beltCard.default.text.opacity(0.6))
+                            .font(Font.pretendard.labelM)
+                            .foregroundStyle(Color.component.beltCard.filled.labelText)
+                            .frame(height: 14)
                         
                         if let beltRank = profile?.beltRank {
                             // 벨트 아이콘
                             beltIcon(for: beltRank)
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
-                                .frame(width: 64, height: 64)
+                                .frame(width: 40, height: 40)
                                 .background(Color.component.list.setting.background)
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                             
-                            // 벨트 등급 텍스트
-                            VStack(spacing: 2) {
-                                HStack(spacing: 4) {
+                            if let beltStripe = profile?.beltStripe {
+                                HStack(spacing: 5) {
                                     Text(beltRank.displayName)
-                                        .font(Font.pretendard.title3)
-                                        .foregroundStyle(Color.component.beltCard.default.text)
+                                        .font(Font.pretendard.bodyS)
+                                        .foregroundStyle(Color.component.beltCard.filled.contentText)
                                     
-                                    if let beltStripe = profile?.beltStripe, beltStripe != .none {
-                                        Text(beltStripe.displayName)
-                                            .font(Font.pretendard.bodyM)
-                                            .foregroundStyle(Color.component.beltCard.default.text.opacity(0.8))
-                                    }
+                                    Text(beltStripe.displayName)
+                                        .font(Font.pretendard.bodyS)
+                                        .foregroundStyle(Color.component.beltCard.filled.contentText)
                                 }
+                                .frame(height: 17)
                             }
-                        } else {
-                            // 벨트 정보 없음
-                            Assets.MyProfile.Icon.beltBlue.swiftUIImage
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 64, height: 64)
-                                .background(Color.component.list.setting.background)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                            
-                            Text("미등록")
-                                .font(Font.pretendard.bodyM)
-                                .foregroundStyle(Color.component.beltCard.default.text.opacity(0.6))
                         }
                     }
                     .frame(maxWidth: .infinity)
                     
                     // 중앙: 구분선
                     Rectangle()
-                        .fill(Color.component.beltCard.default.text.opacity(0.1))
-                        .frame(width: 1)
+                        .fill(Color.primitive.coolGray.cg75)
+                        .frame(width: 1, height: 36)
                         .padding(.vertical, 24)
                     
                     // 오른쪽: 체급 섹션
-                    VStack(spacing: 16) {
+                    VStack(spacing: 8) {
                         Text("체급")
-                            .font(Font.pretendard.bodyM)
-                            .foregroundStyle(Color.component.beltCard.default.text.opacity(0.6))
+                            .font(Font.pretendard.labelM)
+                            .foregroundStyle(Color.component.beltCard.filled.labelText)
+                            .frame(height: 14)
                         
                         if let weightKg = profile?.weightKg {
                             if profile?.isWeightHidden == true {
                                 // 체급 숨김 상태
-                                Text("숨김")
-                                    .font(Font.pretendard.title1)
-                                    .foregroundStyle(Color.component.beltCard.default.text)
-                                    .padding(.vertical, 20)
-                                
-                                Button {
-                                    store.send(.view(.weightVisibilityToggleButtonTapped))
-                                } label: {
-                                    Text("보기")
-                                        .font(Font.pretendard.bodyM)
-                                        .foregroundStyle(Color.component.beltCard.default.text)
-                                        .padding(.horizontal, 24)
-                                        .padding(.vertical, 8)
-                                        .background(Color.component.list.setting.background)
-                                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                                VStack(spacing: 4) {
+                                    Text("숨김")
+                                        .font(Font.pretendard.custom(weight: .medium, size: 24))
+                                        .foregroundStyle(Color.component.beltCard.filled.contentText)
+                                        .frame(height: 40)
+                                    
+                                    Button {
+                                        store.send(.view(.weightVisibilityToggleButtonTapped))
+                                    } label: {
+                                        Text("보기")
+                                            .font(Font.pretendard.buttonS)
+                                            .foregroundStyle(Color.component.button.neutral.defaultText)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 4)
+                                            .background(Color.component.button.neutral.defaultBg)
+                                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .frame(height: 22)
                                 }
-                                .buttonStyle(.plain)
                             } else {
                                 // 체급 표시 상태
-                                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                                    Text(String(format: "%.1f", weightKg))
-                                        .font(Font.pretendard.title1)
-                                        .foregroundStyle(Color.component.beltCard.default.text)
+                                VStack(spacing: 4) {
+                                    Text(String(format: "%.1fkg", weightKg))
+                                        .font(Font.pretendard.custom(weight: .medium, size: 24))
+                                        .foregroundStyle(Color.component.beltCard.filled.contentText)
+                                        .frame(height: 40)
                                     
-                                    Text("kg")
-                                        .font(Font.pretendard.bodyM)
-                                        .foregroundStyle(Color.component.beltCard.default.text.opacity(0.6))
+                                    Button {
+                                        store.send(.view(.weightVisibilityToggleButtonTapped))
+                                    } label: {
+                                        Text("숨기기")
+                                            .font(Font.pretendard.buttonS)
+                                            .foregroundStyle(Color.component.button.neutral.defaultText)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 4)
+                                            .background(Color.component.button.neutral.defaultBg)
+                                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .frame(height: 22)
                                 }
-                                .padding(.vertical, 20)
-                                
-                                Button {
-                                    store.send(.view(.weightVisibilityToggleButtonTapped))
-                                } label: {
-                                    Text("숨기기")
-                                        .font(Font.pretendard.bodyM)
-                                        .foregroundStyle(Color.component.beltCard.default.text)
-                                        .padding(.horizontal, 24)
-                                        .padding(.vertical, 8)
-                                        .background(Color.component.list.setting.background)
-                                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                                }
-                                .buttonStyle(.plain)
                             }
-                        } else {
-                            // 체급 정보 없음
-                            Text("미등록")
-                                .font(Font.pretendard.bodyM)
-                                .foregroundStyle(Color.component.beltCard.default.text.opacity(0.6))
-                                .padding(.vertical, 20)
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -490,15 +472,15 @@ public struct MyProfileView: View {
     private func beltIcon(for beltRank: BeltRank) -> Image {
         switch beltRank {
         case .white:
-            return Assets.MyProfile.Icon.beltBlue.swiftUIImage // TODO: 실제 화이트 벨트 아이콘으로 교체
+            return Assets.MyProfile.Icon.beltWhite.swiftUIImage
         case .blue:
             return Assets.MyProfile.Icon.beltBlue.swiftUIImage
         case .purple:
-            return Assets.MyProfile.Icon.beltBlue.swiftUIImage // TODO: 실제 퍼플 벨트 아이콘으로 교체
+            return Assets.MyProfile.Icon.beltPurple.swiftUIImage
         case .brown:
-            return Assets.MyProfile.Icon.beltBlue.swiftUIImage // TODO: 실제 브라운 벨트 아이콘으로 교체
+            return Assets.MyProfile.Icon.beltBrown.swiftUIImage
         case .black:
-            return Assets.MyProfile.Icon.beltBlue.swiftUIImage // TODO: 실제 블랙 벨트 아이콘으로 교체
+            return Assets.MyProfile.Icon.beltBlack.swiftUIImage
         }
     }
     
