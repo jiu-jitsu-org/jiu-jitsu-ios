@@ -303,8 +303,7 @@ public struct MyProfileView: View {
                     } label: {
                         AppButtonConfiguration(title: "도장 정보 입력하기", size: .small)
                     }
-                    .appButtonStyle(.tint, size: .small)
-                    .frame(height: 32)
+                    .appButtonStyle(.tint, size: .small, height: 32)
                     .padding(.top, 15)
                     
                     // 헤더 하단 여백 (이 공간 위로 카드가 overlap됨)
@@ -328,7 +327,7 @@ public struct MyProfileView: View {
                         Text("벨트")
                             .font(Font.pretendard.labelM)
                             .foregroundStyle(Color.component.beltCard.filled.labelText)
-                            .frame(height: 14)
+                            .frame(height: 14, alignment: .center)
                         
                         if let beltRank = profile?.beltRank {
                             // 벨트 아이콘
@@ -336,11 +335,10 @@ public struct MyProfileView: View {
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
                                 .frame(width: 40, height: 40)
-                                .background(Color.component.list.setting.background)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
                             
                             if let beltStripe = profile?.beltStripe {
-                                HStack(spacing: 5) {
+                                HStack(alignment: .center, spacing: 5) {
                                     Text(beltRank.displayName)
                                         .font(Font.pretendard.bodyS)
                                         .foregroundStyle(Color.component.beltCard.filled.contentText)
@@ -349,7 +347,7 @@ public struct MyProfileView: View {
                                         .font(Font.pretendard.bodyS)
                                         .foregroundStyle(Color.component.beltCard.filled.contentText)
                                 }
-                                .frame(height: 17)
+                                .frame(height: 18)
                             }
                         }
                     }
@@ -362,34 +360,27 @@ public struct MyProfileView: View {
                         .padding(.vertical, 24)
                     
                     // 오른쪽: 체급 섹션
-                    VStack(spacing: 8) {
+                    VStack(alignment: .center, spacing: 8) {
                         Text("체급")
                             .font(Font.pretendard.labelM)
                             .foregroundStyle(Color.component.beltCard.filled.labelText)
-                            .frame(height: 14)
+                            .frame(height: 14, alignment: .center)
                         
                         if let weightKg = profile?.weightKg {
                             if profile?.isWeightHidden == true {
                                 // 체급 숨김 상태
-                                VStack(spacing: 4) {
+                                VStack(alignment: .center, spacing: 4) {
                                     Text("숨김")
                                         .font(Font.pretendard.custom(weight: .medium, size: 24))
                                         .foregroundStyle(Color.component.beltCard.filled.contentText)
-                                        .frame(height: 40)
-                                    
-                                    Button {
+                                        .frame(height: 40, alignment: .center)
+                                
+                                    Button(action: {
                                         store.send(.view(.weightVisibilityToggleButtonTapped))
-                                    } label: {
-                                        Text("보기")
-                                            .font(Font.pretendard.buttonS)
-                                            .foregroundStyle(Color.component.button.neutral.defaultText)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 4)
-                                            .background(Color.component.button.neutral.defaultBg)
-                                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    }) {
+                                        AppButtonConfiguration(title: "보기", size: .small)
                                     }
-                                    .buttonStyle(.plain)
-                                    .frame(height: 12)
+                                    .appButtonStyle(.neutral, size: .small, height: 22, horizontalPadding: 12)
                                 }
                             } else {
                                 // 체급 표시 상태
@@ -397,29 +388,22 @@ public struct MyProfileView: View {
                                     Text(String(format: "%.1fkg", weightKg))
                                         .font(Font.pretendard.custom(weight: .medium, size: 24))
                                         .foregroundStyle(Color.component.beltCard.filled.contentText)
-                                        .frame(height: 40)
+                                        .frame(height: 40, alignment: .center)
                                     
-                                    Button {
+                                    Button(action: {
                                         store.send(.view(.weightVisibilityToggleButtonTapped))
-                                    } label: {
-                                        Text("숨기기")
-                                            .font(Font.pretendard.buttonS)
-                                            .foregroundStyle(Color.component.button.neutral.defaultText)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 4)
-                                            .background(Color.component.button.neutral.defaultBg)
-                                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    }) {
+                                        AppButtonConfiguration(title: "숨기기", size: .small)
                                     }
-                                    .buttonStyle(.plain)
-                                    .frame(height: 22)
+                                    .appButtonStyle(.neutral, size: .small, height: 22, horizontalPadding: 12)
                                 }
                             }
                         }
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .padding(.vertical, 24)
-                .padding(.horizontal, 20)
+                .padding(.vertical, 20)
+                .padding(.horizontal, 24)
             } else {
                 // 정보가 없을 때: 기존 UI
                 VStack(spacing: 8) {
@@ -466,8 +450,7 @@ public struct MyProfileView: View {
                 } label: {
                     AppButtonConfiguration(title: "벨트/체급 등록하기", size: .medium)
                 }
-                .appButtonStyle(.primary, size: .medium)
-                .frame(height: 38)
+                .appButtonStyle(.primary, size: .medium, height: 38)
                 .padding(.bottom, 24)
             }
         }
@@ -556,8 +539,7 @@ public struct MyProfileView: View {
                 } label: {
                     AppButtonConfiguration(title: "내 스타일 등록하기", size: .medium)
                 }
-                .appButtonStyle(.tint, size: .medium)
-                .frame(height: 38)
+                .appButtonStyle(.tint, size: .medium, height: 38)
                 .padding(.top, 24)
             }
             

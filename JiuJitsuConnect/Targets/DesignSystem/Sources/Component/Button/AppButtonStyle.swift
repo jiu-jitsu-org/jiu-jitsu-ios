@@ -11,14 +11,27 @@ public struct AppButtonStyle: ButtonStyle {
     private let style: ButtonStyleType
     private let size: ButtonSize
     private let hasRightIcon: Bool
+    private let fixedWidth: CGFloat?
+    private let fixedHeight: CGFloat?
+    private let horizontalPadding: CGFloat?
     
     // View의 .disabled() 상태를 읽어옴
     @Environment(\.isEnabled) private var isEnabled
     
-    public init(style: ButtonStyleType, size: ButtonSize, hasRightIcon: Bool = false) {
+    public init(
+        style: ButtonStyleType,
+        size: ButtonSize,
+        hasRightIcon: Bool = false,
+        width: CGFloat? = nil,
+        height: CGFloat? = nil,
+        horizontalPadding: CGFloat? = nil
+    ) {
         self.style = style
         self.size = size
         self.hasRightIcon = hasRightIcon
+        self.fixedWidth = width
+        self.fixedHeight = height
+        self.horizontalPadding = horizontalPadding
     }
     
     public func makeBody(configuration: Configuration) -> some View {
@@ -33,7 +46,8 @@ public struct AppButtonStyle: ButtonStyle {
         configuration.label
             .font(font)
             .padding(padding)
-            .frame(maxHeight: .infinity)
+            .frame(width: fixedWidth, height: fixedHeight)
+            .frame(maxHeight: fixedHeight == nil ? .infinity : nil)
             .background(colors.background)
             .foregroundStyle(colors.foreground)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
@@ -82,6 +96,11 @@ public struct AppButtonStyle: ButtonStyle {
     
     // 크기에 따른 패딩을 반환하는 헬퍼 메서드
     private func getPadding() -> EdgeInsets {
+        // horizontalPadding이 지정된 경우 좌우 패딩을 커스텀 값으로 적용
+        if let padding = horizontalPadding {
+            return EdgeInsets(top: 0, leading: padding, bottom: 0, trailing: padding)
+        }
+        
         switch size {
         case .large:
             return EdgeInsets(

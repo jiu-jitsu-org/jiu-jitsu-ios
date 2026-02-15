@@ -13,8 +13,18 @@ public extension View {
     ///   - style: 버튼의 종류 (primary, tint, text, neutral)
     ///   - size: 버튼의 크기 (large, medium, small, iconOnly)
     ///   - hasRightIcon: 오른쪽 아이콘 유무에 따라 패딩을 조절할지 여부
-    func appButtonStyle(_ style: ButtonStyleType, size: ButtonSize, hasRightIcon: Bool = false) -> some View {
-        self.buttonStyle(AppButtonStyle(style: style, size: size, hasRightIcon: hasRightIcon))
+    ///   - width: 버튼의 고정 너비 (nil이면 부모 크기에 맞춤)
+    ///   - height: 버튼의 고정 높이 (nil이면 부모 크기에 맞춤)
+    ///   - horizontalPadding: 좌우 패딩 직접 지정 (nil이면 size 기본값 사용). 텍스트가 동적으로 변할 때 width 대신 사용 권장.
+    func appButtonStyle(
+        _ style: ButtonStyleType,
+        size: ButtonSize,
+        hasRightIcon: Bool = false,
+        width: CGFloat? = nil,
+        height: CGFloat? = nil,
+        horizontalPadding: CGFloat? = nil
+    ) -> some View {
+        self.buttonStyle(AppButtonStyle(style: style, size: size, hasRightIcon: hasRightIcon, width: width, height: height, horizontalPadding: horizontalPadding))
     }
 }
 
