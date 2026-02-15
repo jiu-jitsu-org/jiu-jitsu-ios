@@ -35,6 +35,17 @@ private enum Style {
         private static let bottomPaddingWithAcademyName = Header.bottomPaddingWithAcademyName
     }
     
+    static func headerBackgroundColor(for beltRank: BeltRank?) -> Color {
+        switch beltRank {
+        case .white:  return Color.component.myProfileHeader.bg.white
+        case .blue:   return Color.component.myProfileHeader.bg.blue
+        case .purple: return Color.component.myProfileHeader.bg.purple
+        case .brown:  return Color.component.myProfileHeader.bg.brwon
+        case .black:  return Color.component.myProfileHeader.bg.black
+        case .none:   return Color.component.myProfileHeader.bg.default
+        }
+    }
+    
     struct DecorativeCardConfiguration {
         let image: Image
         let width: CGFloat
@@ -110,7 +121,10 @@ public struct MyProfileView: View {
                     // 메인 콘텐츠
                     VStack(spacing: 0) {
                         // 1. 헤더 영역
-                        profileHeaderView(safeAreaTop: safeAreaTop)
+                        profileHeaderView(
+                            safeAreaTop: safeAreaTop,
+                            beltRank: store.communityProfile?.beltRank
+                        )
                             .zIndex(0) // 배경
                         
                         // 2. 카드 영역 (Offset으로 겹침 효과 구현)
@@ -201,9 +215,10 @@ public struct MyProfileView: View {
     
     // MARK: - Subviews
     
-    private func profileHeaderView(safeAreaTop: CGFloat) -> some View {
+    private func profileHeaderView(safeAreaTop: CGFloat, beltRank: BeltRank?) -> some View {
         ZStack(alignment: .top) {
-            Color.component.myProfileHeader.bg.default
+            Style.headerBackgroundColor(for: beltRank)
+                .animation(.easeInOut(duration: 0.3), value: beltRank)
             
             VStack(spacing: 0) {
                 // 상단 여백 (Safe Area + 지정된 여백)
