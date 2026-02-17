@@ -367,6 +367,10 @@ public struct MyProfileView: View {
                         }
                     }
                     .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        store.send(.view(.beltTapped))
+                    }
                     
                     // 중앙: 구분선
                     Rectangle()

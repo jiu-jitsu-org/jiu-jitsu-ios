@@ -72,6 +72,7 @@ public struct MyProfileFeature: Sendable {
             case gymInfoButtonTapped
             case nicknameEditButtonTapped
             case registerBeltButtonTapped
+            case beltTapped             // 이미 등록된 벨트 영역 탭 → 수정 모드로 시트 노출
             case registerStyleButtonTapped
             case weightVisibilityToggleButtonTapped
             case toastButtonTapped(ToastState.Action)
@@ -136,7 +137,7 @@ public struct MyProfileFeature: Sendable {
                 return .none
                 
             case .view(.registerBeltButtonTapped):
-                // 벨트/체급 등록 화면을 시트로 노출
+                // 벨트/체급 등록 화면을 시트로 노출 (최초 설정 모드)
                 let currentRank = state.communityProfile?.beltRank ?? .white
                 let currentStripe = state.communityProfile?.beltStripe ?? .none
                 // 최초 설정인지 확인 (벨트 정보가 없으면 최초 설정)
@@ -146,6 +147,19 @@ public struct MyProfileFeature: Sendable {
                         selectedRank: currentRank,
                         selectedStripe: currentStripe,
                         isInitialSetup: isInitialSetup
+                    )
+                )
+                return .none
+                
+            case .view(.beltTapped):
+                // 이미 등록된 벨트 영역 탭 → 수정 모드(isInitialSetup: false)로 시트 노출
+                let currentRank = state.communityProfile?.beltRank ?? .white
+                let currentStripe = state.communityProfile?.beltStripe ?? .none
+                state.sheet = .beltSetting(
+                    BeltSettingFeature.State(
+                        selectedRank: currentRank,
+                        selectedStripe: currentStripe,
+                        isInitialSetup: false
                     )
                 )
                 return .none
