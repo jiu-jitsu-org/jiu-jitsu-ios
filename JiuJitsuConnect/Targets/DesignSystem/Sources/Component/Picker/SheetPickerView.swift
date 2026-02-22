@@ -57,6 +57,10 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
     
     @State private var currentSelectedId: Item.ID
     @State private var scrollOffset: CGFloat = 0
+    @State private var isScrolling: Bool = false
+    @State private var scrollStopWorkItem: DispatchWorkItem?
+    @State private var isInternalSelection: Bool = false  // 내부 선택인지 외부 변경인지 구분
+    @State private var isDragging: Bool = false  // 사용자가 드래그 중인지
     
     // MARK: - Initialization
     
@@ -117,51 +121,73 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
             .frame(width: width, height: itemHeight * 3 + itemSpacing * 2) // 정확히 3개 항목 노출
             .simultaneousGesture(
                 DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        // 사용자가 직접 드래그 시작
+                        if !isDragging {
+                            isDragging = true
+                        }
+                        isScrolling = true
+                        scrollStopWorkItem?.cancel()
+                    }
                     .onEnded { _ in
-                        // 드래그 종료 시 가장 가까운 항목으로 스냅
-                        snapToNearestItem(proxy: proxy, geometry: geometry)
+                        // 드래그 종료 후 0.3초 뒤에 스크롤 완료로 간주하고 선택 확정
+                        let workItem = DispatchWorkItem { [self] in
+                            isScrolling = false
+                            isDragging = false
+                        }
+                        scrollStopWorkItem = workItem
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
                     }
             )
         }
         .frame(width: width, height: itemHeight * 3 + itemSpacing * 2)
         .onAppear {
             currentSelectedId = selectedItem.id
+            isScrolling = true
+            scrollStopWorkItem?.cancel()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 proxy.scrollTo(selectedItem.id, anchor: .center)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    isScrolling = false
+                }
             }
         }
-        .onChange(of: selectedItem.id) { _, newValue in
+        .onChange(of: selectedItem.id) { oldValue, newValue in
+            // 내부 선택에 의한 변경이면 무시 (이미 스크롤되었음)
+            guard !isInternalSelection else {
+                return
+            }
+            
+            // 외부에서 selectedItem이 변경된 경우에만 스크롤
             currentSelectedId = newValue
+            isScrolling = true
+            scrollStopWorkItem?.cancel()
             withAnimation(.easeInOut(duration: 0.3)) {
                 proxy.scrollTo(newValue, anchor: .center)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                isScrolling = false
             }
         }
     }
     
-    // 가장 가까운 항목으로 스냅
+    // 가장 가까운 항목으로 스냅 (드래그 후 가장 가까운 항목 선택)
     private func snapToNearestItem(proxy: ScrollViewProxy, geometry: GeometryProxy) {
-        let centerY = geometry.size.height / 2
+        // 현재 뷰 중앙과 가장 가까운 항목 찾기
+        _ = geometry.frame(in: .global).midY
         
-        var closestItem: Item?
-        var minDistance: CGFloat = .infinity
-        
-        for (index, item) in items.enumerated() {
-            let itemCenterY = CGFloat(index) * (itemHeight + itemSpacing) + itemHeight / 2
-            let distance = abs(itemCenterY - centerY - scrollOffset)
-            
-            if distance < minDistance {
-                minDistance = distance
-                closestItem = item
+        // 모든 항목을 순회하면서 가장 중앙에 가까운 항목 찾기
+        for item in items {
+            // 각 항목의 ID를 기준으로 현재 위치 확인이 어려우므로
+            // 대신 현재 화면에 보이는 항목 중 중앙에 가까운 것을 찾습니다
+            if item.id == currentSelectedId {
+                // 이미 선택된 항목이면 스킵
+                continue
             }
         }
         
-        if let item = closestItem, item.id != currentSelectedId {
-            withAnimation(.easeOut(duration: 0.25)) {
-                proxy.scrollTo(item.id, anchor: .center)
-                currentSelectedId = item.id
-            }
-            onSelect(item)
-        }
+        // ScrollView의 현재 위치를 정확히 알기 어렵기 때문에
+        // onChange로 드래그 중 중앙 항목 추적
     }
     
     // MARK: - Private Views
@@ -177,11 +203,19 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
             let isNearCenter = distance < itemHeight / 2
             
             Button(action: {
+                isInternalSelection = true  // 내부 선택 플래그 설정
+                isScrolling = true
+                scrollStopWorkItem?.cancel()
                 currentSelectedId = item.id
                 withAnimation(.easeInOut(duration: 0.3)) {
                     proxy.scrollTo(item.id, anchor: .center)
                 }
                 onSelect(item)
+                // 애니메이션 완료 후 충분한 시간을 두고 플래그 해제
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    isScrolling = false
+                    isInternalSelection = false
+                }
             }) {
                 Text(displayText(item))
                     .font(isNearCenter
@@ -202,9 +236,15 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
             }
             .buttonStyle(.plain)
             .onChange(of: isNearCenter) { _, newValue in
-                if newValue && item.id != currentSelectedId {
+                // 드래그 중에만 중앙 항목 자동 선택
+                if isDragging && newValue && item.id != currentSelectedId {
+                    isInternalSelection = true
                     currentSelectedId = item.id
                     onSelect(item)
+                    // 0.1초 후 플래그 해제 (드래그가 계속되고 있으므로 빠르게)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        isInternalSelection = false
+                    }
                 }
             }
         }

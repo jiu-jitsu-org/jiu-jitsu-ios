@@ -212,6 +212,7 @@ public struct MyProfileFeature: Sendable {
                 
             case let .sheet(.presented(.beltSetting(.delegate(.didConfirmBelt(rank, stripe))))):
                 // 벨트 수정: API 호출하고 토스트 표시
+                Log.trace("벨트 수정 확인됨 - rank: \(rank.displayName), stripe: \(stripe.displayName)", category: .debug, level: .info)
                 state.sheet = nil
                 return .send(.internal(.saveBeltInfoOnly(rank: rank, stripe: stripe)))
                 
@@ -280,6 +281,8 @@ public struct MyProfileFeature: Sendable {
                     return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
                 }
                 
+                Log.trace("벨트 수정 - 기존: \(profile.beltRank?.displayName ?? "없음") \(profile.beltStripe?.displayName ?? ""), 새로운: \(rank.displayName) \(stripe.displayName)", category: .debug, level: .info)
+                
                 // 벨트 정보만 업데이트
                 profile = CommunityProfile(
                     nickname: profile.nickname,
@@ -302,6 +305,8 @@ public struct MyProfileFeature: Sendable {
                     teachingStartDate: profile.teachingStartDate,
                     teachingDetail: profile.teachingDetail
                 )
+                
+                Log.trace("API 요청할 프로필: \(profile.beltRank?.displayName ?? "없음") \(profile.beltStripe?.displayName ?? "")", category: .debug, level: .info)
                 
                 state.isLoadingProfile = true
                 
