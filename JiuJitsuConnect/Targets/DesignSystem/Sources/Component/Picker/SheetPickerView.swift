@@ -152,7 +152,7 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
                 }
             }
         }
-        .onChange(of: selectedItem.id) { oldValue, newValue in
+        .onChange(of: selectedItem.id) { _, newValue in
             // 내부 선택에 의한 변경이면 무시 (이미 스크롤되었음)
             guard !isInternalSelection else {
                 return

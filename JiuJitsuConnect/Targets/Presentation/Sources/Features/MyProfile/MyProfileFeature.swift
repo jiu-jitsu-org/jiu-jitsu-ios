@@ -73,6 +73,7 @@ public struct MyProfileFeature: Sendable {
             case nicknameEditButtonTapped
             case registerBeltButtonTapped
             case beltTapped             // 이미 등록된 벨트 영역 탭 → 수정 모드로 시트 노출
+            case weightClassTapped      // 이미 등록된 체급 영역 탭 → 체급 수정 시트 노출
             case registerStyleButtonTapped
             case weightVisibilityToggleButtonTapped
             case toastButtonTapped(ToastState.Action)
@@ -84,6 +85,7 @@ public struct MyProfileFeature: Sendable {
             case updateProfileSection(ProfileSection, String?)
             case saveBeltAndWeightInfo(rank: BeltRank, stripe: BeltStripe, gender: Gender, weightKg: Double, isWeightHidden: Bool)
             case saveBeltInfoOnly(rank: BeltRank, stripe: BeltStripe)
+            case saveWeightInfoOnly(gender: Gender, weightKg: Double, isWeightHidden: Bool)
             case toggleWeightVisibility
             case updateProfileResponse(TaskResult<CommunityProfile>)
             case showToast(ToastState)
@@ -164,6 +166,21 @@ public struct MyProfileFeature: Sendable {
                 )
                 return .none
                 
+            case .view(.weightClassTapped):
+                // 이미 등록된 체급 영역 탭 → 체급 수정 시트 노출
+                let currentGender = state.communityProfile?.gender ?? .male
+                let currentWeight = state.communityProfile?.weightKg ?? 60.0
+                let isWeightHidden = state.communityProfile?.isWeightHidden ?? false
+                
+                state.sheet = .weightClassSetting(
+                    WeightClassSettingFeature.State(
+                        selectedGender: currentGender,
+                        selectedWeightKg: currentWeight,
+                        isWeightHidden: isWeightHidden
+                    )
+                )
+                return .none
+                
             case .view(.registerStyleButtonTapped):
                 // 스타일 등록 화면 이동 로직
                 return .none
@@ -219,10 +236,12 @@ public struct MyProfileFeature: Sendable {
             case let .sheet(.presented(.weightClassSetting(.delegate(.didConfirmWeightClass(gender, weightKg, isWeightHidden))))):
                 // 체급 설정 완료: 벨트 정보와 함께 API 호출
                 guard let beltInfo = state.tempBeltInfo else {
+                    // 벨트 정보가 없는 경우 = 체급만 수정하는 경우
                     state.sheet = nil
-                    return .send(.internal(.showToast(.init(message: "벨트 정보를 찾을 수 없어요", style: .info))))
+                    return .send(.internal(.saveWeightInfoOnly(gender: gender, weightKg: weightKg, isWeightHidden: isWeightHidden)))
                 }
                 
+                // 벨트 정보가 있는 경우 = 최초 설정 (벨트 + 체급 함께 저장)
                 state.sheet = nil
                 state.tempBeltInfo = nil
                 return .send(.internal(.saveBeltAndWeightInfo(
@@ -307,6 +326,49 @@ public struct MyProfileFeature: Sendable {
                 )
                 
                 Log.trace("API 요청할 프로필: \(profile.beltRank?.displayName ?? "없음") \(profile.beltStripe?.displayName ?? "")", category: .debug, level: .info)
+                
+                state.isLoadingProfile = true
+                
+                return .run { [profile] send in
+                    await send(.internal(.updateProfileResponse(
+                        await TaskResult {
+                            try await communityClient.updateProfile(profile, .beltWeight)
+                        }
+                    )))
+                }
+                
+            case let .internal(.saveWeightInfoOnly(gender, weightKg, isWeightHidden)):
+                guard var profile = state.communityProfile else {
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                }
+                
+                // 체중을 소수점 첫째 자리로 반올림
+                let roundedWeight = round(weightKg * 10) / 10.0
+                
+                Log.trace("체급 수정 - 기존: \(profile.gender?.displayName ?? "없음") \(profile.weightKg ?? 0)kg (숨김: \(profile.isWeightHidden)), 새로운: \(gender.displayName) \(roundedWeight)kg (숨김: \(isWeightHidden))", category: .debug, level: .info)
+                
+                // 체급 정보만 업데이트
+                profile = CommunityProfile(
+                    nickname: profile.nickname,
+                    profileImageUrl: profile.profileImageUrl,
+                    beltRank: profile.beltRank,
+                    beltStripe: profile.beltStripe,
+                    gender: gender,
+                    weightKg: roundedWeight,
+                    academyName: profile.academyName,
+                    competitions: profile.competitions,
+                    bestSubmission: profile.bestSubmission,
+                    favoriteSubmission: profile.favoriteSubmission,
+                    bestTechnique: profile.bestTechnique,
+                    favoriteTechnique: profile.favoriteTechnique,
+                    bestPosition: profile.bestPosition,
+                    favoritePosition: profile.favoritePosition,
+                    isWeightHidden: isWeightHidden,
+                    isOwner: profile.isOwner,
+                    teachingPhilosophy: profile.teachingPhilosophy,
+                    teachingStartDate: profile.teachingStartDate,
+                    teachingDetail: profile.teachingDetail
+                )
                 
                 state.isLoadingProfile = true
                 
@@ -423,6 +485,12 @@ public struct MyProfileFeature: Sendable {
                          previousProfile?.beltStripe != updatedProfile.beltStripe {
                     // 벨트 정보 수정
                     message = "벨트 정보 수정을 완료했어요"
+                } else if previousProfile?.gender != updatedProfile.gender ||
+                         previousProfile?.weightKg != updatedProfile.weightKg ||
+                         (previousProfile?.isWeightHidden == updatedProfile.isWeightHidden &&
+                          (previousProfile?.gender != updatedProfile.gender || previousProfile?.weightKg != updatedProfile.weightKg)) {
+                    // 체급 정보 수정 (성별, 체중 변경)
+                    message = "체급 정보 수정을 완료했어요"
                 } else if previousProfile?.isWeightHidden != updatedProfile.isWeightHidden {
                     // 체급 가시성 변경
                     message = updatedProfile.isWeightHidden ? "체급을 숨겼어요" : "체급을 공개했어요"

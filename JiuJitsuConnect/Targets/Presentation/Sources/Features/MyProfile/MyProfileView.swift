@@ -417,6 +417,10 @@ public struct MyProfileView: View {
                         }
                     }
                     .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        store.send(.view(.weightClassTapped))
+                    }
                 }
                 .padding(.vertical, 20)
                 .padding(.horizontal, 24)
