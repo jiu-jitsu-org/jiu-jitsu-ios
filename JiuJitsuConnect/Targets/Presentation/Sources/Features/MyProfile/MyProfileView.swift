@@ -172,6 +172,11 @@ public struct MyProfileView: View {
             ) { nicknameSettingStore in
                 NicknameSettingView(store: nicknameSettingStore)
             }
+            .navigationDestination(
+                item: $store.scope(state: \.destination?.positionSetting, action: \.destination.positionSetting)
+            ) { positionSettingStore in
+                PositionSettingView(store: positionSettingStore)
+            }
             // 토스트 메시지 표시
             .overlay(alignment: .bottom) {
                 if let toastState = store.toast {

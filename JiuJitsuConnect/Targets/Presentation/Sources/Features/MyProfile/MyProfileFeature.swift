@@ -50,6 +50,7 @@ public struct MyProfileFeature: Sendable {
     public enum Destination {
         case academySetting(MyAcademySettingFeature)
         case nicknameSetting(NicknameSettingFeature)
+        case positionSetting(PositionSettingFeature)
     }
     
     @Reducer
@@ -87,6 +88,7 @@ public struct MyProfileFeature: Sendable {
             case saveBeltInfoOnly(rank: BeltRank, stripe: BeltStripe)
             case saveWeightInfoOnly(gender: Gender, weightKg: Double, isWeightHidden: Bool)
             case toggleWeightVisibility
+            case updatePositionInfo(best: PositionType?, favorite: PositionType?)
             case updateProfileResponse(TaskResult<CommunityProfile>)
             case showToast(ToastState)
             case toastDismissed
@@ -182,7 +184,15 @@ public struct MyProfileFeature: Sendable {
                 return .none
                 
             case .view(.registerStyleButtonTapped):
-                // 스타일 등록 화면 이동 로직
+                // 포지션 설정 화면으로 네비게이션
+                let currentBest = state.communityProfile?.bestPosition
+                let currentFavorite = state.communityProfile?.favoritePosition
+                state.destination = .positionSetting(
+                    PositionSettingFeature.State(
+                        bestPosition: currentBest,
+                        favoritePosition: currentFavorite
+                    )
+                )
                 return .none
                 
             case .view(.weightVisibilityToggleButtonTapped):
@@ -206,6 +216,14 @@ public struct MyProfileFeature: Sendable {
                 return .send(.internal(.showToast(.init(message: "닉네임 수정을 완료했어요", style: .info))))
                 
             case .destination(.presented(.nicknameSetting(.delegate(.cancel)))):
+                // 취소 - 아무것도 하지 않음
+                return .none
+                
+            case let .destination(.presented(.positionSetting(.delegate(.didConfirmPosition(best, favorite))))):
+                // 포지션 저장 요청 받음 → API 호출
+                return .send(.internal(.updatePositionInfo(best: best, favorite: favorite)))
+                
+            case .destination(.presented(.positionSetting(.delegate(.cancel)))):
                 // 취소 - 아무것도 하지 않음
                 return .none
                 
@@ -419,6 +437,44 @@ public struct MyProfileFeature: Sendable {
                     )))
                 }
                 
+            case let .internal(.updatePositionInfo(best, favorite)):
+                guard var profile = state.communityProfile else {
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                }
+                
+                // 포지션 정보 업데이트
+                profile = CommunityProfile(
+                    nickname: profile.nickname,
+                    profileImageUrl: profile.profileImageUrl,
+                    beltRank: profile.beltRank,
+                    beltStripe: profile.beltStripe,
+                    gender: profile.gender,
+                    weightKg: profile.weightKg,
+                    academyName: profile.academyName,
+                    competitions: profile.competitions,
+                    bestSubmission: profile.bestSubmission,
+                    favoriteSubmission: profile.favoriteSubmission,
+                    bestTechnique: profile.bestTechnique,
+                    favoriteTechnique: profile.favoriteTechnique,
+                    bestPosition: best,
+                    favoritePosition: favorite,
+                    isWeightHidden: profile.isWeightHidden,
+                    isOwner: profile.isOwner,
+                    teachingPhilosophy: profile.teachingPhilosophy,
+                    teachingStartDate: profile.teachingStartDate,
+                    teachingDetail: profile.teachingDetail
+                )
+                
+                state.isLoadingProfile = true
+                
+                return .run { [profile] send in
+                    await send(.internal(.updateProfileResponse(
+                        await TaskResult {
+                            try await communityClient.updateProfile(profile, .position)
+                        }
+                    )))
+                }
+                
             // MARK: - API 호출: 프로필 섹션 업데이트
                 
             case let .internal(.updateProfileSection(section, value)):
@@ -494,6 +550,10 @@ public struct MyProfileFeature: Sendable {
                 } else if previousProfile?.isWeightHidden != updatedProfile.isWeightHidden {
                     // 체급 가시성 변경
                     message = updatedProfile.isWeightHidden ? "체급을 숨겼어요" : "체급을 공개했어요"
+                } else if previousProfile?.bestPosition != updatedProfile.bestPosition ||
+                         previousProfile?.favoritePosition != updatedProfile.favoritePosition {
+                    // 포지션 정보 수정
+                    message = "포지션 설정을 완료했어요"
                 } else {
                     // 기타
                     message = "프로필 수정을 완료했어요"
