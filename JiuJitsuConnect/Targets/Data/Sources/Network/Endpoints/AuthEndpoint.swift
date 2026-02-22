@@ -41,14 +41,25 @@ extension AuthEndpoint: Endpoint {
         }
     }
     
+    // TODO: refresh 엔드포인트를 다시 body로 변경해야 함 (임시로 query parameter 사용 중)
+    var queryParameters: [String: String]? {
+        switch self {
+        case .refresh(let request):
+            return ["refreshToken": request.refreshToken]
+        default:
+            return nil
+        }
+    }
+    
     var body: Data? {
         switch self {
         case .serverLogin(let request):
             return try? JSONEncoder().encode(request)
         case .serverLogout(let request):
             return try? JSONEncoder().encode(request)
-        case .refresh(let request):
-            return try? JSONEncoder().encode(request)
+        case .refresh:
+            // TODO: 임시로 query parameter 사용 중 - 나중에 body로 다시 변경 필요
+            return nil
         }
     }
 }

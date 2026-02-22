@@ -10,9 +10,6 @@ import DesignSystem
 import ComposableArchitecture
 import Domain
 
-extension Color {
-}
-
 private enum Style {
     enum Header {
         static let topPadding: CGFloat = 68         // Safe Area Top 부터 프로필 이미지까지의 거리

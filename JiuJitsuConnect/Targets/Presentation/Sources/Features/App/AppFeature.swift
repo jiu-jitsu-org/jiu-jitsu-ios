@@ -33,8 +33,8 @@ public struct AppFeature: Sendable {
                 
             case let .destination(.presented(.splash(.delegate(.finishedLaunch(authInfo))))):
                 if let authInfo = authInfo {
-                    // 자동 로그인 성공 → 메인 화면으로
-                    state.destination = .main(.init(authInfo: authInfo))
+                    // 자동 로그인 성공 → 탭바 화면으로
+                    state.destination = .appTab(.init(authInfo: authInfo))
                 } else {
                     // 자동 로그인 실패 or 토큰 없음 → 로그인 화면으로
                     state.destination = .login(.init())
