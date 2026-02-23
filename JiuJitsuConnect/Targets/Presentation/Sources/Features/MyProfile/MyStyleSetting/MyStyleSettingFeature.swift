@@ -1,5 +1,5 @@
 //
-//  PositionSettingFeature.swift
+//  MyStyleSettingFeature.swift
 //  Presentation
 //
 //  Created by suni on 2/22/26.
@@ -10,7 +10,7 @@ import ComposableArchitecture
 import Domain
 
 @Reducer
-public struct PositionSettingFeature: Sendable {
+public struct MyStyleSettingFeature: Sendable {
     public init() {}
     
     @ObservableState

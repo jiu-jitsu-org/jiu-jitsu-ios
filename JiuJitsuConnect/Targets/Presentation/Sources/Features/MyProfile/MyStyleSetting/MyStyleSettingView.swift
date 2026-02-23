@@ -1,5 +1,5 @@
 //
-//  PositionSettingView.swift
+//  MyStyleSettingView.swift
 //  Presentation
 //
 //  Created by suni on 2/22/26.
@@ -9,10 +9,10 @@ import SwiftUI
 import ComposableArchitecture
 import DesignSystem
 
-public struct PositionSettingView: View {
-    @Bindable var store: StoreOf<PositionSettingFeature>
+public struct MyStyleSettingView: View {
+    @Bindable var store: StoreOf<MyStyleSettingFeature>
     
-    public init(store: StoreOf<PositionSettingFeature>) {
+    public init(store: StoreOf<MyStyleSettingFeature>) {
         self.store = store
     }
     
@@ -76,35 +76,39 @@ public struct PositionSettingView: View {
     
     private var headerView: some View {
         HStack(spacing: 0) {
-            Button {
-                store.send(.view(.backButtonTapped))
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(.black)
-                    .frame(width: 44, height: 44)
+            Button(action: { store.send(.view(.backButtonTapped)) }) {
+                ZStack {
+                    // 라운드 배경
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.primitive.coolGray.cg50)
+                    
+                    // 화살표 아이콘
+                    Assets.Common.Icon.arrowLeft.swiftUIImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
+                        .foregroundStyle(Color.primitive.coolGray.cg700)
+                }
+                .frame(width: 36, height: 36)
+                .contentShape(Rectangle())
             }
-            
-            Spacer()
-            
-            Text("포지션 설정")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.black)
+            .buttonStyle(.plain)
             
             Spacer()
             
             Button {
                 store.send(.view(.resetButtonTapped))
             } label: {
-                Text("내용에 하지")
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundColor(Color(hex: "#007AFF"))
+                Text("포지션 설정")
+                    .font(Font.pretendard.buttonS)
+                    .foregroundStyle(Color.component.button.text.defaultText)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 9)
             }
-            .frame(width: 80, height: 44)
+            .frame(height: 32)
         }
-        .padding(.horizontal, 4)
-        .frame(height: 56)
-        .background(Color.white)
+        .padding(.horizontal, 16)
+        .frame(height: 36)
     }
     
     // MARK: - Tab View
@@ -287,11 +291,11 @@ private extension Color {
 
 #Preview {
     NavigationStack {
-        PositionSettingView(
+        MyStyleSettingView(
             store: Store(
-                initialState: PositionSettingFeature.State()
+                initialState: MyStyleSettingFeature.State()
             ) {
-                PositionSettingFeature()
+                MyStyleSettingFeature()
             }
         )
     }

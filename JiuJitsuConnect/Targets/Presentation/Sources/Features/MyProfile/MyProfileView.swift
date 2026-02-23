@@ -173,9 +173,9 @@ public struct MyProfileView: View {
                 NicknameSettingView(store: nicknameSettingStore)
             }
             .navigationDestination(
-                item: $store.scope(state: \.destination?.positionSetting, action: \.destination.positionSetting)
-            ) { positionSettingStore in
-                PositionSettingView(store: positionSettingStore)
+                item: $store.scope(state: \.destination?.myStyleSetting, action: \.destination.myStyleSetting)
+            ) { myStyleSettingStore in
+                MyStyleSettingView(store: myStyleSettingStore)
             }
             // 토스트 메시지 표시
             .overlay(alignment: .bottom) {

@@ -50,7 +50,7 @@ public struct MyProfileFeature: Sendable {
     public enum Destination {
         case academySetting(MyAcademySettingFeature)
         case nicknameSetting(NicknameSettingFeature)
-        case positionSetting(PositionSettingFeature)
+        case myStyleSetting(MyStyleSettingFeature)
     }
     
     @Reducer
@@ -187,8 +187,8 @@ public struct MyProfileFeature: Sendable {
                 // 포지션 설정 화면으로 네비게이션
                 let currentBest = state.communityProfile?.bestPosition
                 let currentFavorite = state.communityProfile?.favoritePosition
-                state.destination = .positionSetting(
-                    PositionSettingFeature.State(
+                state.destination = .myStyleSetting(
+                    MyStyleSettingFeature.State(
                         bestPosition: currentBest,
                         favoritePosition: currentFavorite
                     )
@@ -219,11 +219,11 @@ public struct MyProfileFeature: Sendable {
                 // 취소 - 아무것도 하지 않음
                 return .none
                 
-            case let .destination(.presented(.positionSetting(.delegate(.didConfirmPosition(best, favorite))))):
+            case let .destination(.presented(.myStyleSetting(.delegate(.didConfirmPosition(best, favorite))))):
                 // 포지션 저장 요청 받음 → API 호출
                 return .send(.internal(.updatePositionInfo(best: best, favorite: favorite)))
                 
-            case .destination(.presented(.positionSetting(.delegate(.cancel)))):
+            case .destination(.presented(.myStyleSetting(.delegate(.cancel)))):
                 // 취소 - 아무것도 하지 않음
                 return .none
                 
