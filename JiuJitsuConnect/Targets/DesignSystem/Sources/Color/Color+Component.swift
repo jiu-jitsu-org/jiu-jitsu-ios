@@ -426,4 +426,32 @@ public struct ComponentColors {
         public let unit = Color.semantic.text.primary
     }
     
+    // MARK: - Segment
+    public let segment = Segment()
+    
+    public struct Segment {
+        public let container = Container()
+        
+        public struct Container {
+            public let bg = Color.semantic.surface.tertiary
+        }
+        
+        public let selected = Selected()
+        
+        public struct Selected {
+            public let bg = Color.semantic.surface.container
+            public let titleText = Color.semantic.text.primary
+            public let subText = Color.semantic.text.secondary
+        }
+        
+        
+        public let unselected = Unselected()
+        
+        public struct Unselected {
+            public let bg = Color.semantic.transparent.transparent
+            public let titleText = Color.semantic.text.secondary
+            public let subText = Color.semantic.text.tertiary
+        }
+    }
+    
 }

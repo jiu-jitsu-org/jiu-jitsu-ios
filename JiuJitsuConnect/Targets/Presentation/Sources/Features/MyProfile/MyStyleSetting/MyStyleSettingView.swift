@@ -21,8 +21,8 @@ public struct MyStyleSettingView: View {
             ScrollView {
                 // 탭 (특기/최애)
                 tabView
-                    .padding(.top, 20)
-                    .padding(.horizontal, 20)
+                    .padding(.top, 26)
+                    .padding(.horizontal, 50)
                 
                 // 메인 카드
                 VStack(spacing: 16) {
@@ -125,8 +125,8 @@ public struct MyStyleSettingView: View {
                 }
             }
         }
-        .frame(height: 60)
-        .background(Color.white)
+        .frame(height: 67)
+        .background(Color.component.segment.container.bg)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
     }
