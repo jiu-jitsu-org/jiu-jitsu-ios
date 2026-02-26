@@ -18,30 +18,7 @@ public struct MyStyleSettingView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                // 탭 (특기/최애)
-                tabView
-                    .padding(.top, 26)
-                    .padding(.horizontal, 50)
-                
-                // 메인 카드
-                VStack(spacing: 16) {
-                    ForEach(store.availableStyles) { style in
-                        PositionStyleCard(
-                            style: style,
-                            isSelected: store.selectedBestPosition == style || store.selectedFavoritePosition == style
-                        )
-                        .onTapGesture {
-                            store.send(.view(.styleCardTapped(style)))
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-            }
-            .background(Color.component.background.default)
-            .scrollEdgeEffectStyle(.soft, for: .top)    // 상단 부드러운 페이드
-            .scrollEdgeEffectStyle(.hard, for: .bottom) // 하단 선명한 경계
+            mainScrollView
             
             // 선택된 스타일 미리보기
             if store.selectedBestPosition != nil || store.selectedFavoritePosition != nil {
@@ -51,22 +28,7 @@ public struct MyStyleSettingView: View {
             }
             
             // 완료 버튼
-            Button {
-                store.send(.view(.completeButtonTapped))
-            } label: {
-                Text(store.selectedBestPosition == nil ? "특기 선정 완료" :
-                        store.selectedTab == .top ? "특기 선정 완료" : "최애 선정 완료")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .background(store.canComplete ? Color.blue : Color.gray)
-                .cornerRadius(12)
-            }
-            .disabled(!store.canComplete)
-            .padding(.horizontal, 20)
-            .padding(.bottom, 34)
-            .padding(.top, 16)
+            completeButton
         }
         .background(Color.component.background.default)
         .navigationTitle("포지션 설정")
@@ -75,60 +37,141 @@ public struct MyStyleSettingView: View {
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button(action: { store.send(.view(.backButtonTapped)) }) {
-                    ZStack {
-                        // 라운드 배경
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.primitive.coolGray.cg50)
-                        
-                        Assets.Common.Icon.arrowLeft.swiftUIImage
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 24, height: 24)
-                            .foregroundStyle(Color.primitive.coolGray.cg700)
-                    }
-                    .frame(width: 36, height: 36)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                backButton
             }
             .sharedBackgroundVisibility(.hidden)
             
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    store.send(.view(.resetButtonTapped))
-                } label: {
-                    Text("나중에 하기")
-                        .font(Font.pretendard.buttonS)
-                        .foregroundStyle(Color.component.button.text.defaultText)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 9)
-                        .frame(height: 32)
-                }
-                .buttonStyle(.plain)
+                resetButton
             }
             .sharedBackgroundVisibility(.hidden)
         }
+    }
+    
+    // MARK: - Main Content Views
+    
+    private var mainScrollView: some View {
+        ScrollView {
+            // 탭 (특기/최애)
+            tabView
+                .padding(.top, 26)
+                .padding(.horizontal, 50)
+            
+            // 메인 카드
+            styleCardsView
+        }
+        .background(Color.component.background.default)
+        .scrollEdgeEffectStyle(.soft, for: .top)    // 상단 부드러운 페이드
+        .scrollEdgeEffectStyle(.hard, for: .bottom) // 하단 선명한 경계
+    }
+    
+    private var styleCardsView: some View {
+        VStack(spacing: 16) {
+            ForEach(store.availableStyles) { style in
+                PositionStyleCard(
+                    style: style,
+                    isSelected: store.selectedBestPosition == style || store.selectedFavoritePosition == style
+                )
+                .onTapGesture {
+                    store.send(.view(.styleCardTapped(style)))
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+    }
+    
+    private var completeButton: some View {
+        Button {
+            store.send(.view(.completeButtonTapped))
+        } label: {
+            completeButtonLabel
+        }
+        .disabled(!store.canComplete)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 34)
+        .padding(.top, 16)
+    }
+    
+    private var completeButtonLabel: some View {
+        let buttonText: String
+        if store.selectedBestPosition == nil {
+            buttonText = "특기 선정 완료"
+        } else if store.selectedTab == .best {
+            buttonText = "특기 선정 완료"
+        } else {
+            buttonText = "최애 선정 완료"
+        }
+        
+        return Text(buttonText)
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
+            .background(store.canComplete ? Color.blue : Color.gray)
+            .cornerRadius(12)
+    }
+    
+    private var backButton: some View {
+        Button(action: { store.send(.view(.backButtonTapped)) }) {
+            ZStack {
+                // 라운드 배경
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.primitive.coolGray.cg50)
+                
+                Assets.Common.Icon.arrowLeft.swiftUIImage
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 24, height: 24)
+                    .foregroundStyle(Color.primitive.coolGray.cg700)
+            }
+            .frame(width: 36, height: 36)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private var resetButton: some View {
+        Button {
+            store.send(.view(.resetButtonTapped))
+        } label: {
+            Text("나중에 하기")
+                .font(Font.pretendard.buttonS)
+                .foregroundStyle(Color.component.button.text.defaultText)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 9)
+                .frame(height: 32)
+        }
+        .buttonStyle(.plain)
     }
     
     // MARK: - Tab View
     
     private var tabView: some View {
         HStack(spacing: 0) {
-            ForEach(StyleCategory.allCases, id: \.self) { category in
+            ForEach(MyStyleSettingFeature.SelectionTab.allCases, id: \.self) { tab in
                 TabButton(
-                    title: category.displayName,
-                    subtitle: category.subtitle,
-                    isSelected: store.selectedTab == category
+                    title: tab.displayName,
+                    subtitle: subtitle(for: tab),
+                    isSelected: store.selectedTab == tab
                 ) {
-                    store.send(.view(.tabSelected(category)))
+                    store.send(.view(.tabSelected(tab)))
                 }
             }
         }
         .frame(height: 67)
         .background(Color.component.segment.container.bg)
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .cornerRadius(28)
+    }
+    
+    /// 각 탭의 subtitle을 선택된 포지션에 따라 동적으로 반환
+    private func subtitle(for tab: MyStyleSettingFeature.SelectionTab) -> String {
+        switch tab {
+        case .best:
+            return store.selectedBestPosition?.displayName ?? "탑포지션"
+        case .favorite:
+            return store.selectedFavoritePosition?.displayName ?? "가드포지션"
+        }
     }
     
     // MARK: - Selected Styles Preview
@@ -156,19 +199,20 @@ private struct TabButton: View {
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? .black : Color(hex: "#999999"))
+                    .font(Font.pretendard.custom(weight: .semiBold, size: 18))
+                    .foregroundColor(isSelected ? Color.component.segment.selected.titleText : Color.component.segment.unselected.titleText)
                 
                 Text(subtitle)
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundColor(Color(hex: "#CCCCCC"))
+                    .font(Font.pretendard.labelM)
+                    .foregroundColor(isSelected ? Color.component.segment.selected.subText : Color.component.segment.unselected.subText)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 60)
-            .background(isSelected ? Color.white : Color.clear)
-            .cornerRadius(12)
+            .frame(height: 59)
+            .background(isSelected ? Color.component.segment.selected.bg : Color.component.segment.unselected.bg)
+            .cornerRadius(24)
+            .padding([.top, .bottom, .leading], 4)
         }
     }
 }

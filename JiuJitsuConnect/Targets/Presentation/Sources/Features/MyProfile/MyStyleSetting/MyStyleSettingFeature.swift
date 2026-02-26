@@ -13,10 +13,22 @@ import Domain
 public struct MyStyleSettingFeature: Sendable {
     public init() {}
     
+    public enum SelectionTab: String, CaseIterable, Equatable, Sendable {
+        case best
+        case favorite
+        
+        public var displayName: String {
+            switch self {
+            case .best: return "특기"
+            case .favorite: return "최애"
+            }
+        }
+    }
+    
     @ObservableState
     public struct State: Equatable, Sendable {
-        // 탭 선택 (탑/가드)
-        var selectedTab: StyleCategory = .top
+        // 탭 선택 (특기/최애)
+        var selectedTab: SelectionTab = .best
         
         // 선택된 포지션 스타일
         var selectedBestPosition: PositionStyle?
@@ -37,7 +49,12 @@ public struct MyStyleSettingFeature: Sendable {
         
         // 현재 탭에 따른 포지션 스타일 목록
         var availableStyles: [PositionStyle] {
-            PositionStyle.allCases.filter { $0.category == selectedTab }
+            switch selectedTab {
+            case .best:
+                return PositionStyle.allCases.filter { $0.isBestCategory }
+            case .favorite:
+                return PositionStyle.allCases.filter { $0.isFavoriteCategory }
+            }
         }
         
         // 완료 버튼 활성화 조건
@@ -51,7 +68,7 @@ public struct MyStyleSettingFeature: Sendable {
         case delegate(DelegateAction)
         
         public enum ViewAction: Sendable {
-            case tabSelected(StyleCategory)
+            case tabSelected(SelectionTab)
             case styleCardTapped(PositionStyle)
             case completeButtonTapped
             case backButtonTapped
@@ -67,8 +84,8 @@ public struct MyStyleSettingFeature: Sendable {
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
-            case let .view(.tabSelected(category)):
-                state.selectedTab = category
+            case let .view(.tabSelected(tab)):
+                state.selectedTab = tab
                 return .none
                 
             case let .view(.styleCardTapped(style)):
@@ -81,10 +98,10 @@ public struct MyStyleSettingFeature: Sendable {
                 
                 // 새로운 스타일 선택
                 if state.selectedBestPosition == nil {
-                    // 최고 포지션이 없으면 최고로 설정
+                    // 특기가 없으면 특기로 설정
                     state.selectedBestPosition = style
                 } else {
-                    // 최고 포지션이 있으면 선호로 설정
+                    // 특기가 있으면 최애로 설정
                     state.selectedFavoritePosition = style
                 }
                 return .none
@@ -116,23 +133,32 @@ public struct MyStyleSettingFeature: Sendable {
 
 /// 포지션 스타일 (UI용)
 public enum PositionStyle: String, CaseIterable, Equatable, Sendable, Identifiable {
-    // Top 계열
+    // Best 계열 (특기)
     case topAttack = "top_attack"
     case topControl = "top_control"
     
-    // Guard 계열
+    // Favorite 계열 (최애)
     case guardAttack = "guard_attack"
     case guardDefense = "guard_defense"
     
     public var id: String { rawValue }
     
-    /// 스타일이 속한 카테고리
-    public var category: StyleCategory {
+    /// 특기(베스트) 카테고리 여부
+    public var isBestCategory: Bool {
         switch self {
         case .topAttack, .topControl:
-            return .top
+            return true
+        default:
+            return false
+        }
+    }
+    /// 최애(페이보릿) 카테고리 여부
+    public var isFavoriteCategory: Bool {
+        switch self {
         case .guardAttack, .guardDefense:
-            return .guard
+            return true
+        default:
+            return false
         }
     }
     
@@ -219,30 +245,6 @@ public enum PositionStyle: String, CaseIterable, Equatable, Sendable, Identifiab
             return "icon_position_guard_attack"
         case .guardDefense:
             return "icon_position_guard_defense"
-        }
-    }
-}
-
-/// 스타일 카테고리 (탭)
-public enum StyleCategory: String, CaseIterable, Equatable, Sendable {
-    case top = "TOP"
-    case `guard` = "GUARD"
-    
-    public var displayName: String {
-        switch self {
-        case .top:
-            return "특기"
-        case .guard:
-            return "최애"
-        }
-    }
-    
-    public var subtitle: String {
-        switch self {
-        case .top:
-            return "탑포지션"
-        case .guard:
-            return "가드포지션"
         }
     }
 }
