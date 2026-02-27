@@ -20,12 +20,10 @@ public struct MyStyleSettingView: View {
         VStack(spacing: 0) {
             mainScrollView
             
-            // 선택된 스타일 미리보기
-            if store.selectedBestPosition != nil || store.selectedFavoritePosition != nil {
-                selectedStylesPreview
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
-            }
+            // 선택된 스타일 미리보기 (항상 표시)
+            selectedStylesPreview
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
             
             // 완료 버튼
             completeButton
@@ -66,15 +64,29 @@ public struct MyStyleSettingView: View {
     }
     
     private var styleCardsView: some View {
-        VStack(spacing: 16) {
-            ForEach(store.availableStyles) { style in
+        let currentStyle: PositionStyle?
+        
+        switch store.selectedTab {
+        case .best:
+            currentStyle = store.selectedBestPosition
+        case .favorite:
+            currentStyle = store.selectedFavoritePosition
+        }
+        
+        return VStack(spacing: 0) {
+            if let style = currentStyle {
+                // 선택된 스타일 카드
                 PositionStyleCard(
                     style: style,
-                    isSelected: store.selectedBestPosition == style || store.selectedFavoritePosition == style
+                    isSelected: true
                 )
-                .onTapGesture {
-                    store.send(.view(.styleCardTapped(style)))
-                }
+            } else {
+                // 선택 전 기본 카드
+                EmptySelectionCard(
+                    onTap: {
+                        // 첫 번째 스타일을 선택하도록 유도하거나 그냥 비워둘 수 있음
+                    }
+                )
             }
         }
         .padding(.horizontal, 20)
@@ -177,14 +189,30 @@ public struct MyStyleSettingView: View {
     // MARK: - Selected Styles Preview
     
     private var selectedStylesPreview: some View {
-        HStack(spacing: 12) {
-            if let best = store.selectedBestPosition {
-                SmallStyleCard(style: best, label: "탑")
+        // 선택 가능한 스타일들을 가로 스크롤로 표시
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(store.availableStyles) { style in
+                    SmallStyleCard(
+                        style: style,
+                        label: style.displayName,
+                        isSelected: isStyleSelected(style)
+                    )
+                    .onTapGesture {
+                        store.send(.view(.styleCardTapped(style)))
+                    }
+                }
             }
-            
-            if let favorite = store.selectedFavoritePosition {
-                SmallStyleCard(style: favorite, label: "가드")
-            }
+            .padding(.horizontal, 20)
+        }
+    }
+    
+    private func isStyleSelected(_ style: PositionStyle) -> Bool {
+        switch store.selectedTab {
+        case .best:
+            return store.selectedBestPosition == style
+        case .favorite:
+            return store.selectedFavoritePosition == style
         }
     }
 }
@@ -280,6 +308,7 @@ private struct PositionStyleCard: View {
 private struct SmallStyleCard: View {
     let style: PositionStyle
     let label: String
+    let isSelected: Bool
     
     var body: some View {
         ZStack {
@@ -293,12 +322,65 @@ private struct SmallStyleCard: View {
                 endPoint: .bottom
             )
             
-            Text(label)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white)
+            VStack(spacing: 4) {
+                // 아이콘 또는 텍스트
+                Image(systemName: "figure.martial.arts")
+                    .font(.system(size: 24))
+                    .foregroundColor(.white)
+                
+                Text(label)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white)
+            }
+            
+            // 선택 표시
+            if isSelected {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.white, lineWidth: 2)
+            }
         }
         .frame(width: 80, height: 80)
         .cornerRadius(12)
+    }
+}
+
+// MARK: - Empty Selection Card (Default State)
+
+private struct EmptySelectionCard: View {
+    let onTap: () -> Void
+    
+    var body: some View {
+        ZStack {
+            // 배경 - 점선 테두리와 어두운 배경
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(hex: "2C2C2E"))
+            
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(
+                    style: StrokeStyle(lineWidth: 2, dash: [8, 6])
+                )
+                .foregroundColor(Color.white.opacity(0.3))
+            
+            VStack(spacing: 20) {
+                // + 아이콘
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.2))
+                        .frame(width: 80, height: 80)
+                    
+                    Image(systemName: "plus")
+                        .font(.system(size: 40, weight: .light))
+                        .foregroundColor(.white)
+                }
+                
+                // "선택하기" 텍스트
+                Text("선택하기")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            .padding(.vertical, 40)
+        }
+        .frame(height: 320)
     }
 }
 
