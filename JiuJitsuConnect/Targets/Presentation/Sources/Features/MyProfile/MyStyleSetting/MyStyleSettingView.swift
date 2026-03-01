@@ -89,6 +89,7 @@ public struct MyStyleSettingView: View {
                 )
             }
         }
+        .frame(width: 262, height: 394)
         .padding(.horizontal, 20)
         .padding(.top, 20)
     }
@@ -352,35 +353,27 @@ private struct EmptySelectionCard: View {
     var body: some View {
         ZStack {
             // 배경 - 점선 테두리와 어두운 배경
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color(hex: "2C2C2E"))
+            RoundedRectangle(cornerRadius: 40)
+                .fill(Color.primitive.coolGray.cg900)
             
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: 40)
                 .strokeBorder(
-                    style: StrokeStyle(lineWidth: 2, dash: [8, 6])
+                    style: StrokeStyle(lineWidth: 2, dash: [8, 8])
                 )
-                .foregroundColor(Color.white.opacity(0.3))
+                .foregroundColor(Color.primitive.coolGray.cg200)
             
-            VStack(spacing: 20) {
-                // + 아이콘
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.2))
-                        .frame(width: 80, height: 80)
-                    
-                    Image(systemName: "plus")
-                        .font(.system(size: 40, weight: .light))
-                        .foregroundColor(.white)
-                }
+            VStack(spacing: 16) {
+                // + 아이콘 (배경 원 없이)
+                Text("+")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(.white)
                 
                 // "선택하기" 텍스트
                 Text("선택하기")
-                    .font(.system(size: 24, weight: .bold))
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(.white)
             }
-            .padding(.vertical, 40)
         }
-        .frame(height: 320)
     }
 }
 

@@ -53,7 +53,10 @@ let appInfoPlist: [String: Plist.Value] = {
             "Pretendard-Medium.otf",
             "Pretendard-Regular.otf",
             "Pretendard-SemiBold.otf",
-            "Pretendard-Thin.otf"
+            "Pretendard-Thin.otf",
+            "CookieRun Black.otf",
+            "CookieRun Bold.otf",
+            "CookieRun Regular.otf"
         ],
         "CFBundleURLTypes": [
             [
