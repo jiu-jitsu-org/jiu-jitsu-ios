@@ -362,17 +362,21 @@ private struct EmptySelectionCard: View {
                 )
                 .foregroundColor(Color.primitive.coolGray.cg200)
             
-            VStack(spacing: 16) {
+            // + 아이콘을 중앙에 배치
+            VStack(spacing: 0) {
                 // + 아이콘 (배경 원 없이)
                 Text("+")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(.white)
+                    .font(Font.cookieRun.custom(weight: .black, size: 80))
+                    .foregroundColor(Color.primitive.coolGray.cg100)
                 
                 // "선택하기" 텍스트
                 Text("선택하기")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(.white)
+                    .font(Font.cookieRun.custom(weight: .black, size: 20))
+                    .foregroundColor(Color.primitive.coolGray.cg100)
+                    .frame(height: 27)
+                    .padding(.top, -5)
             }
+            .offset(y: -13.5)
         }
     }
 }

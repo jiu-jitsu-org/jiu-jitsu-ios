@@ -102,29 +102,6 @@ public struct Pretendard {
 }
 // MARK: - CookieRun Font
 public struct CookieRun {
-    // MARK: - Display
-    public let display1 = Font.custom("CookieRunOTF-Bold", fixedSize: 30)
-    
-    // MARK: - Title
-    public let title1 = Font.custom("CookieRunOTF-Bold", fixedSize: 22)
-    public let title2 = Font.custom("CookieRunOTF-Bold", fixedSize: 20)
-    public let title3 = Font.custom("CookieRunOTF-Bold", fixedSize: 18)
-
-    // MARK: - Body
-    public let bodyM = Font.custom("CookieRunOTF-Regular", fixedSize: 16)
-    public let bodyS = Font.custom("CookieRunOTF-Regular", fixedSize: 14)
-
-    // MARK: - Label
-    public let labelM = Font.custom("CookieRunOTF-Regular", fixedSize: 12)
-    public let labelS = Font.custom("CookieRunOTF-Regular", fixedSize: 10)
-    
-    // MARK: - Button
-    public let buttonL = Font.custom("CookieRunOTF-Bold", fixedSize: 18)
-    public let buttonM = Font.custom("CookieRunOTF-Bold", fixedSize: 16)
-    public let buttonS = Font.custom("CookieRunOTF-Bold", fixedSize: 12)
-    
-    // MARK: - Caption
-    public let captionM = Font.custom("CookieRunOTF-Regular", fixedSize: 12)
     
     /// 사이즈와 웨이트를 직접 지정해야 할 경우 사용
     public func custom(weight: CookieRun.Weight, size: CGFloat) -> Font {
