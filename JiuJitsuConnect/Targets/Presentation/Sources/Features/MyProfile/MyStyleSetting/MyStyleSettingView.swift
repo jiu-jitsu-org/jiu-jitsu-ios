@@ -8,6 +8,7 @@
 import SwiftUI
 import ComposableArchitecture
 import DesignSystem
+import Domain
 
 public struct MyStyleSettingView: View {
     @Bindable var store: StoreOf<MyStyleSettingFeature>
@@ -29,7 +30,7 @@ public struct MyStyleSettingView: View {
             completeButton
         }
         .background(Color.component.background.default)
-        .navigationTitle("포지션 설정")
+        .navigationTitle(store.settingType.navigationTitle)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .tabBar)
@@ -64,19 +65,13 @@ public struct MyStyleSettingView: View {
     }
     
     private var styleCardsView: some View {
-        let currentStyle: PositionStyle?
-        
-        switch store.selectedTab {
-        case .best:
-            currentStyle = store.selectedBestPosition
-        case .favorite:
-            currentStyle = store.selectedFavoritePosition
-        }
+        // 현재 탭에서 선택된 스타일
+        let currentStyle = store.currentSelectedStyle
         
         return VStack(spacing: 0) {
             if let style = currentStyle {
                 // 선택된 스타일 카드
-                PositionStyleCard(
+                StyleCard(
                     style: style,
                     isSelected: true
                 )
@@ -108,7 +103,7 @@ public struct MyStyleSettingView: View {
     
     private var completeButtonLabel: some View {
         let buttonText: String
-        if store.selectedBestPosition == nil {
+        if store.selectedBestStyle == nil {
             buttonText = "특기 선정 완료"
         } else if store.selectedTab == .best {
             buttonText = "특기 선정 완료"
@@ -177,13 +172,25 @@ public struct MyStyleSettingView: View {
         .cornerRadius(28)
     }
     
-    /// 각 탭의 subtitle을 선택된 포지션에 따라 동적으로 반환
+    /// 각 탭의 subtitle을 선택된 스타일에 따라 동적으로 반환
     private func subtitle(for tab: MyStyleSettingFeature.SelectionTab) -> String {
         switch tab {
         case .best:
-            return store.selectedBestPosition?.displayName ?? "탑포지션"
+            return store.selectedBestStyle?.displayName ?? defaultSubtitle(for: .best)
         case .favorite:
-            return store.selectedFavoritePosition?.displayName ?? "가드포지션"
+            return store.selectedFavoriteStyle?.displayName ?? defaultSubtitle(for: .favorite)
+        }
+    }
+    
+    /// 선택되지 않았을 때 기본 subtitle
+    private func defaultSubtitle(for tab: MyStyleSettingFeature.SelectionTab) -> String {
+        switch store.settingType {
+        case .position:
+            return tab == .best ? "탑포지션" : "가드포지션"
+        case .submission:
+            return tab == .best ? "암바" : "레그락"
+        case .technique:
+            return tab == .best ? "테이크다운" : "이스케이프"
         }
     }
     
@@ -193,7 +200,7 @@ public struct MyStyleSettingView: View {
         // 선택 가능한 스타일들을 가로 스크롤로 표시
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                ForEach(store.availableStyles) { style in
+                ForEach(store.availableStyles, id: \.id) { style in
                     SmallStyleCard(
                         style: style,
                         label: style.displayName,
@@ -208,13 +215,9 @@ public struct MyStyleSettingView: View {
         }
     }
     
-    private func isStyleSelected(_ style: PositionStyle) -> Bool {
-        switch store.selectedTab {
-        case .best:
-            return store.selectedBestPosition == style
-        case .favorite:
-            return store.selectedFavoritePosition == style
-        }
+    private func isStyleSelected(_ style: any StyleSelectable) -> Bool {
+        // 현재 탭에서 선택된 스타일과 비교
+        return store.currentSelectedStyle?.id == style.id
     }
 }
 
@@ -246,10 +249,10 @@ private struct TabButton: View {
     }
 }
 
-// MARK: - Position Style Card
+// MARK: - Style Card
 
-private struct PositionStyleCard: View {
-    let style: PositionStyle
+private struct StyleCard: View {
+    let style: any StyleSelectable
     let isSelected: Bool
     
     var body: some View {
@@ -307,7 +310,7 @@ private struct PositionStyleCard: View {
 // MARK: - Small Style Card (Preview)
 
 private struct SmallStyleCard: View {
-    let style: PositionStyle
+    let style: any StyleSelectable
     let label: String
     let isSelected: Bool
     
@@ -416,7 +419,7 @@ private extension Color {
     NavigationStack {
         MyStyleSettingView(
             store: Store(
-                initialState: MyStyleSettingFeature.State()
+                initialState: MyStyleSettingFeature.State(settingType: .position)
             ) {
                 MyStyleSettingFeature()
             }

@@ -189,6 +189,7 @@ public struct MyProfileFeature: Sendable {
                 let currentFavorite = state.communityProfile?.favoritePosition
                 state.destination = .myStyleSetting(
                     MyStyleSettingFeature.State(
+                        settingType: .position,
                         bestPosition: currentBest,
                         favoritePosition: currentFavorite
                     )
@@ -219,8 +220,11 @@ public struct MyProfileFeature: Sendable {
                 // 취소 - 아무것도 하지 않음
                 return .none
                 
-            case let .destination(.presented(.myStyleSetting(.delegate(.didConfirmPosition(best, favorite))))):
-                // 포지션 저장 요청 받음 → API 호출
+            case let .destination(.presented(.myStyleSetting(.delegate(.didConfirmStyles(bestKey, favoriteKey))))):
+                // 스타일 저장 요청 받음 → API 호출
+                // API 키를 PositionType으로 변환
+                let best = bestKey.flatMap { PositionType(rawValue: $0) }
+                let favorite = favoriteKey.flatMap { PositionType(rawValue: $0) }
                 return .send(.internal(.updatePositionInfo(best: best, favorite: favorite)))
                 
             case .destination(.presented(.myStyleSetting(.delegate(.cancel)))):

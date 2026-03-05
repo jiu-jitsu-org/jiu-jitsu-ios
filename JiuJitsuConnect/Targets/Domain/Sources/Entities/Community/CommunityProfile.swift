@@ -231,12 +231,14 @@ public enum Gender: String, Codable, Equatable, Sendable {
 }
 
 /// 서브미션 타입
-public enum SubmissionType: String, Codable, Equatable, Sendable {
+public enum SubmissionType: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
     case chokes = "CHOKES"
     case armLocks = "ARM_LOCKS"
     case legLocks = "LEG_LOCKS"
     case shoulderLocks = "SHOULDER_LOCKS"
     case spineLocks = "SPINE_LOCKS"
+    
+    public var id: String { rawValue }
     
     public var displayName: String {
         switch self {
@@ -250,12 +252,14 @@ public enum SubmissionType: String, Codable, Equatable, Sendable {
 }
 
 /// 기술 타입
-public enum TechniqueType: String, Codable, Equatable, Sendable {
+public enum TechniqueType: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
     case guardPasses = "GUARD_PASSES"
     case sweeps = "SWEEPS"
     case takedowns = "TAKEDOWNS"
     case escapes = "ESCAPES"
     case transitions = "TRANSITIONS"
+    
+    public var id: String { rawValue }
     
     public var displayName: String {
         switch self {
@@ -269,13 +273,15 @@ public enum TechniqueType: String, Codable, Equatable, Sendable {
 }
 
 /// 포지션 타입
-public enum PositionType: String, Codable, Equatable, Sendable {
+public enum PositionType: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
     case top = "TOP"
     case `guard` = "GUARD"
     case side = "SIDE"
     case mount = "MOUNT"
     case back = "BACK"
     case turtle = "TURTLE"
+    
+    public var id: String { rawValue }
     
     public var displayName: String {
         switch self {
