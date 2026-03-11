@@ -9,12 +9,15 @@ let isAppStore = Environment.isAppStore.getBoolean(default: false)
 let additionalCondition = isAppStore ? "APPSTORE" : ""
 
 // MARK: - SwiftLint
-let swiftlintScript: TargetScript = .pre(
+let swiftlintScript: TargetScript = .post(
     script: """
-    if which swiftlint >/dev/null; then
-        swiftlint --fix && swiftlint
+    if test -d "/opt/homebrew/bin/"; then
+        export PATH="/opt/homebrew/bin/:${PATH}"
+    fi
+    if which swiftlint > /dev/null; then
+        swiftlint
     else
-        echo "warning: SwiftLint not installed, download from https://github.com/realm/SwiftLint"
+        echo "warning: SwiftLint not installed, run: brew install swiftlint"
     fi
     """,
     name: "SwiftLint",
