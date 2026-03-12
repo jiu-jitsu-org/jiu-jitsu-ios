@@ -30,68 +30,87 @@ public enum MyStyleSettingType: Sendable, Equatable {
 public protocol StyleSelectable: Identifiable, Equatable, Sendable {
     var id: String { get }
     var rawValue: String { get }
-    var displayName: String { get }
     
     // UI 전용 속성
-    var description: String { get }
-    var backgroundColors: (top: String, bottom: String) { get }
-    var iconName: String { get }
+    var fullTitle: String { get }              // 타이틀 (풀 네임): "탑 포지션", "가드 포지션"
+    var shortTitle: String { get }             // 요약된 타이틀: "탑", "가드"
+    var tabTitle: String { get }               // 탭에 표시될 타이틀: "탑포지션", "가드포지션"
+    var cardDescription: String { get }        // 카드에 들어갈 약 3줄의 설명
+    var backgroundImageName: String { get }    // 카드 백그라운드 이미지
+    var iconImageName: String { get }          // 카드에 들어갈 아이콘
+    var smallCardColorHex: String { get }      // 작은 카드 배경색 (16진수)
 }
 
 // MARK: - Domain Extension: PositionType + UI
 
 extension PositionType: StyleSelectable {
-    /// UI용 상세 설명
-    public var description: String {
+    /// 타이틀 (풀 네임)
+    public var fullTitle: String {
         switch self {
         case .top:
-            return "이 매트 위에서 '선다'는 건 없어.\n'아직 넘어지지 않았다'란 있을 뿐.\n그리고 그 시간은, 이제 끝났어."
-        case .side:
-            return "서두르지 않아. 압박을 주고,\n상대를 무너뜨린 뒤,\n천천히 마무리해."
+            return "탑 포지션"
         case .guard:
-            return "누워있다고 당하는 게 아니야.\n오히려 여기가 내 무대.\n올라와봐, 내가 끝내줄게."
-        case .turtle:
-            return "급할 필요 없어. 버티고,\n흐름을 읽고, 기회를 만들어.\n내 템포로 가는 거야."
-        case .mount:
-            return "가장 지배적인 위치.\n여기서는 내가 왕이야."
-        case .back:
-            return "등을 보인 순간,\n게임은 끝났어."
+            return "가드 포지션"
         }
     }
     
-    /// UI용 배경 색상 (그라데이션)
-    public var backgroundColors: (top: String, bottom: String) {
+    /// 요약된 타이틀
+    public var shortTitle: String {
         switch self {
         case .top:
-            return ("#8B4513", "#5C3317")  // 갈색 계열
-        case .side:
-            return ("#2F4F2F", "#1C3A1C")  // 진한 초록 계열
+            return "탑"
         case .guard:
-            return ("#B8C951", "#7A9F35")  // 연두-초록 그라데이션
-        case .turtle:
-            return ("#6B8E23", "#4A6B1C")  // 올리브 초록 계열
-        case .mount:
-            return ("#8B0000", "#4A0000")  // 진한 빨강 계열
-        case .back:
-            return ("#1C1C1C", "#000000")  // 검정 계열
+            return "가드"
         }
     }
     
-    /// UI용 아이콘 이미지 이름
-    public var iconName: String {
+    /// 탭에 표시될 타이틀
+    public var tabTitle: String {
+        switch self {
+        case .top:
+            return "탑 포지션"
+        case .guard:
+            return "가드 포지션"
+        }
+    }
+    
+    /// 카드에 들어갈 설명 (약 3줄)
+    public var cardDescription: String {
+        switch self {
+        case .top:
+            return "이 매트 위에서 '선다'는 건 없어.\n'아직 넘어지지 않았다'만 있을 뿐.\n그리고 그 시간은, 이제 끝났어."
+        case .guard:
+            return "이 매트 위에서 '선다'는 건 없어.\n'아직 넘어지지 않았다'만 있을 뿐.\n그리고 그 시간은, 이제 끝났어."
+        }
+    }
+    
+    /// 카드 백그라운드 이미지
+    public var backgroundImageName: String {
+        switch self {
+        case .top:
+            return "bg_position_top"
+        case .guard:
+            return "bg_position_guard"
+        }
+    }
+    
+    /// 카드 아이콘 이미지
+    public var iconImageName: String {
         switch self {
         case .top:
             return "icon_position_top"
-        case .side:
-            return "icon_position_side"
         case .guard:
             return "icon_position_guard"
-        case .turtle:
-            return "icon_position_turtle"
-        case .mount:
-            return "icon_position_mount"
-        case .back:
-            return "icon_position_back"
+        }
+    }
+    
+    /// 작은 카드 배경색
+    public var smallCardColorHex: String {
+        switch self {
+        case .top:
+            return "#341F1A"
+        case .guard:
+            return "#355530"
         }
     }
 }
@@ -99,40 +118,68 @@ extension PositionType: StyleSelectable {
 // MARK: - Domain Extension: SubmissionType + UI
 
 extension SubmissionType: StyleSelectable {
-    /// UI용 상세 설명
-    public var description: String {
+    /// 타이틀 (풀 네임)
+    public var fullTitle: String {
         switch self {
         case .armLocks:
-            return "팔을 잡았다면,\n그건 이미 끝난 거야.\n저항? 그건 네 선택이지만."
+            return "팔 관절기"
         case .chokes:
-            return "숨을 끊는 순간,\n모든 게 조용해져.\n잘 자, 편히."
+            return "조르기"
         case .legLocks:
-            return "다리를 잡았어?\n이제 걷기 힘들 거야.\n아플 테니 조심해."
-        case .shoulderLocks:
-            return "어깨가 빠지기 전에\n탭하는 게 좋을 거야.\n안 그러면 후회해."
-        case .spineLocks:
-            return "척추는 소중하니까,\n빨리 탭하는 게 현명해."
+            return "하체 관절기"
         }
     }
     
-    /// UI용 배경 색상 (그라데이션)
-    public var backgroundColors: (top: String, bottom: String) {
+    /// 요약된 타이틀
+    public var shortTitle: String {
         switch self {
         case .armLocks:
-            return ("#DC143C", "#8B0000")  // 빨강 계열
+            return "팔"
         case .chokes:
-            return ("#FF8C00", "#FF4500")  // 주황 계열
+            return "조르"
         case .legLocks:
-            return ("#9370DB", "#6A5ACD")  // 보라 계열
-        case .shoulderLocks:
-            return ("#4169E1", "#191970")  // 파랑 계열
-        case .spineLocks:
-            return ("#2E8B57", "#006400")  // 녹색 계열
+            return "하체"
         }
     }
     
-    /// UI용 아이콘 이미지 이름
-    public var iconName: String {
+    /// 탭에 표시될 타이틀
+    public var tabTitle: String {
+        switch self {
+        case .armLocks:
+            return "팔 관절기"
+        case .chokes:
+            return "조르기"
+        case .legLocks:
+            return "하체 관절기"
+        }
+    }
+    
+    /// 카드에 들어갈 설명 (약 3줄)
+    public var cardDescription: String {
+        switch self {
+        case .armLocks:
+            return "도망갈 곳은 없어. 네 팔은 내 손아귀에 완벽히 잡혔으니까.\n남은 건 네 결정뿐."
+        case .chokes:
+            return "내 몸은 아나콘다, 넌 그냥 먹잇감.\n탭이 늦으면, 네 뼈가 먼저 비명을 지를 거다."
+        case .legLocks:
+            return "네가 아무리 발버둥 쳐도 소용없어. 네 하체는 이제 완벽하게\n내 통제하에 들어왔으니까."
+        }
+    }
+    
+    /// 카드 백그라운드 이미지
+    public var backgroundImageName: String {
+        switch self {
+        case .armLocks:
+            return "bg_submission_armlock"
+        case .chokes:
+            return "bg_submission_choke"
+        case .legLocks:
+            return "bg_submission_leglock"
+        }
+    }
+    
+    /// 카드 아이콘 이미지
+    public var iconImageName: String {
         switch self {
         case .armLocks:
             return "icon_submission_armlock"
@@ -140,10 +187,18 @@ extension SubmissionType: StyleSelectable {
             return "icon_submission_choke"
         case .legLocks:
             return "icon_submission_leglock"
-        case .shoulderLocks:
-            return "icon_submission_shoulderlock"
-        case .spineLocks:
-            return "icon_submission_spinelock"
+        }
+    }
+    
+    /// 작은 카드 배경색
+    public var smallCardColorHex: String {
+        switch self {
+        case .armLocks:
+            return "#0A6B59"
+        case .chokes:
+            return "#8A64F9"
+        case .legLocks:
+            return "#156A7E"
         }
     }
 }
@@ -151,40 +206,78 @@ extension SubmissionType: StyleSelectable {
 // MARK: - Domain Extension: TechniqueType + UI
 
 extension TechniqueType: StyleSelectable {
-    /// UI용 상세 설명
-    public var description: String {
+    /// 타이틀 (풀 네임)
+    public var fullTitle: String {
         switch self {
         case .takedowns:
-            return "서있는 상태에서 시작해서\n매트에 눕히는 건,\n내가 제일 잘하는 거야."
+            return "테이크다운"
         case .sweeps:
-            return "아래에서 위로,\n한 번의 움직임으로 역전.\n이게 바로 스윕이지."
+            return "스윕 · 뒤집기"
         case .escapes:
-            return "갇혔다고? 천만에.\n언제든 빠져나갈 수 있어,\n내가 원할 때 말이야."
-        case .transitions:
-            return "포지션에서 포지션으로,\n끊임없이 움직이며\n상대를 혼란에 빠뜨려."
+            return "이스케이프\n디펜스"
         case .guardPasses:
-            return "가드를 뚫는 건\n예술이야. 인내심과\n기술의 조화지."
+            return "가드패스"
         }
     }
     
-    /// UI용 배경 색상 (그라데이션)
-    public var backgroundColors: (top: String, bottom: String) {
+    /// 요약된 타이틀
+    public var shortTitle: String {
         switch self {
         case .takedowns:
-            return ("#FFD700", "#FFA500")  // 금색 계열
+            return "테이"
         case .sweeps:
-            return ("#00CED1", "#4682B4")  // 청록 계열
+            return "스윕"
         case .escapes:
-            return ("#32CD32", "#228B22")  // 연두 계열
-        case .transitions:
-            return ("#FF69B4", "#C71585")  // 핑크 계열
+            return "이스"
         case .guardPasses:
-            return ("#8A2BE2", "#4B0082")  // 보라 계열
+            return "패스"
         }
     }
     
-    /// UI용 아이콘 이미지 이름
-    public var iconName: String {
+    /// 탭에 표시될 타이틀
+    public var tabTitle: String {
+        switch self {
+        case .takedowns:
+            return "테이크다운"
+        case .sweeps:
+            return "스윕 · 뒤집기"
+        case .escapes:
+            return "이스케이프 디펜스"
+        case .guardPasses:
+            return "가드패스"
+        }
+    }
+    
+    /// 카드에 들어갈 설명 (약 3줄)
+    public var cardDescription: String {
+        switch self {
+        case .takedowns:
+            return "이 매트 위에서 '선다'는 건 없어.\n'아직 넘어지지 않았다'만 있을 뿐.\n그리고 그 시간은, 이제 끝났어."
+        case .sweeps:
+            return "지금 네가 보는 천장, 곧 네 등이 마주할 매트가 될 거다. 세상이 뒤집히는 기분을 즐겨보라고."
+        case .escapes:
+            return "계속 그렇게 힘을 낭비해. 네가 헛된 그림자에 매달려 있을 때,\n난 이미 사라지고 없을 걸?"
+        case .guardPasses:
+            return "계속 막아봐.\n네 다리는 고작 두 개뿐이지만,\n내가 뚫을 패스는 무한하거든."
+        }
+    }
+    
+    /// 카드 백그라운드 이미지
+    public var backgroundImageName: String {
+        switch self {
+        case .takedowns:
+            return "bg_technique_takedown"
+        case .sweeps:
+            return "bg_technique_sweep"
+        case .escapes:
+            return "bg_technique_escape"
+        case .guardPasses:
+            return "bg_technique_guardpass"
+        }
+    }
+    
+    /// 카드 아이콘 이미지
+    public var iconImageName: String {
         switch self {
         case .takedowns:
             return "icon_technique_takedown"
@@ -192,10 +285,22 @@ extension TechniqueType: StyleSelectable {
             return "icon_technique_sweep"
         case .escapes:
             return "icon_technique_escape"
-        case .transitions:
-            return "icon_technique_transition"
         case .guardPasses:
             return "icon_technique_guardpass"
+        }
+    }
+    
+    /// 작은 카드 배경색
+    public var smallCardColorHex: String {
+        switch self {
+        case .takedowns:
+            return "#009DAE"
+        case .sweeps:
+            return "#F769C4"
+        case .escapes:
+            return "#F07613"
+        case .guardPasses:
+            return "#4F535B"
         }
     }
 }

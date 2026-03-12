@@ -8,6 +8,7 @@
 import SwiftUI
 import ComposableArchitecture
 import DesignSystem
+import CoreKit
 import Domain
 
 public struct MyStyleSettingView: View {
@@ -17,14 +18,64 @@ public struct MyStyleSettingView: View {
         self.store = store
     }
     
+    // MARK: - Layout Constants
+    
+    fileprivate enum CardMetrics {
+        enum Size {
+            static let selectedWidth: CGFloat = 73.53
+            static let selectedHeight: CGFloat = 88
+            static let unselectedWidth: CGFloat = 55
+            static let unselectedHeight: CGFloat = 65
+        }
+        
+        enum CornerRadius {
+            static let selected: CGFloat = 19.29
+            static let unselected: CGFloat = 14.4
+        }
+        
+        enum Spacing {
+            static let horizontal: CGFloat = 8
+            static let containerPadding: CGFloat = 36
+        }
+        
+        enum Font {
+            static let size: CGFloat = 16  // 선택/비선택 모두 동일
+        }
+        
+        enum Padding {
+            static let selectedTop: CGFloat = 20
+            static let unselectedTop: CGFloat = 14.7
+        }
+    }
+    
     public var body: some View {
-        VStack(spacing: 0) {
-            mainScrollView
+        ZStack(alignment: .bottom) {
+            VStack(spacing: 0) {
+                mainScrollView
+                
+                // 완료 버튼 영역
+                Spacer()
+                    .frame(height: 59) // 버튼 높이만큼 공간 확보
+            }
             
-            // 선택된 스타일 미리보기 (항상 표시)
-            selectedStylesPreview
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
+            // 그라데이션 배경 (화면 하단에서 위로)
+            VStack(spacing: 0) {
+                Spacer()
+                LinearGradient(
+                    stops: [
+                        Gradient.Stop(color: Color(hex: "#EDEFF0").opacity(0), location: 0.0),
+                        Gradient.Stop(color: Color(hex: "#EDEFF0").opacity(1.0), location: 1.0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 73)
+                .frame(maxWidth: .infinity)
+                
+                Spacer()
+                    .frame(height: 38)
+            }
+            .allowsHitTesting(false)
             
             // 완료 버튼
             completeButton
@@ -51,24 +102,36 @@ public struct MyStyleSettingView: View {
     
     private var mainScrollView: some View {
         ScrollView {
-            // 탭 (특기/최애)
-            tabView
+            VStack(spacing: 0) {
+                // 탭 (특기/최애)
+                HStack {
+                    Spacer()
+                    tabView
+                    Spacer()
+                }
                 .padding(.top, 26)
-                .padding(.horizontal, 50)
-            
-            // 메인 카드
-            styleCardsView
+                
+                // 메인 카드
+                styleCardsView
+                    .padding(.top, 26)
+                
+                // 선택 가능한 스타일 미리보기 (스크롤뷰 내부)
+                selectedStylesPreview
+                    .padding(.top, 29)
+            }
         }
         .background(Color.component.background.default)
         .scrollEdgeEffectStyle(.soft, for: .top)    // 상단 부드러운 페이드
-        .scrollEdgeEffectStyle(.hard, for: .bottom) // 하단 선명한 경계
+        .scrollEdgeEffectStyle(.soft, for: .bottom) // 하단 부드러운 페이드
     }
     
     private var styleCardsView: some View {
         // 현재 탭에서 선택된 스타일
         let currentStyle = store.currentSelectedStyle
         
-        return VStack(spacing: 0) {
+        return HStack {
+            Spacer()
+            
             if let style = currentStyle {
                 // 선택된 스타일 카드
                 StyleCard(
@@ -76,48 +139,44 @@ public struct MyStyleSettingView: View {
                     isSelected: true
                 )
             } else {
-                // 선택 전 기본 카드
+                // "없음"이 선택된 상태 - EmptySelectionCard 표시
                 EmptySelectionCard(
                     onTap: {
-                        // 첫 번째 스타일을 선택하도록 유도하거나 그냥 비워둘 수 있음
+                        // 탭 동작 없음 (이미 선택된 상태)
                     }
                 )
             }
+            
+            Spacer()
         }
-        .frame(width: 262, height: 394)
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
+        .frame(height: 394)
     }
     
     private var completeButton: some View {
-        Button {
-            store.send(.view(.completeButtonTapped))
-        } label: {
-            completeButtonLabel
+        VStack(spacing: 0) {
+            CTAButton(
+                title: completeButtonTitle,
+                type: .blue,
+                style: .rounded,
+                height: 51,
+                action: {
+                    store.send(.view(.completeButtonTapped))
+                }
+            )
+            .disabled(!store.canComplete)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 8)
         }
-        .disabled(!store.canComplete)
-        .padding(.horizontal, 20)
-        .padding(.bottom, 34)
-        .padding(.top, 16)
     }
     
-    private var completeButtonLabel: some View {
-        let buttonText: String
+    private var completeButtonTitle: String {
         if store.selectedBestStyle == nil {
-            buttonText = "특기 선정 완료"
+            return "특기 설정 완료"
         } else if store.selectedTab == .best {
-            buttonText = "특기 선정 완료"
+            return "특기 설정 완료"
         } else {
-            buttonText = "최애 선정 완료"
+            return "최애 설정 완료"
         }
-        
-        return Text(buttonText)
-            .font(.system(size: 17, weight: .semibold))
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .background(store.canComplete ? Color.blue : Color.gray)
-            .cornerRadius(12)
     }
     
     private var backButton: some View {
@@ -167,7 +226,7 @@ public struct MyStyleSettingView: View {
                 }
             }
         }
-        .frame(height: 67)
+        .frame(width: 262, height: 67)
         .background(Color.component.segment.container.bg)
         .cornerRadius(28)
     }
@@ -176,9 +235,9 @@ public struct MyStyleSettingView: View {
     private func subtitle(for tab: MyStyleSettingFeature.SelectionTab) -> String {
         switch tab {
         case .best:
-            return store.selectedBestStyle?.displayName ?? defaultSubtitle(for: .best)
+            return store.selectedBestStyle?.tabTitle ?? defaultSubtitle(for: .best)
         case .favorite:
-            return store.selectedFavoriteStyle?.displayName ?? defaultSubtitle(for: .favorite)
+            return store.selectedFavoriteStyle?.tabTitle ?? defaultSubtitle(for: .favorite)
         }
     }
     
@@ -197,22 +256,86 @@ public struct MyStyleSettingView: View {
     // MARK: - Selected Styles Preview
     
     private var selectedStylesPreview: some View {
-        // 선택 가능한 스타일들을 가로 스크롤로 표시
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(store.availableStyles, id: \.id) { style in
-                    SmallStyleCard(
-                        style: style,
-                        label: style.displayName,
-                        isSelected: isStyleSelected(style)
-                    )
-                    .onTapGesture {
-                        store.send(.view(.styleCardTapped(style)))
+        // 컨테이너: 120 높이 고정, 좌우 여백 없음
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                if needsScrolling(containerWidth: geometry.size.width) {
+                    // 스크롤이 필요한 경우: ScrollView 사용
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: CardMetrics.Spacing.horizontal) {
+                            // "없음" 카드 (첫 번째)
+                            NoneStyleCard(isSelected: store.currentSelectedStyle == nil)
+                                .onTapGesture {
+                                    // 현재 탭의 선택을 해제
+                                    if let currentStyle = store.currentSelectedStyle {
+                                        store.send(.view(.styleCardTapped(currentStyle)))
+                                    }
+                                }
+                            
+                            // 나머지 스타일 카드들
+                            ForEach(store.availableStyles, id: \.id) { style in
+                                SmallStyleCard(
+                                    style: style,
+                                    label: style.shortTitle,
+                                    isSelected: isStyleSelected(style)
+                                )
+                                .onTapGesture {
+                                    store.send(.view(.styleCardTapped(style)))
+                                }
+                            }
+                        }
+                        .frame(height: CardMetrics.Size.selectedHeight)
+                        .padding(.horizontal, CardMetrics.Spacing.containerPadding)
+                        .padding(.vertical, 16)
                     }
+                } else {
+                    // 스크롤이 필요 없는 경우: 가운데 정렬된 HStack
+                    HStack(spacing: CardMetrics.Spacing.horizontal) {
+                        // "없음" 카드 (첫 번째)
+                        NoneStyleCard(isSelected: store.currentSelectedStyle == nil)
+                            .onTapGesture {
+                                // 현재 탭의 선택을 해제
+                                if let currentStyle = store.currentSelectedStyle {
+                                    store.send(.view(.styleCardTapped(currentStyle)))
+                                }
+                            }
+                        
+                        // 나머지 스타일 카드들
+                        ForEach(store.availableStyles, id: \.id) { style in
+                            SmallStyleCard(
+                                style: style,
+                                label: style.shortTitle,
+                                isSelected: isStyleSelected(style)
+                            )
+                            .onTapGesture {
+                                store.send(.view(.styleCardTapped(style)))
+                            }
+                        }
+                    }
+                    .frame(height: CardMetrics.Size.selectedHeight)
+                    .padding(.vertical, 16)
+                    .frame(maxWidth: .infinity) // 전체 너비 사용
                 }
             }
-            .padding(.horizontal, 20)
+            .frame(height: 120)  // 컨테이너 높이 120 고정
+            .frame(maxWidth: .infinity)  // 컨테이너 좌우 여백 없음
         }
+        .frame(height: 120)  // GeometryReader에 높이 제약 설정
+    }
+    
+    /// 스크롤이 필요한지 계산
+    private func needsScrolling(containerWidth: CGFloat) -> Bool {
+        // "없음" 카드 + 나머지 스타일 카드들
+        let totalCardCount = store.availableStyles.count + 1
+        
+        // 선택된 카드 1개 + 선택 안된 카드 (totalCardCount - 1)개
+        let totalCardsWidth = CardMetrics.Size.selectedWidth
+            + (CardMetrics.Size.unselectedWidth * CGFloat(totalCardCount - 1))
+        let totalSpacingWidth = CGFloat(max(0, totalCardCount - 1)) * CardMetrics.Spacing.horizontal
+        let horizontalPadding = CardMetrics.Spacing.containerPadding * 2
+        let totalWidth = totalCardsWidth + totalSpacingWidth + horizontalPadding
+        
+        return totalWidth > containerWidth
     }
     
     private func isStyleSelected(_ style: any StyleSelectable) -> Bool {
@@ -257,53 +380,45 @@ private struct StyleCard: View {
     
     var body: some View {
         ZStack {
-            // 배경 그라데이션
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(hex: style.backgroundColors.top),
-                    Color(hex: style.backgroundColors.bottom)
-                ]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            // 배경 이미지
+            Image(style.backgroundImageName)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 262, height: 394)
+                .clipped()
             
-            VStack(spacing: 16) {
+            VStack(alignment: .center, spacing: 0) {
+                Spacer()
+                
                 // 아이콘
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.2))
-                        .frame(width: 80, height: 80)
-                    
-                    // 실제로는 에셋의 아이콘을 사용해야 합니다
-                    Image(systemName: "figure.martial.arts")
-                        .font(.system(size: 40))
-                        .foregroundColor(.white)
-                }
+                Image(style.iconImageName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 93, height: 93)
+                    .padding(.bottom, 54)
                 
-                // 스타일 이름
-                Text(style.displayName)
-                    .font(.system(size: 28, weight: .bold))
+                // 풀 타이틀
+                Text(style.fullTitle)
+                    .font(.cookieRun.custom(weight: .black, size: 40))
                     .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .frame(height: 54)
+                    .padding(.bottom, 20)
                 
-                // 설명
-                Text(style.description)
-                    .font(.system(size: 13, weight: .regular))
+                // 카드 설명
+                Text(style.cardDescription)
+                    .font(.pretendard.custom(weight: .medium, size: 16))
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
-                    .padding(.horizontal, 20)
-            }
-            .padding(.vertical, 40)
-            
-            // 선택 표시
-            if isSelected {
-                RoundedRectangle(cornerRadius: 20)
-                    .strokeBorder(Color.white, lineWidth: 3)
+                    .frame(height: 72)
+                    .padding(.horizontal, 25)
+                    .padding(.bottom, 32)
             }
         }
-        .frame(height: 320)
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 4)
+        .frame(width: 262, height: 394)
+        .cornerRadius(40)
+//        .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 4)
     }
 }
 
@@ -314,37 +429,96 @@ private struct SmallStyleCard: View {
     let label: String
     let isSelected: Bool
     
+    // 선택 여부에 따른 사이즈
+    private var cardWidth: CGFloat {
+        isSelected ? MyStyleSettingView.CardMetrics.Size.selectedWidth
+                   : MyStyleSettingView.CardMetrics.Size.unselectedWidth
+    }
+    
+    private var cardHeight: CGFloat {
+        isSelected ? MyStyleSettingView.CardMetrics.Size.selectedHeight
+                   : MyStyleSettingView.CardMetrics.Size.unselectedHeight
+    }
+    
+    private var cornerRadius: CGFloat {
+        isSelected ? MyStyleSettingView.CardMetrics.CornerRadius.selected
+                   : MyStyleSettingView.CardMetrics.CornerRadius.unselected
+    }
+    
+    private var fontSize: CGFloat {
+        MyStyleSettingView.CardMetrics.Font.size
+    }
+    
+    private var topPadding: CGFloat {
+        isSelected ? MyStyleSettingView.CardMetrics.Padding.selectedTop
+                   : MyStyleSettingView.CardMetrics.Padding.unselectedTop
+    }
+    
     var body: some View {
-        ZStack {
-            // 배경 그라데이션
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(hex: style.backgroundColors.top),
-                    Color(hex: style.backgroundColors.bottom)
-                ]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
+        ZStack(alignment: .top) {
+            // 배경 색상 - style마다 다른 색상 사용
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(Color(hex: style.smallCardColorHex))
             
-            VStack(spacing: 4) {
-                // 아이콘 또는 텍스트
-                Image(systemName: "figure.martial.arts")
-                    .font(.system(size: 24))
-                    .foregroundColor(.white)
-                
-                Text(label)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.white)
-            }
-            
-            // 선택 표시
-            if isSelected {
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color.white, lineWidth: 2)
-            }
+            // 짧은 타이틀을 상단에 배치 - 중앙 정렬
+            Text(style.shortTitle)
+                .font(.cookieRun.custom(weight: .black, size: fontSize))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top, topPadding)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: topPadding)
         }
-        .frame(width: 80, height: 80)
-        .cornerRadius(12)
+        .frame(width: cardWidth, height: cardHeight)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+    }
+}
+
+// MARK: - None Style Card (첫 번째 카드)
+
+private struct NoneStyleCard: View {
+    let isSelected: Bool
+    
+    // 선택 여부에 따른 사이즈
+    private var cardWidth: CGFloat {
+        isSelected ? MyStyleSettingView.CardMetrics.Size.selectedWidth
+                   : MyStyleSettingView.CardMetrics.Size.unselectedWidth
+    }
+    
+    private var cardHeight: CGFloat {
+        isSelected ? MyStyleSettingView.CardMetrics.Size.selectedHeight
+                   : MyStyleSettingView.CardMetrics.Size.unselectedHeight
+    }
+    
+    private var cornerRadius: CGFloat {
+        isSelected ? MyStyleSettingView.CardMetrics.CornerRadius.selected
+                   : MyStyleSettingView.CardMetrics.CornerRadius.unselected
+    }
+    
+    private var fontSize: CGFloat {
+        MyStyleSettingView.CardMetrics.Font.size
+    }
+    
+    private var topPadding: CGFloat {
+        isSelected ? MyStyleSettingView.CardMetrics.Padding.selectedTop
+                   : MyStyleSettingView.CardMetrics.Padding.unselectedTop
+    }
+    
+    var body: some View {
+        ZStack(alignment: .top) {
+            // 배경 색상 - 고정된 회색
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(Color(hex: "#4F535B"))
+            
+            // "없음" 타이틀을 상단에 배치 - 중앙 정렬
+            Text("없음")
+                .font(.cookieRun.custom(weight: .black, size: fontSize))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top, topPadding)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: topPadding)
+        }
+        .frame(width: cardWidth, height: cardHeight)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
     }
 }
 
@@ -381,35 +555,8 @@ private struct EmptySelectionCard: View {
             }
             .offset(y: -13.5)
         }
-    }
-}
-
-// MARK: - Color Extension
-
-private extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let alpha, red, green, blue: UInt64
-        switch hex.count {
-        case 3: // RGB (12-bit)
-            (alpha, red, green, blue) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
-            (alpha, red, green, blue) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
-            (alpha, red, green, blue) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (alpha, red, green, blue) = (255, 0, 0, 0)
-        }
-        
-        self.init(
-            .sRGB,
-            red: Double(red) / 255,
-            green: Double(green) / 255,
-            blue: Double(blue) / 255,
-            opacity: Double(alpha) / 255
-        )
+        .frame(width: 262, height: 394)
+        .cornerRadius(40)
     }
 }
 

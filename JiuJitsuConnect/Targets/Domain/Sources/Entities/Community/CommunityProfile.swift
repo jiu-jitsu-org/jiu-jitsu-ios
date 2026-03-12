@@ -235,18 +235,17 @@ public enum SubmissionType: String, Codable, Equatable, Sendable, CaseIterable, 
     case chokes = "CHOKES"
     case armLocks = "ARM_LOCKS"
     case legLocks = "LEG_LOCKS"
-    case shoulderLocks = "SHOULDER_LOCKS"
-    case spineLocks = "SPINE_LOCKS"
     
     public var id: String { rawValue }
     
     public var displayName: String {
         switch self {
-        case .chokes: return "초크 (조르기)"
-        case .armLocks: return "암락 (팔꺾기)"
-        case .legLocks: return "레그락 (다리꺾기)"
-        case .shoulderLocks: return "숄더락 (어깨꺾기)"
-        case .spineLocks: return "스파인락 (척추꺾기)"
+        case .armLocks:
+            return "팔 관절기"
+        case .chokes:
+            return "조르기"
+        case .legLocks:
+            return "하체 관절기"
         }
     }
 }
@@ -257,17 +256,19 @@ public enum TechniqueType: String, Codable, Equatable, Sendable, CaseIterable, I
     case sweeps = "SWEEPS"
     case takedowns = "TAKEDOWNS"
     case escapes = "ESCAPES"
-    case transitions = "TRANSITIONS"
     
     public var id: String { rawValue }
     
     public var displayName: String {
         switch self {
-        case .guardPasses: return "가드 패스"
-        case .sweeps: return "스윕"
-        case .takedowns: return "테이크다운"
-        case .escapes: return "이스케이프"
-        case .transitions: return "트랜지션"
+        case .takedowns:
+            return "테이크다운"
+        case .sweeps:
+            return "스윕 · 뒤집기"
+        case .escapes:
+            return "이스케이프\n디펜스"
+        case .guardPasses:
+            return "가드패스"
         }
     }
 }
@@ -276,21 +277,13 @@ public enum TechniqueType: String, Codable, Equatable, Sendable, CaseIterable, I
 public enum PositionType: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
     case top = "TOP"
     case `guard` = "GUARD"
-    case side = "SIDE"
-    case mount = "MOUNT"
-    case back = "BACK"
-    case turtle = "TURTLE"
     
     public var id: String { rawValue }
     
     public var displayName: String {
         switch self {
         case .top: return "탑 포지션"
-        case .guard: return "가드"
-        case .side: return "사이드 컨트롤"
-        case .mount: return "마운트"
-        case .back: return "백"
-        case .turtle: return "터틀"
+        case .guard: return "가드 포지션"
         }
     }
 }
