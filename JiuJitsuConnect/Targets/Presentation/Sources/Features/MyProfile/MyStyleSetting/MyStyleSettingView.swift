@@ -461,6 +461,19 @@ private struct FlippableStyleCard: View {
         let positive = normalized < 0 ? normalized + 360 : normalized
         return (positive > 90 && positive < 270)
     }
+    
+    // 회전 각도 기반으로 섀도우 강도 계산 (0.0 ~ 1.0)
+    private var shadowIntensity: Double {
+        let normalized = abs(dragAngle).truncatingRemainder(dividingBy: 180)
+        let progress = normalized / 180  // 0 = 정면, 0.5 = 옆면, 1.0 = 뒷면
+        // 정면/뒷면: 1.0, 옆면(90도): 0.0
+        return abs(cos(progress * .pi))
+    }
+    
+    // 회전 시 카드가 옆으로 기울어지면 X 오프셋도 살짝 변화
+    private var shadowOffsetX: Double {
+        sin(dragAngle * .pi / 180) * 6  // 회전 방향으로 그림자 이동
+    }
 
     var body: some View {
         ZStack {
@@ -480,6 +493,20 @@ private struct FlippableStyleCard: View {
             .degrees(dragAngle),
             axis: (x: 0, y: 1, z: 0),
             perspective: 0.4
+        )
+        // Shadow 1 - 기본 섀도우 (Blur: 12, Color: #000000 20%)
+        .shadow(
+            color: Color.black.opacity(0.20 * shadowIntensity),
+            radius: 6,   // Blur 12 → radius 6
+            x: shadowOffsetX,
+            y: 2
+        )
+        // Shadow 2 - 깊이감 섀도우 (Blur: 24, Spread: 4, Color: #000000 25%)
+        .shadow(
+            color: Color.black.opacity(0.25 * shadowIntensity),
+            radius: 14,  // Blur 24 → radius 12, spread 4 보정 +2
+            x: shadowOffsetX,
+            y: 2
         )
         .gesture(
             DragGesture()
