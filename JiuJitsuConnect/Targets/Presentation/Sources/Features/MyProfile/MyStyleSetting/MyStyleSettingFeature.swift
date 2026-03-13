@@ -8,6 +8,7 @@
 import Foundation
 import ComposableArchitecture
 import Domain
+import DesignSystem
 
 // MARK: - Setting Type
 
@@ -42,8 +43,8 @@ public protocol StyleSelectable: Identifiable, Equatable, Sendable {
     var shortTitle: String { get }             // 요약된 타이틀: "탑", "가드"
     var tabTitle: String { get }               // 탭에 표시될 타이틀: "탑포지션", "가드포지션"
     var cardDescription: String { get }        // 카드에 들어갈 약 3줄의 설명
-    var backgroundImageName: String { get }    // 카드 백그라운드 이미지
-    var iconImageName: String { get }          // 카드에 들어갈 아이콘
+    var backgroundImage: ImageAsset { get }    // 카드 백그라운드 이미지 (SwiftGen)
+    var iconImage: ImageAsset { get }          // 카드에 들어갈 아이콘 (SwiftGen)
     var smallCardColorHex: String { get }      // 작은 카드 배경색 (16진수)
 }
 
@@ -91,22 +92,22 @@ extension PositionType: StyleSelectable {
     }
     
     /// 카드 백그라운드 이미지
-    public var backgroundImageName: String {
+    public var backgroundImage: ImageAsset {
         switch self {
         case .top:
-            return "bg_position_top"
+            return Assets.MyProfile.Background.styleTopPosition
         case .guard:
-            return "bg_position_guard"
+            return Assets.MyProfile.Background.styleGuardPosition
         }
     }
     
     /// 카드 아이콘 이미지
-    public var iconImageName: String {
+    public var iconImage: ImageAsset {
         switch self {
         case .top:
-            return "icon_position_top"
+            return Assets.MyProfile.Icon.styleTopPosition
         case .guard:
-            return "icon_position_guard"
+            return Assets.MyProfile.Icon.styleGuardPosition
         }
     }
     
@@ -173,26 +174,26 @@ extension SubmissionType: StyleSelectable {
     }
     
     /// 카드 백그라운드 이미지
-    public var backgroundImageName: String {
+    public var backgroundImage: ImageAsset {
         switch self {
         case .armLocks:
-            return "bg_submission_armlock"
+            return Assets.MyProfile.Background.styleArmLock
         case .chokes:
-            return "bg_submission_choke"
+            return Assets.MyProfile.Background.styleChoke
         case .legLocks:
-            return "bg_submission_leglock"
+            return Assets.MyProfile.Background.styleLegLock
         }
     }
     
     /// 카드 아이콘 이미지
-    public var iconImageName: String {
+    public var iconImage: ImageAsset {
         switch self {
         case .armLocks:
-            return "icon_submission_armlock"
+            return Assets.MyProfile.Icon.styleArmLock
         case .chokes:
-            return "icon_submission_choke"
+            return Assets.MyProfile.Icon.styleChoke
         case .legLocks:
-            return "icon_submission_leglock"
+            return Assets.MyProfile.Icon.styleLegLock
         }
     }
     
@@ -269,30 +270,30 @@ extension TechniqueType: StyleSelectable {
     }
     
     /// 카드 백그라운드 이미지
-    public var backgroundImageName: String {
+    public var backgroundImage: ImageAsset {
         switch self {
         case .takedowns:
-            return "bg_technique_takedown"
+            return Assets.MyProfile.Background.styleTakedown
         case .sweeps:
-            return "bg_technique_sweep"
+            return Assets.MyProfile.Background.styleSweep
         case .escapes:
-            return "bg_technique_escape"
+            return Assets.MyProfile.Background.styleEscapeDefense
         case .guardPasses:
-            return "bg_technique_guardpass"
+            return Assets.MyProfile.Background.styleGuardPass
         }
     }
     
     /// 카드 아이콘 이미지
-    public var iconImageName: String {
+    public var iconImage: ImageAsset {
         switch self {
         case .takedowns:
-            return "icon_technique_takedown"
+            return Assets.MyProfile.Icon.styleTakedown
         case .sweeps:
-            return "icon_technique_sweep"
+            return Assets.MyProfile.Icon.styleSweep
         case .escapes:
-            return "icon_technique_escape"
+            return Assets.MyProfile.Icon.styleEscapeDefense
         case .guardPasses:
-            return "icon_technique_guardpass"
+            return Assets.MyProfile.Icon.styleGuardPass
         }
     }
     

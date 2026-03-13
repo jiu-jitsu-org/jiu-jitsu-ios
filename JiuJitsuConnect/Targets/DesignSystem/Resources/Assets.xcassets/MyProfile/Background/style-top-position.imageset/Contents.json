@@ -1,8 +1,19 @@
 {
   "images" : [
     {
-      "filename" : "Card.svg",
-      "idiom" : "universal"
+      "filename" : "Card.png",
+      "idiom" : "universal",
+      "scale" : "1x"
+    },
+    {
+      "filename" : "Card@2x.png",
+      "idiom" : "universal",
+      "scale" : "2x"
+    },
+    {
+      "filename" : "Card@3x.png",
+      "idiom" : "universal",
+      "scale" : "3x"
     }
   ],
   "info" : {

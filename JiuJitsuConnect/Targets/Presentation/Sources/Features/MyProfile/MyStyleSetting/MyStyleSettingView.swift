@@ -376,27 +376,21 @@ private struct StyleCard: View {
     let isSelected: Bool
     
     var body: some View {
-        ZStack {
-            // 배경 이미지 (임시 주석처리)
-//            Image(style.backgroundImageName)
-//                .resizable()
-//                .scaledToFill()
-//                .frame(width: 262, height: 394)
-//                .clipped()
-            
-            // 임시 배경색
-            RoundedRectangle(cornerRadius: 40)
-                .fill(Color(hex: style.smallCardColorHex))
+        ZStack(alignment: .center) {
+            // 배경 이미지 - 카드 크기에 딱 맞게 (비율 무시하고 꽉 채움)
+            style.backgroundImage.swiftUIImage
+                .resizable()
+                .frame(width: 262, height: 394)
             
             VStack(alignment: .center, spacing: 0) {
                 Spacer()
                 
-                // 아이콘 (임시 주석처리)
-//                Image(style.iconImageName)
-//                    .resizable()
-//                    .scaledToFit()
-//                    .frame(width: 93, height: 93)
-//                    .padding(.bottom, 54)
+                // 아이콘
+                style.iconImage.swiftUIImage
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 93, height: 93)
+                    .padding(.bottom, 54)
                 
                 // 풀 타이틀
                 Text(style.fullTitle)
