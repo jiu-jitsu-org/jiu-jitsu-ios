@@ -45,6 +45,17 @@ public enum Assets {
     }
   }
   public enum MyProfile {
+    public enum Background {
+      public static let styleArmLock = ImageAsset(name: "MyProfile/Background/style-arm-lock")
+      public static let styleChoke = ImageAsset(name: "MyProfile/Background/style-choke")
+      public static let styleEscapeDefense = ImageAsset(name: "MyProfile/Background/style-escape-defense")
+      public static let styleGuardPass = ImageAsset(name: "MyProfile/Background/style-guard-pass")
+      public static let styleGuardPosition = ImageAsset(name: "MyProfile/Background/style-guard-position")
+      public static let styleLegLock = ImageAsset(name: "MyProfile/Background/style-leg-lock")
+      public static let styleSweep = ImageAsset(name: "MyProfile/Background/style-sweep")
+      public static let styleTakedown = ImageAsset(name: "MyProfile/Background/style-takedown")
+      public static let styleTopPosition = ImageAsset(name: "MyProfile/Background/style-top-position")
+    }
     public enum Card {
       public static let styleArmLock = ImageAsset(name: "MyProfile/Card/style-arm-lock")
       public static let styleEscapeDefense = ImageAsset(name: "MyProfile/Card/style-escape-defense")
@@ -64,6 +75,7 @@ public enum Assets {
       public static let styleGuardPosition = ImageAsset(name: "MyProfile/Icon/style-guard-position")
       public static let styleLegLock = ImageAsset(name: "MyProfile/Icon/style-leg-lock")
       public static let styleSweep = ImageAsset(name: "MyProfile/Icon/style-sweep")
+      public static let styleTakedown = ImageAsset(name: "MyProfile/Icon/style-takedown")
       public static let styleTopPosition = ImageAsset(name: "MyProfile/Icon/style-top-position")
     }
   }
