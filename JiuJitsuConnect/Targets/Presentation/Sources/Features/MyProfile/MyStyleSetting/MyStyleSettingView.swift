@@ -133,11 +133,8 @@ public struct MyStyleSettingView: View {
             Spacer()
             
             if let style = currentStyle {
-                // 선택된 스타일 카드
-                StyleCard(
-                    style: style,
-                    isSelected: true
-                )
+                // 선택된 스타일 카드 (플립 가능)
+                FlippableStyleCard(style: style, settingType: store.settingType)
             } else {
                 // "없음"이 선택된 상태 - EmptySelectionCard 표시
                 EmptySelectionCard(
@@ -380,22 +377,26 @@ private struct StyleCard: View {
     
     var body: some View {
         ZStack {
-            // 배경 이미지
-            Image(style.backgroundImageName)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 262, height: 394)
-                .clipped()
+            // 배경 이미지 (임시 주석처리)
+//            Image(style.backgroundImageName)
+//                .resizable()
+//                .scaledToFill()
+//                .frame(width: 262, height: 394)
+//                .clipped()
+            
+            // 임시 배경색
+            RoundedRectangle(cornerRadius: 40)
+                .fill(Color(hex: style.smallCardColorHex))
             
             VStack(alignment: .center, spacing: 0) {
                 Spacer()
                 
-                // 아이콘
-                Image(style.iconImageName)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 93, height: 93)
-                    .padding(.bottom, 54)
+                // 아이콘 (임시 주석처리)
+//                Image(style.iconImageName)
+//                    .resizable()
+//                    .scaledToFit()
+//                    .frame(width: 93, height: 93)
+//                    .padding(.bottom, 54)
                 
                 // 풀 타이틀
                 Text(style.fullTitle)
@@ -419,6 +420,101 @@ private struct StyleCard: View {
         .frame(width: 262, height: 394)
         .cornerRadius(40)
 //        .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 4)
+    }
+}
+
+// MARK: - Style Card Back
+
+private struct StyleCardBack: View {
+    let style: any StyleSelectable
+    let settingType: MyStyleSettingType
+
+    var body: some View {
+        ZStack {
+            // 배경 색상 - 고정된 회색
+            RoundedRectangle(cornerRadius: 40)
+                .fill(Color.primitive.coolGray.cg75)
+
+            VStack(alignment: .center, spacing: 7) {
+                // 타이틀 - 화면 타입 표시 (포지션/서브미션/기술)
+                Text(settingType.navigationTitle)
+                    .font(.pretendard.bodyM)
+                    .foregroundColor(.primitive.coolGray.cg400)
+
+                // 캡션 - 스타일 타이틀
+                Text(style.fullTitle)
+                    .font(.pretendard.display1)
+                    .lineSpacing(5)
+                    .foregroundColor(.primitive.coolGray.cg600)
+            }
+        }
+        .frame(width: 262, height: 394)
+    }
+}
+
+// MARK: - Flippable Style Card
+
+private struct FlippableStyleCard: View {
+    let style: any StyleSelectable
+    let settingType: MyStyleSettingType
+
+    @State private var dragAngle: Double = 0
+    @State private var cumulativeRotation: Double = 0  // 누적 회전각
+
+    // 현재 총 회전각 기준으로 앞/뒷면 판단
+    private var showBack: Bool {
+        let normalized = dragAngle.truncatingRemainder(dividingBy: 360)
+        let positive = normalized < 0 ? normalized + 360 : normalized
+        return (positive > 90 && positive < 270)
+    }
+
+    var body: some View {
+        ZStack {
+            // 뒷면 (처음부터 180도 뒤집어 대기)
+            StyleCardBack(style: style, settingType: settingType)
+                .rotation3DEffect(
+                    .degrees(180),
+                    axis: (x: 0, y: 1, z: 0)
+                )
+                .opacity(showBack ? 1 : 0)
+
+            // 앞면
+            StyleCard(style: style, isSelected: true)
+                .opacity(showBack ? 0 : 1)
+        }
+        .rotation3DEffect(
+            .degrees(dragAngle),
+            axis: (x: 0, y: 1, z: 0),
+            perspective: 0.4
+        )
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    // 누적 회전각에 드래그 이동량을 더함 (양방향 지원)
+                    dragAngle = cumulativeRotation + value.translation.width * 0.5
+                }
+                .onEnded { value in
+                    let dragDistance = value.translation.width
+                    // 속도 기반으로 넘길지 복귀할지 판단
+                    let velocity = value.predictedEndTranslation.width - value.translation.width
+                    let shouldFlip = abs(dragDistance) > 60 || abs(velocity) > 30
+
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.72)) {
+                        if shouldFlip {
+                            // 드래그 방향에 따라 ±180도 회전
+                            if dragDistance < 0 {
+                                cumulativeRotation -= 180  // 왼쪽으로 드래그 → 왼쪽 회전
+                            } else {
+                                cumulativeRotation += 180  // 오른쪽으로 드래그 → 오른쪽 회전
+                            }
+                            dragAngle = cumulativeRotation
+                        } else {
+                            // 복귀
+                            dragAngle = cumulativeRotation
+                        }
+                    }
+                }
+        )
     }
 }
 

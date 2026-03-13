@@ -16,12 +16,18 @@ public enum MyStyleSettingType: Sendable, Equatable {
     case submission
     case technique
     
-    public var navigationTitle: String {
+    /// 타입 명 (설정 제외)
+    public var title: String {
         switch self {
-        case .position: return "포지션 설정"
-        case .submission: return "서브미션 설정"
-        case .technique: return "기술 설정"
+        case .position: return "포지션"
+        case .submission: return "서브미션"
+        case .technique: return "기술"
         }
+    }
+    
+    /// 네비게이션 타이틀 (설정 포함)
+    public var navigationTitle: String {
+        return "\(title) 설정"
     }
 }
 

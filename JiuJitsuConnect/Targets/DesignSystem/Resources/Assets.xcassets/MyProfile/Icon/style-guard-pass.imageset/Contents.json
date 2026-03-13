@@ -1,17 +1,17 @@
 {
   "images" : [
     {
-      "filename" : "Property=가드 패스.png",
+      "filename" : "style-guard-pass.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "Property=가드 패스@2x.png",
+      "filename" : "style-guard-pass@2x.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
-      "filename" : "Property=가드 패스@3x.png",
+      "filename" : "style-guard-pass@3x.png",
       "idiom" : "universal",
       "scale" : "3x"
     }

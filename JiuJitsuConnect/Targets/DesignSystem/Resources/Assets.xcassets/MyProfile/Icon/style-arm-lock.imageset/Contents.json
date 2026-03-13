@@ -1,17 +1,17 @@
 {
   "images" : [
     {
-      "filename" : "Property=팔 관절기.png",
+      "filename" : "style-arm-lock.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "Property=팔 관절기@2x.png",
+      "filename" : "style-arm-lock@2x.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
-      "filename" : "Property=팔 관절기@3x.png",
+      "filename" : "style-arm-lock@3x.png",
       "idiom" : "universal",
       "scale" : "3x"
     }
