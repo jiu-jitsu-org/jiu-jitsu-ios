@@ -353,11 +353,19 @@ public struct MyStyleSettingFeature: Sendable {
         public init(
             settingType: MyStyleSettingType,
             bestPosition: PositionType? = nil,
-            favoritePosition: PositionType? = nil
+            favoritePosition: PositionType? = nil,
+            bestSubmission: SubmissionType? = nil,
+            favoriteSubmission: SubmissionType? = nil,
+            bestTechnique: TechniqueType? = nil,
+            favoriteTechnique: TechniqueType? = nil
         ) {
             self.settingType = settingType
             self.selectedBestPosition = bestPosition
             self.selectedFavoritePosition = favoritePosition
+            self.selectedBestSubmission = bestSubmission
+            self.selectedFavoriteSubmission = favoriteSubmission
+            self.selectedBestTechnique = bestTechnique
+            self.selectedFavoriteTechnique = favoriteTechnique
         }
         
         // 현재 타입의 모든 스타일 목록 (특기/최애 탭 모두 동일)
@@ -400,12 +408,20 @@ public struct MyStyleSettingFeature: Sendable {
         
         // 완료 버튼 활성화 조건
         var canComplete: Bool {
-            selectedBestStyle != nil
+            switch selectedTab {
+            case .best:
+                // 특기 탭: 특기가 선택되어야 활성화
+                return selectedBestStyle != nil
+            case .favorite:
+                // 최애 탭: 최애가 선택되어야 활성화 (선택 안 함도 허용하려면 항상 true)
+                return true  // 최애는 선택 안 해도 완료 가능
+            }
         }
     }
     
     public enum Action: Sendable {
         case view(ViewAction)
+        case `internal`(InternalAction)
         case delegate(DelegateAction)
         
         public enum ViewAction: Sendable {
@@ -416,8 +432,13 @@ public struct MyStyleSettingFeature: Sendable {
             case resetButtonTapped
         }
         
+        public enum InternalAction: Sendable {
+            case switchToFavoriteTab  // 특기 완료 후 최애 탭으로 전환
+        }
+        
         public enum DelegateAction: Sendable {
-            case didConfirmStyles(best: String?, favorite: String?)
+            case didConfirmBest(type: MyStyleSettingType, best: String?)  // 특기 완료 → 최애 탭으로 전환
+            case didConfirmFavorite(type: MyStyleSettingType, best: String?, favorite: String?)  // 최애 완료 → 다음 단계 또는 최종 완료
             case cancel
         }
     }
@@ -493,11 +514,26 @@ public struct MyStyleSettingFeature: Sendable {
             case .view(.completeButtonTapped):
                 guard state.canComplete else { return .none }
                 
-                // API 키만 추출해서 전달 (rawValue 사용)
-                let bestKey = state.selectedBestStyle?.rawValue
-                let favoriteKey = state.selectedFavoriteStyle?.rawValue
+                switch state.selectedTab {
+                case .best:
+                    // 특기 완료 → 내부적으로 최애 탭으로 전환하고, 부모에게도 알림
+                    let bestKey = state.selectedBestStyle?.rawValue
+                    return .merge(
+                        .send(.internal(.switchToFavoriteTab)),
+                        .send(.delegate(.didConfirmBest(type: state.settingType, best: bestKey)))
+                    )
+                    
+                case .favorite:
+                    // 최애 완료 → 부모에게 전달 (다음 단계 또는 최종 완료)
+                    let bestKey = state.selectedBestStyle?.rawValue
+                    let favoriteKey = state.selectedFavoriteStyle?.rawValue
+                    return .send(.delegate(.didConfirmFavorite(type: state.settingType, best: bestKey, favorite: favoriteKey)))
+                }
                 
-                return .send(.delegate(.didConfirmStyles(best: bestKey, favorite: favoriteKey)))
+            case .internal(.switchToFavoriteTab):
+                // 최애 탭으로 전환
+                state.selectedTab = .favorite
+                return .none
                 
             case .view(.backButtonTapped):
                 return .send(.delegate(.cancel))
@@ -517,7 +553,7 @@ public struct MyStyleSettingFeature: Sendable {
                 }
                 return .none
                 
-            case .delegate:
+            case .delegate, .internal:
                 return .none
             }
         }

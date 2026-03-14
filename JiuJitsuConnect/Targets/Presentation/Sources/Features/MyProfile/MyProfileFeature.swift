@@ -89,7 +89,28 @@ public struct MyProfileFeature: Sendable {
             case saveWeightInfoOnly(gender: Gender, weightKg: Double, isWeightHidden: Bool)
             case toggleWeightVisibility
             case updatePositionInfo(best: PositionType?, favorite: PositionType?)
+            
+            // 포지션 저장
+            case savePositionBest(best: PositionType?)
+            case savePositionFavorite(best: PositionType?, favorite: PositionType?)
+            
+            // 서브미션 저장
+            case saveSubmissionBest(best: SubmissionType?)
+            case saveSubmissionFavorite(best: SubmissionType?, favorite: SubmissionType?)
+            
+            // 기술 저장
+            case saveTechniqueBest(best: TechniqueType?)
+            case saveTechniqueFavorite(best: TechniqueType?, favorite: TechniqueType?)
+            
+            // 응답 처리
             case updateProfileResponse(TaskResult<CommunityProfile>)
+            case positionBestSaved(CommunityProfile)  // 포지션 특기 저장 후 최애 탭으로 전환
+            case submissionBestSaved(CommunityProfile)  // 서브미션 특기 저장 후 최애 탭으로 전환
+            case techniqueBestSaved(CommunityProfile)  // 기술 특기 저장 후 최애 탭으로 전환
+            case positionFavoriteSaved(CommunityProfile)  // 포지션 최애 저장 후 서브미션 화면으로 이동
+            case submissionFavoriteSaved(CommunityProfile)  // 서브미션 최애 저장 후 기술 화면으로 이동
+            case techniqueFavoriteSaved(CommunityProfile)  // 기술 최애 저장 후 프로필 화면으로 복귀
+            
             case showToast(ToastState)
             case toastDismissed
         }
@@ -184,14 +205,16 @@ public struct MyProfileFeature: Sendable {
                 return .none
                 
             case .view(.registerStyleButtonTapped):
-                // 포지션 설정 화면으로 네비게이션
-                let currentBest = state.communityProfile?.bestPosition
-                let currentFavorite = state.communityProfile?.favoritePosition
+                // 포지션 설정 화면으로 네비게이션 (스타일 설정의 첫 단계)
                 state.destination = .myStyleSetting(
                     MyStyleSettingFeature.State(
                         settingType: .position,
-                        bestPosition: currentBest,
-                        favoritePosition: currentFavorite
+                        bestPosition: state.communityProfile?.bestPosition,
+                        favoritePosition: state.communityProfile?.favoritePosition,
+                        bestSubmission: state.communityProfile?.bestSubmission,
+                        favoriteSubmission: state.communityProfile?.favoriteSubmission,
+                        bestTechnique: state.communityProfile?.bestTechnique,
+                        favoriteTechnique: state.communityProfile?.favoriteTechnique
                     )
                 )
                 return .none
@@ -220,12 +243,40 @@ public struct MyProfileFeature: Sendable {
                 // 취소 - 아무것도 하지 않음
                 return .none
                 
-            case let .destination(.presented(.myStyleSetting(.delegate(.didConfirmStyles(bestKey, favoriteKey))))):
-                // 스타일 저장 요청 받음 → API 호출
-                // API 키를 PositionType으로 변환
-                let best = bestKey.flatMap { PositionType(rawValue: $0) }
-                let favorite = favoriteKey.flatMap { PositionType(rawValue: $0) }
-                return .send(.internal(.updatePositionInfo(best: best, favorite: favorite)))
+            case let .destination(.presented(.myStyleSetting(.delegate(.didConfirmBest(type, bestKey))))):
+                // 특기 완료 → API 저장 후 최애 탭으로 자동 전환
+                switch type {
+                case .position:
+                    let best = bestKey.flatMap { PositionType(rawValue: $0) }
+                    return .send(.internal(.savePositionBest(best: best)))
+                    
+                case .submission:
+                    let best = bestKey.flatMap { SubmissionType(rawValue: $0) }
+                    return .send(.internal(.saveSubmissionBest(best: best)))
+                    
+                case .technique:
+                    let best = bestKey.flatMap { TechniqueType(rawValue: $0) }
+                    return .send(.internal(.saveTechniqueBest(best: best)))
+                }
+                
+            case let .destination(.presented(.myStyleSetting(.delegate(.didConfirmFavorite(type, bestKey, favoriteKey))))):
+                // 최애 완료 → API 저장 후 다음 단계로 이동
+                switch type {
+                case .position:
+                    let best = bestKey.flatMap { PositionType(rawValue: $0) }
+                    let favorite = favoriteKey.flatMap { PositionType(rawValue: $0) }
+                    return .send(.internal(.savePositionFavorite(best: best, favorite: favorite)))
+                    
+                case .submission:
+                    let best = bestKey.flatMap { SubmissionType(rawValue: $0) }
+                    let favorite = favoriteKey.flatMap { SubmissionType(rawValue: $0) }
+                    return .send(.internal(.saveSubmissionFavorite(best: best, favorite: favorite)))
+                    
+                case .technique:
+                    let best = bestKey.flatMap { TechniqueType(rawValue: $0) }
+                    let favorite = favoriteKey.flatMap { TechniqueType(rawValue: $0) }
+                    return .send(.internal(.saveTechniqueFavorite(best: best, favorite: favorite)))
+                }
                 
             case .destination(.presented(.myStyleSetting(.delegate(.cancel)))):
                 // 취소 - 아무것도 하지 않음
@@ -527,6 +578,319 @@ public struct MyProfileFeature: Sendable {
                     )))
                 }
                 
+            // MARK: - API 호출: 스타일 정보 저장
+            
+            // 포지션 특기 저장
+            case let .internal(.savePositionBest(best)):
+                guard var profile = state.communityProfile else {
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                }
+                
+                profile = CommunityProfile(
+                    nickname: profile.nickname,
+                    profileImageUrl: profile.profileImageUrl,
+                    beltRank: profile.beltRank,
+                    beltStripe: profile.beltStripe,
+                    gender: profile.gender,
+                    weightKg: profile.weightKg,
+                    academyName: profile.academyName,
+                    competitions: profile.competitions,
+                    bestSubmission: profile.bestSubmission,
+                    favoriteSubmission: profile.favoriteSubmission,
+                    bestTechnique: profile.bestTechnique,
+                    favoriteTechnique: profile.favoriteTechnique,
+                    bestPosition: best,  // 특기만 업데이트
+                    favoritePosition: profile.favoritePosition,
+                    isWeightHidden: profile.isWeightHidden,
+                    isOwner: profile.isOwner,
+                    teachingPhilosophy: profile.teachingPhilosophy,
+                    teachingStartDate: profile.teachingStartDate,
+                    teachingDetail: profile.teachingDetail
+                )
+                
+                state.isLoadingProfile = true
+                
+                return .run { [profile] send in
+                    let result = await TaskResult {
+                        try await communityClient.updateProfile(profile, .position)
+                    }
+                    
+                    switch result {
+                    case .success(let updatedProfile):
+                        await send(.internal(.positionBestSaved(updatedProfile)))
+                    case .failure(let error):
+                        await send(.internal(.updateProfileResponse(.failure(error))))
+                    }
+                }
+                
+            // 포지션 최애 저장
+            case let .internal(.savePositionFavorite(best, favorite)):
+                guard var profile = state.communityProfile else {
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                }
+                
+                profile = CommunityProfile(
+                    nickname: profile.nickname,
+                    profileImageUrl: profile.profileImageUrl,
+                    beltRank: profile.beltRank,
+                    beltStripe: profile.beltStripe,
+                    gender: profile.gender,
+                    weightKg: profile.weightKg,
+                    academyName: profile.academyName,
+                    competitions: profile.competitions,
+                    bestSubmission: profile.bestSubmission,
+                    favoriteSubmission: profile.favoriteSubmission,
+                    bestTechnique: profile.bestTechnique,
+                    favoriteTechnique: profile.favoriteTechnique,
+                    bestPosition: best,
+                    favoritePosition: favorite,  // 최애 업데이트
+                    isWeightHidden: profile.isWeightHidden,
+                    isOwner: profile.isOwner,
+                    teachingPhilosophy: profile.teachingPhilosophy,
+                    teachingStartDate: profile.teachingStartDate,
+                    teachingDetail: profile.teachingDetail
+                )
+                
+                state.isLoadingProfile = true
+                
+                return .run { [profile] send in
+                    let result = await TaskResult {
+                        try await communityClient.updateProfile(profile, .position)
+                    }
+                    
+                    switch result {
+                    case .success(let updatedProfile):
+                        await send(.internal(.positionFavoriteSaved(updatedProfile)))
+                    case .failure(let error):
+                        await send(.internal(.updateProfileResponse(.failure(error))))
+                    }
+                }
+                
+            // 서브미션 특기 저장
+            case let .internal(.saveSubmissionBest(best)):
+                guard var profile = state.communityProfile else {
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                }
+                
+                profile = CommunityProfile(
+                    nickname: profile.nickname,
+                    profileImageUrl: profile.profileImageUrl,
+                    beltRank: profile.beltRank,
+                    beltStripe: profile.beltStripe,
+                    gender: profile.gender,
+                    weightKg: profile.weightKg,
+                    academyName: profile.academyName,
+                    competitions: profile.competitions,
+                    bestSubmission: best,  // 특기만 업데이트
+                    favoriteSubmission: profile.favoriteSubmission,
+                    bestTechnique: profile.bestTechnique,
+                    favoriteTechnique: profile.favoriteTechnique,
+                    bestPosition: profile.bestPosition,
+                    favoritePosition: profile.favoritePosition,
+                    isWeightHidden: profile.isWeightHidden,
+                    isOwner: profile.isOwner,
+                    teachingPhilosophy: profile.teachingPhilosophy,
+                    teachingStartDate: profile.teachingStartDate,
+                    teachingDetail: profile.teachingDetail
+                )
+                
+                state.isLoadingProfile = true
+                
+                return .run { [profile] send in
+                    let result = await TaskResult {
+                        try await communityClient.updateProfile(profile, .submission)
+                    }
+                    
+                    switch result {
+                    case .success(let updatedProfile):
+                        await send(.internal(.submissionBestSaved(updatedProfile)))
+                    case .failure(let error):
+                        await send(.internal(.updateProfileResponse(.failure(error))))
+                    }
+                }
+                
+            // 서브미션 최애 저장
+            case let .internal(.saveSubmissionFavorite(best, favorite)):
+                guard var profile = state.communityProfile else {
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                }
+                
+                profile = CommunityProfile(
+                    nickname: profile.nickname,
+                    profileImageUrl: profile.profileImageUrl,
+                    beltRank: profile.beltRank,
+                    beltStripe: profile.beltStripe,
+                    gender: profile.gender,
+                    weightKg: profile.weightKg,
+                    academyName: profile.academyName,
+                    competitions: profile.competitions,
+                    bestSubmission: best,
+                    favoriteSubmission: favorite,  // 최애 업데이트
+                    bestTechnique: profile.bestTechnique,
+                    favoriteTechnique: profile.favoriteTechnique,
+                    bestPosition: profile.bestPosition,
+                    favoritePosition: profile.favoritePosition,
+                    isWeightHidden: profile.isWeightHidden,
+                    isOwner: profile.isOwner,
+                    teachingPhilosophy: profile.teachingPhilosophy,
+                    teachingStartDate: profile.teachingStartDate,
+                    teachingDetail: profile.teachingDetail
+                )
+                
+                state.isLoadingProfile = true
+                
+                return .run { [profile] send in
+                    let result = await TaskResult {
+                        try await communityClient.updateProfile(profile, .submission)
+                    }
+                    
+                    switch result {
+                    case .success(let updatedProfile):
+                        await send(.internal(.submissionFavoriteSaved(updatedProfile)))
+                    case .failure(let error):
+                        await send(.internal(.updateProfileResponse(.failure(error))))
+                    }
+                }
+                
+            // 기술 특기 저장
+            case let .internal(.saveTechniqueBest(best)):
+                guard var profile = state.communityProfile else {
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                }
+                
+                profile = CommunityProfile(
+                    nickname: profile.nickname,
+                    profileImageUrl: profile.profileImageUrl,
+                    beltRank: profile.beltRank,
+                    beltStripe: profile.beltStripe,
+                    gender: profile.gender,
+                    weightKg: profile.weightKg,
+                    academyName: profile.academyName,
+                    competitions: profile.competitions,
+                    bestSubmission: profile.bestSubmission,
+                    favoriteSubmission: profile.favoriteSubmission,
+                    bestTechnique: best,  // 특기만 업데이트
+                    favoriteTechnique: profile.favoriteTechnique,
+                    bestPosition: profile.bestPosition,
+                    favoritePosition: profile.favoritePosition,
+                    isWeightHidden: profile.isWeightHidden,
+                    isOwner: profile.isOwner,
+                    teachingPhilosophy: profile.teachingPhilosophy,
+                    teachingStartDate: profile.teachingStartDate,
+                    teachingDetail: profile.teachingDetail
+                )
+                
+                state.isLoadingProfile = true
+                
+                return .run { [profile] send in
+                    let result = await TaskResult {
+                        try await communityClient.updateProfile(profile, .technique)
+                    }
+                    
+                    switch result {
+                    case .success(let updatedProfile):
+                        await send(.internal(.techniqueBestSaved(updatedProfile)))
+                    case .failure(let error):
+                        await send(.internal(.updateProfileResponse(.failure(error))))
+                    }
+                }
+                
+            // 기술 최애 저장
+            case let .internal(.saveTechniqueFavorite(best, favorite)):
+                guard var profile = state.communityProfile else {
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                }
+                
+                profile = CommunityProfile(
+                    nickname: profile.nickname,
+                    profileImageUrl: profile.profileImageUrl,
+                    beltRank: profile.beltRank,
+                    beltStripe: profile.beltStripe,
+                    gender: profile.gender,
+                    weightKg: profile.weightKg,
+                    academyName: profile.academyName,
+                    competitions: profile.competitions,
+                    bestSubmission: profile.bestSubmission,
+                    favoriteSubmission: profile.favoriteSubmission,
+                    bestTechnique: best,
+                    favoriteTechnique: favorite,  // 최애 업데이트
+                    bestPosition: profile.bestPosition,
+                    favoritePosition: profile.favoritePosition,
+                    isWeightHidden: profile.isWeightHidden,
+                    isOwner: profile.isOwner,
+                    teachingPhilosophy: profile.teachingPhilosophy,
+                    teachingStartDate: profile.teachingStartDate,
+                    teachingDetail: profile.teachingDetail
+                )
+                
+                state.isLoadingProfile = true
+                
+                return .run { [profile] send in
+                    let result = await TaskResult {
+                        try await communityClient.updateProfile(profile, .technique)
+                    }
+                    
+                    switch result {
+                    case .success(let updatedProfile):
+                        await send(.internal(.techniqueFavoriteSaved(updatedProfile)))
+                    case .failure(let error):
+                        await send(.internal(.updateProfileResponse(.failure(error))))
+                    }
+                }
+                
+            // MARK: - 저장 성공 후 처리
+            
+            case let .internal(.positionBestSaved(profile)):
+                state.isLoadingProfile = false
+                state.communityProfile = profile
+                // 최애 탭으로 전환은 MyStyleSettingFeature 내부에서 처리됨
+                return .send(.internal(.showToast(.init(message: "포지션 특기를 저장했어요", style: .info))))
+                
+            case let .internal(.positionFavoriteSaved(profile)):
+                state.isLoadingProfile = false
+                state.communityProfile = profile
+                // 서브미션 설정 화면으로 이동
+                state.destination = .myStyleSetting(
+                    MyStyleSettingFeature.State(
+                        settingType: .submission,
+                        bestSubmission: profile.bestSubmission,
+                        favoriteSubmission: profile.favoriteSubmission
+                    )
+                )
+                return .send(.internal(.showToast(.init(message: "포지션 최애를 저장했어요", style: .info))))
+                
+            case let .internal(.submissionBestSaved(profile)):
+                state.isLoadingProfile = false
+                state.communityProfile = profile
+                return .send(.internal(.showToast(.init(message: "서브미션 특기를 저장했어요", style: .info))))
+                
+            case let .internal(.submissionFavoriteSaved(profile)):
+                state.isLoadingProfile = false
+                state.communityProfile = profile
+                // 기술 설정 화면으로 이동
+                state.destination = .myStyleSetting(
+                    MyStyleSettingFeature.State(
+                        settingType: .technique,
+                        bestTechnique: profile.bestTechnique,
+                        favoriteTechnique: profile.favoriteTechnique
+                    )
+                )
+                return .send(.internal(.showToast(.init(message: "서브미션 최애를 저장했어요", style: .info))))
+                
+            case let .internal(.techniqueBestSaved(profile)):
+                state.isLoadingProfile = false
+                state.communityProfile = profile
+                return .send(.internal(.showToast(.init(message: "기술 특기를 저장했어요", style: .info))))
+                
+            case let .internal(.techniqueFavoriteSaved(profile)):
+                state.isLoadingProfile = false
+                state.communityProfile = profile
+                // 프로필 화면으로 복귀
+                state.destination = nil
+                return .send(.internal(.showToast(.init(message: "모든 스타일 설정을 완료했어요", style: .info))))
+                
+            // MARK: - API 호출: 프로필 섹션 업데이트
+                
             case let .internal(.updateProfileResponse(.success(updatedProfile))):
                 state.isLoadingProfile = false
                 let previousProfile = state.communityProfile
@@ -554,10 +918,6 @@ public struct MyProfileFeature: Sendable {
                 } else if previousProfile?.isWeightHidden != updatedProfile.isWeightHidden {
                     // 체급 가시성 변경
                     message = updatedProfile.isWeightHidden ? "체급을 숨겼어요" : "체급을 공개했어요"
-                } else if previousProfile?.bestPosition != updatedProfile.bestPosition ||
-                         previousProfile?.favoritePosition != updatedProfile.favoritePosition {
-                    // 포지션 정보 수정
-                    message = "포지션 설정을 완료했어요"
                 } else {
                     // 기타
                     message = "프로필 수정을 완료했어요"
