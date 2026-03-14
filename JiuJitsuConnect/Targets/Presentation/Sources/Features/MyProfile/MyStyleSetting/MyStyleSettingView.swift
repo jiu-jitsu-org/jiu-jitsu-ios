@@ -336,82 +336,10 @@ public struct MyStyleSettingView: View {
     }
 }
 
-// MARK: - Style Card
-
-private struct StyleCard: View {
-    let style: any StyleSelectable
-    let isSelected: Bool
-    
-    var body: some View {
-        ZStack(alignment: .center) {
-            // 배경 이미지 - 카드 크기에 딱 맞게 (비율 무시하고 꽉 채움)
-            style.backgroundImage.swiftUIImage
-                .resizable()
-                .frame(width: 262, height: 394)
-            
-            VStack(alignment: .center, spacing: 0) {
-                Spacer()
-                
-                // 아이콘
-                style.iconImage.swiftUIImage
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 93, height: 93)
-                    .padding(.bottom, 54)
-                
-                // 풀 타이틀
-                Text(style.fullTitle)
-                    .font(.cookieRun.custom(weight: .black, size: 40))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .frame(height: 54)
-                    .padding(.bottom, 20)
-                
-                // 카드 설명
-                Text(style.cardDescription)
-                    .font(.pretendard.custom(weight: .medium, size: 16))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(4)
-                    .frame(height: 72)
-                    .padding(.horizontal, 25)
-                    .padding(.bottom, 32)
-            }
-        }
-        .frame(width: 262, height: 394)
-        .cornerRadius(40)
-//        .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 4)
-    }
-}
-
-// MARK: - Style Card Back
-
-private struct StyleCardBack: View {
-    let style: any StyleSelectable
-    let settingType: MyStyleSettingType
-
-    var body: some View {
-        ZStack {
-            // 배경 색상 - 고정된 회색
-            RoundedRectangle(cornerRadius: 40)
-                .fill(Color.primitive.coolGray.cg75)
-
-            VStack(alignment: .center, spacing: 7) {
-                // 타이틀 - 화면 타입 표시 (포지션/서브미션/기술)
-                Text(settingType.navigationTitle)
-                    .font(.pretendard.bodyM)
-                    .foregroundColor(.primitive.coolGray.cg400)
-
-                // 캡션 - 스타일 타이틀
-                Text(style.fullTitle)
-                    .font(.pretendard.display1)
-                    .lineSpacing(5)
-                    .foregroundColor(.primitive.coolGray.cg600)
-            }
-        }
-        .frame(width: 262, height: 394)
-    }
-}
+// MARK: - Main Card Components
+// ℹ️ 다음 컴포넌트들이 별도 파일로 분리됨:
+// - StyleCard.swift (카드 앞면)
+// - StyleCardBack.swift (카드 뒷면)
 
 // MARK: - Flippable Style Card
 
