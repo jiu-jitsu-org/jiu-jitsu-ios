@@ -336,109 +336,14 @@ public struct MyStyleSettingView: View {
     }
 }
 
-// MARK: - Main Card Components
-// ℹ️ 다음 컴포넌트들이 별도 파일로 분리됨:
+// MARK: - Card Components
+// ℹ️ 모든 카드 컴포넌트들이 별도 파일로 분리됨:
+// - FlippableStyleCard.swift (3D 회전 카드)
 // - StyleCard.swift (카드 앞면)
 // - StyleCardBack.swift (카드 뒷면)
-
-// MARK: - Flippable Style Card
-
-private struct FlippableStyleCard: View {
-    let style: any StyleSelectable
-    let settingType: MyStyleSettingType
-
-    @State private var dragAngle: Double = 0
-    @State private var cumulativeRotation: Double = 0  // 누적 회전각
-
-    // 현재 총 회전각 기준으로 앞/뒷면 판단
-    private var showBack: Bool {
-        let normalized = dragAngle.truncatingRemainder(dividingBy: 360)
-        let positive = normalized < 0 ? normalized + 360 : normalized
-        return (positive > 90 && positive < 270)
-    }
-    
-    // 회전 각도 기반으로 섀도우 강도 계산 (0.0 ~ 1.0)
-    private var shadowIntensity: Double {
-        let normalized = abs(dragAngle).truncatingRemainder(dividingBy: 180)
-        let progress = normalized / 180  // 0 = 정면, 0.5 = 옆면, 1.0 = 뒷면
-        // 정면/뒷면: 1.0, 옆면(90도): 0.0
-        return abs(cos(progress * .pi))
-    }
-    
-    // 회전 시 카드가 옆으로 기울어지면 X 오프셋도 살짝 변화
-    private var shadowOffsetX: Double {
-        sin(dragAngle * .pi / 180) * 6  // 회전 방향으로 그림자 이동
-    }
-
-    var body: some View {
-        ZStack {
-            // 뒷면 (처음부터 180도 뒤집어 대기)
-            StyleCardBack(style: style, settingType: settingType)
-                .rotation3DEffect(
-                    .degrees(180),
-                    axis: (x: 0, y: 1, z: 0)
-                )
-                .opacity(showBack ? 1 : 0)
-
-            // 앞면
-            StyleCard(style: style, isSelected: true)
-                .opacity(showBack ? 0 : 1)
-        }
-        .rotation3DEffect(
-            .degrees(dragAngle),
-            axis: (x: 0, y: 1, z: 0),
-            perspective: 0.4
-        )
-        // Shadow 1 - 기본 섀도우 (Blur: 12, Color: #000000 20%)
-        .shadow(
-            color: Color.black.opacity(0.20 * shadowIntensity),
-            radius: 6,   // Blur 12 → radius 6
-            x: shadowOffsetX,
-            y: 2
-        )
-        // Shadow 2 - 깊이감 섀도우 (Blur: 24, Spread: 4, Color: #000000 25%)
-        .shadow(
-            color: Color.black.opacity(0.25 * shadowIntensity),
-            radius: 14,  // Blur 24 → radius 12, spread 4 보정 +2
-            x: shadowOffsetX,
-            y: 2
-        )
-        .gesture(
-            DragGesture()
-                .onChanged { value in
-                    // 누적 회전각에 드래그 이동량을 더함 (양방향 지원)
-                    dragAngle = cumulativeRotation + value.translation.width * 0.5
-                }
-                .onEnded { value in
-                    let dragDistance = value.translation.width
-                    // 속도 기반으로 넘길지 복귀할지 판단
-                    let velocity = value.predictedEndTranslation.width - value.translation.width
-                    let shouldFlip = abs(dragDistance) > 60 || abs(velocity) > 30
-
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.72)) {
-                        if shouldFlip {
-                            // 드래그 방향에 따라 ±180도 회전
-                            if dragDistance < 0 {
-                                cumulativeRotation -= 180  // 왼쪽으로 드래그 → 왼쪽 회전
-                            } else {
-                                cumulativeRotation += 180  // 오른쪽으로 드래그 → 오른쪽 회전
-                            }
-                            dragAngle = cumulativeRotation
-                        } else {
-                            // 복귀
-                            dragAngle = cumulativeRotation
-                        }
-                    }
-                }
-        )
-    }
-}
-
-// MARK: - Card Components
-// ℹ️ 다음 컴포넌트들이 별도 파일로 분리됨:
-// - SmallStyleCard.swift
-// - NoneStyleCard.swift
-// - EmptySelectionCard.swift
+// - SmallStyleCard.swift (미리보기 작은 카드)
+// - NoneStyleCard.swift ("없음" 카드)
+// - EmptySelectionCard.swift (초기 선택 카드)
 
 // MARK: - Preview
 
