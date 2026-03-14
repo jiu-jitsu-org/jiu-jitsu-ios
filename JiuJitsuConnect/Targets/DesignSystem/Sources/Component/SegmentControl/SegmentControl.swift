@@ -170,7 +170,7 @@ private struct SegmentButton: View {
                     : Color.component.segment.unselected.bg
             )
             .cornerRadius(Metrics.itemCornerRadius)
-            .padding([.top, .bottom, .leading], Metrics.itemPadding)
+            .padding(Metrics.itemPadding)
         }
         .buttonStyle(.plain)
     }

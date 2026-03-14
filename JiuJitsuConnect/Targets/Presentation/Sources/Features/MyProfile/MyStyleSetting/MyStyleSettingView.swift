@@ -215,11 +215,11 @@ public struct MyStyleSettingView: View {
         SegmentControl(
             leftItem: SegmentItem(
                 title: "특기",
-                subtitle: store.selectedBestStyle?.tabTitle ?? defaultSubtitle(for: .best)
+                subtitle: subtitleForBest
             ),
             rightItem: SegmentItem(
                 title: "최애",
-                subtitle: store.selectedFavoriteStyle?.tabTitle ?? defaultSubtitle(for: .favorite)
+                subtitle: subtitleForFavorite
             ),
             selectedSide: store.selectedTab == .best ? .left : .right
         ) { newSide in
@@ -228,17 +228,24 @@ public struct MyStyleSettingView: View {
         }
     }
     
-    /// 선택되지 않았을 때 기본 subtitle
-    private func defaultSubtitle(for tab: MyStyleSettingFeature.SelectionTab) -> String {
-        switch store.settingType {
-        case .position:
-            return tab == .best ? "탑포지션" : "가드포지션"
-        case .submission:
-            return tab == .best ? "암바" : "레그락"
-        case .technique:
-            return tab == .best ? "테이크다운" : "이스케이프"
+    /// 특기 탭의 subtitle
+    private var subtitleForBest: String {
+        if let bestStyle = store.selectedBestStyle {
+            return bestStyle.tabTitle
+        } else {
+            return "입력해주세요"
         }
     }
+    
+    /// 최애 탭의 subtitle
+    private var subtitleForFavorite: String {
+        if let favoriteStyle = store.selectedFavoriteStyle {
+            return favoriteStyle.tabTitle
+        } else {
+            return "입력해주세요"
+        }
+    }
+
     
     // MARK: - Selected Styles Preview
     
@@ -246,10 +253,11 @@ public struct MyStyleSettingView: View {
         // 컨테이너: 120 높이 고정, 좌우 여백 없음
         GeometryReader { geometry in
             VStack(spacing: 0) {
+                Spacer()
                 if needsScrolling(containerWidth: geometry.size.width) {
                     // 스크롤이 필요한 경우: ScrollView 사용
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: CardMetrics.Spacing.horizontal) {
+                        HStack(alignment: .bottom, spacing: CardMetrics.Spacing.horizontal) {
                             // "없음" 카드 (첫 번째)
                             NoneStyleCard(isSelected: store.currentSelectedStyle == nil)
                                 .onTapGesture {
@@ -271,13 +279,12 @@ public struct MyStyleSettingView: View {
                                 }
                             }
                         }
-                        .frame(height: CardMetrics.Size.selectedHeight)
                         .padding(.horizontal, CardMetrics.Spacing.containerPadding)
-                        .padding(.vertical, 16)
+                        .padding(.bottom, 16)
                     }
                 } else {
                     // 스크롤이 필요 없는 경우: 가운데 정렬된 HStack
-                    HStack(spacing: CardMetrics.Spacing.horizontal) {
+                    HStack(alignment: .bottom, spacing: CardMetrics.Spacing.horizontal) {
                         // "없음" 카드 (첫 번째)
                         NoneStyleCard(isSelected: store.currentSelectedStyle == nil)
                             .onTapGesture {
@@ -299,8 +306,7 @@ public struct MyStyleSettingView: View {
                             }
                         }
                     }
-                    .frame(height: CardMetrics.Size.selectedHeight)
-                    .padding(.vertical, 16)
+                    .padding(.bottom, 16)
                     .frame(maxWidth: .infinity) // 전체 너비 사용
                 }
             }
