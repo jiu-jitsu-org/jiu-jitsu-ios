@@ -506,59 +506,11 @@ private struct FlippableStyleCard: View {
     }
 }
 
-// MARK: - Small Style Card (Preview)
-
-private struct SmallStyleCard: View {
-    let style: any StyleSelectable
-    let label: String
-    let isSelected: Bool
-    
-    // 선택 여부에 따른 사이즈
-    private var cardWidth: CGFloat {
-        isSelected ? MyStyleSettingView.CardMetrics.Size.selectedWidth
-                   : MyStyleSettingView.CardMetrics.Size.unselectedWidth
-    }
-    
-    private var cardHeight: CGFloat {
-        isSelected ? MyStyleSettingView.CardMetrics.Size.selectedHeight
-                   : MyStyleSettingView.CardMetrics.Size.unselectedHeight
-    }
-    
-    private var cornerRadius: CGFloat {
-        isSelected ? MyStyleSettingView.CardMetrics.CornerRadius.selected
-                   : MyStyleSettingView.CardMetrics.CornerRadius.unselected
-    }
-    
-    private var fontSize: CGFloat {
-        MyStyleSettingView.CardMetrics.Font.size
-    }
-    
-    private var topPadding: CGFloat {
-        isSelected ? MyStyleSettingView.CardMetrics.Padding.selectedTop
-                   : MyStyleSettingView.CardMetrics.Padding.unselectedTop
-    }
-    
-    var body: some View {
-        ZStack(alignment: .top) {
-            // 배경 색상 - style마다 다른 색상 사용
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(Color(hex: style.smallCardColorHex))
-            
-            // 짧은 타이틀을 상단에 배치 - 중앙 정렬
-            Text(style.shortTitle)
-                .font(.cookieRun.custom(weight: .black, size: fontSize))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.top, topPadding)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: topPadding)
-        }
-        .frame(width: cardWidth, height: cardHeight)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
-    }
-}
-
-// MARK: - None Style Card & Empty Selection Card
-// ℹ️ NoneStyleCard.swift 와 EmptySelectionCard.swift 파일로 분리됨
+// MARK: - Card Components
+// ℹ️ 다음 컴포넌트들이 별도 파일로 분리됨:
+// - SmallStyleCard.swift
+// - NoneStyleCard.swift
+// - EmptySelectionCard.swift
 
 // MARK: - Preview
 
