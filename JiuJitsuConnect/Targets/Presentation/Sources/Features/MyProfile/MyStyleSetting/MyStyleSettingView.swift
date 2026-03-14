@@ -246,7 +246,6 @@ public struct MyStyleSettingView: View {
         }
     }
 
-    
     // MARK: - Selected Styles Preview
     
     private var selectedStylesPreview: some View {
@@ -558,92 +557,8 @@ private struct SmallStyleCard: View {
     }
 }
 
-// MARK: - None Style Card (첫 번째 카드)
-
-private struct NoneStyleCard: View {
-    let isSelected: Bool
-    
-    // 선택 여부에 따른 사이즈
-    private var cardWidth: CGFloat {
-        isSelected ? MyStyleSettingView.CardMetrics.Size.selectedWidth
-                   : MyStyleSettingView.CardMetrics.Size.unselectedWidth
-    }
-    
-    private var cardHeight: CGFloat {
-        isSelected ? MyStyleSettingView.CardMetrics.Size.selectedHeight
-                   : MyStyleSettingView.CardMetrics.Size.unselectedHeight
-    }
-    
-    private var cornerRadius: CGFloat {
-        isSelected ? MyStyleSettingView.CardMetrics.CornerRadius.selected
-                   : MyStyleSettingView.CardMetrics.CornerRadius.unselected
-    }
-    
-    private var fontSize: CGFloat {
-        MyStyleSettingView.CardMetrics.Font.size
-    }
-    
-    private var topPadding: CGFloat {
-        isSelected ? MyStyleSettingView.CardMetrics.Padding.selectedTop
-                   : MyStyleSettingView.CardMetrics.Padding.unselectedTop
-    }
-    
-    var body: some View {
-        ZStack(alignment: .top) {
-            // 배경 색상 - 고정된 회색
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(Color(hex: "#4F535B"))
-            
-            // "없음" 타이틀을 상단에 배치 - 중앙 정렬
-            Text("없음")
-                .font(.cookieRun.custom(weight: .black, size: fontSize))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.top, topPadding)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: topPadding)
-        }
-        .frame(width: cardWidth, height: cardHeight)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
-    }
-}
-
-// MARK: - Empty Selection Card (Default State)
-
-private struct EmptySelectionCard: View {
-    let onTap: () -> Void
-    
-    var body: some View {
-        ZStack {
-            // 배경 - 점선 테두리와 어두운 배경
-            RoundedRectangle(cornerRadius: 40)
-                .fill(Color.primitive.coolGray.cg900)
-            
-            RoundedRectangle(cornerRadius: 40)
-                .strokeBorder(
-                    style: StrokeStyle(lineWidth: 2, dash: [8, 8])
-                )
-                .foregroundColor(Color.primitive.coolGray.cg200)
-            
-            // + 아이콘을 중앙에 배치
-            VStack(spacing: 0) {
-                // + 아이콘 (배경 원 없이)
-                Text("+")
-                    .font(Font.cookieRun.custom(weight: .black, size: 80))
-                    .foregroundColor(Color.primitive.coolGray.cg100)
-                
-                // "선택하기" 텍스트
-                Text("선택하기")
-                    .font(Font.cookieRun.custom(weight: .black, size: 20))
-                    .foregroundColor(Color.primitive.coolGray.cg100)
-                    .frame(height: 27)
-                    .padding(.top, -5)
-            }
-            .offset(y: -13.5)
-        }
-        .frame(width: 262, height: 394)
-        .cornerRadius(40)
-    }
-}
+// MARK: - None Style Card & Empty Selection Card
+// ℹ️ NoneStyleCard.swift 와 EmptySelectionCard.swift 파일로 분리됨
 
 // MARK: - Preview
 
