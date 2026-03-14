@@ -212,29 +212,19 @@ public struct MyStyleSettingView: View {
     // MARK: - Tab View
     
     private var tabView: some View {
-        HStack(spacing: 0) {
-            ForEach(MyStyleSettingFeature.SelectionTab.allCases, id: \.self) { tab in
-                TabButton(
-                    title: tab.displayName,
-                    subtitle: subtitle(for: tab),
-                    isSelected: store.selectedTab == tab
-                ) {
-                    store.send(.view(.tabSelected(tab)))
-                }
-            }
-        }
-        .frame(width: 262, height: 67)
-        .background(Color.component.segment.container.bg)
-        .cornerRadius(28)
-    }
-    
-    /// 각 탭의 subtitle을 선택된 스타일에 따라 동적으로 반환
-    private func subtitle(for tab: MyStyleSettingFeature.SelectionTab) -> String {
-        switch tab {
-        case .best:
-            return store.selectedBestStyle?.tabTitle ?? defaultSubtitle(for: .best)
-        case .favorite:
-            return store.selectedFavoriteStyle?.tabTitle ?? defaultSubtitle(for: .favorite)
+        SegmentControl(
+            leftItem: SegmentItem(
+                title: "특기",
+                subtitle: store.selectedBestStyle?.tabTitle ?? defaultSubtitle(for: .best)
+            ),
+            rightItem: SegmentItem(
+                title: "최애",
+                subtitle: store.selectedFavoriteStyle?.tabTitle ?? defaultSubtitle(for: .favorite)
+            ),
+            selectedSide: store.selectedTab == .best ? .left : .right
+        ) { newSide in
+            let newTab: MyStyleSettingFeature.SelectionTab = newSide == .left ? .best : .favorite
+            store.send(.view(.tabSelected(newTab)))
         }
     }
     
@@ -338,34 +328,6 @@ public struct MyStyleSettingView: View {
     private func isStyleSelected(_ style: any StyleSelectable) -> Bool {
         // 현재 탭에서 선택된 스타일과 비교
         return store.currentSelectedStyle?.id == style.id
-    }
-}
-
-// MARK: - Tab Button
-
-private struct TabButton: View {
-    let title: String
-    let subtitle: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(Font.pretendard.custom(weight: .semiBold, size: 18))
-                    .foregroundColor(isSelected ? Color.component.segment.selected.titleText : Color.component.segment.unselected.titleText)
-                
-                Text(subtitle)
-                    .font(Font.pretendard.labelM)
-                    .foregroundColor(isSelected ? Color.component.segment.selected.subText : Color.component.segment.unselected.subText)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 59)
-            .background(isSelected ? Color.component.segment.selected.bg : Color.component.segment.unselected.bg)
-            .cornerRadius(24)
-            .padding([.top, .bottom, .leading], 4)
-        }
     }
 }
 
