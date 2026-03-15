@@ -510,55 +510,43 @@ public struct MyProfileView: View {
                           profile?.bestTechnique != nil
         
         return VStack(spacing: 0) {
-            VStack(spacing: 8) {
-                Text("나의 주짓수를 보여주세요")
-                    .font(Font.pretendard.title3)
-                    .foregroundStyle(Color.component.sectionHeader.title)
-                
-                if hasStyleInfo {
-                    VStack(alignment: .leading, spacing: 8) {
-                        if let bestSubmission = profile?.bestSubmission {
-                            HStack {
-                                Text("최고 서브미션:")
-                                    .font(Font.pretendard.bodyM)
-                                    .foregroundStyle(Color.component.sectionHeader.subTitle)
-                                Text(bestSubmission.displayName)
-                                    .font(Font.pretendard.bodyM.bold())
-                                    .foregroundStyle(Color.component.sectionHeader.title)
-                            }
-                        }
-                        
-                        if let favoritePosition = profile?.favoritePosition {
-                            HStack {
-                                Text("선호 포지션:")
-                                    .font(Font.pretendard.bodyM)
-                                    .foregroundStyle(Color.component.sectionHeader.subTitle)
-                                Text(favoritePosition.displayName)
-                                    .font(Font.pretendard.bodyM.bold())
-                                    .foregroundStyle(Color.component.sectionHeader.title)
-                            }
-                        }
-                        
-                        if let bestTechnique = profile?.bestTechnique {
-                            HStack {
-                                Text("최고 기술:")
-                                    .font(Font.pretendard.bodyM)
-                                    .foregroundStyle(Color.component.sectionHeader.subTitle)
-                                Text(bestTechnique.displayName)
-                                    .font(Font.pretendard.bodyM.bold())
-                                    .foregroundStyle(Color.component.sectionHeader.title)
-                            }
-                        }
-                    }
-                    .padding(.top, 8)
-                } else {
-                    Text("특기와 최애 포지션, 기술 등을 등록해보세요.")
-                        .font(Font.pretendard.bodyM)
-                        .foregroundStyle(Color.component.sectionHeader.subTitle)
-                }
-            }
+            // 헤더
+            Text("나의 주짓수를 보여주세요")
+                .font(Font.pretendard.title3)
+                .foregroundStyle(Color.component.sectionHeader.title)
+                .padding(.bottom, hasStyleInfo ? 24 : 8)
             
-            if !hasStyleInfo {
+            if hasStyleInfo {
+                // 스타일 정보가 있을 때: 카드 그리드 표시
+                VStack(alignment: .leading, spacing: 16) {
+                    // 포지션 섹션
+                    styleSection(
+                        title: "포지션",
+                        bestStyle: profile?.bestPosition,
+                        favoriteStyle: profile?.favoritePosition
+                    )
+                    
+                    // 기술 섹션
+                    styleSection(
+                        title: "기술",
+                        bestStyle: profile?.bestTechnique,
+                        favoriteStyle: profile?.favoriteTechnique
+                    )
+                    
+                    // 서브미션 섹션
+                    styleSection(
+                        title: "서브미션",
+                        bestStyle: profile?.bestSubmission,
+                        favoriteStyle: profile?.favoriteSubmission
+                    )
+                }
+                .padding(.horizontal, 24)
+            } else {
+                // 스타일 정보가 없을 때: 안내 문구 + 등록 버튼
+                Text("특기와 최애 포지션, 기술 등을 등록해보세요.")
+                    .font(Font.pretendard.bodyM)
+                    .foregroundStyle(Color.component.sectionHeader.subTitle)
+                
                 Button {
                     store.send(.view(.registerStyleButtonTapped))
                 } label: {
@@ -571,6 +559,111 @@ public struct MyProfileView: View {
             decorativeCardsView
                 .padding(.top, 16)
         }
+    }
+    
+    /// 스타일 섹션 (포지션/기술/서브미션)
+    private func styleSection(
+        title: String,
+        bestStyle: (any StyleSelectable)?,
+        favoriteStyle: (any StyleSelectable)?
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // 섹션 타이틀
+            Text(title)
+                .font(.pretendard.title3)
+                .foregroundStyle(Color.component.sectionHeader.subTitle)
+            
+            // 카드 그리드 (2열)
+            HStack(spacing: 12) {
+                // 왼쪽 카드 (최고 스타일)
+                if let bestStyle = bestStyle {
+                    styleCardItem(
+                        label: "최고",
+                        style: bestStyle
+                    )
+                } else {
+                    emptyStyleCardItem(label: "최고")
+                }
+                
+                // 오른쪽 카드 (선호 스타일)
+                if let favoriteStyle = favoriteStyle {
+                    styleCardItem(
+                        label: "최애",
+                        style: favoriteStyle
+                    )
+                } else {
+                    emptyStyleCardItem(label: "최애")
+                }
+            }
+        }
+    }
+    
+    /// 스타일 카드 아이템
+    private func styleCardItem(
+        label: String,
+        style: any StyleSelectable
+    ) -> some View {
+        Button {
+            store.send(.view(.registerStyleButtonTapped))
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                // 아이콘 + 배경
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(hex: style.smallCardColorHex))
+                        .frame(width: 64, height: 64)
+                    
+                    style.iconImage.swiftUIImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 40, height: 40)
+                }
+                
+                // 라벨
+                Text(label)
+                    .font(Font.pretendard.labelM)
+                    .foregroundStyle(Color.component.sectionHeader.subTitle)
+                
+                // 스타일 이름
+                Text(style.shortTitle)
+                    .font(Font.pretendard.bodyM)
+                    .foregroundStyle(Color.component.sectionHeader.title)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(Color.component.list.setting.background)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+    
+    /// 빈 스타일 카드 아이템 (정보가 없을 때)
+    private func emptyStyleCardItem(label: String) -> some View {
+        Button {
+            store.send(.view(.registerStyleButtonTapped))
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                // 빈 아이콘 배경
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.primitive.coolGray.cg100)
+                    .frame(width: 64, height: 64)
+                
+                // 라벨
+                Text(label)
+                    .font(Font.pretendard.labelM)
+                    .foregroundStyle(Color.component.sectionHeader.subTitle)
+                
+                // 안내 텍스트
+                Text("지정해주세요")
+                    .font(Font.pretendard.bodyM)
+                    .foregroundStyle(Color.component.sectionHeader.subTitle)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(Color.component.list.setting.background)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
     }
     
     private var decorativeCardsView: some View {
