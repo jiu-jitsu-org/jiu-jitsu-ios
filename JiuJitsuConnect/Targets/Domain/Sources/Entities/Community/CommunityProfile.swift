@@ -109,6 +109,291 @@ public struct CommunityProfile: Codable, Equatable, Sendable {
     }
 }
 
+// MARK: - Convenience Update Methods
+
+extension CommunityProfile {
+    /// 도장명 업데이트
+    public func updatingAcademy(_ academyName: String?) -> CommunityProfile {
+        CommunityProfile(
+            nickname: nickname,
+            profileImageUrl: profileImageUrl,
+            beltRank: beltRank,
+            beltStripe: beltStripe,
+            gender: gender,
+            weightKg: weightKg,
+            academyName: academyName,
+            competitions: competitions,
+            bestSubmission: bestSubmission,
+            favoriteSubmission: favoriteSubmission,
+            bestTechnique: bestTechnique,
+            favoriteTechnique: favoriteTechnique,
+            bestPosition: bestPosition,
+            favoritePosition: favoritePosition,
+            isWeightHidden: isWeightHidden,
+            isOwner: isOwner,
+            teachingPhilosophy: teachingPhilosophy,
+            teachingStartDate: teachingStartDate,
+            teachingDetail: teachingDetail
+        )
+    }
+    
+    /// 벨트 정보 업데이트
+    public func updatingBelt(rank: BeltRank, stripe: BeltStripe) -> CommunityProfile {
+        CommunityProfile(
+            nickname: nickname,
+            profileImageUrl: profileImageUrl,
+            beltRank: rank,
+            beltStripe: stripe,
+            gender: gender,
+            weightKg: weightKg,
+            academyName: academyName,
+            competitions: competitions,
+            bestSubmission: bestSubmission,
+            favoriteSubmission: favoriteSubmission,
+            bestTechnique: bestTechnique,
+            favoriteTechnique: favoriteTechnique,
+            bestPosition: bestPosition,
+            favoritePosition: favoritePosition,
+            isWeightHidden: isWeightHidden,
+            isOwner: isOwner,
+            teachingPhilosophy: teachingPhilosophy,
+            teachingStartDate: teachingStartDate,
+            teachingDetail: teachingDetail
+        )
+    }
+    
+    /// 체급 정보 업데이트
+    public func updatingWeight(gender: Gender, weightKg: Double, isWeightHidden: Bool) -> CommunityProfile {
+        CommunityProfile(
+            nickname: nickname,
+            profileImageUrl: profileImageUrl,
+            beltRank: beltRank,
+            beltStripe: beltStripe,
+            gender: gender,
+            weightKg: weightKg,
+            academyName: academyName,
+            competitions: competitions,
+            bestSubmission: bestSubmission,
+            favoriteSubmission: favoriteSubmission,
+            bestTechnique: bestTechnique,
+            favoriteTechnique: favoriteTechnique,
+            bestPosition: bestPosition,
+            favoritePosition: favoritePosition,
+            isWeightHidden: isWeightHidden,
+            isOwner: isOwner,
+            teachingPhilosophy: teachingPhilosophy,
+            teachingStartDate: teachingStartDate,
+            teachingDetail: teachingDetail
+        )
+    }
+    
+    /// 벨트와 체급 정보 함께 업데이트
+    public func updatingBeltAndWeight(
+        rank: BeltRank,
+        stripe: BeltStripe,
+        gender: Gender,
+        weightKg: Double,
+        isWeightHidden: Bool
+    ) -> CommunityProfile {
+        CommunityProfile(
+            nickname: nickname,
+            profileImageUrl: profileImageUrl,
+            beltRank: rank,
+            beltStripe: stripe,
+            gender: gender,
+            weightKg: weightKg,
+            academyName: academyName,
+            competitions: competitions,
+            bestSubmission: bestSubmission,
+            favoriteSubmission: favoriteSubmission,
+            bestTechnique: bestTechnique,
+            favoriteTechnique: favoriteTechnique,
+            bestPosition: bestPosition,
+            favoritePosition: favoritePosition,
+            isWeightHidden: isWeightHidden,
+            isOwner: isOwner,
+            teachingPhilosophy: teachingPhilosophy,
+            teachingStartDate: teachingStartDate,
+            teachingDetail: teachingDetail
+        )
+    }
+    
+    /// 체급 가시성 토글
+    public func togglingWeightVisibility() -> CommunityProfile {
+        CommunityProfile(
+            nickname: nickname,
+            profileImageUrl: profileImageUrl,
+            beltRank: beltRank,
+            beltStripe: beltStripe,
+            gender: gender,
+            weightKg: weightKg,
+            academyName: academyName,
+            competitions: competitions,
+            bestSubmission: bestSubmission,
+            favoriteSubmission: favoriteSubmission,
+            bestTechnique: bestTechnique,
+            favoriteTechnique: favoriteTechnique,
+            bestPosition: bestPosition,
+            favoritePosition: favoritePosition,
+            isWeightHidden: !isWeightHidden,
+            isOwner: isOwner,
+            teachingPhilosophy: teachingPhilosophy,
+            teachingStartDate: teachingStartDate,
+            teachingDetail: teachingDetail
+        )
+    }
+    
+    /// 포지션 정보 업데이트 (특기만)
+    public func updatingPositionBest(_ best: PositionType?) -> CommunityProfile {
+        CommunityProfile(
+            nickname: nickname,
+            profileImageUrl: profileImageUrl,
+            beltRank: beltRank,
+            beltStripe: beltStripe,
+            gender: gender,
+            weightKg: weightKg,
+            academyName: academyName,
+            competitions: competitions,
+            bestSubmission: bestSubmission,
+            favoriteSubmission: favoriteSubmission,
+            bestTechnique: bestTechnique,
+            favoriteTechnique: favoriteTechnique,
+            bestPosition: best,
+            favoritePosition: favoritePosition,
+            isWeightHidden: isWeightHidden,
+            isOwner: isOwner,
+            teachingPhilosophy: teachingPhilosophy,
+            teachingStartDate: teachingStartDate,
+            teachingDetail: teachingDetail
+        )
+    }
+    
+    /// 포지션 정보 업데이트 (특기 + 최애)
+    public func updatingPositionFavorite(best: PositionType?, favorite: PositionType?) -> CommunityProfile {
+        CommunityProfile(
+            nickname: nickname,
+            profileImageUrl: profileImageUrl,
+            beltRank: beltRank,
+            beltStripe: beltStripe,
+            gender: gender,
+            weightKg: weightKg,
+            academyName: academyName,
+            competitions: competitions,
+            bestSubmission: bestSubmission,
+            favoriteSubmission: favoriteSubmission,
+            bestTechnique: bestTechnique,
+            favoriteTechnique: favoriteTechnique,
+            bestPosition: best,
+            favoritePosition: favorite,
+            isWeightHidden: isWeightHidden,
+            isOwner: isOwner,
+            teachingPhilosophy: teachingPhilosophy,
+            teachingStartDate: teachingStartDate,
+            teachingDetail: teachingDetail
+        )
+    }
+    
+    /// 서브미션 정보 업데이트 (특기만)
+    public func updatingSubmissionBest(_ best: SubmissionType?) -> CommunityProfile {
+        CommunityProfile(
+            nickname: nickname,
+            profileImageUrl: profileImageUrl,
+            beltRank: beltRank,
+            beltStripe: beltStripe,
+            gender: gender,
+            weightKg: weightKg,
+            academyName: academyName,
+            competitions: competitions,
+            bestSubmission: best,
+            favoriteSubmission: favoriteSubmission,
+            bestTechnique: bestTechnique,
+            favoriteTechnique: favoriteTechnique,
+            bestPosition: bestPosition,
+            favoritePosition: favoritePosition,
+            isWeightHidden: isWeightHidden,
+            isOwner: isOwner,
+            teachingPhilosophy: teachingPhilosophy,
+            teachingStartDate: teachingStartDate,
+            teachingDetail: teachingDetail
+        )
+    }
+    
+    /// 서브미션 정보 업데이트 (특기 + 최애)
+    public func updatingSubmissionFavorite(best: SubmissionType?, favorite: SubmissionType?) -> CommunityProfile {
+        CommunityProfile(
+            nickname: nickname,
+            profileImageUrl: profileImageUrl,
+            beltRank: beltRank,
+            beltStripe: beltStripe,
+            gender: gender,
+            weightKg: weightKg,
+            academyName: academyName,
+            competitions: competitions,
+            bestSubmission: best,
+            favoriteSubmission: favorite,
+            bestTechnique: bestTechnique,
+            favoriteTechnique: favoriteTechnique,
+            bestPosition: bestPosition,
+            favoritePosition: favoritePosition,
+            isWeightHidden: isWeightHidden,
+            isOwner: isOwner,
+            teachingPhilosophy: teachingPhilosophy,
+            teachingStartDate: teachingStartDate,
+            teachingDetail: teachingDetail
+        )
+    }
+    
+    /// 기술 정보 업데이트 (특기만)
+    public func updatingTechniqueBest(_ best: TechniqueType?) -> CommunityProfile {
+        CommunityProfile(
+            nickname: nickname,
+            profileImageUrl: profileImageUrl,
+            beltRank: beltRank,
+            beltStripe: beltStripe,
+            gender: gender,
+            weightKg: weightKg,
+            academyName: academyName,
+            competitions: competitions,
+            bestSubmission: bestSubmission,
+            favoriteSubmission: favoriteSubmission,
+            bestTechnique: best,
+            favoriteTechnique: favoriteTechnique,
+            bestPosition: bestPosition,
+            favoritePosition: favoritePosition,
+            isWeightHidden: isWeightHidden,
+            isOwner: isOwner,
+            teachingPhilosophy: teachingPhilosophy,
+            teachingStartDate: teachingStartDate,
+            teachingDetail: teachingDetail
+        )
+    }
+    
+    /// 기술 정보 업데이트 (특기 + 최애)
+    public func updatingTechniqueFavorite(best: TechniqueType?, favorite: TechniqueType?) -> CommunityProfile {
+        CommunityProfile(
+            nickname: nickname,
+            profileImageUrl: profileImageUrl,
+            beltRank: beltRank,
+            beltStripe: beltStripe,
+            gender: gender,
+            weightKg: weightKg,
+            academyName: academyName,
+            competitions: competitions,
+            bestSubmission: bestSubmission,
+            favoriteSubmission: favoriteSubmission,
+            bestTechnique: best,
+            favoriteTechnique: favorite,
+            bestPosition: bestPosition,
+            favoritePosition: favoritePosition,
+            isWeightHidden: isWeightHidden,
+            isOwner: isOwner,
+            teachingPhilosophy: teachingPhilosophy,
+            teachingStartDate: teachingStartDate,
+            teachingDetail: teachingDetail
+        )
+    }
+}
+
 // MARK: - Enums
 
 /// 프로필 섹션 (수정/조회 단위)
