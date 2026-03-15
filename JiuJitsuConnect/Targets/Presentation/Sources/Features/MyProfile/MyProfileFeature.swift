@@ -88,7 +88,6 @@ public struct MyProfileFeature: Sendable {
             case saveBeltInfoOnly(rank: BeltRank, stripe: BeltStripe)
             case saveWeightInfoOnly(gender: Gender, weightKg: Double, isWeightHidden: Bool)
             case toggleWeightVisibility
-            case updatePositionInfo(best: PositionType?, favorite: PositionType?)
             
             // 포지션 저장
             case savePositionBest(best: PositionType?)
@@ -492,44 +491,6 @@ public struct MyProfileFeature: Sendable {
                     )))
                 }
                 
-            case let .internal(.updatePositionInfo(best, favorite)):
-                guard var profile = state.communityProfile else {
-                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
-                }
-                
-                // 포지션 정보 업데이트
-                profile = CommunityProfile(
-                    nickname: profile.nickname,
-                    profileImageUrl: profile.profileImageUrl,
-                    beltRank: profile.beltRank,
-                    beltStripe: profile.beltStripe,
-                    gender: profile.gender,
-                    weightKg: profile.weightKg,
-                    academyName: profile.academyName,
-                    competitions: profile.competitions,
-                    bestSubmission: profile.bestSubmission,
-                    favoriteSubmission: profile.favoriteSubmission,
-                    bestTechnique: profile.bestTechnique,
-                    favoriteTechnique: profile.favoriteTechnique,
-                    bestPosition: best,
-                    favoritePosition: favorite,
-                    isWeightHidden: profile.isWeightHidden,
-                    isOwner: profile.isOwner,
-                    teachingPhilosophy: profile.teachingPhilosophy,
-                    teachingStartDate: profile.teachingStartDate,
-                    teachingDetail: profile.teachingDetail
-                )
-                
-                state.isLoadingProfile = true
-                
-                return .run { [profile] send in
-                    await send(.internal(.updateProfileResponse(
-                        await TaskResult {
-                            try await communityClient.updateProfile(profile, .position)
-                        }
-                    )))
-                }
-                
             // MARK: - API 호출: 프로필 섹션 업데이트
                 
             case let .internal(.updateProfileSection(section, value)):
@@ -562,7 +523,7 @@ public struct MyProfileFeature: Sendable {
                         teachingDetail: profile.teachingDetail
                     )
                     
-                case .beltWeight, .position, .submission, .technique, .competition, .instructorInfo:
+                case .beltWeight, .positionBest, .positionFavorite, .submissionBest, .submissionFavorite, .techniqueBest, .techniqueFavorite, .competition, .instructorInfo:
                     // TODO: 다른 섹션 업데이트 구현
                     break
                 }
@@ -612,7 +573,7 @@ public struct MyProfileFeature: Sendable {
                 
                 return .run { [profile] send in
                     let result = await TaskResult {
-                        try await communityClient.updateProfile(profile, .position)
+                        try await communityClient.updateProfile(profile, .positionBest)
                     }
                     
                     switch result {
@@ -655,7 +616,7 @@ public struct MyProfileFeature: Sendable {
                 
                 return .run { [profile] send in
                     let result = await TaskResult {
-                        try await communityClient.updateProfile(profile, .position)
+                        try await communityClient.updateProfile(profile, .positionFavorite)
                     }
                     
                     switch result {
@@ -698,7 +659,7 @@ public struct MyProfileFeature: Sendable {
                 
                 return .run { [profile] send in
                     let result = await TaskResult {
-                        try await communityClient.updateProfile(profile, .submission)
+                        try await communityClient.updateProfile(profile, .submissionBest)
                     }
                     
                     switch result {
@@ -741,7 +702,7 @@ public struct MyProfileFeature: Sendable {
                 
                 return .run { [profile] send in
                     let result = await TaskResult {
-                        try await communityClient.updateProfile(profile, .submission)
+                        try await communityClient.updateProfile(profile, .submissionFavorite)
                     }
                     
                     switch result {
@@ -784,7 +745,7 @@ public struct MyProfileFeature: Sendable {
                 
                 return .run { [profile] send in
                     let result = await TaskResult {
-                        try await communityClient.updateProfile(profile, .technique)
+                        try await communityClient.updateProfile(profile, .techniqueBest)
                     }
                     
                     switch result {
@@ -827,7 +788,7 @@ public struct MyProfileFeature: Sendable {
                 
                 return .run { [profile] send in
                     let result = await TaskResult {
-                        try await communityClient.updateProfile(profile, .technique)
+                        try await communityClient.updateProfile(profile, .techniqueFavorite)
                     }
                     
                     switch result {
