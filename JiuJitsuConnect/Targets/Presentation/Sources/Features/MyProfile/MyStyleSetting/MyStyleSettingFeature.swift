@@ -407,15 +407,9 @@ public struct MyStyleSettingFeature: Sendable {
         }
         
         // 완료 버튼 활성화 조건
+        // "없음"도 유효한 선택이므로 항상 활성화
         var canComplete: Bool {
-            switch selectedTab {
-            case .best:
-                // 특기 탭: 특기가 선택되어야 활성화
-                return selectedBestStyle != nil
-            case .favorite:
-                // 최애 탭: 최애가 선택되어야 활성화 (선택 안 함도 허용하려면 항상 true)
-                return true  // 최애는 선택 안 해도 완료 가능
-            }
+            return true
         }
     }
     

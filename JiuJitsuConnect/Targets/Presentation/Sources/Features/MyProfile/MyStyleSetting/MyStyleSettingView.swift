@@ -160,7 +160,6 @@ public struct MyStyleSettingView: View {
                     store.send(.view(.completeButtonTapped))
                 }
             )
-            .disabled(!store.canComplete)
             .padding(.horizontal, 20)
             .padding(.bottom, 8)
         }
