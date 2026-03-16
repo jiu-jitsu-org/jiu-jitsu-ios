@@ -510,15 +510,9 @@ public struct MyProfileView: View {
                           profile?.bestTechnique != nil
         
         return VStack(spacing: 0) {
-            // 헤더
-            Text("나의 주짓수를 보여주세요")
-                .font(Font.pretendard.title3)
-                .foregroundStyle(Color.component.sectionHeader.title)
-                .padding(.bottom, hasStyleInfo ? 24 : 8)
-            
             if hasStyleInfo {
                 // 스타일 정보가 있을 때: 카드 그리드 표시
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 36) {
                     // 포지션 섹션
                     styleSection(
                         title: "포지션",
@@ -542,6 +536,12 @@ public struct MyProfileView: View {
                 }
                 .padding(.horizontal, 24)
             } else {
+                
+                Text("나의 주짓수를 보여주세요")
+                    .font(Font.pretendard.title3)
+                    .foregroundStyle(Color.component.sectionHeader.title)
+                    .padding(.bottom, 8)
+
                 // 스타일 정보가 없을 때: 안내 문구 + 등록 버튼
                 Text("특기와 최애 포지션, 기술 등을 등록해보세요.")
                     .font(Font.pretendard.bodyM)
@@ -567,22 +567,22 @@ public struct MyProfileView: View {
         bestStyle: (any StyleSelectable)?,
         favoriteStyle: (any StyleSelectable)?
     ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             // 섹션 타이틀
             Text(title)
                 .font(.pretendard.title3)
-                .foregroundStyle(Color.component.sectionHeader.subTitle)
+                .foregroundStyle(Color.component.sectionHeader.title)
             
             // 카드 그리드 (2열)
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 // 왼쪽 카드 (최고 스타일)
                 if let bestStyle = bestStyle {
                     styleCardItem(
-                        label: "최고",
+                        label: "특기",
                         style: bestStyle
                     )
                 } else {
-                    emptyStyleCardItem(label: "최고")
+                    emptyStyleCardItem(label: "특기")
                 }
                 
                 // 오른쪽 카드 (선호 스타일)
@@ -606,33 +606,28 @@ public struct MyProfileView: View {
         Button {
             store.send(.view(.registerStyleButtonTapped))
         } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                // 아이콘 + 배경
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(hex: style.smallCardColorHex))
-                        .frame(width: 64, height: 64)
+            VStack(alignment: .leading, spacing: 16) {
+                style.iconImage.swiftUIImage
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 40, height: 40)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    // 라벨
+                    Text(label)
+                        .font(Font.pretendard.labelM)
+                        .foregroundStyle(Color.component.skillCard.default.labelText)
                     
-                    style.iconImage.swiftUIImage
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 40, height: 40)
+                    // 스타일 이름
+                    Text(style.tabTitle)
+                        .font(Font.pretendard.title3)
+                        .foregroundStyle(Color.component.skillCard.default.titleTextFilled)
                 }
-                
-                // 라벨
-                Text(label)
-                    .font(Font.pretendard.labelM)
-                    .foregroundStyle(Color.component.sectionHeader.subTitle)
-                
-                // 스타일 이름
-                Text(style.shortTitle)
-                    .font(Font.pretendard.bodyM)
-                    .foregroundStyle(Color.component.sectionHeader.title)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-            .background(Color.component.list.setting.background)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(16)
+            .background(Color.component.skillCard.default.bg)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(.plain)
     }
@@ -642,26 +637,28 @@ public struct MyProfileView: View {
         Button {
             store.send(.view(.registerStyleButtonTapped))
         } label: {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 16) {
                 // 빈 아이콘 배경
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.primitive.coolGray.cg100)
-                    .frame(width: 64, height: 64)
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.primitive.coolGray.cg50)
+                    .frame(width: 40, height: 40)
                 
-                // 라벨
-                Text(label)
-                    .font(Font.pretendard.labelM)
-                    .foregroundStyle(Color.component.sectionHeader.subTitle)
-                
-                // 안내 텍스트
-                Text("지정해주세요")
-                    .font(Font.pretendard.bodyM)
-                    .foregroundStyle(Color.component.sectionHeader.subTitle)
+                VStack(alignment: .leading, spacing: 4) {
+                    // 라벨
+                    Text(label)
+                        .font(Font.pretendard.labelM)
+                        .foregroundStyle(Color.component.skillCard.default.labelText)
+                    
+                    // 안내 텍스트
+                    Text("지정해주세요")
+                        .font(Font.pretendard.title3)
+                        .foregroundStyle(Color.component.skillCard.default.titleTextEmpty)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-            .background(Color.component.list.setting.background)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(16)
+            .background(Color.component.skillCard.default.bg)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(.plain)
     }
