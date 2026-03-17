@@ -113,6 +113,12 @@ public struct MyProfileView: View {
                 ? Style.Card.overlapWithAcademyName
                 : Style.Card.overlapWithButton
             
+            // 스타일 정보 유무 확인
+            let profile = store.communityProfile
+            let hasStyleInfo = profile?.bestSubmission != nil ||
+                              profile?.favoritePosition != nil ||
+                              profile?.bestTechnique != nil
+            
             ScrollView(showsIndicators: false) {
                 ZStack(alignment: .bottom) {
                     // 메인 콘텐츠
@@ -136,22 +142,24 @@ public struct MyProfileView: View {
                             .padding(.bottom, 18)
                     }
                     
-                    // 배경 그라데이션 (최하위 레이어)
-                    VStack {
-                        Spacer()
-                        LinearGradient(
-                            gradient: Gradient(stops: [
-                                .init(color: Color(hex: "0090FF").opacity(0), location: 0),
-                                .init(color: Color(hex: "0090FF").opacity(0.4), location: 1)
-                            ]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(height: 433)
+                    // 배경 그라데이션 (스타일 정보가 없을 때만 표시)
+                    if !hasStyleInfo {
+                        VStack {
+                            Spacer()
+                            LinearGradient(
+                                gradient: Gradient(stops: [
+                                    .init(color: Color(hex: "0090FF").opacity(0), location: 0),
+                                    .init(color: Color(hex: "0090FF").opacity(0.4), location: 1)
+                                ]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: 433)
+                        }
+                        .offset(y: 58 + safeAreaBottom) // bottom 기준으로 위로 올림
+                        .allowsHitTesting(false) // 터치 이벤트가 뒤의 콘텐츠로 전달되도록
+                        .zIndex(-1)
                     }
-                    .offset(y: 58 + safeAreaBottom) // bottom 기준으로 위로 올림
-                    .allowsHitTesting(false) // 터치 이벤트가 뒤의 콘텐츠로 전달되도록
-                    .zIndex(-1)
                 }
             }
             .scrollDisabled(false)
@@ -554,10 +562,11 @@ public struct MyProfileView: View {
                 }
                 .appButtonStyle(.tint, size: .medium, height: 38)
                 .padding(.top, 24)
+                
+                decorativeCardsView
+                    .padding(.top, 16)
             }
             
-            decorativeCardsView
-                .padding(.top, 16)
         }
     }
     
