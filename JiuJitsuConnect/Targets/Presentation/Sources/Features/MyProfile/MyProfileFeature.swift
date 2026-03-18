@@ -78,6 +78,8 @@ public struct MyProfileFeature: Sendable {
             case registerStyleButtonTapped
             case weightVisibilityToggleButtonTapped
             case toastButtonTapped(ToastState.Action)
+            case addCompetitionButtonTapped  // 대회 정보 추가 버튼 탭
+            case competitionDetailTapped(Competition)  // 대회 정보 행 탭
         }
         
         public enum InternalAction: Sendable {
@@ -726,6 +728,18 @@ public struct MyProfileFeature: Sendable {
                 
             case .view(.toastButtonTapped):
                 return .send(.internal(.toastDismissed))
+                
+            case .view(.addCompetitionButtonTapped):
+                // TODO: 대회 정보 추가 화면으로 네비게이션
+                // 현재는 로그만 출력
+                Log.trace("대회 정보 추가 버튼 탭", category: .debug, level: .info)
+                return .send(.internal(.showToast(.init(message: "대회 정보 추가 기능은 준비 중입니다", style: .info))))
+                
+            case let .view(.competitionDetailTapped(competition)):
+                // TODO: 대회 정보 상세 화면으로 네비게이션
+                // 현재는 로그만 출력
+                Log.trace("대회 정보 탭: \(competition.competitionName)", category: .debug, level: .info)
+                return .none
                 
             case .destination, .sheet, .view, .internal:
                 return .none

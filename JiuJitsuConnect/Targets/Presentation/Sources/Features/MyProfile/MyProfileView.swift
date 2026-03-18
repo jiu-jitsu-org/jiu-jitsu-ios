@@ -136,8 +136,8 @@ public struct MyProfileView: View {
                             .padding(.bottom, -cardOverlapHeight) // 끌어올린 만큼 공간 제거
                             .zIndex(1) // 헤더 위에 표시
                         
-                        // 3. 스타일 영역
-                        styleSectionView
+                        // 3. 스타일 & 대회 정보 영역
+                        profileContentView
                             .padding(.top, 72) // 카드와의 간격
                             .padding(.bottom, 18)
                     }
@@ -511,7 +511,10 @@ public struct MyProfileView: View {
         }
     }
     
-    private var styleSectionView: some View {
+    // MARK: - Profile Content Section
+    
+    /// 프로필 콘텐츠 영역 (스타일 정보 + 대회 정보)
+    private var profileContentView: some View {
         let profile = store.communityProfile
         let hasStyleInfo = profile?.bestSubmission != nil ||
                           profile?.favoritePosition != nil ||
@@ -519,54 +522,69 @@ public struct MyProfileView: View {
         
         return VStack(spacing: 0) {
             if hasStyleInfo {
-                // 스타일 정보가 있을 때: 카드 그리드 표시
+                // 스타일 정보가 있을 때: 스타일 섹션 + 대회 정보 섹션 표시
                 VStack(alignment: .leading, spacing: 36) {
-                    // 포지션 섹션
-                    styleSection(
-                        title: "포지션",
-                        bestStyle: profile?.bestPosition,
-                        favoriteStyle: profile?.favoritePosition
-                    )
-                    
-                    // 기술 섹션
-                    styleSection(
-                        title: "기술",
-                        bestStyle: profile?.bestTechnique,
-                        favoriteStyle: profile?.favoriteTechnique
-                    )
-                    
-                    // 서브미션 섹션
-                    styleSection(
-                        title: "서브미션",
-                        bestStyle: profile?.bestSubmission,
-                        favoriteStyle: profile?.favoriteSubmission
-                    )
+                    styleSectionsView
+                    competitionSection
                 }
                 .padding(.horizontal, 24)
             } else {
-                
-                Text("나의 주짓수를 보여주세요")
-                    .font(Font.pretendard.title3)
-                    .foregroundStyle(Color.component.sectionHeader.title)
-                    .padding(.bottom, 8)
-
-                // 스타일 정보가 없을 때: 안내 문구 + 등록 버튼
-                Text("특기와 최애 포지션, 기술 등을 등록해보세요.")
-                    .font(Font.pretendard.bodyM)
-                    .foregroundStyle(Color.component.sectionHeader.subTitle)
-                
-                Button {
-                    store.send(.view(.registerStyleButtonTapped))
-                } label: {
-                    AppButtonConfiguration(title: "내 스타일 등록하기", size: .medium)
-                }
-                .appButtonStyle(.tint, size: .medium, height: 38)
-                .padding(.top, 24)
-                
-                decorativeCardsView
-                    .padding(.top, 16)
+                // 스타일 정보가 없을 때: 등록 유도 UI
+                emptyStyleView
             }
+        }
+    }
+    
+    /// 스타일 섹션들 (포지션 + 기술 + 서브미션)
+    private var styleSectionsView: some View {
+        let profile = store.communityProfile
+        
+        return VStack(alignment: .leading, spacing: 36) {
+            // 포지션 섹션
+            styleSection(
+                title: "포지션",
+                bestStyle: profile?.bestPosition,
+                favoriteStyle: profile?.favoritePosition
+            )
             
+            // 기술 섹션
+            styleSection(
+                title: "기술",
+                bestStyle: profile?.bestTechnique,
+                favoriteStyle: profile?.favoriteTechnique
+            )
+            
+            // 서브미션 섹션
+            styleSection(
+                title: "서브미션",
+                bestStyle: profile?.bestSubmission,
+                favoriteStyle: profile?.favoriteSubmission
+            )
+        }
+    }
+    
+    /// 스타일 정보가 없을 때 표시되는 뷰
+    private var emptyStyleView: some View {
+        VStack(spacing: 0) {
+            Text("나의 주짓수를 보여주세요")
+                .font(Font.pretendard.title3)
+                .foregroundStyle(Color.component.sectionHeader.title)
+                .padding(.bottom, 8)
+
+            Text("특기와 최애 포지션, 기술 등을 등록해보세요.")
+                .font(Font.pretendard.bodyM)
+                .foregroundStyle(Color.component.sectionHeader.subTitle)
+            
+            Button {
+                store.send(.view(.registerStyleButtonTapped))
+            } label: {
+                AppButtonConfiguration(title: "내 스타일 등록하기", size: .medium)
+            }
+            .appButtonStyle(.tint, size: .medium, height: 38)
+            .padding(.top, 24)
+            
+            decorativeCardsView
+                .padding(.top, 16)
         }
     }
     
@@ -697,6 +715,133 @@ public struct MyProfileView: View {
                 y: config.yPosition + config.height / 2
             )
             .zIndex(config.zIndex)
+    }
+    
+    // MARK: - Competition Section
+    
+    /// 대회 정보 섹션
+    private var competitionSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // 섹션 타이틀
+            Text("대회 정보")
+                .font(.pretendard.title3)
+                .foregroundStyle(Color.component.sectionHeader.title)
+            
+            // 대회 정보 컨테이너
+            if let competitions = store.communityProfile?.competitions, !competitions.isEmpty {
+                // 대회 정보가 있을 때
+                competitionListView(competitions: competitions)
+            } else {
+                // 대회 정보가 없을 때
+                emptyCompetitionView
+            }
+        }
+    }
+    
+    /// 대회 정보가 없을 때의 뷰
+    private var emptyCompetitionView: some View {
+        Button {
+            store.send(.view(.addCompetitionButtonTapped))
+        } label: {
+            HStack(spacing: 12) {
+                // 메달 아이콘
+                ZStack {
+                    Circle()
+                        .fill(Color.primitive.coolGray.cg50)
+                        .frame(width: 40, height: 40)
+                    
+                    // TODO: Assets에 메달 아이콘이 있다면 교체 필요
+                    Image(systemName: "trophy.fill")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 20, height: 20)
+                        .foregroundStyle(Color.primitive.coolGray.cg300)
+                }
+                
+                // 텍스트
+                Text("출전한 대회 정보를 입력해주세요")
+                    .font(.pretendard.bodyM)
+                    .foregroundStyle(Color.component.skillCard.default.titleTextEmpty)
+                
+                Spacer()
+                
+                // Chevron 아이콘
+                Image(systemName: "chevron.right")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 8, height: 14)
+                    .foregroundStyle(Color.primitive.coolGray.cg300)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 20)
+            .background(Color.component.skillCard.default.bg)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+        }
+        .buttonStyle(.plain)
+    }
+    
+    /// 대회 정보 리스트 뷰
+    private func competitionListView(competitions: [Competition]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(competitions.enumerated()), id: \.offset) { index, competition in
+                competitionRowView(competition: competition)
+                
+                // 마지막 항목이 아닐 경우 구분선 추가
+                if index < competitions.count - 1 {
+                    Rectangle()
+                        .fill(Color.primitive.coolGray.cg75)
+                        .frame(height: 1)
+                        .padding(.horizontal, 16)
+                }
+            }
+        }
+        .background(Color.component.skillCard.default.bg)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+    
+    /// 대회 정보 행 뷰
+    private func competitionRowView(competition: Competition) -> some View {
+        Button {
+            store.send(.view(.competitionDetailTapped(competition)))
+        } label: {
+            HStack(spacing: 12) {
+                // 메달 아이콘
+                medalIcon(for: competition.competitionRank)
+                
+                // 대회 이름
+                Text(competition.competitionName)
+                    .font(.pretendard.bodyM)
+                    .foregroundStyle(Color.component.skillCard.default.titleTextFilled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                
+                // 날짜 (YYYY.MM 형식)
+                Text(formatCompetitionDate(year: competition.competitionYear, month: competition.competitionMonth))
+                    .font(.pretendard.bodyS)
+                    .foregroundStyle(Color.primitive.coolGray.cg400)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 20)
+        }
+        .buttonStyle(.plain)
+    }
+    
+    /// 메달 아이콘 (순위에 따라)
+    private func medalIcon(for rank: CompetitionRank) -> some View {
+        ZStack {
+            Circle()
+                .fill(Color.primitive.coolGray.cg50)
+                .frame(width: 40, height: 40)
+            
+            // TODO: Assets에 메달 아이콘이 있다면 실제 이미지로 교체 필요
+            // 임시로 이모지 사용
+            Text(rank.emoji)
+                .font(.system(size: 20))
+        }
+    }
+    
+    /// 대회 날짜 포맷팅 (YYYY.MM 형식)
+    private func formatCompetitionDate(year: Int, month: Int) -> String {
+        return String(format: "%d.%02d", year, month)
     }
 }
 
