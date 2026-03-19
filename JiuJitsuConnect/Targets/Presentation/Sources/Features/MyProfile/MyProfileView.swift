@@ -138,8 +138,8 @@ public struct MyProfileView: View {
                         
                         // 3. 스타일 & 대회 정보 영역
                         profileContentView
-                            .padding(.top, 72) // 카드와의 간격
-                            .padding(.bottom, 18)
+                            .padding(.top, 36) // 카드와의 간격
+                            .padding(.horizontal, 20)
                     }
                     
                     // 배경 그라데이션 (스타일 정보가 없을 때만 표시)
@@ -527,10 +527,11 @@ public struct MyProfileView: View {
                     styleSectionsView
                     competitionSection
                 }
-                .padding(.horizontal, 24)
+                .padding(.bottom, 29)
             } else {
                 // 스타일 정보가 없을 때: 등록 유도 UI
                 emptyStyleView
+                    .padding(.bottom, 18)
             }
         }
     }
@@ -743,38 +744,31 @@ public struct MyProfileView: View {
         Button {
             store.send(.view(.addCompetitionButtonTapped))
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 // 메달 아이콘
-                ZStack {
-                    Circle()
-                        .fill(Color.primitive.coolGray.cg50)
-                        .frame(width: 40, height: 40)
-                    
-                    // TODO: Assets에 메달 아이콘이 있다면 교체 필요
-                    Image(systemName: "trophy.fill")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 20, height: 20)
-                        .foregroundStyle(Color.primitive.coolGray.cg300)
-                }
+                Assets.MyProfile.Icon.medalDefaultDisable.swiftUIImage
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
                 
                 // 텍스트
                 Text("출전한 대회 정보를 입력해주세요")
-                    .font(.pretendard.bodyM)
-                    .foregroundStyle(Color.component.skillCard.default.titleTextEmpty)
+                    .font(.pretendard.bodyS)
+                    .foregroundStyle(Color.component.list.setting.text)
                 
                 Spacer()
                 
                 // Chevron 아이콘
-                Image(systemName: "chevron.right")
+                Assets.Common.Icon.chevronRight.swiftUIImage
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 8, height: 14)
-                    .foregroundStyle(Color.primitive.coolGray.cg300)
+                    .frame(width: 18, height: 18)
+                    .foregroundStyle(Color.component.list.setting.icon)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 20)
-            .background(Color.component.skillCard.default.bg)
+            .frame(height: 56)  // 전체 높이 56으로 고정
+            .padding(.leading, 12)
+            .padding(.trailing, 20)
+            .background(Color.component.list.setting.background)
             .clipShape(RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(.plain)
