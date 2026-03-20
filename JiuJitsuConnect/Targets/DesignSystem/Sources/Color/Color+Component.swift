@@ -376,6 +376,17 @@ public struct ComponentColors {
         }
     }
     
+    // MARK: - Competition Card
+    public let competitionCard = CompetitionCard()
+    
+    public struct CompetitionCard {
+        public let titleText = Color.semantic.text.primary
+        public let cardBg = Color.semantic.surface.container
+        public let cardIcon = Color.semantic.icon.secondary
+        public let cardTextPrimary = Color.semantic.text.primary
+        public let cardTextSecondary = Color.semantic.text.tertiary
+    }
+    
     // MARK: - Skill Card
     public let skillCard = SkillCard()
     
