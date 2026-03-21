@@ -776,19 +776,12 @@ public struct MyProfileView: View {
     
     /// 대회 정보 리스트 뷰
     private func competitionListView(competitions: [Competition]) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 4) {
             ForEach(Array(competitions.enumerated()), id: \.offset) { index, competition in
                 competitionRowView(competition: competition)
-                
-                // 마지막 항목이 아닐 경우 구분선 추가
-                if index < competitions.count - 1 {
-                    Rectangle()
-                        .fill(Color.primitive.coolGray.cg75)
-                        .frame(height: 1)
-                        .padding(.horizontal, 16)
-                }
             }
         }
+        .padding(.vertical, 8)
         .background(Color.component.skillCard.default.bg)
         .clipShape(RoundedRectangle(cornerRadius: 18))
     }
@@ -798,38 +791,48 @@ public struct MyProfileView: View {
         Button {
             store.send(.view(.competitionDetailTapped(competition)))
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 // 메달 아이콘
                 medalIcon(for: competition.competitionRank)
                 
                 // 대회 이름
                 Text(competition.competitionName)
-                    .font(.pretendard.bodyM)
-                    .foregroundStyle(Color.component.skillCard.default.titleTextFilled)
+                    .font(.pretendard.bodyS)
+                    .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                
+                Spacer()
                 
                 // 날짜 (YYYY.MM 형식)
                 Text(formatCompetitionDate(year: competition.competitionYear, month: competition.competitionMonth))
-                    .font(.pretendard.bodyS)
-                    .foregroundStyle(Color.primitive.coolGray.cg400)
+                    .font(.pretendard.labelM)
+                    .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
             }
+            .frame(height: 40)
             .padding(.horizontal, 16)
-            .padding(.vertical, 20)
         }
         .buttonStyle(.plain)
     }
     
     /// 메달 아이콘 (순위에 따라)
     private func medalIcon(for rank: CompetitionRank) -> some View {
-        ZStack {
-            Circle()
-                .fill(Color.primitive.coolGray.cg50)
-                .frame(width: 40, height: 40)
-            
-            // TODO: Assets에 메달 아이콘이 있다면 실제 이미지로 교체 필요
-            // 임시로 이모지 사용
-            Text(rank.emoji)
-                .font(.system(size: 20))
+        medalImage(for: rank)
+            .resizable()
+            .scaledToFit()
+            .frame(width: 18, height: 18)
+    }
+    
+    /// 메달 이미지 반환 (순위에 따라)
+    private func medalImage(for rank: CompetitionRank) -> Image {
+        switch rank {
+        case .gold:
+            return Assets.MyProfile.Icon.medalGold.swiftUIImage
+        case .silver:
+            return Assets.MyProfile.Icon.medalSilver.swiftUIImage
+        case .bronze:
+            return Assets.MyProfile.Icon.medalBronze.swiftUIImage
+        case .participation:
+            return Assets.MyProfile.Icon.medalDefault.swiftUIImage
         }
     }
     
@@ -839,7 +842,7 @@ public struct MyProfileView: View {
     }
 }
 
-#Preview {
+#Preview("기본 - 대회 정보 없음") {
     MyProfileView(
         store: Store(
             initialState: MyProfileFeature.State(
@@ -856,6 +859,123 @@ public struct MyProfileView: View {
                         snsProvider: "apple",
                         deactivatedWithinGrace: false
                     )
+                )
+            )
+        ) {
+            MyProfileFeature()
+        }
+    )
+}
+#Preview("대회 정보 있음 - 다양한 메달") {
+    MyProfileView(
+        store: Store(
+            initialState: MyProfileFeature.State(
+                authInfo: AuthInfo(
+                    accessToken: "sample_token",
+                    refreshToken: "sample_refresh",
+                    tempToken: nil,
+                    isNewUser: false,
+                    userInfo: AuthInfo.UserInfo(
+                        userId: 1,
+                        email: "user@example.com",
+                        nickname: "주짓수 러버",
+                        profileImageUrl: nil,
+                        snsProvider: "apple",
+                        deactivatedWithinGrace: false
+                    )
+                ),
+                communityProfile: CommunityProfile(
+                    nickname: "주짓수 러버",
+                    profileImageUrl: nil,
+                    beltRank: .blue,
+                    beltStripe: .two,
+                    gender: .male,
+                    weightKg: 75.0,
+                    academyName: "그라시에 바하 주짓수",
+                    competitions: [
+                        Competition(
+                            competitionYear: 2025,
+                            competitionMonth: 11,
+                            competitionName: "2025 서울 오픈 챔피언십",
+                            competitionRank: .gold
+                        ),
+                        Competition(
+                            competitionYear: 2025,
+                            competitionMonth: 8,
+                            competitionName: "전국 주짓수 선수권 대회",
+                            competitionRank: .silver
+                        ),
+                        Competition(
+                            competitionYear: 2025,
+                            competitionMonth: 5,
+                            competitionName: "부산 국제 주짓수 대회",
+                            competitionRank: .bronze
+                        ),
+                        Competition(
+                            competitionYear: 2025,
+                            competitionMonth: 3,
+                            competitionName: "강남 주짓수 토너먼트",
+                            competitionRank: .participation
+                        )
+                    ],
+                    bestSubmission: .chokes,
+                    favoriteSubmission: .armLocks,
+                    bestTechnique: .guardPasses,
+                    favoriteTechnique: .sweeps,
+                    bestPosition: .top,
+                    favoritePosition: .guard,
+                    isWeightHidden: false,
+                    isOwner: true
+                )
+            )
+        ) {
+            MyProfileFeature()
+        }
+    )
+}
+
+#Preview("대회 정보 1개") {
+    MyProfileView(
+        store: Store(
+            initialState: MyProfileFeature.State(
+                authInfo: AuthInfo(
+                    accessToken: "sample_token",
+                    refreshToken: "sample_refresh",
+                    tempToken: nil,
+                    isNewUser: false,
+                    userInfo: AuthInfo.UserInfo(
+                        userId: 1,
+                        email: "user@example.com",
+                        nickname: "주짓수 초보",
+                        profileImageUrl: nil,
+                        snsProvider: "apple",
+                        deactivatedWithinGrace: false
+                    )
+                ),
+                communityProfile: CommunityProfile(
+                    nickname: "주짓수 초보",
+                    profileImageUrl: nil,
+                    beltRank: .white,
+                    beltStripe: BeltStripe.none,
+                    gender: .female,
+                    weightKg: 58.0,
+                    academyName: "주짓수 도장",
+                    competitions: [
+                        Competition(
+                            competitionYear: 2026,
+                            competitionMonth: 1,
+                            competitionName: "신년 주짓수 페스티벌",
+                            competitionRank: .gold
+                        )
+                    ],
+                    bestSubmission: .legLocks,
+                    favoriteSubmission: .chokes,
+                    bestTechnique: .escapes,
+                    favoriteTechnique: .takedowns,
+                    bestPosition: .guard,
+                    favoritePosition: .top,
+                    isWeightHidden: false,
+                    isOwner: true
                 )
             )
         ) {
