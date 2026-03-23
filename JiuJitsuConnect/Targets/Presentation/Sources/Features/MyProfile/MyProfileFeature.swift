@@ -34,6 +34,10 @@ public struct MyProfileFeature: Sendable {
         // 벨트 설정 임시 저장 (최초 설정 시 벨트 정보를 체급 설정으로 전달하기 위해)
         var tempBeltInfo: TempBeltInfo?
         
+        // TODO: 테스트 기간 동안만 사용 - 운영 배포 전 제거 필요
+        // 디버그용: 데이터가 리셋된 상태인지 추적
+        var isDataReset: Bool = false
+        
         public init(authInfo: AuthInfo, communityProfile: CommunityProfile? = nil) {
             self.authInfo = authInfo
             self.communityProfile = communityProfile
@@ -80,6 +84,9 @@ public struct MyProfileFeature: Sendable {
             case toastButtonTapped(ToastState.Action)
             case addCompetitionButtonTapped  // 대회 정보 추가 버튼 탭
             case competitionDetailTapped(Competition)  // 대회 정보 행 탭
+            
+            // TODO: 테스트 기간 동안만 사용 - 운영 배포 전 제거 필요
+            case debugResetDataButtonTapped  // 디버그용 데이터 리셋 버튼 (리셋 상태에서는 데이터 불러오기 버튼)
         }
         
         public enum InternalAction: Sendable {
@@ -115,6 +122,9 @@ public struct MyProfileFeature: Sendable {
             
             case showToast(ToastState)
             case toastDismissed
+            
+            // TODO: 테스트 기간 동안만 사용 - 운영 배포 전 제거 필요
+            case debugResetAllData  // 디버그용 모든 데이터 리셋
         }
     }
     
@@ -126,6 +136,8 @@ public struct MyProfileFeature: Sendable {
         Reduce { state, action in
             switch action {
             case .view(.onAppear):
+                // 데이터 리셋 상태에서는 자동으로 로드하지 않음
+                guard !state.isDataReset else { return .none }
                 return .send(.internal(.loadProfile))
                 
             case .internal(.loadProfile):
@@ -139,6 +151,7 @@ public struct MyProfileFeature: Sendable {
             case let .internal(.profileResponse(.success(profile))):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
+                state.isDataReset = false  // 데이터 로드 성공 시 리셋 상태 해제
                 return .none
                 
             case let .internal(.profileResponse(.failure(error))):
@@ -740,6 +753,32 @@ public struct MyProfileFeature: Sendable {
                 // 현재는 로그만 출력
                 Log.trace("대회 정보 탭: \(competition.competitionName)", category: .debug, level: .info)
                 return .none
+                
+            // MARK: - Debug Actions (테스트 전용)
+            
+            case .view(.debugResetDataButtonTapped):
+                // TODO: 테스트 기간 동안만 사용 - 운영 배포 전 제거 필요
+                if state.isDataReset {
+                    // 리셋 상태에서 버튼 탭 = 데이터 다시 불러오기
+                    Log.trace("🔄 디버그: 데이터 다시 불러오기", category: .debug, level: .info)
+                    state.isDataReset = false
+                    return .send(.internal(.loadProfile))
+                } else {
+                    // 일반 상태에서 버튼 탭 = 데이터 리셋
+                    Log.trace("🔄 디버그: 데이터 리셋 버튼 탭", category: .debug, level: .info)
+                    return .send(.internal(.debugResetAllData))
+                }
+                
+            case .internal(.debugResetAllData):
+                // TODO: 테스트 기간 동안만 사용 - 운영 배포 전 제거 필요
+                Log.trace("🔄 디버그: 모든 데이터를 초기화합니다", category: .debug, level: .info)
+                
+                // 프로필을 nil로 설정하여 빈 화면 표시
+                state.communityProfile = nil
+                state.isDataReset = true
+                state.isLoadingProfile = false
+                
+                return .send(.internal(.showToast(.init(message: "데이터를 초기화했어요. '내 데이터 불러오기'를 눌러 복원하세요", style: .info))))
                 
             case .destination, .sheet, .view, .internal:
                 return .none

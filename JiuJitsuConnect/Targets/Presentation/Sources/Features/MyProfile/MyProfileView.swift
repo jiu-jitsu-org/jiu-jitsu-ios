@@ -96,7 +96,31 @@ public struct MyProfileView: View {
             .navigationDestinations(store: $store)
             .toastOverlay(store: store)
             .sheetPresentation(store: $store)
+            .overlay(alignment: .bottomTrailing) {
+                // TODO: 테스트 기간 동안만 사용 - 운영 배포 전 제거 필요
+                debugDataResetButton
+            }
         }
+    }
+    
+    // MARK: - Debug Components
+    
+    /// 디버그용 데이터 리셋 버튼 (테스트 전용)
+    private var debugDataResetButton: some View {
+        Button {
+            store.send(.view(.debugResetDataButtonTapped))
+        } label: {
+            Text(store.isDataReset ? "📥 내 데이터 불러오기" : "🔄 데이터 리셋")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(store.isDataReset ? Color.blue.opacity(0.8) : Color.red.opacity(0.8))
+                .cornerRadius(8)
+                .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+        }
+        .padding(.trailing, 20)
+        .padding(.bottom, 20)
     }
     
     // MARK: - View Components
