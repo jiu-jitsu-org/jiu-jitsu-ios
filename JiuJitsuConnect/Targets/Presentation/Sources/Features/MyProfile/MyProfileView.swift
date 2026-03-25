@@ -110,7 +110,7 @@ public struct MyProfileView: View {
         Button {
             store.send(.view(.debugResetDataButtonTapped))
         } label: {
-            Text(store.isDataReset ? "📥 내 데이터 불러오기" : "🔄 데이터 리셋")
+            Text(store.isDataReset ? "📥 내 데이터 불러오기" : "🔄 데이터 리셋 (UI 확인용)")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(.white)
                 .padding(.horizontal, 12)
@@ -128,9 +128,9 @@ public struct MyProfileView: View {
     /// 헤더 영역
     private func headerView(safeAreaTop: CGFloat) -> some View {
         MyProfileHeaderView(
-            nickname: store.communityProfile?.nickname ?? store.authInfo.userInfo?.nickname ?? "",
-            academyName: store.communityProfile?.academyName,
-            profileImageUrl: store.communityProfile?.profileImageUrl,
+            nickname: store.isDataReset ? "" : (store.communityProfile?.nickname ?? store.authInfo.userInfo?.nickname ?? ""),
+            academyName: store.isDataReset ? nil : store.communityProfile?.academyName,
+            profileImageUrl: store.isDataReset ? nil : store.communityProfile?.profileImageUrl,
             beltRank: store.communityProfile?.beltRank,
             safeAreaTop: safeAreaTop,
             onNicknameEditTapped: { store.send(.view(.nicknameEditButtonTapped)) },

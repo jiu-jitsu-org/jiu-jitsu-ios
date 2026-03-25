@@ -112,7 +112,7 @@ public struct BeltWeightCardView: View {
     // MARK: - Empty Content
     
     private var emptyContent: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 24) {
             VStack(spacing: 8) {
                 // 아이콘 영역
                 HStack(spacing: 5) {
