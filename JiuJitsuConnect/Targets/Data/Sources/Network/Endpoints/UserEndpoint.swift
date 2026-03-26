@@ -12,6 +12,7 @@ enum UserEndpoint {
     case signup(request: SignupRequestDTO, tempToken: String)
     case checkNickname(request: CheckNicknameRequestDTO)
     case withdrawal
+    case registerAppInfo(request: AppInfoRequestDTO)
 }
 
 extension UserEndpoint: Endpoint {
@@ -29,6 +30,8 @@ extension UserEndpoint: Endpoint {
             return "/api/user"
         case .checkNickname:
             return "/api/user/check/nickname"
+        case .registerAppInfo:
+            return "/api/user/appInfo"
         }
     }
     
@@ -36,7 +39,7 @@ extension UserEndpoint: Endpoint {
         switch self {
         case .checkNickname:
             return .get
-        case .signup:
+        case .signup, .registerAppInfo:
             return .post
         case .withdrawal:
             return .delete
@@ -63,6 +66,8 @@ extension UserEndpoint: Endpoint {
     var body: Data? {
         switch self {
         case .signup(let request, _):
+            return try? JSONEncoder().encode(request)
+        case .registerAppInfo(let request):
             return try? JSONEncoder().encode(request)
         default: return nil
         }
