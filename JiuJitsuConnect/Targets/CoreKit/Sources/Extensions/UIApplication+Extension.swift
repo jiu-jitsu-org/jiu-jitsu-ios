@@ -14,8 +14,7 @@ public extension UIApplication {
         await MainActor.run {
             // 현재 연결되고 활성화된 Scene들을 필터링합니다.
             let windowScene = UIApplication.shared.connectedScenes
-                .filter { $0.activationState == .foregroundActive }
-                .first as? UIWindowScene
+                .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
             
             // 해당 Scene에서 현재 Key Window의 Root ViewController를 찾아 반환합니다.
             return windowScene?.windows.first(where: { $0.isKeyWindow })?.rootViewController

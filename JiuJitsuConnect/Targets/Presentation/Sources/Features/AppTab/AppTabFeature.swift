@@ -131,6 +131,8 @@ public struct CommunityFeature: Sendable {
     
     @ObservableState
     public struct State: Equatable { public init() {} }
+    
     public enum Action: Sendable {}
+    
     public var body: some ReducerOf<Self> { EmptyReducer() }
 }

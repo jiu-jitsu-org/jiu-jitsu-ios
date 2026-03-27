@@ -177,13 +177,10 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
         _ = geometry.frame(in: .global).midY
         
         // 모든 항목을 순회하면서 가장 중앙에 가까운 항목 찾기
-        for item in items {
+        for item in items where item.id != currentSelectedId {
             // 각 항목의 ID를 기준으로 현재 위치 확인이 어려우므로
             // 대신 현재 화면에 보이는 항목 중 중앙에 가까운 것을 찾습니다
-            if item.id == currentSelectedId {
-                // 이미 선택된 항목이면 스킵
-                continue
-            }
+            // (이미 선택된 항목은 제외됨)
         }
         
         // ScrollView의 현재 위치를 정확히 알기 어렵기 때문에

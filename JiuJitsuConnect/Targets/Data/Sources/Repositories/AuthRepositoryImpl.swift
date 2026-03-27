@@ -227,9 +227,12 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     // MARK: - ASAuthorizationControllerPresentationContextProviding
     
     public func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        // findRootViewController()를 통해 현재 활성화된 window를 반환합니다.
-        // 이 메서드는 MainActor에서 호출되므로 try! 사용이 비교적 안전합니다.
-        return try! findRootViewController().view.window!
+        guard let windowScene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
+              let window = windowScene.windows.first(where: { $0.isKeyWindow }) else {
+            // 절대 도달하지 않는 경로
+            fatalError("No active window found for Apple Sign In")
+        }
+        return window
     }
     
     public func signOut() async throws {

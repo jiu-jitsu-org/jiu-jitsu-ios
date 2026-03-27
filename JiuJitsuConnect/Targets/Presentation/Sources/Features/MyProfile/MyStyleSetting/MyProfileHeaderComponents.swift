@@ -108,7 +108,7 @@ public struct MyProfileHeaderView: View {
 // MARK: - ProfileImageView
 
 /// 프로필 이미지 컴포넌트
-fileprivate struct ProfileImageView: View {
+private struct ProfileImageView: View {
     let profileImageUrl: String?
     let size: CGFloat
     let cornerRadius: CGFloat
@@ -155,7 +155,7 @@ fileprivate struct ProfileImageView: View {
 // MARK: - NicknameEditRow
 
 /// 닉네임 + 수정 버튼 행
-fileprivate struct NicknameEditRow: View {
+private struct NicknameEditRow: View {
     let nickname: String
     let height: CGFloat
     let onEditTapped: () -> Void
@@ -191,7 +191,7 @@ fileprivate struct NicknameEditRow: View {
 // MARK: - AcademyNameEditRow
 
 /// 도장명 + 수정 버튼 행
-fileprivate struct AcademyNameEditRow: View {
+private struct AcademyNameEditRow: View {
     let academyName: String
     let height: CGFloat
     let onEditTapped: () -> Void

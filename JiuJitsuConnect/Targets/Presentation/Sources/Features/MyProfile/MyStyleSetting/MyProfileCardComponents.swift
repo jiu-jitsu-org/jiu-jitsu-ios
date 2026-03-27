@@ -169,7 +169,7 @@ public struct BeltWeightCardView: View {
 // MARK: - BeltSection
 
 /// 벨트 정보 섹션
-fileprivate struct BeltSection: View {
+private struct BeltSection: View {
     let beltRank: BeltRank?
     let beltStripe: BeltStripe?
     let onTapped: () -> Void
@@ -223,7 +223,7 @@ fileprivate struct BeltSection: View {
 // MARK: - WeightSection
 
 /// 체급 정보 섹션
-fileprivate struct WeightSection: View {
+private struct WeightSection: View {
     let weightKg: Double?
     let isHidden: Bool
     let onTapped: () -> Void
