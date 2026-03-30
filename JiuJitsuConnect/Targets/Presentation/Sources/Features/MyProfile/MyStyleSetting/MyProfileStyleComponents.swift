@@ -58,7 +58,7 @@ public struct MyProfileStyleSectionView: View {
 // MARK: - StyleCategorySection
 
 /// 개별 스타일 카테고리 섹션 (포지션/기술/서브미션)
-fileprivate struct StyleCategorySection: View {
+private struct StyleCategorySection: View {
     let title: String
     let bestStyle: (any StyleSelectable)?
     let favoriteStyle: (any StyleSelectable)?
@@ -99,7 +99,7 @@ fileprivate struct StyleCategorySection: View {
 // MARK: - FilledStyleCardItem
 
 /// 스타일 정보가 있는 카드 아이템
-fileprivate struct FilledStyleCardItem: View {
+private struct FilledStyleCardItem: View {
     let label: String
     let style: any StyleSelectable
     let onTapped: () -> Void
@@ -147,7 +147,7 @@ fileprivate struct FilledStyleCardItem: View {
 // MARK: - EmptyStyleCardItem
 
 /// 스타일 정보가 없는 빈 카드 아이템
-fileprivate struct EmptyStyleCardItem: View {
+private struct EmptyStyleCardItem: View {
     let label: String
     let onTapped: () -> Void
     
@@ -233,7 +233,7 @@ public struct EmptyStyleView: View {
 // MARK: - DecorativeCardsView
 
 /// 장식용 스타일 카드 배치 뷰
-fileprivate struct DecorativeCardsView: View {
+private struct DecorativeCardsView: View {
     private enum Metrics {
         static let height: CGFloat = 282
     }
@@ -269,7 +269,7 @@ fileprivate struct DecorativeCardsView: View {
 // MARK: - DecorativeCardConfig
 
 /// 장식용 카드 설정
-fileprivate struct DecorativeCardConfig {
+private struct DecorativeCardConfig {
     let image: Image
     let width: CGFloat
     let height: CGFloat

@@ -44,7 +44,7 @@ public struct MyProfileCompetitionSection: View {
 // MARK: - CompetitionListView
 
 /// 대회 정보 리스트 (정보가 있을 때)
-fileprivate struct CompetitionListView: View {
+private struct CompetitionListView: View {
     let competitions: [Competition]
     let onCompetitionDetailTapped: (Competition) -> Void
     
@@ -56,7 +56,7 @@ fileprivate struct CompetitionListView: View {
     
     var body: some View {
         VStack(spacing: Metrics.rowSpacing) {
-            ForEach(Array(competitions.enumerated()), id: \.offset) { index, competition in
+            ForEach(Array(competitions.enumerated()), id: \.offset) { _, competition in
                 CompetitionRowView(
                     competition: competition,
                     onTapped: { onCompetitionDetailTapped(competition) }
@@ -72,7 +72,7 @@ fileprivate struct CompetitionListView: View {
 // MARK: - CompetitionRowView
 
 /// 개별 대회 정보 행
-fileprivate struct CompetitionRowView: View {
+private struct CompetitionRowView: View {
     let competition: Competition
     let onTapped: () -> Void
     
@@ -117,7 +117,7 @@ fileprivate struct CompetitionRowView: View {
 // MARK: - EmptyCompetitionView
 
 /// 대회 정보가 없을 때의 뷰
-fileprivate struct EmptyCompetitionView: View {
+private struct EmptyCompetitionView: View {
     let onAddCompetitionTapped: () -> Void
     
     private enum Metrics {

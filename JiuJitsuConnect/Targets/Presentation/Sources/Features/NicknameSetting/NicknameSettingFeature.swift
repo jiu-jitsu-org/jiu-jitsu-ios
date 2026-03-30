@@ -239,7 +239,10 @@ public struct NicknameSettingFeature: Sendable {
                 return .none
             }
             
-            fallthrough
+            // Other API errors fall through to default handling
+            state.validationState = .networkError
+            state.isKeyboardVisible = false
+            return .send(.delegate(.signupFailed(message: "오류가 발생했습니다. 다시 시도해주세요.")))
             
         default:
             state.validationState = .networkError
