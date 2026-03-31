@@ -21,9 +21,9 @@ public struct NicknameSettingFeature: Sendable {
     private enum CancelID { case apiCall }
     
     // 정규식 객체 재사용을 위한 Static 선언
-    private static let nicknameRegex: NSRegularExpression = {
+    private static let nicknameRegex: NSRegularExpression? = {
         let pattern = "^[a-zA-Z0-9가-힣\\s_.]*$"
-        return try! NSRegularExpression(pattern: pattern, options: .caseInsensitive)
+        return try? NSRegularExpression(pattern: pattern, options: .caseInsensitive)
     }()
     
     @ObservableState
@@ -213,8 +213,11 @@ public struct NicknameSettingFeature: Sendable {
 
     // 정규식 검사 최적화
     private func isValid(nickname: String) -> Bool {
+        guard let regex = Self.nicknameRegex else {
+            return false
+        }
         let range = NSRange(location: 0, length: nickname.utf16.count)
-        return Self.nicknameRegex.firstMatch(in: nickname, options: [], range: range) != nil
+        return regex.firstMatch(in: nickname, options: [], range: range) != nil
     }
     
     private func handleApiFailure(state: inout State, error: Error) -> Effect<Action> {
