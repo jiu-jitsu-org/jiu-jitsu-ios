@@ -76,6 +76,9 @@ let appInfoPlist: [String: Plist.Value] = {
         "LSApplicationQueriesSchemes": [
             "kakaokompassauth",
             "kakaolink"
+        ],
+        "UIBackgroundModes": [
+            "remote-notification"
         ]
     ]
     return base
@@ -121,7 +124,10 @@ let project = Project(
                 .target(name: "Data"),
                 .target(name: "CoreKit"),
                 .external(name: "Pulse"),
-                .external(name: "PulseUI")
+                .external(name: "PulseUI"),
+                .external(name: "FirebaseCore"),
+                .external(name: "FirebaseMessaging"),
+                .external(name: "GoogleSignIn")
             ],
             settings: .settings(
                 base: [
@@ -184,8 +190,7 @@ let project = Project(
             bundleId: "com.jiujitsulab.connect.data",
             deploymentTargets: appDeploymentTargets,
             infoPlist: .default,
-            sources: ["Targets/Data/Sources/**",
-                      "Secrets/GoogleService-Info.plist"],
+            sources: ["Targets/Data/Sources/**"],
             scripts: [swiftlintScript],
             dependencies: [
                 .target(name: "Domain"),
