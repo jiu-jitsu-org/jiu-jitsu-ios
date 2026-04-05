@@ -22,6 +22,15 @@ extension CheckNicknameRequestDTO {
     }
 }
 
+extension AppInfoRequestDTO {
+    init(info: AppInfo) {
+        self.fcmToken = info.fcmToken
+        self.deviceId = info.deviceId
+        self.osType = info.osType
+        self.osVersion = info.osVersion
+    }
+}
+
 // MARK: - DTO to Domain
 extension SignupResponseDTO {
     func toDomain() -> AuthInfo {

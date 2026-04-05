@@ -88,10 +88,7 @@ public final class UserRepositoryImpl: NSObject, UserRepository {
     
     public func registerAppInfo(info: AppInfo) async throws -> Bool {
         do {
-            // 1. Domain 모델을 Data 모델로 변환
             let requestDTO = AppInfoRequestDTO(info: info)
-            
-            // 2. 변환된 DTO를 사용하여 API Endpoint 생성 및 요청
             let endpoint = UserEndpoint.registerAppInfo(request: requestDTO)
             let responseDTO: Bool = try await networkService.request(endpoint: endpoint)
             

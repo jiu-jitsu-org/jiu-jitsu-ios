@@ -81,25 +81,25 @@ public extension DependencyValues {
 extension AuthClient {
     static let unimplemented: Self = Self(
         loginWithGoogle: {
-            fatalError("AuthClient.loginWithGoogle is not implemented")
+            fatalError("unimplemented.loginWithGoogle is not implemented")
         },
         loginWithApple: {
-            fatalError("AuthClient.loginWithApple is not implemented")
+            fatalError("unimplemented.loginWithApple is not implemented")
         },
         loginWithKakao: {
-            fatalError("AuthClient.loginWithKakao is not implemented")
+            fatalError("unimplemented.loginWithKakao is not implemented")
         },
         serverLogin: { _ in
-            fatalError("AuthClient.serverLogin is not implemented")
+            fatalError("unimplemented.serverLogin is not implemented")
         },
         serverLogout: {
-            fatalError("AuthClient.serverLogout is not implemented")
+            fatalError("unimplemented.serverLogout is not implemented")
         },
         autoLogin: {
-            fatalError("AuthClient.autoLogin is not implemented")
+            fatalError("unimplemented.autoLogin is not implemented")
         },
         hasValidToken: {
-            fatalError("AuthClient.hasValidToken is not implemented")
+            fatalError("unimplemented.hasValidToken is not implemented")
         }
     )
 }

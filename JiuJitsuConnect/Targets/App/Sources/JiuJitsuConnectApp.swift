@@ -61,10 +61,13 @@ struct JiuJitsuConnectApp: App {
     private func createStore() -> StoreOf<AppFeature> {
         // 테스트 환경이 아닐 때만 Live 의존성 주입
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
+            let firebaseClient = DependencyContainer.shared.configureFirebaseClient()
+            firebaseClient.configure()
             return Store(
                 initialState: AppFeature.State(),
                 reducer: { AppFeature() },
                 withDependencies: {
+                    $0.firebaseClient = firebaseClient
                     $0.authClient = DependencyContainer.shared.configureAuthClient()
                     $0.userClient = DependencyContainer.shared.configureUserClient()
                     $0.communityClient = DependencyContainer.shared.configureCommunityClient()

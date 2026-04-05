@@ -12,6 +12,7 @@ enum UserEndpoint {
     case signup(request: SignupRequestDTO, tempToken: String)
     case checkNickname(request: CheckNicknameRequestDTO)
     case withdrawal
+    /// 회원 앱 정보 등록 (Swagger: POST `/user/appInfo` — 서버 라우팅에 맞춰 `/api/user/appInfo`)
     case registerAppInfo(request: AppInfoRequestDTO)
 }
 
