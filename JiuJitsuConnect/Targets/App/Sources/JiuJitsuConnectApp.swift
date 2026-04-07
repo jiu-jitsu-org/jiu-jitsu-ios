@@ -10,6 +10,8 @@ import PulseUI
 
 @main
 struct JiuJitsuConnectApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     init() {
         configureGoogleSignIn()
         configureKakaoSDK()
