@@ -79,7 +79,8 @@ let appInfoPlist: [String: Plist.Value] = {
         ],
         "UIBackgroundModes": [
             "remote-notification"
-        ]
+        ],
+        "FirebaseAppDelegateProxyEnabled": false
     ]
     return base
 }()
@@ -136,6 +137,7 @@ let project = Project(
                     "CODE_SIGN_IDENTITY": "iPhone Developer",
                     "CODE_SIGNING_REQUIRED": "YES",
                     "OTHER_LDFLAGS": "-ObjC",
+                    "CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION": "YES",
                 ],
                 debug: [
                     "OTHER_SWIFT_FLAGS": "-D DEBUG $(inherited) -Xfrontend -warn-long-function-bodies=500 -Xfrontend -warn-long-expression-type-checking=500 -Xfrontend -debug-time-function-bodies -Xfrontend -debug-time-expression-type-checking -Xfrontend -enable-actor-data-race-checks",
