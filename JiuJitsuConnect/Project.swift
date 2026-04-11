@@ -8,9 +8,10 @@ public let appDestinations: Destinations = [.iPhone, .iPad]
 let isAppStore = Environment.isAppStore.getBoolean(default: false)
 let additionalCondition = isAppStore ? "APPSTORE" : ""
 
-// MARK: - SwiftLint
-let swiftlintScript: TargetScript = .post(
+// MARK: - SwiftLint (스킴 `SwiftLint`로만 실행 — 일반 앱 빌드에서는 스크립트 미실행)
+let swiftlintScript: TargetScript = .pre(
     script: """
+    cd "${PROJECT_DIR}"
     if test -d "/opt/homebrew/bin/"; then
         export PATH="/opt/homebrew/bin/:${PATH}"
     fi
@@ -119,7 +120,6 @@ let project = Project(
                 .glob(pattern: .relativeToRoot("Targets/DesignSystem/Resources/**"))
             ],
             entitlements: "JiuJitsuConnect.entitlements",
-            scripts: [swiftlintScript],
             dependencies: [
                 .target(name: "Presentation"),
                 .target(name: "Data"),
@@ -141,7 +141,7 @@ let project = Project(
                 ],
                 debug: [
                     "OTHER_SWIFT_FLAGS": "-D DEBUG $(inherited) -Xfrontend -warn-long-function-bodies=500 -Xfrontend -warn-long-expression-type-checking=500 -Xfrontend -debug-time-function-bodies -Xfrontend -debug-time-expression-type-checking -Xfrontend -enable-actor-data-race-checks",
-                    "OTHER_LDFLAGS": "-Xlinker -interposable $(inherited)",
+                    "OTHER_LDFLAGS": "$(inherited)",
                     "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "\(additionalCondition) DEBUG",
                 ],
                 release: [
@@ -161,7 +161,6 @@ let project = Project(
             infoPlist: .default,
             sources: ["Targets/Presentation/Sources/**"],
             resources: ["Targets/Presentation/Resources/**"],
-            scripts: [swiftlintScript],
             dependencies: [
                 .target(name: "Domain"),
                 .target(name: "DesignSystem"),
@@ -178,7 +177,6 @@ let project = Project(
             deploymentTargets: appDeploymentTargets,
             infoPlist: .default,
             sources: ["Targets/Domain/Sources/**"],
-            scripts: [swiftlintScript],
             dependencies: [
                 .target(name: "CoreKit")
             ]
@@ -193,7 +191,6 @@ let project = Project(
             deploymentTargets: appDeploymentTargets,
             infoPlist: .default,
             sources: ["Targets/Data/Sources/**"],
-            scripts: [swiftlintScript],
             dependencies: [
                 .target(name: "Domain"),
                 .target(name: "CoreKit"),
@@ -214,7 +211,6 @@ let project = Project(
             deploymentTargets: appDeploymentTargets,
             infoPlist: .default,
             sources: ["Targets/CoreKit/Sources/**"],
-            scripts: [swiftlintScript],
             dependencies: []
         ),
         
@@ -228,11 +224,30 @@ let project = Project(
             infoPlist: .default,
             sources: ["Targets/DesignSystem/Sources/**"],
             resources: ["Targets/DesignSystem/Resources/**"],
-            scripts: [swiftlintScript],
             dependencies: [
                 .target(name: "CoreKit"),
                 .external(name: "Lottie")
             ]
+        ),
+        
+        // MARK: - SwiftLint (스킴 전용, 앱에 링크되지 않음)
+        .target(
+            name: "SwiftLint",
+            destinations: appDestinations,
+            product: .framework,
+            bundleId: "com.jiujitsulab.connect.swiftlint",
+            deploymentTargets: appDeploymentTargets,
+            infoPlist: .default,
+            sources: ["Targets/SwiftLint/Sources/**"],
+            scripts: [swiftlintScript],
+            dependencies: []
+        )
+    ],
+    schemes: [
+        .scheme(
+            name: "SwiftLint",
+            shared: true,
+            buildAction: .buildAction(targets: [.target("SwiftLint")])
         )
     ]
 )
