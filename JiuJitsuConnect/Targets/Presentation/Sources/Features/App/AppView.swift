@@ -10,33 +10,16 @@ public struct AppView: View {
   }
   
   public var body: some View {
-    switch store.state.destination {
-    case .splash:
-      if let splashStore = store.scope(state: \.destination?.splash, action: \.destination.splash) {
-        SplashView(store: splashStore)
-      }
-      
-    case .main:
-      if let mainStore = store.scope(state: \.destination?.main, action: \.destination.main) {
-        MainView(store: mainStore)
-      }
-      
-    case .login:
-      if let loginStore = store.scope(state: \.destination?.login, action: \.destination.login) {
-        LoginView(store: loginStore)
-      }
-        
-    case .appTab:
-      if let appTabStore = store.scope(state: \.destination?.appTab, action: \.destination.appTab) {
-        AppTabView(store: appTabStore)
-      }
-          
-    case .none:
+    if let splashStore = store.scope(state: \.destination?.splash, action: \.destination.splash) {
+      SplashView(store: splashStore)
+    } else if let loginStore = store.scope(state: \.destination?.login, action: \.destination.login) {
+      LoginView(store: loginStore)
+    } else if let appTabStore = store.scope(state: \.destination?.appTab, action: \.destination.appTab) {
+      AppTabView(store: appTabStore)
+    } else if let mainStore = store.scope(state: \.destination?.main, action: \.destination.main) {
+      MainView(store: mainStore)
+    } else {
       EmptyView()
-        
-    case .some:
-        EmptyView()
-
     }
   }
 }

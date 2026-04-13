@@ -9,6 +9,7 @@ public struct SplashFeature: Sendable {
 
     private enum CancelID: Hashable, Sendable {
         case onAppearLaunch
+        case fcmSync
     }
 
     @Dependency(\.continuousClock) var clock
@@ -18,6 +19,7 @@ public struct SplashFeature: Sendable {
 
     @ObservableState
     public struct State: Equatable {
+        var isLaunching = false
         @Presents public var alert: AlertState<Alert>?
 
         public init() {}
@@ -45,6 +47,8 @@ public struct SplashFeature: Sendable {
         Reduce { state, action in
             switch action {
             case .view(.onAppear):
+                guard !state.isLaunching else { return .none }
+                state.isLaunching = true
                 return .merge(
                     // FCM sync: 스플래시 라이프사이클과 무관하게 독립 실행
                     .run { _ in
@@ -52,7 +56,8 @@ public struct SplashFeature: Sendable {
                             firebaseClient: self.firebaseClient,
                             userClient: self.userClient
                         )
-                    },
+                    }
+                    .cancellable(id: CancelID.fcmSync, cancelInFlight: true),
                     // 스플래시 최소 대기 + 자동 로그인 병렬 (취소 가능)
                     .run { send in
                         async let splashDelay: Void = self.clock.sleep(for: .seconds(1.5))
