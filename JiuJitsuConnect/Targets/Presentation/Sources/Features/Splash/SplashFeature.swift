@@ -9,13 +9,10 @@ public struct SplashFeature: Sendable {
 
     private enum CancelID: Hashable, Sendable {
         case onAppearLaunch
-        case fcmSync
     }
 
     @Dependency(\.continuousClock) var clock
     @Dependency(\.authClient) var authClient
-    @Dependency(\.firebaseClient) var firebaseClient
-    @Dependency(\.userClient) var userClient
 
     @ObservableState
     public struct State: Equatable {
@@ -49,36 +46,25 @@ public struct SplashFeature: Sendable {
             case .view(.onAppear):
                 guard !state.isLaunching else { return .none }
                 state.isLaunching = true
-                return .merge(
-                    // FCM sync: 스플래시 라이프사이클과 무관하게 독립 실행
-                    .run { _ in
-                        await FCMAppInfoSync.syncOnAppLaunch(
-                            firebaseClient: self.firebaseClient,
-                            userClient: self.userClient
-                        )
+                return .run { send in
+                    async let splashDelay: Void = self.clock.sleep(for: .seconds(1.5))
+                    async let autoLoginResult = TaskResult {
+                        try await self.authClient.autoLogin()
                     }
-                    .cancellable(id: CancelID.fcmSync, cancelInFlight: true),
-                    // 스플래시 최소 대기 + 자동 로그인 병렬 (취소 가능)
-                    .run { send in
-                        async let splashDelay: Void = self.clock.sleep(for: .seconds(1.5))
-                        async let autoLoginResult = TaskResult {
-                            try await self.authClient.autoLogin()
-                        }
 
-                        let loginResult = await autoLoginResult
-                        _ = try await splashDelay
+                    let loginResult = await autoLoginResult
+                    _ = try await splashDelay
 
-                        switch loginResult {
-                        case let .success(authInfo):
-                            Log.trace("✅ Auto login check completed. AuthInfo: \(authInfo != nil)", category: .debug, level: .info)
-                            await send(.delegate(.finishedLaunch(authInfo: authInfo)))
-                        case let .failure(error):
-                            Log.trace("⚠️ Auto login failed: \(error)", category: .debug, level: .error)
-                            await send(.delegate(.finishedLaunch(authInfo: nil)))
-                        }
+                    switch loginResult {
+                    case let .success(authInfo):
+                        Log.trace("✅ Auto login check completed. AuthInfo: \(authInfo != nil)", category: .debug, level: .info)
+                        await send(.delegate(.finishedLaunch(authInfo: authInfo)))
+                    case let .failure(error):
+                        Log.trace("⚠️ Auto login failed: \(error)", category: .debug, level: .error)
+                        await send(.delegate(.finishedLaunch(authInfo: nil)))
                     }
-                    .cancellable(id: CancelID.onAppearLaunch, cancelInFlight: true)
-                )
+                }
+                .cancellable(id: CancelID.onAppearLaunch, cancelInFlight: true)
 
             case .alert(.presented(.goToUpdateTapped)):
                 // TODO: - 추후 업데이트 로직 구현 필요

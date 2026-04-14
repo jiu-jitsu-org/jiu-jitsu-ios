@@ -15,15 +15,22 @@ public enum FCMAppInfoSync: Sendable {
         firebaseClient: FirebaseClient,
         userClient: UserClient
     ) async -> Bool {
+        let token: String
         do {
-            let token = try await firebaseClient.getFCMToken()
+            token = try await firebaseClient.getFCMToken()
             firebaseClient.cacheToken(token)
+        } catch {
+            Log.trace("⚠️ 앱 진입: FCM 발급 실패 → 캐시 시도 (\(error))", category: .debug, level: .error)
+            return await syncUsingCachedTokenIfAny(firebaseClient: firebaseClient, userClient: userClient, context: "앱 진입")
+        }
+
+        do {
             try await registerAppInfo(fcmToken: token, userClient: userClient)
             Log.trace("✅ 앱 진입: FCM 발급 및 AppInfo 반영", category: .network, level: .info)
             return true
         } catch {
-            Log.trace("⚠️ 앱 진입: FCM 발급 실패 → 캐시 시도 (\(error))", category: .debug, level: .error)
-            return await syncUsingCachedTokenIfAny(firebaseClient: firebaseClient, userClient: userClient, context: "앱 진입")
+            Log.trace("⚠️ 앱 진입: AppInfo 등록 실패 (\(error))", category: .network, level: .error)
+            return false
         }
     }
 
@@ -42,14 +49,22 @@ public enum FCMAppInfoSync: Sendable {
                 Log.trace("⚠️ 로그인 후: 캐시 FCM AppInfo 실패 (\(error))", category: .network, level: .error)
             }
         }
+
+        let token: String
         do {
-            let token = try await firebaseClient.getFCMToken()
+            token = try await firebaseClient.getFCMToken()
             firebaseClient.cacheToken(token)
+        } catch {
+            Log.trace("⚠️ 로그인 후: FCM 발급 실패 (\(error))", category: .debug, level: .error)
+            return false
+        }
+
+        do {
             try await registerAppInfo(fcmToken: token, userClient: userClient)
             Log.trace("✅ 로그인 후: FCM 재발급 및 AppInfo 반영", category: .network, level: .info)
             return true
         } catch {
-            Log.trace("⚠️ 로그인 후: FCM 발급·AppInfo 모두 실패 (\(error))", category: .network, level: .error)
+            Log.trace("⚠️ 로그인 후: AppInfo 등록 실패 (\(error))", category: .network, level: .error)
             return false
         }
     }

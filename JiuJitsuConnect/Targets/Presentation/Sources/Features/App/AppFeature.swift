@@ -5,7 +5,7 @@ import Domain
 @Reducer
 public struct AppFeature: Sendable {
     public init() { }
-    
+
     @Reducer
     public enum Destination {
         case splash(SplashFeature)
@@ -14,41 +14,54 @@ public struct AppFeature: Sendable {
         case appTab(AppTabFeature)
         case login(LoginFeature)
     }
-    
+
     @ObservableState
     public struct State: Equatable {
         @Presents public var destination: Destination.State? = .splash(.init())
-        
+
         public init() {}
     }
-    
+
     public enum Action: Sendable {
         case destination(PresentationAction<Destination.Action>)
     }
-    
+
+    @Dependency(\.firebaseClient) var firebaseClient
+    @Dependency(\.userClient) var userClient
+
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
                 // MARK: - Navigation Logic
-                
+
             case let .destination(.presented(.splash(.delegate(.finishedLaunch(authInfo))))):
                 if let authInfo = authInfo {
-                    // 자동 로그인 성공 → 탭바 화면으로
                     state.destination = .appTab(.init(authInfo: authInfo))
                 } else {
-                    // 자동 로그인 실패 or 토큰 없음 → 로그인 화면으로
                     state.destination = .login(.init())
                 }
-                return .none
-                
+                // 앱 진입 FCM sync: AppFeature 라이프사이클로 실행 (취소되지 않음)
+                return .run { _ in
+                    await FCMAppInfoSync.syncOnAppLaunch(
+                        firebaseClient: self.firebaseClient,
+                        userClient: self.userClient
+                    )
+                }
+
             case let .destination(.presented(.login(.delegate(.didLogin(authInfo))))):
                 state.destination = .appTab(.init(authInfo: authInfo))
-                return .none
-                
+                // 로그인 성공 FCM sync
+                return .run { _ in
+                    await FCMAppInfoSync.syncAfterLoginSuccess(
+                        firebaseClient: self.firebaseClient,
+                        userClient: self.userClient
+                    )
+                }
+
             case .destination(.presented(.login(.delegate(.skipLogin)))):
                 state.destination = .appTab(.init(authInfo: .guest))
                 return .none
-                
+
             default:
                 return .none
             }

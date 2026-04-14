@@ -44,7 +44,6 @@ public struct LoginFeature: Sendable {
             case serverLoginResponse(TaskResult<AuthInfo>)
             case showToast(ToastState)
             case toastDismissed
-            case updateFCMTokenAfterLogin
         }
         
         public enum DelegateAction: Sendable {
@@ -67,8 +66,6 @@ public struct LoginFeature: Sendable {
     // MARK: - Dependencies
     @Dependency(\.authClient) var authClient
     @Dependency(\.continuousClock) var clock
-    @Dependency(\.firebaseClient) var firebaseClient
-    @Dependency(\.userClient) var userClient
     
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -123,10 +120,7 @@ public struct LoginFeature: Sendable {
                 } else {
                     // 2. 기존 유저일 경우
                     Log.trace("기존 유저 로그인 성공", category: .debug, level: .info)
-                    return .merge(
-                        .send(.delegate(.didLogin(authInfo))),
-                        .send(.internal(.updateFCMTokenAfterLogin))
-                    )
+                    return .send(.delegate(.didLogin(authInfo)))
                 }
                 return .none
                 
@@ -159,10 +153,7 @@ public struct LoginFeature: Sendable {
                     
                     // 회원가입 완료 확인
                 case let .element(id: _, action: .signupComplete(.delegate(.completeSignupFlow(info)))):
-                    return .merge(
-                        .send(.delegate(.didLogin(info))),
-                        .send(.internal(.updateFCMTokenAfterLogin))
-                    )
+                    return .send(.delegate(.didLogin(info)))
                     
                     // 닉네임 설정 실패
                 case let .element(id: _, action: .nicknameSetting(.delegate(.signupFailed(message)))):
@@ -189,15 +180,6 @@ public struct LoginFeature: Sendable {
                 
             case .view(.toastButtonTapped):
                 return .send(.internal(.toastDismissed))
-                
-            // MARK: - FCM Token Update
-            case .internal(.updateFCMTokenAfterLogin):
-                return .run { _ in
-                    _ = await FCMAppInfoSync.syncAfterLoginSuccess(
-                        firebaseClient: firebaseClient,
-                        userClient: userClient
-                    )
-                }
                 
             // MARK: - 기타 액션
             case .view(.aroundButtonTapped):
