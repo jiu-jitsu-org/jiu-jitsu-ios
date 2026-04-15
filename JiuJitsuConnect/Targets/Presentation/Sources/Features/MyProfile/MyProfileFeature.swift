@@ -80,6 +80,7 @@ public struct MyProfileFeature: Sendable {
             case beltTapped             // 이미 등록된 벨트 영역 탭 → 수정 모드로 시트 노출
             case weightClassTapped      // 이미 등록된 체급 영역 탭 → 체급 수정 시트 노출
             case registerStyleButtonTapped
+            case styleCardEditTapped(MyStyleSettingType)  // 프로필 스타일 카드 탭 → 해당 타입 수정 모드 진입
             case weightVisibilityToggleButtonTapped
             case toastButtonTapped(ToastState.Action)
             case addCompetitionButtonTapped  // 대회 정보 추가 버튼 탭
@@ -224,6 +225,23 @@ public struct MyProfileFeature: Sendable {
                 state.destination = .myStyleSetting(
                     MyStyleSettingFeature.State(
                         settingType: .position,
+                        mode: .register,
+                        bestPosition: state.communityProfile?.bestPosition,
+                        favoritePosition: state.communityProfile?.favoritePosition,
+                        bestSubmission: state.communityProfile?.bestSubmission,
+                        favoriteSubmission: state.communityProfile?.favoriteSubmission,
+                        bestTechnique: state.communityProfile?.bestTechnique,
+                        favoriteTechnique: state.communityProfile?.favoriteTechnique
+                    )
+                )
+                return .none
+                
+            case let .view(.styleCardEditTapped(type)):
+                // 프로필 카드 탭 → 해당 타입만 수정하는 edit 모드로 진입
+                state.destination = .myStyleSetting(
+                    MyStyleSettingFeature.State(
+                        settingType: type,
+                        mode: .edit,
                         bestPosition: state.communityProfile?.bestPosition,
                         favoritePosition: state.communityProfile?.favoritePosition,
                         bestSubmission: state.communityProfile?.bestSubmission,
@@ -640,43 +658,64 @@ public struct MyProfileFeature: Sendable {
             case let .internal(.positionBestSaved(profile)):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
-                // 최애 탭으로 전환은 MyStyleSettingFeature 내부에서 처리됨
+                // edit 모드: 화면 닫기 / register 모드: 최애 탭 전환은 MyStyleSettingFeature 내부에서 처리됨
+                if case let .myStyleSetting(styleState) = state.destination, styleState.mode == .edit {
+                    state.destination = nil
+                }
                 return .send(.internal(.showToast(.init(message: "포지션 특기를 저장했어요", style: .info))))
                 
             case let .internal(.positionFavoriteSaved(profile)):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
-                // 서브미션 설정 화면으로 이동
-                state.destination = .myStyleSetting(
-                    MyStyleSettingFeature.State(
-                        settingType: .submission,
-                        bestSubmission: profile.bestSubmission,
-                        favoriteSubmission: profile.favoriteSubmission
+                if case let .myStyleSetting(styleState) = state.destination, styleState.mode == .edit {
+                    // edit 모드: 화면 닫기
+                    state.destination = nil
+                } else {
+                    // register 모드: 서브미션 설정 화면으로 이동
+                    state.destination = .myStyleSetting(
+                        MyStyleSettingFeature.State(
+                            settingType: .submission,
+                            bestSubmission: profile.bestSubmission,
+                            favoriteSubmission: profile.favoriteSubmission
+                        )
                     )
-                )
+                }
                 return .send(.internal(.showToast(.init(message: "포지션 최애를 저장했어요", style: .info))))
                 
             case let .internal(.submissionBestSaved(profile)):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
+                // edit 모드: 화면 닫기 / register 모드: 최애 탭 전환은 MyStyleSettingFeature 내부에서 처리됨
+                if case let .myStyleSetting(styleState) = state.destination, styleState.mode == .edit {
+                    state.destination = nil
+                }
                 return .send(.internal(.showToast(.init(message: "서브미션 특기를 저장했어요", style: .info))))
                 
             case let .internal(.submissionFavoriteSaved(profile)):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
-                // 기술 설정 화면으로 이동
-                state.destination = .myStyleSetting(
-                    MyStyleSettingFeature.State(
-                        settingType: .technique,
-                        bestTechnique: profile.bestTechnique,
-                        favoriteTechnique: profile.favoriteTechnique
+                if case let .myStyleSetting(styleState) = state.destination, styleState.mode == .edit {
+                    // edit 모드: 화면 닫기
+                    state.destination = nil
+                } else {
+                    // register 모드: 기술 설정 화면으로 이동
+                    state.destination = .myStyleSetting(
+                        MyStyleSettingFeature.State(
+                            settingType: .technique,
+                            bestTechnique: profile.bestTechnique,
+                            favoriteTechnique: profile.favoriteTechnique
+                        )
                     )
-                )
+                }
                 return .send(.internal(.showToast(.init(message: "서브미션 최애를 저장했어요", style: .info))))
                 
             case let .internal(.techniqueBestSaved(profile)):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
+                // edit 모드: 화면 닫기 / register 모드: 최애 탭 전환은 MyStyleSettingFeature 내부에서 처리됨
+                if case let .myStyleSetting(styleState) = state.destination, styleState.mode == .edit {
+                    state.destination = nil
+                }
                 return .send(.internal(.showToast(.init(message: "기술 특기를 저장했어요", style: .info))))
                 
             case let .internal(.techniqueFavoriteSaved(profile)):

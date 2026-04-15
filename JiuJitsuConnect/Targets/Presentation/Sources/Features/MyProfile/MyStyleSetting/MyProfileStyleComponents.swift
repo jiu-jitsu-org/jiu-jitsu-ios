@@ -20,7 +20,7 @@ public struct MyProfileStyleSectionView: View {
     let bestSubmission: (any StyleSelectable)?
     let favoriteSubmission: (any StyleSelectable)?
     
-    let onRegisterStyleTapped: () -> Void
+    let onStyleCardTapped: (MyStyleSettingType) -> Void
     
     private enum Metrics {
         static let sectionSpacing: CGFloat = 36
@@ -33,7 +33,7 @@ public struct MyProfileStyleSectionView: View {
                 title: "포지션",
                 bestStyle: bestPosition,
                 favoriteStyle: favoritePosition,
-                onCardTapped: onRegisterStyleTapped
+                onCardTapped: { onStyleCardTapped(.position) }
             )
             
             // 기술 섹션
@@ -41,7 +41,7 @@ public struct MyProfileStyleSectionView: View {
                 title: "기술",
                 bestStyle: bestTechnique,
                 favoriteStyle: favoriteTechnique,
-                onCardTapped: onRegisterStyleTapped
+                onCardTapped: { onStyleCardTapped(.technique) }
             )
             
             // 서브미션 섹션
@@ -49,7 +49,7 @@ public struct MyProfileStyleSectionView: View {
                 title: "서브미션",
                 bestStyle: bestSubmission,
                 favoriteStyle: favoriteSubmission,
-                onCardTapped: onRegisterStyleTapped
+                onCardTapped: { onStyleCardTapped(.submission) }
             )
         }
     }
@@ -329,7 +329,7 @@ private struct DecorativeCardConfig {
         favoriteTechnique: TechniqueType.escapes,
         bestSubmission: SubmissionType.chokes,
         favoriteSubmission: SubmissionType.armLocks,
-        onRegisterStyleTapped: { print("스타일 등록") }
+        onStyleCardTapped: { type in print("스타일 카드 탭: \(type)") }
     )
     .padding()
     .background(Color.component.background.default)
@@ -343,7 +343,7 @@ private struct DecorativeCardConfig {
         favoriteTechnique: TechniqueType.escapes,
         bestSubmission: SubmissionType.chokes,
         favoriteSubmission: nil,
-        onRegisterStyleTapped: { print("스타일 등록") }
+        onStyleCardTapped: { type in print("스타일 카드 탭: \(type)") }
     )
     .padding()
     .background(Color.component.background.default)

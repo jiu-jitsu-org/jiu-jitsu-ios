@@ -318,6 +318,14 @@ extension TechniqueType: StyleSelectable {
 public struct MyStyleSettingFeature: Sendable {
     public init() {}
     
+    /// 화면 진입 모드
+    /// - register: 최초 등록 플로우 (포지션 → 서브미션 → 기술 순차 진행)
+    /// - edit: 개별 수정 (해당 타입만 수정 후 화면 닫기)
+    public enum Mode: Sendable, Equatable {
+        case register
+        case edit
+    }
+    
     public enum SelectionTab: String, CaseIterable, Equatable, Sendable {
         case best
         case favorite
@@ -332,6 +340,9 @@ public struct MyStyleSettingFeature: Sendable {
     
     @ObservableState
     public struct State: Equatable, Sendable {
+        // 진입 모드 (register: 순차 등록 플로우, edit: 개별 수정)
+        var mode: Mode
+        
         // 설정 타입 (포지션/서브미션/기술)
         var settingType: MyStyleSettingType
         
@@ -352,6 +363,7 @@ public struct MyStyleSettingFeature: Sendable {
         
         public init(
             settingType: MyStyleSettingType,
+            mode: Mode = .register,
             bestPosition: PositionType? = nil,
             favoritePosition: PositionType? = nil,
             bestSubmission: SubmissionType? = nil,
@@ -359,6 +371,7 @@ public struct MyStyleSettingFeature: Sendable {
             bestTechnique: TechniqueType? = nil,
             favoriteTechnique: TechniqueType? = nil
         ) {
+            self.mode = mode
             self.settingType = settingType
             self.selectedBestPosition = bestPosition
             self.selectedFavoritePosition = favoritePosition
@@ -510,15 +523,20 @@ public struct MyStyleSettingFeature: Sendable {
                 
                 switch state.selectedTab {
                 case .best:
-                    // 특기 완료 → 내부적으로 최애 탭으로 전환하고, 부모에게도 알림
                     let bestKey = state.selectedBestStyle?.rawValue
-                    return .merge(
-                        .send(.internal(.switchToFavoriteTab)),
-                        .send(.delegate(.didConfirmBest(type: state.settingType, best: bestKey)))
-                    )
+                    if state.mode == .register {
+                        // 등록 플로우: 최애 탭으로 전환 + 부모에게 알림
+                        return .merge(
+                            .send(.internal(.switchToFavoriteTab)),
+                            .send(.delegate(.didConfirmBest(type: state.settingType, best: bestKey)))
+                        )
+                    } else {
+                        // 수정 모드: 최애 탭 전환 없이 바로 부모에게 알림 (화면 닫기는 부모가 담당)
+                        return .send(.delegate(.didConfirmBest(type: state.settingType, best: bestKey)))
+                    }
                     
                 case .favorite:
-                    // 최애 완료 → 부모에게 전달 (다음 단계 또는 최종 완료)
+                    // 최애 완료 → 부모에게 전달 (등록 플로우: 다음 단계, 수정 모드: 화면 닫기)
                     let bestKey = state.selectedBestStyle?.rawValue
                     let favoriteKey = state.selectedFavoriteStyle?.rawValue
                     return .send(.delegate(.didConfirmFavorite(type: state.settingType, best: bestKey, favorite: favoriteKey)))

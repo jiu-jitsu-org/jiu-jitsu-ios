@@ -179,7 +179,7 @@ public struct MyProfileView: View {
             favoriteTechnique: store.communityProfile?.favoriteTechnique,
             bestSubmission: store.communityProfile?.bestSubmission,
             favoriteSubmission: store.communityProfile?.favoriteSubmission,
-            onRegisterStyleTapped: { store.send(.view(.registerStyleButtonTapped)) }
+            onStyleCardTapped: { type in store.send(.view(.styleCardEditTapped(type))) }
         )
     }
     
