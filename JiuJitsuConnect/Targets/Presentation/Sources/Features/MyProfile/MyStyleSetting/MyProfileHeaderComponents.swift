@@ -121,7 +121,8 @@ private struct ProfileImageView: View {
                 .frame(width: size, height: size)
             
             if let profileImageUrl = profileImageUrl,
-               let url = URL(string: profileImageUrl) {
+               let url = URL(string: profileImageUrl),
+               url.scheme == "https" || url.scheme == "http" {
                 // 실제 프로필 이미지
                 AsyncImage(url: url) { phase in
                     switch phase {
