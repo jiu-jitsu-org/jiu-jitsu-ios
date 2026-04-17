@@ -137,8 +137,10 @@ public struct MyProfileFeature: Sendable {
         Reduce { state, action in
             switch action {
             case .view(.onAppear):
-                // 데이터 리셋 상태이거나 이미 로딩 중이면 스킵
                 guard !state.isDataReset, !state.isLoadingProfile else { return .none }
+                // 이미 프로필 데이터가 있으면 불필요한 재로드 방지
+                // (toast dismiss 등 state 변화로 onAppear가 재트리거되는 경우 차단)
+                guard state.communityProfile == nil else { return .none }
                 return .send(.internal(.loadProfile))
                 
             case .internal(.loadProfile):
