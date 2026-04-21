@@ -10,7 +10,7 @@ import Foundation
 import Domain
 
 @Reducer
-public struct WithdrawalFeature {
+public struct WithdrawalFeature: Sendable {
     public init() {}
     
     @ObservableState
@@ -22,9 +22,7 @@ public struct WithdrawalFeature {
         }
     }
     
-    @CasePathable
-    public enum Action: Equatable {
-        // View UI Actions
+    public enum Action: Sendable {
         case backButtonTapped
     }
     
