@@ -19,8 +19,8 @@ public struct CommunityClient: Sendable {
     public var updateProfile: @Sendable (CommunityProfile, ProfileSection) async throws -> CommunityProfile
     
     public init(
-        fetchProfile: @escaping @Sendable () async throws -> CommunityProfile,
-        updateProfile: @escaping @Sendable (CommunityProfile, ProfileSection) async throws -> CommunityProfile
+        fetchProfile: @Sendable @escaping () async throws -> CommunityProfile,
+        updateProfile: @Sendable @escaping (CommunityProfile, ProfileSection) async throws -> CommunityProfile
     ) {
         self.fetchProfile = fetchProfile
         self.updateProfile = updateProfile
