@@ -104,7 +104,7 @@ public struct LoginFeature: Sendable {
                 }
                 
             case let .internal(.socialLoginResponse(.failure(error))):
-                return handleLoginError(state: &state, error: error)
+                return handleError(state: &state, error: error)
                 
             case let .internal(.serverLoginResponse(.success(authInfo))):
                 state.isLoading = false
@@ -125,7 +125,7 @@ public struct LoginFeature: Sendable {
                 return .none
                 
             case let .internal(.serverLoginResponse(.failure(error))):
-                return handleLoginError(state: &state, error: error)
+                return handleError(state: &state, error: error)
                 
                 // 약관 동의 완료
             case let .sheet(.presented(.termsAgreement(.delegate(.didFinishAgreement(isMarketingAgreed))))):
@@ -193,31 +193,31 @@ public struct LoginFeature: Sendable {
         .forEach(\.path, action: \.path)
     }
     
-    private func handleLoginError(state: inout State, error: Error) -> Effect<Action> {
-            state.isLoading = false
-            
-            guard let domainError = error as? DomainError else {
-                Log.trace("Unknown login error: \(error)", category: .network, level: .error)
-                return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info))))
-            }
-            
-            switch domainError {
-            case .signInCancelled:
-                return .none
-                
-            case .apiError(let code, _):
-                let message: String  = code.displayMessage
-                return .send(.internal(.showToast(.init(message: message, style: .info))))
+    private func handleError(state: inout State, error: Error) -> Effect<Action> {
+        state.isLoading = false
 
-            default:
-                // 그 외 모든 공통 에러는 DomainErrorMapper에게 위임
-                let displayError = DomainErrorMapper.toDisplayError(from: domainError)
-                if case .toast(let message) = displayError {
-                    return .send(.internal(.showToast(.init(message: message, style: .info))))
-                }
+        guard let domainError = error as? DomainError else {
+            Log.trace("Unknown login error: \(error)", category: .network, level: .error)
+            return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info))))
+        }
+
+        switch domainError {
+        case .signInCancelled:
+            return .none
+
+        case .apiError(let code, _):
+            return .send(.internal(.showToast(.init(message: code.displayMessage, style: .info))))
+
+        default:
+            let displayError = DomainErrorMapper.toDisplayError(from: domainError)
+            switch displayError {
+            case .toast(let message), .info(let message), .alert(let message):
+                return .send(.internal(.showToast(.init(message: message, style: .info))))
+            case .none:
                 return .none
             }
         }
+    }
 }
 
 extension LoginFeature.Path.State: Sendable, Equatable {}

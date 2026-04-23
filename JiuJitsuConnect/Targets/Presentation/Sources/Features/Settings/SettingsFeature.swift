@@ -131,41 +131,20 @@ public struct SettingsFeature: Sendable {
                 
             case let .internal(.logoutResponse(.failure(error))):
                 Log.trace("\(error)")
-                //                state.isLoading = false
-                
-                guard let domainError = error as? DomainError else {
-                    return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info))))
-                }
-                
-                let displayError = DomainErrorMapper.toDisplayError(from: domainError)
-                if case .toast(let message) = displayError {
-                    return .send(.internal(.showToast(.init(message: message, style: .info))))
-                }
-                return .none
-                
+                return handleError(error)
+
             case let .internal(.withdrawalResponse(.success(isSuccess))):
-//                state.isLoading = false
                 Log.trace("\(isSuccess)")
-                
+
                 if isSuccess {
                     return .send(.delegate(.didWithdrawSuccessfully))
                 } else {
                     return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info))))
                 }
-                
+
             case let .internal(.withdrawalResponse(.failure(error))):
                 Log.trace("\(error)")
-                //                state.isLoading = false
-                
-                guard let domainError = error as? DomainError else {
-                    return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info))))
-                }
-                
-                let displayError = DomainErrorMapper.toDisplayError(from: domainError)
-                if case .toast(let message) = displayError {
-                    return .send(.internal(.showToast(.init(message: message, style: .info))))
-                }
-                return .none
+                return handleError(error)
                 
             case .view(.alertDismissed):
                 state.alert = nil
@@ -191,6 +170,19 @@ public struct SettingsFeature: Sendable {
                 // 부모 Reducer에서 처리할 액션입니다.
                 return .none
             }
+        }
+    }
+
+    private func handleError(_ error: Error) -> Effect<Action> {
+        guard let domainError = error as? DomainError else {
+            return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info))))
+        }
+        let displayError = DomainErrorMapper.toDisplayError(from: domainError)
+        switch displayError {
+        case .toast(let message), .info(let message), .alert(let message):
+            return .send(.internal(.showToast(.init(message: message, style: .info))))
+        case .none:
+            return .none
         }
     }
 }

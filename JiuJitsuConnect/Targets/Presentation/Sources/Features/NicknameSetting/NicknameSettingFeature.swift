@@ -192,13 +192,13 @@ public struct NicknameSettingFeature: Sendable {
                 return .none
                 
             case let .internal(.checkNicknameResponse(.failure(error))):
-                return handleApiFailure(state: &state, error: error)
+                return handleError(state: &state, error: error)
                 
             case let .internal(.signupResponse(.success(info))):
                 return .send(.delegate(.signupSuccessful(info: info)))
                 
             case let .internal(.signupResponse(.failure(error))):
-                return handleApiFailure(state: &state, error: error)
+                return handleError(state: &state, error: error)
                 
             case .view(.viewTapped):
                 state.isKeyboardVisible = false
@@ -220,7 +220,7 @@ public struct NicknameSettingFeature: Sendable {
         return regex.firstMatch(in: nickname, options: [], range: range) != nil
     }
     
-    private func handleApiFailure(state: inout State, error: Error) -> Effect<Action> {
+    private func handleError(state: inout State, error: Error) -> Effect<Action> {
         guard let domainError = error as? DomainError else {
             Log.trace("Unknown API error: \(error)", category: .network, level: .error)
             state.validationState = .networkError
