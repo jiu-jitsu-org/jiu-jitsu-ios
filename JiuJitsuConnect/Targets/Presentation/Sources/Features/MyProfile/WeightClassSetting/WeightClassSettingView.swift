@@ -24,7 +24,7 @@ struct WeightComponent: Identifiable, Hashable {
 }
 
 public struct WeightClassSettingView: View {
-    @Bindable var store: StoreOf<WeightClassSettingFeature>
+    let store: StoreOf<WeightClassSettingFeature>
     
     // 성별 아이템 (여성 → 남성)
     private let genderItems = [
@@ -89,7 +89,10 @@ public struct WeightClassSettingView: View {
                     .font(Font.pretendard.bodyS)
                     .foregroundStyle(Color.component.sectionHeader.subTitle)
                 
-                Toggle("", isOn: $store.isWeightHidden.sending(\.view.weightHiddenToggled))
+                Toggle("", isOn: Binding(
+                    get: { store.isWeightHidden },
+                    set: { store.send(.view(.weightHiddenToggled($0))) }
+                ))
                     .labelsHidden()
                     .tint(Color.component.switch.on.bg)
             }
