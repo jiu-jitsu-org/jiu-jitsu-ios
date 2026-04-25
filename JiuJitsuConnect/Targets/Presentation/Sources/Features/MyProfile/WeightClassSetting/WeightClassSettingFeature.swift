@@ -37,15 +37,13 @@ public struct WeightClassSettingFeature: Sendable {
         case view(ViewAction)
         case delegate(DelegateAction)
         
-        @CasePathable
         public enum ViewAction: Sendable {
             case genderSelected(Gender)
             case weightChanged(Double)
             case weightHiddenToggled(Bool)
             case confirmButtonTapped
         }
-        
-        @CasePathable
+
         public enum DelegateAction: Sendable {
             case didConfirmWeightClass(gender: Gender, weightKg: Double, isWeightHidden: Bool)
         }

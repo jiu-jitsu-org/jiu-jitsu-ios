@@ -22,7 +22,6 @@ public struct LoginFeature: Sendable {
         public init() {}
     }
     
-    @CasePathable
     public enum Action: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)

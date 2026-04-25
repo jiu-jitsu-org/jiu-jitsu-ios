@@ -58,7 +58,6 @@ public struct AppTabFeature: Sendable {
             case tabSelected(Tab)
         }
         
-        @CasePathable
         public enum InternalAction: Sendable {
             case showLoginModal
         }
