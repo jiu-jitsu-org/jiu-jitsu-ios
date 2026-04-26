@@ -15,7 +15,7 @@ public struct MainFeature: Sendable {
     @ObservableState
     public struct State: Equatable {
         @Presents public var destination: Destination.State?
-        @Presents public var loginModal: LoginFeature.State?
+        @Presents public var loginCover: LoginFeature.State?
         
         public var authInfo: AuthInfo
         
@@ -29,7 +29,7 @@ public struct MainFeature: Sendable {
         case `internal`(InternalAction)
         
         // 네비게이션 액션
-        case loginModal(PresentationAction<LoginFeature.Action>)
+        case loginCover(PresentationAction<LoginFeature.Action>)
         case destination(PresentationAction<Destination.Action>)
         
         public enum ViewAction: Sendable {
@@ -63,10 +63,10 @@ public struct MainFeature: Sendable {
                 
                 // MARK: - Login Logic
             case .internal(.showLoginModal):
-                state.loginModal = LoginFeature.State()
+                state.loginCover = LoginFeature.State()
                 return .none
                 
-            case let .loginModal(.presented(.delegate(delegateAction))):
+            case let .loginCover(.presented(.delegate(delegateAction))):
                 switch delegateAction {
                 case let .didLogin(newAuthInfo):
                     state.authInfo = newAuthInfo
@@ -75,15 +75,15 @@ public struct MainFeature: Sendable {
                         settingsState.authInfo = newAuthInfo
                         state.destination = .settings(settingsState)
                     }
-                    state.loginModal = nil
+                    state.loginCover = nil
                     return .none
                     
                 case .skipLogin:
-                    state.loginModal = nil
+                    state.loginCover = nil
                     return .none
                 }
                 
-            case .loginModal:
+            case .loginCover:
                 return .none
                 
             case let .destination(.presented(.settings(.delegate(delegateAction)))):
@@ -106,7 +106,7 @@ public struct MainFeature: Sendable {
             }
         }
         .ifLet(\.$destination, action: \.destination)
-        .ifLet(\.$loginModal, action: \.loginModal) {
+        .ifLet(\.$loginCover, action: \.loginCover) {
             LoginFeature()
         }
     }

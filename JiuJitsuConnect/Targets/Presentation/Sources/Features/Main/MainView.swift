@@ -61,7 +61,7 @@ public struct MainView: View {
             }
         }
         .fullScreenCover(
-            item: $store.scope(state: \.loginModal, action: \.loginModal)
+            item: $store.scope(state: \.loginCover, action: \.loginCover)
         ) { loginStore in
             LoginView(store: loginStore)
         }

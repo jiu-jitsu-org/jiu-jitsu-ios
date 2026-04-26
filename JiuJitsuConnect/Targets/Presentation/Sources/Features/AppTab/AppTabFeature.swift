@@ -29,7 +29,7 @@ public struct AppTabFeature: Sendable {
         var myPage: MyProfileFeature.State
         
         // 로그인 모달
-        @Presents var loginModal: LoginFeature.State?
+        @Presents var loginCover: LoginFeature.State?
         
         var authInfo: AuthInfo
         
@@ -51,7 +51,7 @@ public struct AppTabFeature: Sendable {
         case community(CommunityFeature.Action)
         case myPage(MyProfileFeature.Action)
         
-        case loginModal(PresentationAction<LoginFeature.Action>)
+        case loginCover(PresentationAction<LoginFeature.Action>)
         
         @CasePathable
         public enum ViewAction: Sendable {
@@ -96,28 +96,28 @@ public struct AppTabFeature: Sendable {
                 
                 // MARK: - Login Logic
             case .internal(.showLoginModal):
-                state.loginModal = LoginFeature.State()
+                state.loginCover = LoginFeature.State()
                 return .none
                 
-            case let .loginModal(.presented(.delegate(delegateAction))):
+            case let .loginCover(.presented(.delegate(delegateAction))):
                 switch delegateAction {
                 case let .didLogin(newAuthInfo):
                     state.authInfo = newAuthInfo
                     state.selectedTab = .myPage
-                    state.loginModal = nil
+                    state.loginCover = nil
                     return .none
                     
                 case .skipLogin:
-                    state.loginModal = nil
+                    state.loginCover = nil
                     return .none
                 }
                 
-            case .loginModal, .view, .internal:
+            case .loginCover, .view, .internal:
                 return .none
                 
             }
         }
-        .ifLet(\.$loginModal, action: \.loginModal) {
+        .ifLet(\.$loginCover, action: \.loginCover) {
             LoginFeature()
         }
     }
