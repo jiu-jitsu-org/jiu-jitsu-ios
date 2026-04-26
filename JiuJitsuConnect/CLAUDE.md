@@ -5,6 +5,30 @@
 - **레이어 순서**: App → Presentation (TCA) → Domain → Data → CoreKit / DesignSystem
 - **상태 관리**: The Composable Architecture (TCA) 전용. MVVM/MVC 혼용 금지.
 
+### UseCase 레이어를 사용하지 않는 이유
+
+이 프로젝트는 **UseCase 레이어를 의도적으로 생략**한다.
+
+```
+// ❌ UseCases/ 폴더 없음 (제거됨)
+Domain/
+├── Entities/      ← 도메인 모델
+└── Repositories/  ← Repository 프로토콜
+```
+
+**이유:**
+- TCA Reducer가 비즈니스 흐름을 이미 명확하게 표현 (UseCase의 역할을 대체)
+- Repository 프로토콜 + `DependencyContainer` + TCA Client 조합으로 레이어 분리 충분
+- 현재 앱 규모에서 UseCase 추가는 오버엔지니어링
+
+**비즈니스 로직 위치 기준:**
+| 로직 종류 | 위치 |
+|----------|------|
+| UI 상태 전환, 화면 흐름 | TCA Reducer |
+| 단순 데이터 변환 (DTO → Entity) | Data Mapper |
+| 외부 API 조합 (ex. FCM 토큰 조립 후 등록) | DependencyContainer 클로저 |
+| 도메인 규칙이 매우 복잡해지는 경우 | 그때 UseCase 도입 검토 |
+
 ---
 
 ## TCA Feature 구조
