@@ -102,6 +102,11 @@ public struct AppTabFeature: Sendable {
                 state.myPage = MyProfileFeature.State(authInfo: .guest)
                 state.selectedTab = .main
                 return .none
+
+            case let .main(.delegate(.didLogin(newAuthInfo))):
+                state.authInfo = newAuthInfo
+                state.myPage.authInfo = newAuthInfo
+                return .none
                 
             case .main, .community, .myPage:
                 return .none

@@ -45,6 +45,7 @@ public struct MainFeature: Sendable {
         
         public enum DelegateAction: Sendable {
             case didLogoutSuccessfully
+            case didLogin(AuthInfo)
         }
     }
     
@@ -86,12 +87,15 @@ public struct MainFeature: Sendable {
                         state.destination = .settings(settingsState)
                     }
                     state.loginCover = nil
-                    return .run { _ in
-                        await FCMAppInfoSync.syncAfterLoginSuccess(
-                            firebaseClient: self.firebaseClient,
-                            userClient: self.userClient
-                        )
-                    }
+                    return .merge(
+                        .send(.delegate(.didLogin(newAuthInfo))),
+                        .run { _ in
+                            await FCMAppInfoSync.syncAfterLoginSuccess(
+                                firebaseClient: self.firebaseClient,
+                                userClient: self.userClient
+                            )
+                        }
+                    )
                     
                 case .skipLogin:
                     state.loginCover = nil
