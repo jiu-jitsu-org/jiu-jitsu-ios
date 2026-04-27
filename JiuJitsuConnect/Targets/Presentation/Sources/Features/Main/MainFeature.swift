@@ -27,6 +27,7 @@ public struct MainFeature: Sendable {
     public enum Action: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
+        case delegate(DelegateAction)
         
         // 네비게이션 액션
         case loginCover(PresentationAction<LoginFeature.Action>)
@@ -39,6 +40,10 @@ public struct MainFeature: Sendable {
         
         public enum InternalAction: Sendable {
             case showLoginModal
+        }
+        
+        public enum DelegateAction: Sendable {
+            case didLogoutSuccessfully
         }
     }
     
@@ -92,7 +97,7 @@ public struct MainFeature: Sendable {
                     state.authInfo = .guest
                     state.destination = nil
                     
-                    return .none
+                    return .send(.delegate(.didLogoutSuccessfully))
                     
                 case .didWithdrawSuccessfully:
                     state.authInfo = .guest
@@ -101,7 +106,7 @@ public struct MainFeature: Sendable {
                     return .send(.internal(.showLoginModal))
                 }
                 
-            case .destination, .view, .internal:
+            case .destination, .view, .internal, .delegate:
                 return .none
             }
         }
