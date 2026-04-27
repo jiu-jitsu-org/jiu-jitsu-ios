@@ -83,7 +83,7 @@ public final class DefaultNetworkService: NetworkService {
             urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         }
         
-        #if DEBUG
+        #if DEBUG || BETA
         NetworkLogger.log(request: urlRequest)
         #endif
         
@@ -111,7 +111,7 @@ public final class DefaultNetworkService: NetworkService {
             throw NetworkError.invalidResponse
         }
         
-        #if DEBUG
+        #if DEBUG || BETA
         NetworkLogger.log(response: httpResponse, data: data)
         #endif
         

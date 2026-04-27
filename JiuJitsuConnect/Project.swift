@@ -101,6 +101,9 @@ let project = Project(
         ],
         configurations: [
             .debug(name: "Debug", xcconfig: .relativeToRoot("Configs/Secrets.xcconfig")),
+            .release(name: "Beta", settings: [
+                "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "BETA"
+            ], xcconfig: .relativeToRoot("Configs/Secrets.xcconfig")),
             .release(name: "Release", xcconfig: .relativeToRoot("Configs/Secrets.xcconfig"))
         ]
     ),
@@ -139,14 +142,20 @@ let project = Project(
                     "OTHER_LDFLAGS": "-ObjC",
                     "CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION": "YES",
                 ],
-                debug: [
-                    "OTHER_SWIFT_FLAGS": "-D DEBUG $(inherited) -Xfrontend -warn-long-function-bodies=500 -Xfrontend -warn-long-expression-type-checking=500 -Xfrontend -debug-time-function-bodies -Xfrontend -debug-time-expression-type-checking -Xfrontend -enable-actor-data-race-checks",
-                    "OTHER_LDFLAGS": "$(inherited)",
-                    "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "\(additionalCondition) DEBUG",
-                ],
-                release: [
-                    "OTHER_LDFLAGS": "$(inherited)",
-                    "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "\(additionalCondition)",
+                configurations: [
+                    .debug(name: "Debug", settings: [
+                        "OTHER_SWIFT_FLAGS": "-D DEBUG $(inherited) -Xfrontend -warn-long-function-bodies=500 -Xfrontend -warn-long-expression-type-checking=500 -Xfrontend -debug-time-function-bodies -Xfrontend -debug-time-expression-type-checking -Xfrontend -enable-actor-data-race-checks",
+                        "OTHER_LDFLAGS": "$(inherited)",
+                        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "\(additionalCondition) DEBUG",
+                    ]),
+                    .release(name: "Beta", settings: [
+                        "OTHER_LDFLAGS": "$(inherited)",
+                        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "\(additionalCondition) BETA",
+                    ]),
+                    .release(name: "Release", settings: [
+                        "OTHER_LDFLAGS": "$(inherited)",
+                        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "\(additionalCondition)",
+                    ]),
                 ]
             )
         ),
@@ -244,6 +253,13 @@ let project = Project(
         )
     ],
     schemes: [
+        .scheme(
+            name: "App-Beta",
+            shared: true,
+            buildAction: .buildAction(targets: [.target("App")]),
+            runAction: .runAction(configuration: "Beta"),
+            archiveAction: .archiveAction(configuration: "Beta")
+        ),
         .scheme(
             name: "SwiftLint",
             shared: true,

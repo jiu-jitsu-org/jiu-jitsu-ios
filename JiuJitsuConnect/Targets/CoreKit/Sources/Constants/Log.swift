@@ -71,8 +71,7 @@ public enum Log {
         // 1. Xcode 콘솔에는 기존처럼 로그를 남깁니다.
         category.osLogger.log(level: level, "\(category.emoji) \(message)")
         
-        #if DEBUG
-        // 2. 외부에서 주입된 핸들러를 통해 로그를 전달합니다.
+        #if DEBUG || BETA
         handler?.log(
             level: level.toLogLevel(),
             label: category.name,

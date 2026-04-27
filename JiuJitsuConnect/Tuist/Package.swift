@@ -5,10 +5,14 @@ import PackageDescription
     import struct ProjectDescription.PackageSettings
 
     let packageSettings = PackageSettings(
-        // Customize the product types for specific package product
-        // Default is .staticFramework
-        // productTypes: ["Alamofire": .framework,]
-        productTypes: [:]
+        productTypes: [:],
+        baseSettings: .settings(
+            configurations: [
+                .debug(name: "Debug"),
+                .release(name: "Beta"),
+                .release(name: "Release")
+            ]
+        )
     )
 #endif
 
