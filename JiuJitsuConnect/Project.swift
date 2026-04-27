@@ -4,7 +4,7 @@ import ProjectDescription
 public let version = "1.0.0"
 public let deploymentTargetString = "26.0"
 public let appDeploymentTargets: DeploymentTargets = .iOS(deploymentTargetString)
-public let appDestinations: Destinations = [.iPhone, .iPad]
+public let appDestinations: Destinations = [.iPhone]
 let isAppStore = Environment.isAppStore.getBoolean(default: false)
 let additionalCondition = isAppStore ? "APPSTORE" : ""
 
@@ -30,7 +30,7 @@ let appInfoPlist: [String: Plist.Value] = {
     var base: [String: Plist.Value] = [
         "CFBundleDisplayName": "Oss",
         "CFBundleShortVersionString": Plist.Value(stringLiteral: version),
-        "UILaunchStoryboardName": "Launch Screen",
+        "UILaunchStoryboardName": "LaunchScreen",
         "UIApplicationSceneManifest": [
             "UIApplicationSupportsMultipleScenes": false,
             "UISceneConfigurations": []
@@ -42,12 +42,7 @@ let appInfoPlist: [String: Plist.Value] = {
         "ITSAppUsesNonExemptEncryption": false,
         "UIUserInterfaceStyle": "Light",
         "UISupportedInterfaceOrientations": ["UIInterfaceOrientationPortrait"],
-        "UISupportedInterfaceOrientations~ipad": [
-            "UIInterfaceOrientationPortrait",
-            "UIInterfaceOrientationPortraitUpsideDown",
-            "UIInterfaceOrientationLandscapeLeft",
-            "UIInterfaceOrientationLandscapeRight"
-        ],
+
         "UIAppFonts": [
             "Pretendard-Black.otf",
             "Pretendard-Bold.otf",
