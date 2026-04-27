@@ -20,7 +20,7 @@ public struct MyProfileStyleSectionView: View {
     let bestSubmission: (any StyleSelectable)?
     let favoriteSubmission: (any StyleSelectable)?
     
-    let onStyleCardTapped: (MyStyleSettingType) -> Void
+    let onStyleCardTapped: (MyStyleSettingType, MyStyleSettingFeature.SelectionTab) -> Void
     
     private enum Metrics {
         static let sectionSpacing: CGFloat = 36
@@ -33,23 +33,26 @@ public struct MyProfileStyleSectionView: View {
                 title: "포지션",
                 bestStyle: bestPosition,
                 favoriteStyle: favoritePosition,
-                onCardTapped: { onStyleCardTapped(.position) }
+                onBestCardTapped: { onStyleCardTapped(.position, .best) },
+                onFavoriteCardTapped: { onStyleCardTapped(.position, .favorite) }
             )
-            
+
             // 기술 섹션
             StyleCategorySection(
                 title: "기술",
                 bestStyle: bestTechnique,
                 favoriteStyle: favoriteTechnique,
-                onCardTapped: { onStyleCardTapped(.technique) }
+                onBestCardTapped: { onStyleCardTapped(.technique, .best) },
+                onFavoriteCardTapped: { onStyleCardTapped(.technique, .favorite) }
             )
-            
+
             // 서브미션 섹션
             StyleCategorySection(
                 title: "서브미션",
                 bestStyle: bestSubmission,
                 favoriteStyle: favoriteSubmission,
-                onCardTapped: { onStyleCardTapped(.submission) }
+                onBestCardTapped: { onStyleCardTapped(.submission, .best) },
+                onFavoriteCardTapped: { onStyleCardTapped(.submission, .favorite) }
             )
         }
     }
@@ -62,7 +65,8 @@ private struct StyleCategorySection: View {
     let title: String
     let bestStyle: (any StyleSelectable)?
     let favoriteStyle: (any StyleSelectable)?
-    let onCardTapped: () -> Void
+    let onBestCardTapped: () -> Void
+    let onFavoriteCardTapped: () -> Void
     
     private enum Metrics {
         static let titleBottomPadding: CGFloat = 8
@@ -80,16 +84,16 @@ private struct StyleCategorySection: View {
             HStack(spacing: Metrics.cardSpacing) {
                 // 왼쪽: 특기 카드
                 if let bestStyle = bestStyle {
-                    FilledStyleCardItem(label: "특기", style: bestStyle, onTapped: onCardTapped)
+                    FilledStyleCardItem(label: "특기", style: bestStyle, onTapped: onBestCardTapped)
                 } else {
-                    EmptyStyleCardItem(label: "특기", onTapped: onCardTapped)
+                    EmptyStyleCardItem(label: "특기", onTapped: onBestCardTapped)
                 }
-                
+
                 // 오른쪽: 최애 카드
                 if let favoriteStyle = favoriteStyle {
-                    FilledStyleCardItem(label: "최애", style: favoriteStyle, onTapped: onCardTapped)
+                    FilledStyleCardItem(label: "최애", style: favoriteStyle, onTapped: onFavoriteCardTapped)
                 } else {
-                    EmptyStyleCardItem(label: "최애", onTapped: onCardTapped)
+                    EmptyStyleCardItem(label: "최애", onTapped: onFavoriteCardTapped)
                 }
             }
         }
@@ -329,7 +333,7 @@ private struct DecorativeCardConfig {
         favoriteTechnique: TechniqueType.escapes,
         bestSubmission: SubmissionType.chokes,
         favoriteSubmission: SubmissionType.armLocks,
-        onStyleCardTapped: { type in print("스타일 카드 탭: \(type)") }
+        onStyleCardTapped: { type, tab in print("스타일 카드 탭: \(type), \(tab)") }
     )
     .padding()
     .background(Color.component.background.default)
@@ -343,7 +347,7 @@ private struct DecorativeCardConfig {
         favoriteTechnique: TechniqueType.escapes,
         bestSubmission: SubmissionType.chokes,
         favoriteSubmission: nil,
-        onStyleCardTapped: { type in print("스타일 카드 탭: \(type)") }
+        onStyleCardTapped: { type, tab in print("스타일 카드 탭: \(type), \(tab)") }
     )
     .padding()
     .background(Color.component.background.default)

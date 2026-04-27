@@ -364,6 +364,7 @@ public struct MyStyleSettingFeature: Sendable {
         public init(
             settingType: MyStyleSettingType,
             mode: Mode = .register,
+            initialTab: SelectionTab = .best,
             bestPosition: PositionType? = nil,
             favoritePosition: PositionType? = nil,
             bestSubmission: SubmissionType? = nil,
@@ -373,6 +374,7 @@ public struct MyStyleSettingFeature: Sendable {
         ) {
             self.mode = mode
             self.settingType = settingType
+            self.selectedTab = initialTab
             self.selectedBestPosition = bestPosition
             self.selectedFavoritePosition = favoritePosition
             self.selectedBestSubmission = bestSubmission
@@ -551,19 +553,7 @@ public struct MyStyleSettingFeature: Sendable {
                 return .send(.delegate(.cancel))
                 
             case .view(.resetButtonTapped):
-                // 타입별로 리셋
-                switch state.settingType {
-                case .position:
-                    state.selectedBestPosition = nil
-                    state.selectedFavoritePosition = nil
-                case .submission:
-                    state.selectedBestSubmission = nil
-                    state.selectedFavoriteSubmission = nil
-                case .technique:
-                    state.selectedBestTechnique = nil
-                    state.selectedFavoriteTechnique = nil
-                }
-                return .none
+                return .send(.delegate(.cancel))
                 
             case .delegate, .internal:
                 return .none

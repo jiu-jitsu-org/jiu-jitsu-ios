@@ -45,9 +45,12 @@ public struct MyProfileView: View {
     
     private var hasStyleInfo: Bool {
         let profile = store.communityProfile
-        return profile?.bestSubmission != nil ||
+        return profile?.bestPosition != nil ||
                profile?.favoritePosition != nil ||
-               profile?.bestTechnique != nil
+               profile?.bestSubmission != nil ||
+               profile?.favoriteSubmission != nil ||
+               profile?.bestTechnique != nil ||
+               profile?.favoriteTechnique != nil
     }
     
     // MARK: - Body
@@ -180,7 +183,7 @@ public struct MyProfileView: View {
             favoriteTechnique: store.communityProfile?.favoriteTechnique,
             bestSubmission: store.communityProfile?.bestSubmission,
             favoriteSubmission: store.communityProfile?.favoriteSubmission,
-            onStyleCardTapped: { type in store.send(.view(.styleCardEditTapped(type))) }
+            onStyleCardTapped: { type, tab in store.send(.view(.styleCardEditTapped(type, tab))) }
         )
     }
     
@@ -257,10 +260,9 @@ private extension View {
     }
     
     /// 토스트 오버레이
-    @ViewBuilder
     func toastOverlay(store: StoreOf<MyProfileFeature>) -> some View {
-        if let toastState = store.toast {
-            self.overlay(alignment: .bottom) {
+        self.overlay(alignment: .bottom) {
+            if let toastState = store.toast {
                 ToastView(
                     state: toastState,
                     onSwipe: { store.send(.internal(.toastDismissed), animation: .default) },
@@ -268,10 +270,8 @@ private extension View {
                 )
                 .padding(.horizontal, 24)
                 .padding(.bottom, toastState.bottomPadding)
+                .animation(.default, value: toastState)
             }
-            .animation(.default, value: toastState)
-        } else {
-            self
         }
     }
     
