@@ -16,8 +16,6 @@ public struct AppView: View {
       LoginView(store: loginStore)
     } else if let appTabStore = store.scope(state: \.destination?.appTab, action: \.destination.appTab) {
       AppTabView(store: appTabStore)
-    } else if let mainStore = store.scope(state: \.destination?.main, action: \.destination.main) {
-      MainView(store: mainStore)
     } else {
       EmptyView()
     }

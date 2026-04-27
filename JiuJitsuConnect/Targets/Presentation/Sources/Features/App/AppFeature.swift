@@ -10,7 +10,6 @@ public struct AppFeature: Sendable {
     public enum Destination {
         case splash(SplashFeature)
 //        case onboarding(OnboardingFeature)
-        case main(MainFeature)
         case appTab(AppTabFeature)
         case login(LoginFeature)
     }

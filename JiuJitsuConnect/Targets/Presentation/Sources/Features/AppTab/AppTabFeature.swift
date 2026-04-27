@@ -15,18 +15,16 @@ public struct AppTabFeature: Sendable {
     public init() {}
     
     public enum Tab: String, CaseIterable, Equatable, Sendable {
-        case main = "홈"
-        case community = "커뮤니티"
+        case home = "홈"
         case myPage = "MY"
     }
     
     @ObservableState
     public struct State: Equatable {
-        var selectedTab: Tab = .main
+        var selectedTab: Tab = .home
         
         // 각 탭의 독립적인 State
-        var main: MainFeature.State
-        var community: CommunityFeature.State
+        var home: CommunityFeature.State
         var myPage: MyProfileFeature.State
         
         // 로그인 모달
@@ -34,11 +32,9 @@ public struct AppTabFeature: Sendable {
         
         var authInfo: AuthInfo
         
-        // 초기화 시 필요한 정보 주입 (예: AuthInfo)
         public init(authInfo: AuthInfo) {
             self.authInfo = authInfo
-            self.main = MainFeature.State(authInfo: authInfo)
-            self.community = CommunityFeature.State()
+            self.home = CommunityFeature.State()
             self.myPage = MyProfileFeature.State(authInfo: authInfo)
         }
     }
@@ -48,8 +44,7 @@ public struct AppTabFeature: Sendable {
         case `internal`(InternalAction)
         
         // 자식 Feature 액션 연결
-        case main(MainFeature.Action)
-        case community(CommunityFeature.Action)
+        case home(CommunityFeature.Action)
         case myPage(MyProfileFeature.Action)
         
         case loginCover(PresentationAction<LoginFeature.Action>)
@@ -69,24 +64,19 @@ public struct AppTabFeature: Sendable {
     @Dependency(\.userClient) var userClient
 
     public var body: some ReducerOf<Self> {
-        // 1. 각 자식 리듀서를 Scope로 연결
-        Scope(state: \.main, action: \.main) {
-            MainFeature()
-        }
-        Scope(state: \.community, action: \.community) {
+        Scope(state: \.home, action: \.home) {
             CommunityFeature()
         }
         Scope(state: \.myPage, action: \.myPage) {
             MyProfileFeature()
         }
         
-        // 2. 탭 바 자체 로직 처리
         Reduce { state, action in
             switch action {
             case let .view(.tabSelected(tab)):
                 if state.authInfo.isGuest {
                     switch tab {
-                    case .main, .community:
+                    case .home:
                         state.selectedTab = tab
                     case .myPage:
                         return .send(.internal(.showLoginModal))
@@ -96,22 +86,22 @@ public struct AppTabFeature: Sendable {
                 }
                 return .none
                 
-            case .main(.delegate(.didLogoutSuccessfully)):
+            case .myPage(.delegate(.didLogoutSuccessfully)):
                 state.authInfo = .guest
-                state.main = MainFeature.State(authInfo: .guest)
                 state.myPage = MyProfileFeature.State(authInfo: .guest)
-                state.selectedTab = .main
-                return .none
-
-            case let .main(.delegate(.didLogin(newAuthInfo))):
-                state.authInfo = newAuthInfo
-                state.myPage.authInfo = newAuthInfo
+                state.selectedTab = .home
                 return .none
                 
-            case .main, .community, .myPage:
+            case .myPage(.delegate(.didWithdrawSuccessfully)):
+                state.authInfo = .guest
+                state.myPage = MyProfileFeature.State(authInfo: .guest)
+                state.selectedTab = .home
+                return .send(.internal(.showLoginModal))
+                
+            case .home, .myPage:
                 return .none
                 
-                // MARK: - Login Logic
+            // MARK: - Login Logic
             case .internal(.showLoginModal):
                 state.loginCover = LoginFeature.State()
                 return .none
@@ -120,7 +110,6 @@ public struct AppTabFeature: Sendable {
                 switch delegateAction {
                 case let .didLogin(newAuthInfo):
                     state.authInfo = newAuthInfo
-                    state.main.authInfo = newAuthInfo
                     state.myPage.authInfo = newAuthInfo
                     state.selectedTab = .myPage
                     state.loginCover = nil
@@ -145,17 +134,4 @@ public struct AppTabFeature: Sendable {
             LoginFeature()
         }
     }
-}
-
-// TODO: - CommunityFeature.swift (임시)
-@Reducer
-public struct CommunityFeature: Sendable {
-    public init() {}
-    
-    @ObservableState
-    public struct State: Equatable { public init() {} }
-    
-    public enum Action: Sendable {}
-    
-    public var body: some ReducerOf<Self> { EmptyReducer() }
 }

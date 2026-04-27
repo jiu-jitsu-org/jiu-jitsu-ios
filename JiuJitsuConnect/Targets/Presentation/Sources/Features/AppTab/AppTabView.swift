@@ -22,25 +22,17 @@ public struct AppTabView: View {
         // 하위 호환성을 위해 Binding(get:set:)을 명시적으로 사용할 수도 있습니다.
         TabView(selection: $store.selectedTab.sending(\.view.tabSelected)) {
             
-            // 탭 1: 메인
-            MainView(store: store.scope(state: \.main, action: \.main))
-                .tabItem {
-                    Image(systemName: "house") // 실제 에셋으로 변경 필요
-                    Text("홈")
-                }
-                .tag(AppTabFeature.Tab.main)
-            
-            // 탭 2: 커뮤니티
+            // 탭 1: 홈
             NavigationStack {
-                CommunityView(store: store.scope(state: \.community, action: \.community))
+                CommunityView(store: store.scope(state: \.home, action: \.home))
             }
             .tabItem {
-                Image(systemName: "bubble.left.and.bubble.right")
-                Text("커뮤니티")
+                Image(systemName: "house")
+                Text("홈")
             }
-            .tag(AppTabFeature.Tab.community)
+            .tag(AppTabFeature.Tab.home)
             
-            // 탭 3: 마이페이지
+            // 탭 2: 마이페이지
             NavigationStack {
                 MyProfileView(store: store.scope(state: \.myPage, action: \.myPage))
             }
@@ -65,13 +57,6 @@ public struct AppTabView: View {
             LoginView(store: loginStore)
         }
     }
-}
-
-// TODO: - CommunityView.swift (임시)
-public struct CommunityView: View {
-    let store: StoreOf<CommunityFeature>
-    public init(store: StoreOf<CommunityFeature>) { self.store = store }
-    public var body: some View { Text("커뮤니티 화면") }
 }
 
 // MARK: - Preview
