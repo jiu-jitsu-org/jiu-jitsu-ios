@@ -110,6 +110,8 @@ public struct AppTabFeature: Sendable {
                 switch delegateAction {
                 case let .didLogin(newAuthInfo):
                     state.authInfo = newAuthInfo
+                    state.main.authInfo = newAuthInfo
+                    state.myPage.authInfo = newAuthInfo
                     state.selectedTab = .myPage
                     state.loginCover = nil
                     return .none
