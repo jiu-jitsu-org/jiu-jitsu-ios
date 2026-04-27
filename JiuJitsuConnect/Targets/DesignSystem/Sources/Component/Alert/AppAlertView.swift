@@ -41,9 +41,9 @@ public struct AppAlertView: View {
                             isPresented = false
                         }) {
                             AppButtonConfiguration(title: secondaryButton.title, size: .large)
+                                .frame(maxWidth: .infinity)
                         }
-                        .appButtonStyle(secondaryButton.style, size: .large)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .appButtonStyle(secondaryButton.style, size: .large, height: 51)
                     }
                     
                     Button(action: {
@@ -51,11 +51,10 @@ public struct AppAlertView: View {
                         isPresented = false
                     }) {
                         AppButtonConfiguration(title: configuration.primaryButton.title, size: .large)
+                            .frame(maxWidth: .infinity)
                     }
-                    .appButtonStyle(configuration.primaryButton.style, size: .large)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .appButtonStyle(configuration.primaryButton.style, size: .large, height: 51)
                 }
-                .frame(height: 51)
                 .padding(.top, 8)
             }
             .padding(20)
