@@ -37,15 +37,16 @@ public struct AppFeature: Sendable {
             case let .destination(.presented(.splash(.delegate(.finishedLaunch(authInfo))))):
                 if let authInfo = authInfo {
                     state.destination = .appTab(.init(authInfo: authInfo))
+                    // 앱 진입 FCM sync: 로그인 상태일 때만 실행 (취소되지 않음)
+                    return .run { _ in
+                        await FCMAppInfoSync.syncOnAppLaunch(
+                            firebaseClient: self.firebaseClient,
+                            userClient: self.userClient
+                        )
+                    }
                 } else {
                     state.destination = .login(.init())
-                }
-                // 앱 진입 FCM sync: AppFeature 라이프사이클로 실행 (취소되지 않음)
-                return .run { _ in
-                    await FCMAppInfoSync.syncOnAppLaunch(
-                        firebaseClient: self.firebaseClient,
-                        userClient: self.userClient
-                    )
+                    return .none
                 }
 
             case let .destination(.presented(.login(.delegate(.didLogin(authInfo))))):

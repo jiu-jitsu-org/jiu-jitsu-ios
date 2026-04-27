@@ -8,6 +8,7 @@
 import Foundation
 import ComposableArchitecture
 import Domain
+import CoreKit
 
 @Reducer
 public struct AppTabFeature: Sendable {
@@ -63,6 +64,10 @@ public struct AppTabFeature: Sendable {
         }
     }
     
+    // MARK: - Dependencies
+    @Dependency(\.firebaseClient) var firebaseClient
+    @Dependency(\.userClient) var userClient
+
     public var body: some ReducerOf<Self> {
         // 1. 각 자식 리듀서를 Scope로 연결
         Scope(state: \.main, action: \.main) {
@@ -114,7 +119,12 @@ public struct AppTabFeature: Sendable {
                     state.myPage.authInfo = newAuthInfo
                     state.selectedTab = .myPage
                     state.loginCover = nil
-                    return .none
+                    return .run { _ in
+                        await FCMAppInfoSync.syncAfterLoginSuccess(
+                            firebaseClient: self.firebaseClient,
+                            userClient: self.userClient
+                        )
+                    }
                     
                 case .skipLogin:
                     state.loginCover = nil

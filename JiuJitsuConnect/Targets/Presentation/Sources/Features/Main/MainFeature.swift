@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import Foundation
 import Domain
+import CoreKit
 
 @Reducer
 public struct MainFeature: Sendable {
@@ -47,6 +48,10 @@ public struct MainFeature: Sendable {
         }
     }
     
+    // MARK: - Dependencies
+    @Dependency(\.firebaseClient) var firebaseClient
+    @Dependency(\.userClient) var userClient
+
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
@@ -81,7 +86,12 @@ public struct MainFeature: Sendable {
                         state.destination = .settings(settingsState)
                     }
                     state.loginCover = nil
-                    return .none
+                    return .run { _ in
+                        await FCMAppInfoSync.syncAfterLoginSuccess(
+                            firebaseClient: self.firebaseClient,
+                            userClient: self.userClient
+                        )
+                    }
                     
                 case .skipLogin:
                     state.loginCover = nil
