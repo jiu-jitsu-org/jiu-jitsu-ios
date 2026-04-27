@@ -134,7 +134,8 @@ public struct MyProfileView: View {
             beltRank: store.communityProfile?.beltRank,
             safeAreaTop: safeAreaTop,
             onNicknameEditTapped: { store.send(.view(.nicknameEditButtonTapped)) },
-            onGymInfoTapped: { store.send(.view(.gymInfoButtonTapped)) }
+            onGymInfoTapped: { store.send(.view(.gymInfoButtonTapped)) },
+            onSettingsTapped: { store.send(.view(.settingsButtonTapped)) }
         )
     }
     
@@ -221,6 +222,14 @@ private extension View {
     @ViewBuilder
     func navigationDestinations(store: Bindable<StoreOf<MyProfileFeature>>) -> some View {
         self
+            .navigationDestination(
+                item: store.scope(
+                    state: \.destination?.settings,
+                    action: \.destination.settings
+                )
+            ) { settingsStore in
+                SettingsView(store: settingsStore)
+            }
             .navigationDestination(
                 item: store.scope(
                     state: \.destination?.academySetting,

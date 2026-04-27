@@ -52,6 +52,7 @@ public struct MyProfileFeature: Sendable {
     
     @Reducer
     public enum Destination {
+        case settings(SettingsFeature)
         case academySetting(MyAcademySettingFeature)
         case nicknameSetting(NicknameSettingFeature)
         case myStyleSetting(MyStyleSettingFeature)
@@ -66,14 +67,21 @@ public struct MyProfileFeature: Sendable {
     public enum Action: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
+        case delegate(DelegateAction)
         
         // 네비게이션 액션
         case destination(PresentationAction<Destination.Action>)
         // 시트 액션
         case sheet(PresentationAction<Sheet.Action>)
         
+        public enum DelegateAction: Sendable {
+            case didLogoutSuccessfully
+            case didWithdrawSuccessfully
+        }
+        
         public enum ViewAction: Sendable {
             case onAppear
+            case settingsButtonTapped
             case gymInfoButtonTapped
             case nicknameEditButtonTapped
             case registerBeltButtonTapped
@@ -142,6 +150,10 @@ public struct MyProfileFeature: Sendable {
                 // (toast dismiss 등 state 변화로 onAppear가 재트리거되는 경우 차단)
                 guard state.communityProfile == nil else { return .none }
                 return .send(.internal(.loadProfile))
+                
+            case .view(.settingsButtonTapped):
+                state.destination = .settings(.init(authInfo: state.authInfo))
+                return .none
                 
             case .internal(.loadProfile):
                 state.isLoadingProfile = true
@@ -259,6 +271,16 @@ public struct MyProfileFeature: Sendable {
                 return .send(.internal(.toggleWeightVisibility))
                 
             // MARK: - Delegate 처리 (자식 Feature로부터)
+            
+            case .destination(.presented(.settings(.delegate(.didLogoutSuccessfully)))):
+                state.authInfo = .guest
+                state.destination = nil
+                return .send(.delegate(.didLogoutSuccessfully))
+                
+            case .destination(.presented(.settings(.delegate(.didWithdrawSuccessfully)))):
+                state.authInfo = .guest
+                state.destination = nil
+                return .send(.delegate(.didWithdrawSuccessfully))
                 
             case let .destination(.presented(.academySetting(.delegate(.saveAcademyName(academyName))))):
                 // 도장 이름 저장 요청 받음 → API 호출
@@ -821,7 +843,7 @@ public struct MyProfileFeature: Sendable {
                 
                 return .send(.internal(.showToast(.init(message: "데이터를 초기화했어요. '내 데이터 불러오기'를 눌러 복원하세요", style: .info))))
                 
-            case .destination, .sheet, .view, .internal:
+            case .destination, .sheet, .view, .internal, .delegate:
                 return .none
                 
             }

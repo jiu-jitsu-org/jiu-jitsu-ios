@@ -18,7 +18,7 @@ public struct SettingsFeature: Sendable {
     private enum CancelID { case toast }
     
     @ObservableState
-    public struct State: Equatable {
+    public struct State: Equatable, Sendable {
         var authInfo: AuthInfo
         var appVersion: String
         

@@ -25,6 +25,7 @@ public struct MyProfileHeaderView: View {
     
     let onNicknameEditTapped: () -> Void
     let onGymInfoTapped: () -> Void
+    let onSettingsTapped: () -> Void
     
     // MARK: - Metrics
     
@@ -56,7 +57,7 @@ public struct MyProfileHeaderView: View {
             // 배경색 (벨트 등급에 따라 변경)
             beltRank.headerBackgroundColor
                 .animation(.easeInOut(duration: 0.3), value: beltRank)
-            
+
             VStack(spacing: 0) {
                 // 상단 여백
                 Spacer().frame(height: safeAreaTop + Metrics.topPadding)
@@ -97,9 +98,26 @@ public struct MyProfileHeaderView: View {
                     }
                     .appButtonStyle(.tint, size: .small, height: Metrics.buttonHeight)
                     .padding(.top, Metrics.buttonTopPadding)
-                    
+
                     Spacer().frame(height: Metrics.bottomPaddingWithButton)
                 }
+            }
+
+            // 설정 버튼: 네비게이션 바 없이 safe area 기준으로 고정
+            VStack {
+                HStack {
+                    Spacer()
+                    Button {
+                        onSettingsTapped()
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .foregroundStyle(Color.white)
+                            .frame(width: 44, height: 44)
+                    }
+                    .padding(.trailing, 8)
+                }
+                .padding(.top, safeAreaTop)
+                Spacer()
             }
         }
     }
@@ -236,7 +254,8 @@ private struct AcademyNameEditRow: View {
         beltRank: .blue,
         safeAreaTop: 47,
         onNicknameEditTapped: { print("닉네임 수정") },
-        onGymInfoTapped: { print("도장 정보") }
+        onGymInfoTapped: { print("도장 정보") },
+        onSettingsTapped: { print("설정") }
     )
     .background(Color.component.background.default)
 }
@@ -249,7 +268,8 @@ private struct AcademyNameEditRow: View {
         beltRank: .white,
         safeAreaTop: 47,
         onNicknameEditTapped: { print("닉네임 수정") },
-        onGymInfoTapped: { print("도장 정보") }
+        onGymInfoTapped: { print("도장 정보") },
+        onSettingsTapped: { print("설정") }
     )
     .background(Color.component.background.default)
 }
@@ -257,7 +277,7 @@ private struct AcademyNameEditRow: View {
 #Preview("MyProfileHeaderView - 벨트 변경") {
     struct BeltChangePreview: View {
         @State private var selectedBelt: BeltRank = .white
-        
+
         var body: some View {
             VStack(spacing: 0) {
                 MyProfileHeaderView(
@@ -267,7 +287,8 @@ private struct AcademyNameEditRow: View {
                     beltRank: selectedBelt,
                     safeAreaTop: 47,
                     onNicknameEditTapped: { },
-                    onGymInfoTapped: { }
+                    onGymInfoTapped: { },
+                    onSettingsTapped: { }
                 )
                 
                 Picker("벨트", selection: $selectedBelt) {
