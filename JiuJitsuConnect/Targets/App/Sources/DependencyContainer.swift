@@ -28,6 +28,9 @@ public final class DependencyContainer {
     private lazy var authRepository: AuthRepository = AuthRepositoryImpl()
     private lazy var userRepository: UserRepository = UserRepositoryImpl()
     private lazy var communityRepository: CommunityRepository = CommunityRepositoryImpl()
+
+    // MARK: - Firebase Client (shared instance)
+    private lazy var sharedFirebaseClient: FirebaseClient = buildFirebaseClient()
     
     // MARK: - Public Methods
     
@@ -47,6 +50,9 @@ public final class DependencyContainer {
             },
             serverLogout: {
                 try await self.authRepository.serverLogout()
+            },
+            signOut: {
+                await self.authRepository.signOut()
             },
             autoLogin: {
                 try await self.authRepository.autoLogin()
@@ -76,6 +82,7 @@ public final class DependencyContainer {
                     AppInfo.makeWithCurrentDevice(fcmToken: token)
                 }
                 _ = try await self.userRepository.registerAppInfo(info: info)
+                self.sharedFirebaseClient.cacheToken(token)
             }
         )
     }
@@ -92,6 +99,10 @@ public final class DependencyContainer {
     }
 
     public func configureFirebaseClient() -> FirebaseClient {
+        return sharedFirebaseClient
+    }
+
+    private func buildFirebaseClient() -> FirebaseClient {
         let cacheKey = "jj.fcm.cached_token"
         nonisolated(unsafe) let defaults = UserDefaults.standard
         return FirebaseClient(

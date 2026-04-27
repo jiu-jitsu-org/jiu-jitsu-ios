@@ -11,7 +11,7 @@ public protocol AuthRepository {
     func signInWithGoogle() async throws -> SNSUser
     func signInWithApple() async throws -> SNSUser
     func signInWithKakao() async throws -> SNSUser
-    func signOut() async throws
+    func signOut() async
     
     func serverLogin(user: SNSUser) async throws -> AuthInfo
     func serverLogout() async throws -> Bool

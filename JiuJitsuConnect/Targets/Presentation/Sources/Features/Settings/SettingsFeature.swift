@@ -124,7 +124,10 @@ public struct SettingsFeature: Sendable {
                 Log.trace("\(isSuccess)")
                 
                 if isSuccess {
-                    return .send(.delegate(.didLogoutSuccessfully))
+                    return .run { send in
+                        await authClient.signOut()
+                        await send(.delegate(.didLogoutSuccessfully))
+                    }
                 } else {
                     return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info))))
                 }

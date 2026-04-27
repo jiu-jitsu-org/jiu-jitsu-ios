@@ -8,6 +8,7 @@ public struct AuthClient {
     public var loginWithKakao: @Sendable () async throws -> Domain.SNSUser
     public var serverLogin: @Sendable (Domain.SNSUser) async throws -> Domain.AuthInfo
     public var serverLogout: @Sendable () async throws -> Bool
+    public var signOut: @Sendable () async -> Void
     public var autoLogin: @Sendable () async throws -> Domain.AuthInfo?
     public var hasValidToken: @Sendable () -> Bool
     
@@ -17,6 +18,7 @@ public struct AuthClient {
         loginWithKakao: @Sendable @escaping () async throws -> Domain.SNSUser,
         serverLogin: @Sendable @escaping (Domain.SNSUser) async throws -> Domain.AuthInfo,
         serverLogout: @Sendable @escaping () async throws -> Bool,
+        signOut: @Sendable @escaping () async -> Void,
         autoLogin: @Sendable @escaping () async throws -> Domain.AuthInfo?,
         hasValidToken: @Sendable @escaping () -> Bool
     ) {
@@ -25,6 +27,7 @@ public struct AuthClient {
         self.loginWithKakao = loginWithKakao
         self.serverLogin = serverLogin
         self.serverLogout = serverLogout
+        self.signOut = signOut
         self.autoLogin = autoLogin
         self.hasValidToken = hasValidToken
     }
@@ -57,6 +60,7 @@ extension AuthClient: DependencyKey {
         serverLogout: {
             true
         },
+        signOut: {},
         autoLogin: {
             Domain.AuthInfo(accessToken: nil,
                             refreshToken: nil,
@@ -94,6 +98,9 @@ extension AuthClient {
         },
         serverLogout: {
             fatalError("unimplemented.serverLogout is not implemented")
+        },
+        signOut: {
+            fatalError("unimplemented.signOut is not implemented")
         },
         autoLogin: {
             fatalError("unimplemented.autoLogin is not implemented")

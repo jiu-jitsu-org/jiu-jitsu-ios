@@ -235,10 +235,17 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
         return window
     }
     
-    public func signOut() async throws {
+    public func signOut() async {
         await MainActor.run {
             GIDSignIn.sharedInstance.signOut()
-            
+        }
+        
+        guard AuthApi.hasToken() else { return }
+        
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            UserApi.shared.logout { _ in
+                continuation.resume()
+            }
         }
     }
     
