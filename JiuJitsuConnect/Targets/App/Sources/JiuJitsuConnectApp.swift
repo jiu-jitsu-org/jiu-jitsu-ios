@@ -4,7 +4,6 @@ import Combine
 import ComposableArchitecture
 import Presentation
 import GoogleSignIn
-import KakaoSDKCommon
 import KakaoSDKAuth
 import PulseUI
 
@@ -13,8 +12,7 @@ struct JiuJitsuConnectApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init() {
-        configureGoogleSignIn()
-        configureKakaoSDK()
+        AppConfigurator.configureExternalSDKs()
     }
     
     @State private var isPulsePresented = false
@@ -38,25 +36,6 @@ struct JiuJitsuConnectApp: App {
                     }
                 }
         }
-    }
-    
-    // MARK: - Configuration
-    
-    private func configureGoogleSignIn() {
-        guard let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
-              let clientId = NSDictionary(contentsOfFile: path)?["CLIENT_ID"] as? String else {
-            fatalError("GoogleService-Info.plist not found or CLIENT_ID missing")
-        }
-        
-        GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientId)
-    }
-    
-    private func configureKakaoSDK() {
-        // Info.plist에서 KAKAO_NATIVE_APP_KEY 값을 가져와 초기화
-        guard let kakaoAppKey = Bundle.main.object(forInfoDictionaryKey: "KAKAO_NATIVE_APP_KEY") as? String else {
-            fatalError("KAKAO_NATIVE_APP_KEY is not set in Info.plist")
-        }
-        KakaoSDK.initSDK(appKey: kakaoAppKey)
     }
     
     // Store 생성 함수

@@ -4,36 +4,37 @@
 //
 //  Created by suni on 9/21/25.
 //
+//  앱의 Composition Root.
+//  Repository / FirebaseClient 인스턴스 생명주기(lazy 단일 인스턴스)를 보유하고,
+//  TCA Client(`AuthClient`, `UserClient`, `CommunityClient`, `FirebaseClient`) 빌드를 담당한다.
+//
+//  실제 인스턴스화 로직은 `RepositoryFactory` / `FirebaseClientFactory`로 분리되어 있어
+//  본 컨테이너는 의존성 그래프를 조립하는 책임에만 집중한다.
+//
 
 import Foundation
 import Domain
-import Data
 import Presentation
-import ComposableArchitecture
 import CoreKit
-import UIKit
-import UserNotifications
-import FirebaseCore
-import FirebaseMessaging
 
 public final class DependencyContainer {
     public static let shared = DependencyContainer()
-    
+
     private init() {
         // 앱이 시작될 때, CoreKit의 Log 핸들러를 Pulse 핸들러로 설정합니다.
         Log.handler = PulseLogHandler()
     }
-    
-    // MARK: - Repositories
-    private lazy var authRepository: AuthRepository = AuthRepositoryImpl()
-    private lazy var userRepository: UserRepository = UserRepositoryImpl()
-    private lazy var communityRepository: CommunityRepository = CommunityRepositoryImpl()
+
+    // MARK: - Repositories (lazy single instance)
+    private lazy var authRepository: AuthRepository = RepositoryFactory.makeAuthRepository()
+    private lazy var userRepository: UserRepository = RepositoryFactory.makeUserRepository()
+    private lazy var communityRepository: CommunityRepository = RepositoryFactory.makeCommunityRepository()
 
     // MARK: - Firebase Client (shared instance)
-    private lazy var sharedFirebaseClient: FirebaseClient = buildFirebaseClient()
-    
-    // MARK: - Public Methods
-    
+    private lazy var sharedFirebaseClient: FirebaseClient = FirebaseClientFactory.make()
+
+    // MARK: - TCA Clients
+
     public func configureAuthClient() -> AuthClient {
         return AuthClient(
             loginWithGoogle: {
@@ -62,7 +63,7 @@ public final class DependencyContainer {
             }
         )
     }
-    
+
     public func configureUserClient() -> UserClient {
         UserClient(
             signup: { info in
@@ -86,7 +87,7 @@ public final class DependencyContainer {
             }
         )
     }
-    
+
     public func configureCommunityClient() -> CommunityClient {
         return CommunityClient(
             fetchProfile: {
@@ -100,83 +101,5 @@ public final class DependencyContainer {
 
     public func configureFirebaseClient() -> FirebaseClient {
         return sharedFirebaseClient
-    }
-
-    private func buildFirebaseClient() -> FirebaseClient {
-        let cacheKey = "jj.fcm.cached_token"
-        nonisolated(unsafe) let defaults = UserDefaults.standard
-        return FirebaseClient(
-            configure: {
-                if FirebaseApp.app() == nil {
-                    FirebaseApp.configure()
-                }
-            },
-            requestPermission: {
-                let center = UNUserNotificationCenter.current()
-                do {
-                    return try await center.requestAuthorization(options: [.alert, .badge, .sound])
-                } catch {
-                    return false
-                }
-            },
-            getFCMToken: {
-                let center = UNUserNotificationCenter.current()
-                let settings = await center.notificationSettings()
-                let granted: Bool
-                switch settings.authorizationStatus {
-                case .notDetermined:
-                    do {
-                        granted = try await center.requestAuthorization(options: [.alert, .badge, .sound])
-                    } catch {
-                        granted = false
-                    }
-                case .authorized, .provisional, .ephemeral:
-                    granted = true
-                default:
-                    granted = false
-                }
-                guard granted else {
-                    throw FirebaseError.permissionDenied
-                }
-
-                await MainActor.run {
-                    UIApplication.shared.registerForRemoteNotifications()
-                }
-
-                _ = try await FirebaseAPNSTokenBridge.waitForDeviceToken()
-
-                return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-                    Messaging.messaging().token { token, error in
-                        if let error {
-                            continuation.resume(throwing: error)
-                        } else if let token {
-                            continuation.resume(returning: token)
-                        } else {
-                            continuation.resume(throwing: FirebaseError.tokenNotAvailable)
-                        }
-                    }
-                }
-            },
-            deleteFCMToken: {
-                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                    Messaging.messaging().deleteToken { error in
-                        if let error {
-                            continuation.resume(throwing: error)
-                        } else {
-                            continuation.resume(returning: ())
-                        }
-                    }
-                }
-            },
-            loadCachedToken: {
-                defaults.string(forKey: cacheKey)
-            },
-            cacheToken: { token in
-                defaults.set(token, forKey: cacheKey)
-            },
-            clearCachedToken: {
-                defaults.removeObject(forKey: cacheKey)
-            }
-        )
     }
 }
