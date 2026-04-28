@@ -57,16 +57,17 @@ public struct MyAcademySettingFeature: Sendable {
         case delegate(DelegateAction)
         case alert(PresentationAction<Alert>)
         
-        public enum ViewAction: Equatable, Sendable {
+        public enum ViewAction: Sendable {
             case onAppear
             case viewTapped
             case doneButtonTapped
             case backButtonTapped
         }
-        
+
+        // AlertState<Alert> 요구사항을 충족하기 위해 Equatable 유지
         public enum Alert: Equatable, Sendable {}
-        
-        public enum DelegateAction: Equatable, Sendable {
+
+        public enum DelegateAction: Sendable {
             case saveAcademyName(String)  // 저장 요청만 위임
             case cancel
         }
