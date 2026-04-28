@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Lottie
+import CoreKit
 
 public struct JJSLottieView: UIViewRepresentable {
     private let filename: String
@@ -48,7 +49,7 @@ public struct JJSLottieView: UIViewRepresentable {
                 }
                 
             } else {
-                print("❌ Lottie 로드 실패: \(filename)")
+                Log.trace("Lottie 로드 실패: \(filename)", category: .view, level: .error)
             }
         }
         

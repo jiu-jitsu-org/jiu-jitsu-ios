@@ -194,8 +194,8 @@ private struct EmptyCompetitionView: View {
                 competitionRank: .participation
             )
         ],
-        onAddCompetitionTapped: { print("대회 추가") },
-        onCompetitionDetailTapped: { print("대회 상세: \($0.competitionName)") }
+        onAddCompetitionTapped: { },
+        onCompetitionDetailTapped: { _ in }
     )
     .padding()
     .background(Color.component.background.default)
@@ -204,7 +204,7 @@ private struct EmptyCompetitionView: View {
 #Preview("MyProfileCompetitionSection - 정보 없음") {
     MyProfileCompetitionSection(
         competitions: nil,
-        onAddCompetitionTapped: { print("대회 추가") },
+        onAddCompetitionTapped: { },
         onCompetitionDetailTapped: { _ in }
     )
     .padding()
@@ -214,7 +214,7 @@ private struct EmptyCompetitionView: View {
 #Preview("MyProfileCompetitionSection - 빈 배열") {
     MyProfileCompetitionSection(
         competitions: [],
-        onAddCompetitionTapped: { print("대회 추가") },
+        onAddCompetitionTapped: { },
         onCompetitionDetailTapped: { _ in }
     )
     .padding()
@@ -249,7 +249,7 @@ private struct EmptyCompetitionView: View {
                 competitionRank: .participation
             )
         ],
-        onCompetitionDetailTapped: { print("대회: \($0.competitionName)") }
+        onCompetitionDetailTapped: { _ in }
     )
     .padding()
     .background(Color.component.background.default)

@@ -333,7 +333,7 @@ private struct DecorativeCardConfig {
         favoriteTechnique: TechniqueType.escapes,
         bestSubmission: SubmissionType.chokes,
         favoriteSubmission: SubmissionType.armLocks,
-        onStyleCardTapped: { type, tab in print("스타일 카드 탭: \(type), \(tab)") }
+        onStyleCardTapped: { _, _ in }
     )
     .padding()
     .background(Color.component.background.default)
@@ -347,7 +347,7 @@ private struct DecorativeCardConfig {
         favoriteTechnique: TechniqueType.escapes,
         bestSubmission: SubmissionType.chokes,
         favoriteSubmission: nil,
-        onStyleCardTapped: { type, tab in print("스타일 카드 탭: \(type), \(tab)") }
+        onStyleCardTapped: { _, _ in }
     )
     .padding()
     .background(Color.component.background.default)
@@ -355,7 +355,7 @@ private struct DecorativeCardConfig {
 
 #Preview("EmptyStyleView") {
     EmptyStyleView(
-        onRegisterStyleTapped: { print("스타일 등록") }
+        onRegisterStyleTapped: { }
     )
     .padding()
     .background(Color.component.background.default)

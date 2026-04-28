@@ -7,6 +7,7 @@ import UIKit
 import UserNotifications
 import FirebaseCore
 import FirebaseMessaging
+import CoreKit
 import Presentation
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
@@ -21,13 +22,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        print("✅ [APNs] 디바이스 토큰 수신: \(deviceToken.map { String(format: "%02x", $0) }.joined())")
+        Log.trace("[APNs] 디바이스 토큰 수신: \(deviceToken.map { String(format: "%02x", $0) }.joined())", category: .system, level: .info)
         Messaging.messaging().apnsToken = deviceToken
         FirebaseAPNSTokenBridge.deliverDeviceToken(deviceToken)
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        print("❌ [APNs] 등록 실패: \(error)")
+        Log.trace("[APNs] 등록 실패: \(error)", category: .system, level: .error)
         FirebaseAPNSTokenBridge.deliverRegistrationFailure(error)
     }
 }
@@ -41,7 +42,7 @@ extension AppDelegate: MessagingDelegate {
     /// 여기서 서버 호출을 하면 syncOnAppLaunch 와 중복 호출이 발생합니다.
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         guard let fcmToken else { return }
-        print("🔄 [FCM] 토큰 갱신: \(fcmToken)")
+        Log.trace("[FCM] 토큰 갱신: \(fcmToken)", category: .system, level: .info)
         DependencyContainer.shared.configureFirebaseClient().cacheToken(fcmToken)
     }
 }
@@ -65,7 +66,7 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
-        print("📬 [Push] 알림 탭 수신: \(userInfo)")
+        Log.trace("[Push] 알림 탭 수신: \(userInfo)", category: .system, level: .info)
         completionHandler()
     }
 }

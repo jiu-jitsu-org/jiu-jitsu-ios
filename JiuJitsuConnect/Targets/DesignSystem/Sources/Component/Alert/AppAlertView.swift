@@ -86,15 +86,15 @@ struct AppAlertPreview: View {
             configuration: .init(
                 title: "로그아웃",
                 message: "정말 로그아웃 하시겠어요?",
-                primaryButton: .init(title: "확인", action: { print("확인 탭") }), secondaryButton: nil)
+                primaryButton: .init(title: "확인", action: { }), secondaryButton: nil)
         )
         .appAlert(
             isPresented: $showAlertWithTwoButtons,
             configuration: .init(
                 title: "회원 탈퇴",
                 message: "정말 탈퇴 하시겠어요?\n모든 정보가 삭제되며 복구할 수 없습니다.",
-                primaryButton: .init(title: "탈퇴", action: { print("탈퇴 탭") }),
-                secondaryButton: .init(title: "취소", action: { print("취소 탭") })
+                primaryButton: .init(title: "탈퇴", action: { }),
+                secondaryButton: .init(title: "취소", action: { })
             )
         )
     }

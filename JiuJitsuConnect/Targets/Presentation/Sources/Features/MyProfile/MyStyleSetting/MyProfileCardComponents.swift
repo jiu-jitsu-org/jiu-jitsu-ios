@@ -291,10 +291,10 @@ private struct WeightSection: View {
         beltStripe: .two,
         weightKg: 75.0,
         isWeightHidden: false,
-        onBeltTapped: { print("벨트 탭") },
-        onWeightClassTapped: { print("체급 탭") },
-        onWeightVisibilityToggleTapped: { print("체급 표시/숨김") },
-        onRegisterTapped: { print("등록 버튼") }
+        onBeltTapped: { },
+        onWeightClassTapped: { },
+        onWeightVisibilityToggleTapped: { },
+        onRegisterTapped: { }
     )
     .background(Color.component.background.default)
 }
@@ -305,10 +305,10 @@ private struct WeightSection: View {
         beltStripe: nil,
         weightKg: nil,
         isWeightHidden: false,
-        onBeltTapped: { print("벨트 탭") },
-        onWeightClassTapped: { print("체급 탭") },
-        onWeightVisibilityToggleTapped: { print("체급 표시/숨김") },
-        onRegisterTapped: { print("등록 버튼") }
+        onBeltTapped: { },
+        onWeightClassTapped: { },
+        onWeightVisibilityToggleTapped: { },
+        onRegisterTapped: { }
     )
     .background(Color.component.background.default)
 }
@@ -319,10 +319,10 @@ private struct WeightSection: View {
         beltStripe: .four,
         weightKg: 68.5,
         isWeightHidden: true,
-        onBeltTapped: { print("벨트 탭") },
-        onWeightClassTapped: { print("체급 탭") },
-        onWeightVisibilityToggleTapped: { print("체급 표시/숨김") },
-        onRegisterTapped: { print("등록 버튼") }
+        onBeltTapped: { },
+        onWeightClassTapped: { },
+        onWeightVisibilityToggleTapped: { },
+        onRegisterTapped: { }
     )
     .background(Color.component.background.default)
 }
@@ -337,14 +337,14 @@ private struct WeightSection: View {
                 beltStripe: Optional.none,
                 weightKg: 82.3,
                 isWeightHidden: isWeightHidden,
-                onBeltTapped: { print("벨트 탭") },
-                onWeightClassTapped: { print("체급 탭") },
-                onWeightVisibilityToggleTapped: { 
+                onBeltTapped: { },
+                onWeightClassTapped: { },
+                onWeightVisibilityToggleTapped: {
                     withAnimation {
                         isWeightHidden.toggle()
                     }
                 },
-                onRegisterTapped: { print("등록 버튼") }
+                onRegisterTapped: { }
             )
             .background(Color.component.background.default)
         }

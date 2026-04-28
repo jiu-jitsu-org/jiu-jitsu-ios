@@ -253,9 +253,9 @@ private struct AcademyNameEditRow: View {
         profileImageUrl: nil,
         beltRank: .blue,
         safeAreaTop: 47,
-        onNicknameEditTapped: { print("닉네임 수정") },
-        onGymInfoTapped: { print("도장 정보") },
-        onSettingsTapped: { print("설정") }
+        onNicknameEditTapped: { },
+        onGymInfoTapped: { },
+        onSettingsTapped: { }
     )
     .background(Color.component.background.default)
 }
@@ -267,9 +267,9 @@ private struct AcademyNameEditRow: View {
         profileImageUrl: nil,
         beltRank: .white,
         safeAreaTop: 47,
-        onNicknameEditTapped: { print("닉네임 수정") },
-        onGymInfoTapped: { print("도장 정보") },
-        onSettingsTapped: { print("설정") }
+        onNicknameEditTapped: { },
+        onGymInfoTapped: { },
+        onSettingsTapped: { }
     )
     .background(Color.component.background.default)
 }

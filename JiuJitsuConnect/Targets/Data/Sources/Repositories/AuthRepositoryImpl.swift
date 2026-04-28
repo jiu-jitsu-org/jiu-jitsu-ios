@@ -16,7 +16,11 @@ import KakaoSDKUser
 import OSLog
 import CoreKit
 
-public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+/// @unchecked Sendable 사유: Apple Sign-In delegate 채택을 위해 NSObject 상속이 강제되며,
+/// `appleSignInContinuation`은 `@MainActor` 메서드(`signInWithApple`)에서 설정되고
+/// 동일 메인 스레드에서 발화하는 delegate 콜백(`authorizationController(...)`)에서만 접근하므로
+/// 외부 동시성 경계에서 안전하다.
+public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding, @unchecked Sendable {
     
     private let networkService: NetworkService
     private let tokenStorage: TokenStorage

@@ -107,7 +107,7 @@ public struct LoginFeature: Sendable {
                 
             case let .internal(.serverLoginResponse(.success(authInfo))):
                 state.isLoading = false
-                print(authInfo)
+                Log.trace("서버 로그인 성공: isNewUser=\(authInfo.isNewUser ?? false)", category: .network, level: .info)
                 // 1. 신규 유저일 경우
                 if authInfo.isNewUser == true {
                     guard let tempToken = authInfo.tempToken else {

@@ -7,7 +7,7 @@
 
 import Foundation
 
-public protocol AuthRepository {
+public protocol AuthRepository: Sendable {
     func signInWithGoogle() async throws -> SNSUser
     func signInWithApple() async throws -> SNSUser
     func signInWithKakao() async throws -> SNSUser

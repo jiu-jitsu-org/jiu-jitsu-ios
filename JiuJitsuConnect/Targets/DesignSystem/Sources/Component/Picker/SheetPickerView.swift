@@ -272,9 +272,7 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
         items: StripeItem.items,
         selectedItem: StripeItem.items.last!, // STRIPE_0 선택
         displayText: { $0.name },
-        onSelect: { item in
-            print("Selected: \(item.name)")
-        }
+        onSelect: { _ in }
     )
     .background(Color.gray.opacity(0.1))
     .frame(height: 300)

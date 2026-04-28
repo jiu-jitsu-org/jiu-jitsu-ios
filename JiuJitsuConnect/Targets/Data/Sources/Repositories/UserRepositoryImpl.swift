@@ -10,7 +10,7 @@ import Domain
 import OSLog
 import CoreKit
 
-public final class UserRepositoryImpl: NSObject, UserRepository {
+public final class UserRepositoryImpl: UserRepository {
     private let networkService: NetworkService
     private let tokenStorage: TokenStorage
     
