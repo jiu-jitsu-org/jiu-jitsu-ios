@@ -446,8 +446,10 @@ public struct MyStyleSettingFeature: Sendable {
         }
         
         public enum DelegateAction: Sendable {
-            case didConfirmBest(type: MyStyleSettingType, best: String?)  // 특기 완료 → 최애 탭으로 전환
-            case didConfirmFavorite(type: MyStyleSettingType, best: String?, favorite: String?)  // 최애 완료 → 다음 단계 또는 최종 완료
+            /// 특기/최애를 한 번에 저장 요청
+            /// - register 모드: 다음 스타일 단계로 진행
+            /// - edit 모드: 화면 닫기
+            case didConfirmStyle(type: MyStyleSettingType, best: String?, favorite: String?)
             case cancel
         }
     }
@@ -522,27 +524,20 @@ public struct MyStyleSettingFeature: Sendable {
                 
             case .view(.completeButtonTapped):
                 guard state.canComplete else { return .none }
-                
-                switch state.selectedTab {
-                case .best:
-                    let bestKey = state.selectedBestStyle?.rawValue
-                    if state.mode == .register {
-                        // 등록 플로우: 최애 탭으로 전환 + 부모에게 알림
-                        return .merge(
-                            .send(.internal(.switchToFavoriteTab)),
-                            .send(.delegate(.didConfirmBest(type: state.settingType, best: bestKey)))
-                        )
-                    } else {
-                        // 수정 모드: 최애 탭 전환 없이 바로 부모에게 알림 (화면 닫기는 부모가 담당)
-                        return .send(.delegate(.didConfirmBest(type: state.settingType, best: bestKey)))
-                    }
-                    
-                case .favorite:
-                    // 최애 완료 → 부모에게 전달 (등록 플로우: 다음 단계, 수정 모드: 화면 닫기)
-                    let bestKey = state.selectedBestStyle?.rawValue
-                    let favoriteKey = state.selectedFavoriteStyle?.rawValue
-                    return .send(.delegate(.didConfirmFavorite(type: state.settingType, best: bestKey, favorite: favoriteKey)))
+
+                // register 모드 + 특기 탭이면 API 호출 없이 최애 탭으로만 전환
+                if state.mode == .register, state.selectedTab == .best {
+                    return .send(.internal(.switchToFavoriteTab))
                 }
+
+                // 그 외 케이스(register + favorite, edit + best/favorite) → 한 번에 저장
+                let bestKey = state.selectedBestStyle?.rawValue
+                let favoriteKey = state.selectedFavoriteStyle?.rawValue
+                return .send(.delegate(.didConfirmStyle(
+                    type: state.settingType,
+                    best: bestKey,
+                    favorite: favoriteKey
+                )))
                 
             case .internal(.switchToFavoriteTab):
                 // 최애 탭으로 전환

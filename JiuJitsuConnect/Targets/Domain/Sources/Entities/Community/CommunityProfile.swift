@@ -243,33 +243,8 @@ extension CommunityProfile {
         )
     }
     
-    /// 포지션 정보 업데이트 (특기만)
-    public func updatingPositionBest(_ best: PositionType?) -> CommunityProfile {
-        CommunityProfile(
-            nickname: nickname,
-            profileImageUrl: profileImageUrl,
-            beltRank: beltRank,
-            beltStripe: beltStripe,
-            gender: gender,
-            weightKg: weightKg,
-            academyName: academyName,
-            competitions: competitions,
-            bestSubmission: bestSubmission,
-            favoriteSubmission: favoriteSubmission,
-            bestTechnique: bestTechnique,
-            favoriteTechnique: favoriteTechnique,
-            bestPosition: best,
-            favoritePosition: favoritePosition,
-            isWeightHidden: isWeightHidden,
-            isOwner: isOwner,
-            teachingPhilosophy: teachingPhilosophy,
-            teachingStartDate: teachingStartDate,
-            teachingDetail: teachingDetail
-        )
-    }
-    
     /// 포지션 정보 업데이트 (특기 + 최애)
-    public func updatingPositionFavorite(best: PositionType?, favorite: PositionType?) -> CommunityProfile {
+    public func updatingPosition(best: PositionType?, favorite: PositionType?) -> CommunityProfile {
         CommunityProfile(
             nickname: nickname,
             profileImageUrl: profileImageUrl,
@@ -292,34 +267,9 @@ extension CommunityProfile {
             teachingDetail: teachingDetail
         )
     }
-    
-    /// 서브미션 정보 업데이트 (특기만)
-    public func updatingSubmissionBest(_ best: SubmissionType?) -> CommunityProfile {
-        CommunityProfile(
-            nickname: nickname,
-            profileImageUrl: profileImageUrl,
-            beltRank: beltRank,
-            beltStripe: beltStripe,
-            gender: gender,
-            weightKg: weightKg,
-            academyName: academyName,
-            competitions: competitions,
-            bestSubmission: best,
-            favoriteSubmission: favoriteSubmission,
-            bestTechnique: bestTechnique,
-            favoriteTechnique: favoriteTechnique,
-            bestPosition: bestPosition,
-            favoritePosition: favoritePosition,
-            isWeightHidden: isWeightHidden,
-            isOwner: isOwner,
-            teachingPhilosophy: teachingPhilosophy,
-            teachingStartDate: teachingStartDate,
-            teachingDetail: teachingDetail
-        )
-    }
-    
+
     /// 서브미션 정보 업데이트 (특기 + 최애)
-    public func updatingSubmissionFavorite(best: SubmissionType?, favorite: SubmissionType?) -> CommunityProfile {
+    public func updatingSubmission(best: SubmissionType?, favorite: SubmissionType?) -> CommunityProfile {
         CommunityProfile(
             nickname: nickname,
             profileImageUrl: profileImageUrl,
@@ -342,34 +292,9 @@ extension CommunityProfile {
             teachingDetail: teachingDetail
         )
     }
-    
-    /// 기술 정보 업데이트 (특기만)
-    public func updatingTechniqueBest(_ best: TechniqueType?) -> CommunityProfile {
-        CommunityProfile(
-            nickname: nickname,
-            profileImageUrl: profileImageUrl,
-            beltRank: beltRank,
-            beltStripe: beltStripe,
-            gender: gender,
-            weightKg: weightKg,
-            academyName: academyName,
-            competitions: competitions,
-            bestSubmission: bestSubmission,
-            favoriteSubmission: favoriteSubmission,
-            bestTechnique: best,
-            favoriteTechnique: favoriteTechnique,
-            bestPosition: bestPosition,
-            favoritePosition: favoritePosition,
-            isWeightHidden: isWeightHidden,
-            isOwner: isOwner,
-            teachingPhilosophy: teachingPhilosophy,
-            teachingStartDate: teachingStartDate,
-            teachingDetail: teachingDetail
-        )
-    }
-    
+
     /// 기술 정보 업데이트 (특기 + 최애)
-    public func updatingTechniqueFavorite(best: TechniqueType?, favorite: TechniqueType?) -> CommunityProfile {
+    public func updatingTechnique(best: TechniqueType?, favorite: TechniqueType?) -> CommunityProfile {
         CommunityProfile(
             nickname: nickname,
             profileImageUrl: profileImageUrl,
@@ -407,23 +332,14 @@ public enum ProfileSection: String, Codable, Sendable, CaseIterable, Equatable {
     /// 벨트/체급 정보 (beltRank, beltStripe, gender, weightKg)
     case beltWeight = "BELT_WEIGHT"
     
-    /// 포지션 특기 (bestPosition)
-    case positionBest = "POSITION_BEST"
-    
-    /// 포지션 최애 (favoritePosition)
-    case positionFavorite = "POSITION_FAVORITE"
-    
-    /// 서브미션 특기 (bestSubmission)
-    case submissionBest = "SUBMISSION_BEST"
-    
-    /// 서브미션 최애 (favoriteSubmission)
-    case submissionFavorite = "SUBMISSION_FAVORITE"
-    
-    /// 기술 특기 (bestTechnique)
-    case techniqueBest = "TECHNIQUE_BEST"
-    
-    /// 기술 최애 (favoriteTechnique)
-    case techniqueFavorite = "TECHNIQUE_FAVORITE"
+    /// 포지션 (bestPosition + favoritePosition)
+    case position = "POSITION"
+
+    /// 서브미션 (bestSubmission + favoriteSubmission)
+    case submission = "SUBMISSION"
+
+    /// 기술 (bestTechnique + favoriteTechnique)
+    case technique = "TECHNIQUE"
     
     /// 대회 정보 (competitions)
     case competition = "COMPETITION"
@@ -438,18 +354,12 @@ public enum ProfileSection: String, Codable, Sendable, CaseIterable, Equatable {
             return "도장 정보"
         case .beltWeight:
             return "벨트/체급"
-        case .positionBest:
-            return "포지션 특기"
-        case .positionFavorite:
-            return "포지션 최애"
-        case .submissionBest:
-            return "서브미션 특기"
-        case .submissionFavorite:
-            return "서브미션 최애"
-        case .techniqueBest:
-            return "기술 특기"
-        case .techniqueFavorite:
-            return "기술 최애"
+        case .position:
+            return "포지션"
+        case .submission:
+            return "서브미션"
+        case .technique:
+            return "기술"
         case .competition:
             return "대회 기록"
         case .instructorInfo:
