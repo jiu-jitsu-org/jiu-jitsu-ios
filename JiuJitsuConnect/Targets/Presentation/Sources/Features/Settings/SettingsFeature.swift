@@ -46,7 +46,6 @@ public struct SettingsFeature: Sendable {
         case delegate(DelegateAction)
         
         public enum ViewAction: Sendable {
-            case backButtonTapped
             case termsButtonTapped
             case privacyPolicyButtonTapped
             case logoutButtonTapped
@@ -71,7 +70,6 @@ public struct SettingsFeature: Sendable {
     }
     
     // MARK: - Dependencies
-    @Dependency(\.dismiss) var dismiss
     @Dependency(\.authClient) var authClient
     @Dependency(\.userClient) var userClient
     @Dependency(\.continuousClock) var clock
@@ -81,9 +79,6 @@ public struct SettingsFeature: Sendable {
         Reduce { state, action in
             switch action {
             // MARK: UI Actions
-            case .view(.backButtonTapped):
-                return .run { _ in await self.dismiss() }
-                
             case .view(.termsButtonTapped):
                 // TODO: 서비스 이용 약관 화면으로 이동하는 로직
                 return .none

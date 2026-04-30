@@ -52,7 +52,6 @@ public struct MyProfileFeature: Sendable {
     
     @Reducer
     public enum Destination {
-        case settings(SettingsFeature)
         case academySetting(MyAcademySettingFeature)
         case nicknameSetting(NicknameSettingFeature)
         case myStyleSetting(MyStyleSettingFeature)
@@ -74,14 +73,10 @@ public struct MyProfileFeature: Sendable {
         // 시트 액션
         case sheet(PresentationAction<Sheet.Action>)
         
-        public enum DelegateAction: Sendable {
-            case didLogoutSuccessfully
-            case didWithdrawSuccessfully
-        }
-        
+        public enum DelegateAction: Sendable {}
+
         public enum ViewAction: Sendable {
             case onAppear
-            case settingsButtonTapped
             case gymInfoButtonTapped
             case nicknameEditButtonTapped
             case registerBeltButtonTapped
@@ -138,10 +133,6 @@ public struct MyProfileFeature: Sendable {
                 // (toast dismiss 등 state 변화로 onAppear가 재트리거되는 경우 차단)
                 guard state.communityProfile == nil else { return .none }
                 return .send(.internal(.loadProfile))
-                
-            case .view(.settingsButtonTapped):
-                state.destination = .settings(.init(authInfo: state.authInfo))
-                return .none
                 
             case .internal(.loadProfile):
                 state.isLoadingProfile = true
@@ -260,17 +251,7 @@ public struct MyProfileFeature: Sendable {
                 return .send(.internal(.toggleWeightVisibility))
                 
             // MARK: - Delegate 처리 (자식 Feature로부터)
-            
-            case .destination(.presented(.settings(.delegate(.didLogoutSuccessfully)))):
-                state.authInfo = .guest
-                state.destination = nil
-                return .send(.delegate(.didLogoutSuccessfully))
-                
-            case .destination(.presented(.settings(.delegate(.didWithdrawSuccessfully)))):
-                state.authInfo = .guest
-                state.destination = nil
-                return .send(.delegate(.didWithdrawSuccessfully))
-                
+
             case let .destination(.presented(.academySetting(.delegate(.saveAcademyName(academyName))))):
                 // 도장 이름 저장 요청 받음 → API 호출
                 return .send(.internal(.updateProfileSection(.academy, academyName)))

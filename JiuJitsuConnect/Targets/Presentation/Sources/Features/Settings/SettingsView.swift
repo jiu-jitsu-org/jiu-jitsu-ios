@@ -102,31 +102,11 @@ public struct SettingsView: View {
     
     private var headerView: some View {
         HStack {
-            Button(action: { store.send(.view(.backButtonTapped)) }) {
-                ZStack {
-                    Assets.Common.Icon.chevronLeft.swiftUIImage
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 24, height: 24)
-                        .foregroundStyle(Color.component.bottomSheet.unselected.listItem.followingIcon)
-                }
-                .frame(width: 32, height: 32)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            
-            Spacer()
-            
             Text("설정")
                 .font(Font.pretendard.title3)
                 .foregroundStyle(Color.component.header.text)
-            
-            Spacer()
-            
-            Rectangle()
-                .fill(.clear)
-                .frame(width: 32, height: 32)
         }
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, Style.horizontalPadding)
         .frame(height: Style.headerHeight)
         .background(Color.component.background.default.ignoresSafeArea(edges: .top))
