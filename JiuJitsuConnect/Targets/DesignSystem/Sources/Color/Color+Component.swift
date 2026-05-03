@@ -457,12 +457,12 @@ public struct ComponentColors {
         
         
         public let unselected = Unselected()
-        
+
         public struct Unselected {
             public let bg = Color.semantic.transparent.transparent
             public let titleText = Color.semantic.text.secondary
             public let subText = Color.semantic.text.tertiary
         }
     }
-    
+
 }

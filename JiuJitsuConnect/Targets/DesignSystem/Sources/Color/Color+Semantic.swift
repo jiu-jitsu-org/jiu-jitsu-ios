@@ -126,7 +126,7 @@ public struct SemanticColors {
 
     // MARK: - Transparent (투명)
     public let transparent = Transparent()
-    
+
     public struct Transparent {
         public let transparent = Color.clear
     }

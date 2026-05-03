@@ -22,6 +22,13 @@ public typealias AssetImageTypeAlias = ImageAsset.Image
 
 // swiftlint:disable identifier_name line_length nesting type_body_length type_name
 public enum Assets {
+  public enum Bottom {
+    public enum Icon {
+      public static let home = ImageAsset(name: "Bottom/Icon/home")
+      public static let my = ImageAsset(name: "Bottom/Icon/my")
+      public static let setting = ImageAsset(name: "Bottom/Icon/setting")
+    }
+  }
   public enum Common {
     public enum Icon {
       public static let arrowLeft = ImageAsset(name: "Common/Icon/arrow-left")
