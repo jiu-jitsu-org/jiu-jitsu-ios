@@ -25,7 +25,6 @@ public struct MyProfileHeaderView: View {
     
     let onNicknameEditTapped: () -> Void
     let onGymInfoTapped: () -> Void
-    let onSettingsTapped: () -> Void
     
     // MARK: - Metrics
     
@@ -101,23 +100,6 @@ public struct MyProfileHeaderView: View {
 
                     Spacer().frame(height: Metrics.bottomPaddingWithButton)
                 }
-            }
-
-            // 설정 버튼: 네비게이션 바 없이 safe area 기준으로 고정
-            VStack {
-                HStack {
-                    Spacer()
-                    Button {
-                        onSettingsTapped()
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .foregroundStyle(Color.white)
-                            .frame(width: 44, height: 44)
-                    }
-                    .padding(.trailing, 8)
-                }
-                .padding(.top, safeAreaTop)
-                Spacer()
             }
         }
     }
@@ -254,8 +236,7 @@ private struct AcademyNameEditRow: View {
         beltRank: .blue,
         safeAreaTop: 47,
         onNicknameEditTapped: { },
-        onGymInfoTapped: { },
-        onSettingsTapped: { }
+        onGymInfoTapped: { }
     )
     .background(Color.component.background.default)
 }
@@ -268,8 +249,7 @@ private struct AcademyNameEditRow: View {
         beltRank: .white,
         safeAreaTop: 47,
         onNicknameEditTapped: { },
-        onGymInfoTapped: { },
-        onSettingsTapped: { }
+        onGymInfoTapped: { }
     )
     .background(Color.component.background.default)
 }
@@ -287,8 +267,7 @@ private struct AcademyNameEditRow: View {
                     beltRank: selectedBelt,
                     safeAreaTop: 47,
                     onNicknameEditTapped: { },
-                    onGymInfoTapped: { },
-                    onSettingsTapped: { }
+                    onGymInfoTapped: { }
                 )
                 
                 Picker("벨트", selection: $selectedBelt) {

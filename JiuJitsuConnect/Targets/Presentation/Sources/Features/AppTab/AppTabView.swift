@@ -41,6 +41,16 @@ public struct AppTabView: View {
                 Text("MY")
             }
             .tag(AppTabFeature.Tab.myPage)
+
+            // 탭 3: 설정
+            NavigationStack {
+                SettingsView(store: store.scope(state: \.settings, action: \.settings))
+            }
+            .tabItem {
+                Image(systemName: "gearshape")
+                Text("설정")
+            }
+            .tag(AppTabFeature.Tab.settings)
         }
         .tint(.blue) // 선택된 탭 색상
         .onAppear {
