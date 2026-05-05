@@ -12,60 +12,120 @@ import Domain
 
 public struct AppTabView: View {
     @Bindable var store: StoreOf<AppTabFeature>
-    
+
     public init(store: StoreOf<AppTabFeature>) {
         self.store = store
     }
-    
-    public var body: some View {
-        // iOS 18+ 혹은 최신 SwiftUI에서는 $store.selectedTab.sending(\.tabSelected) 사용 가능
-        // 하위 호환성을 위해 Binding(get:set:)을 명시적으로 사용할 수도 있습니다.
-        TabView(selection: $store.selectedTab.sending(\.view.tabSelected)) {
-            
-            // 탭 1: 홈
-            NavigationStack {
-                CommunityView(store: store.scope(state: \.home, action: \.home))
-            }
-            .tabItem {
-                Image(systemName: "house")
-                Text("홈")
-            }
-            .tag(AppTabFeature.Tab.home)
-            
-            // 탭 2: 마이페이지
-            NavigationStack {
-                MyProfileView(store: store.scope(state: \.myPage, action: \.myPage))
-            }
-            .tabItem {
-                Image(systemName: "person")
-                Text("MY")
-            }
-            .tag(AppTabFeature.Tab.myPage)
 
-            // 탭 3: 설정
-            NavigationStack {
-                SettingsView(store: store.scope(state: \.settings, action: \.settings))
+    private enum Metrics {
+        static let tabBarHeight: CGFloat = 58
+        static let tabBarHorizontalPadding: CGFloat = 20
+        static let iconSize: CGFloat = 24
+        static let itemSpacing: CGFloat = 4
+        static let topBorderHeight: CGFloat = 1
+
+        // Drop shadow: x=0, y=-4, blur=12, spread=0, #000000 8% (Figma 기준)
+        static let shadowColor = Color.black.opacity(0.08)
+        static let shadowRadius: CGFloat = 6   // SwiftUI radius ≈ Figma blur / 2
+        static let shadowY: CGFloat = -4
+    }
+
+    public var body: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                // 탭별 NavigationStack을 모두 유지하여 탭 전환 시 상태가 보존되도록 한다
+                tabContainer(for: .home) {
+                    NavigationStack {
+                        CommunityView(store: store.scope(state: \.home, action: \.home))
+                    }
+                }
+                tabContainer(for: .myPage) {
+                    NavigationStack {
+                        MyProfileView(store: store.scope(state: \.myPage, action: \.myPage))
+                    }
+                }
+                tabContainer(for: .settings) {
+                    NavigationStack {
+                        SettingsView(store: store.scope(state: \.settings, action: \.settings))
+                    }
+                }
             }
-            .tabItem {
-                Image(systemName: "gearshape")
-                Text("설정")
-            }
-            .tag(AppTabFeature.Tab.settings)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            bottomTabBar
         }
-        .tint(.blue) // 선택된 탭 색상
-        .onAppear {
-            // 탭바 배경을 흰색으로 고정 (선택 사항)
-            let appearance = UITabBarAppearance()
-            appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = .white
-            UITabBar.appearance().standardAppearance = appearance
-            UITabBar.appearance().scrollEdgeAppearance = appearance
-        }
+        .background(Color.component.navibar.container.background)
         .fullScreenCover(
             item: $store.scope(state: \.loginCover, action: \.loginCover)
         ) { loginStore in
             LoginView(store: loginStore)
         }
+    }
+
+    @ViewBuilder
+    private func tabContainer<Content: View>(
+        for tab: AppTabFeature.Tab,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        let isActive = store.selectedTab == tab
+        content()
+            .opacity(isActive ? 1 : 0)
+            .allowsHitTesting(isActive)
+    }
+
+    private var bottomTabBar: some View {
+        HStack(spacing: 0) {
+            tabBarButton(tab: .home, asset: Assets.Bottom.Icon.home, label: "홈")
+            tabBarButton(tab: .myPage, asset: Assets.Bottom.Icon.my, label: "MY")
+            tabBarButton(tab: .settings, asset: Assets.Bottom.Icon.setting, label: "설정")
+        }
+        .frame(height: Metrics.tabBarHeight)
+        .padding(.horizontal, Metrics.tabBarHorizontalPadding)
+        .background(Color.component.navibar.container.background)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.component.navibar.container.divider)
+                .frame(height: Metrics.topBorderHeight)
+        }
+        .shadow(
+            color: Metrics.shadowColor,
+            radius: Metrics.shadowRadius,
+            x: 0,
+            y: Metrics.shadowY
+        )
+    }
+
+    private func tabBarButton(
+        tab: AppTabFeature.Tab,
+        asset: ImageAsset,
+        label: String
+    ) -> some View {
+        let isSelected = store.selectedTab == tab
+        let iconColor: Color = isSelected
+            ? Color.component.navibar.selected.icon
+            : Color.component.navibar.unselected.icon
+        let labelColor: Color = isSelected
+            ? Color.component.navibar.selected.label
+            : Color.component.navibar.unselected.label
+
+        return Button {
+            store.send(.view(.tabSelected(tab)))
+        } label: {
+            VStack(spacing: Metrics.itemSpacing) {
+                asset.swiftUIImage
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: Metrics.iconSize, height: Metrics.iconSize)
+                    .foregroundStyle(iconColor)
+                Text(label)
+                    .font(Font.pretendard.buttonS)
+                    .foregroundStyle(labelColor)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
