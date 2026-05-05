@@ -117,7 +117,6 @@ let project = Project(
                 "Secrets/GoogleService-Info.plist",
                 .glob(pattern: .relativeToRoot("Targets/DesignSystem/Resources/**"))
             ],
-            entitlements: "JiuJitsuConnect.entitlements",
             dependencies: [
                 .target(name: "Presentation"),
                 .target(name: "Data"),
@@ -142,14 +141,17 @@ let project = Project(
                         "OTHER_SWIFT_FLAGS": "-D DEBUG $(inherited) -Xfrontend -warn-long-function-bodies=500 -Xfrontend -warn-long-expression-type-checking=500 -Xfrontend -debug-time-function-bodies -Xfrontend -debug-time-expression-type-checking -Xfrontend -enable-actor-data-race-checks",
                         "OTHER_LDFLAGS": "$(inherited)",
                         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "\(additionalCondition) DEBUG",
+                        "CODE_SIGN_ENTITLEMENTS": "JiuJitsuConnect.entitlements",
                     ]),
                     .release(name: "Beta", settings: [
                         "OTHER_LDFLAGS": "$(inherited)",
                         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "\(additionalCondition) BETA",
+                        "CODE_SIGN_ENTITLEMENTS": "JiuJitsuConnect.Release.entitlements",
                     ]),
                     .release(name: "Release", settings: [
                         "OTHER_LDFLAGS": "$(inherited)",
                         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "\(additionalCondition)",
+                        "CODE_SIGN_ENTITLEMENTS": "JiuJitsuConnect.Release.entitlements",
                     ]),
                 ]
             )
