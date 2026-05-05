@@ -248,6 +248,14 @@ private extension View {
             ) { myStyleSettingStore in
                 MyStyleSettingView(store: myStyleSettingStore)
             }
+            .navigationDestination(
+                item: store.scope(
+                    state: \.destination?.competitionInfo,
+                    action: \.destination.competitionInfo
+                )
+            ) { competitionInfoStore in
+                CompetitionInfoView(store: competitionInfoStore)
+            }
     }
     
     /// 토스트 오버레이

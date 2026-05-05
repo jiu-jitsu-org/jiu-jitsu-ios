@@ -55,6 +55,7 @@ public struct MyProfileFeature: Sendable {
         case academySetting(MyAcademySettingFeature)
         case nicknameSetting(NicknameSettingFeature)
         case myStyleSetting(MyStyleSettingFeature)
+        case competitionInfo(CompetitionInfoFeature)
     }
     
     @Reducer
@@ -629,10 +630,18 @@ public struct MyProfileFeature: Sendable {
                 return .send(.internal(.toastDismissed))
                 
             case .view(.addCompetitionButtonTapped):
-                // TODO: 대회 정보 추가 화면으로 네비게이션
-                // 현재는 로그만 출력
-                Log.trace("대회 정보 추가 버튼 탭", category: .debug, level: .info)
-                return .send(.internal(.showToast(.init(message: "대회 정보 추가 기능은 준비 중입니다", style: .info))))
+                state.destination = .competitionInfo(CompetitionInfoFeature.State())
+                return .none
+
+            case let .destination(.presented(.competitionInfo(.delegate(.didFinish(competition))))):
+                // TODO: Step 3 - 저장 client 연결. 현재는 로그만 남기고 화면 닫기
+                Log.trace(
+                    "대회 추가 완료: \(competition.competitionYear)/\(competition.competitionMonth) \(competition.competitionName) \(competition.competitionRank.displayName)",
+                    category: .debug,
+                    level: .info
+                )
+                state.destination = nil
+                return .none
                 
             case let .view(.competitionDetailTapped(competition)):
                 // TODO: 대회 정보 상세 화면으로 네비게이션
