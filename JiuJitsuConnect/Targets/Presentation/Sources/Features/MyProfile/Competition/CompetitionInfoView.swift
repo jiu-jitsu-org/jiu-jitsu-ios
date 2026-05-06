@@ -24,8 +24,7 @@ struct CompetitionInfoView: View {
                 case .date:
                     CompetitionDateView(store: store)
                 case .name:
-                    // Step 2에서 CompetitionNameView로 교체 예정
-                    stepPlaceholder("대회명 입력 (Step 2 예정)")
+                    CompetitionNameView(store: store)
                 case .result:
                     // Step 3에서 CompetitionResultView로 교체 예정
                     stepPlaceholder("결과 선택 (Step 3 예정)")
