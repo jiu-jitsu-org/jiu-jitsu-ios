@@ -26,8 +26,7 @@ struct CompetitionInfoView: View {
                 case .name:
                     CompetitionNameView(store: store)
                 case .result:
-                    // Step 3에서 CompetitionResultView로 교체 예정
-                    stepPlaceholder("결과 선택 (Step 3 예정)")
+                    CompetitionResultView(store: store)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -76,21 +75,6 @@ struct CompetitionInfoView: View {
         .frame(height: Style.headerHeight)
     }
 
-    @ViewBuilder
-    private func stepPlaceholder(_ text: String) -> some View {
-        VStack(spacing: 12) {
-            Spacer()
-            Text(text)
-                .font(Font.pretendard.title2)
-                .foregroundStyle(Color.component.sectionHeader.title)
-            Spacer()
-            CTAButton(title: "다음") {
-                store.send(.view(.nextButtonTapped))
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 24)
-        }
-    }
 }
 
 // MARK: - Preview

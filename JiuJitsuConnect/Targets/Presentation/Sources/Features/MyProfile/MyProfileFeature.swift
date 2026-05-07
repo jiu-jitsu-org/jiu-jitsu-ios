@@ -634,14 +634,18 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case let .destination(.presented(.competitionInfo(.delegate(.didFinish(competition))))):
-                // TODO: Step 3 - 저장 client 연결. 현재는 로그만 남기고 화면 닫기
+                // TODO: 추후 communityClient.addCompetition 등 server-side 저장 연결 필요
+                // 현재는 로컬 프로필 상태에만 반영하여 추가된 대회가 즉시 카드에 보이도록 한다
                 Log.trace(
                     "대회 추가 완료: \(competition.competitionYear)/\(competition.competitionMonth) \(competition.competitionName) \(competition.competitionRank.displayName)",
                     category: .debug,
                     level: .info
                 )
+                if let profile = state.communityProfile {
+                    state.communityProfile = profile.addingCompetition(competition)
+                }
                 state.destination = nil
-                return .none
+                return .send(.internal(.showToast(.init(message: "대회 정보를 추가했어요", style: .info))))
                 
             case let .view(.competitionDetailTapped(competition)):
                 // TODO: 대회 정보 상세 화면으로 네비게이션

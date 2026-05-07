@@ -112,6 +112,31 @@ public struct CommunityProfile: Codable, Equatable, Sendable {
 // MARK: - Convenience Update Methods
 
 extension CommunityProfile {
+    /// 대회 정보 추가 (서버 저장 전 로컬 반영용)
+    public func addingCompetition(_ competition: Competition) -> CommunityProfile {
+        CommunityProfile(
+            nickname: nickname,
+            profileImageUrl: profileImageUrl,
+            beltRank: beltRank,
+            beltStripe: beltStripe,
+            gender: gender,
+            weightKg: weightKg,
+            academyName: academyName,
+            competitions: competitions + [competition],
+            bestSubmission: bestSubmission,
+            favoriteSubmission: favoriteSubmission,
+            bestTechnique: bestTechnique,
+            favoriteTechnique: favoriteTechnique,
+            bestPosition: bestPosition,
+            favoritePosition: favoritePosition,
+            isWeightHidden: isWeightHidden,
+            isOwner: isOwner,
+            teachingPhilosophy: teachingPhilosophy,
+            teachingStartDate: teachingStartDate,
+            teachingDetail: teachingDetail
+        )
+    }
+
     /// 도장명 업데이트
     public func updatingAcademy(_ academyName: String?) -> CommunityProfile {
         CommunityProfile(
@@ -526,12 +551,14 @@ public struct Competition: Codable, Equatable, Sendable {
 }
 
 /// 대회 순위
-public enum CompetitionRank: String, Codable, Equatable, Sendable {
+public enum CompetitionRank: String, Codable, Equatable, Sendable, CaseIterable, Identifiable, Hashable {
     case gold = "GOLD"
     case silver = "SILVER"
     case bronze = "BRONZE"
     case participation = "PARTICIPATION"
-    
+
+    public var id: String { rawValue }
+
     public var displayName: String {
         switch self {
         case .gold: return "금메달"

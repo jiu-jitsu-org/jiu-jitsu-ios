@@ -23,8 +23,8 @@ public struct CompetitionInfoFeature: Sendable {
         // 2단계: 대회명 (TextField 직접 바인딩)
         var name: String = ""
 
-        // 3단계: 결과
-        var result: CompetitionRank? = nil
+        // 3단계: 결과 — Picker UI 특성상 초기 선택값이 필요하므로 옵셔널이 아닌 기본값 사용
+        var result: CompetitionRank = .gold
 
         public init() {}
     }
@@ -69,12 +69,11 @@ public struct CompetitionInfoFeature: Sendable {
                     state.step = .result
                     return .none
                 case .result:
-                    guard let rank = state.result else { return .none }
                     let competition = Competition(
                         competitionYear: state.year,
                         competitionMonth: state.month,
                         competitionName: state.name,
-                        competitionRank: rank
+                        competitionRank: state.result
                     )
                     return .send(.delegate(.didFinish(competition)))
                 }
