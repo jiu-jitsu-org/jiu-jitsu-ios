@@ -31,34 +31,62 @@ public struct AppTabView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        ZStack(alignment: .bottom) {
             ZStack {
-                // 탭별 NavigationStack을 모두 유지하여 탭 전환 시 상태가 보존되도록 한다
+                // 탭별 NavigationStack을 모두 유지하여 탭 전환 시 상태가 보존되도록 한다.
+                // safeAreaInset은 NavigationStack 내부의 root view에만 적용하여
+                // push된 destination은 탭바 영역까지 풀스크린으로 차지하도록 한다.
                 tabContainer(for: .home) {
                     NavigationStack {
                         CommunityView(store: store.scope(state: \.home, action: \.home))
+                            .safeAreaInset(edge: .bottom, spacing: 0) { tabBarReservedSpace }
                     }
                 }
                 tabContainer(for: .myPage) {
                     NavigationStack {
                         MyProfileView(store: store.scope(state: \.myPage, action: \.myPage))
+                            .safeAreaInset(edge: .bottom, spacing: 0) { tabBarReservedSpace }
                     }
                 }
                 tabContainer(for: .settings) {
                     NavigationStack {
                         SettingsView(store: store.scope(state: \.settings, action: \.settings))
+                            .safeAreaInset(edge: .bottom, spacing: 0) { tabBarReservedSpace }
                     }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            bottomTabBar
+            // 서브뷰 push 시 탭바를 아래로 슬라이드해서 화면 밖으로 내보낸다.
+            // NavigationStack의 push 애니메이션과 동시에 진행되어
+            // 새 화면이 탭바 위로 덮이는 듯한 인상을 준다.
+            if !isSubViewPushed {
+                bottomTabBar
+                    .transition(.move(edge: .bottom))
+            }
         }
+        .animation(.easeInOut(duration: 0.3), value: isSubViewPushed)
         .background(Color.component.navibar.container.background)
         .fullScreenCover(
             item: $store.scope(state: \.loginCover, action: \.loginCover)
         ) { loginStore in
             LoginView(store: loginStore)
+        }
+    }
+
+    private var tabBarReservedSpace: some View {
+        Color.clear.frame(height: Metrics.tabBarHeight)
+    }
+
+    // 현재 선택된 탭의 NavigationStack에 서브뷰가 push되어 있는지 여부
+    private var isSubViewPushed: Bool {
+        switch store.selectedTab {
+        case .home:
+            return false
+        case .myPage:
+            return store.myPage.destination != nil
+        case .settings:
+            return false
         }
     }
 
