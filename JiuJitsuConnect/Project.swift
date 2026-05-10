@@ -69,6 +69,7 @@ let appInfoPlist: [String: Plist.Value] = {
         "GoogleSignIn": "$(GOOGLE_SIGN_IN)",
         "BASE_URL": "$(BASE_URL)",
         "TEST_BASE_URL": "$(TEST_BASE_URL)",
+        "COMMUNITY_WEB_URL": "$(COMMUNITY_WEB_URL)",
         "LSApplicationQueriesSchemes": [
             "kakaokompassauth",
             "kakaolink"
