@@ -437,6 +437,18 @@ public struct ComponentColors {
         public let unit = Color.semantic.text.primary
     }
     
+    // MARK: - Error State
+    public let errorState = ErrorState()
+
+    public struct ErrorState {
+        public let `default` = Default()
+
+        public struct Default {
+            public let titleText = Color.semantic.text.primary
+            public let descriptionText = Color.semantic.text.secondary
+        }
+    }
+
     // MARK: - Segment
     public let segment = Segment()
     
