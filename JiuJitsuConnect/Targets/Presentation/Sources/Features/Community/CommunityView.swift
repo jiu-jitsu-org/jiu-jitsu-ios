@@ -50,11 +50,18 @@ public struct CommunityView: View {
     }
 
     private var errorOverlay: some View {
-        VStack(spacing: 12) {
-            Text("페이지를 불러올 수 없어요")
-                .font(.pretendard.bodyM)
-            Button("다시 시도") {
-                store.send(.view(.retryTapped))
+        VStack(spacing: 0) {
+            VStack(spacing: 13) {
+                Text("잠시 문제가 생겼어요")
+                    .font(.pretendard.bodyM)
+                    .foregroundStyle(Color.component.errorState.default.titleText)
+                Button {
+                    store.send(.view(.retryTapped))
+                } label: {
+                    AppButtonConfiguration(title: "재시도", size: .medium)
+                }
+                .appButtonStyle(.neutral, size: .medium)
+                .frame(height: 38)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
