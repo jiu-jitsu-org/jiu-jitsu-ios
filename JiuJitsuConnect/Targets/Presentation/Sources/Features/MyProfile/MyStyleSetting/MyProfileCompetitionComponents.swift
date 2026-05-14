@@ -19,15 +19,31 @@ public struct MyProfileCompetitionSection: View {
     
     private enum Metrics {
         static let titleBottomPadding: CGFloat = 8
+        static let addButtonSize: CGFloat = 20
     }
-    
+
     public var body: some View {
         VStack(alignment: .leading, spacing: Metrics.titleBottomPadding) {
-            // 섹션 타이틀
-            Text("대회 정보")
-                .font(.pretendard.title3)
-                .foregroundStyle(Color.component.sectionHeader.title)
-            
+            // 섹션 타이틀 + 추가 버튼
+            HStack(spacing: 0) {
+                Text("대회 정보")
+                    .font(.pretendard.title3)
+                    .foregroundStyle(Color.component.sectionHeader.title)
+
+                Spacer()
+
+                Button {
+                    onAddCompetitionTapped()
+                } label: {
+                    Image(systemName: "plus")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: Metrics.addButtonSize, height: Metrics.addButtonSize)
+                        .foregroundStyle(Color.component.sectionHeader.title)
+                }
+                .buttonStyle(.plain)
+            }
+
             // 대회 정보 컨테이너
             if let competitions = competitions, !competitions.isEmpty {
                 CompetitionListView(

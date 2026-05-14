@@ -30,6 +30,7 @@ public struct ComponentColors {
         public let neutral = Neutral()
         public let text = Text()
         public let inverted = Inverted()
+        public let ghost = Ghost()
         
         public struct Filled {
             public let defaultBg = Color.semantic.interactive.primary
@@ -74,7 +75,13 @@ public struct ComponentColors {
             public let pressedText = Color.semantic.primary.onPrimary
             public let disabledBg = Color.semantic.transparent.transparent
             public let disabledText = Color.semantic.icon.disabledOnDark
-            
+
+        }
+
+        public struct Ghost {
+            public let defaultText = Color.semantic.text.primary
+            public let pressedText = Color.semantic.text.primary
+            public let disabledText = Color.semantic.text.disabled
         }
     }
     
