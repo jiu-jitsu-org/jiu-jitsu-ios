@@ -19,7 +19,8 @@ public struct MyProfileCompetitionSection: View {
     
     private enum Metrics {
         static let titleBottomPadding: CGFloat = 8
-        static let addButtonSize: CGFloat = 20
+        static let addButtonIconSize: CGFloat = 16
+        static let addButtonSize: CGFloat = 32
     }
 
     public var body: some View {
@@ -35,12 +36,13 @@ public struct MyProfileCompetitionSection: View {
                 Button {
                     onAddCompetitionTapped()
                 } label: {
-                    Image(systemName: "plus")
+                    Assets.Common.Icon.plus.swiftUIImage
                         .resizable()
                         .scaledToFit()
-                        .frame(width: Metrics.addButtonSize, height: Metrics.addButtonSize)
-                        .foregroundStyle(Color.component.sectionHeader.title)
+                        .frame(width: Metrics.addButtonIconSize, height: Metrics.addButtonIconSize)
+                        .foregroundStyle(Color.component.button.ghost.defaultText)
                 }
+                .frame(width: Metrics.addButtonSize, height: Metrics.addButtonSize)
                 .buttonStyle(.plain)
             }
 
