@@ -83,15 +83,18 @@ public struct AppTabFeature: Sendable {
             case let .view(.tabSelected(tab)):
                 if state.authInfo.isGuest {
                     switch tab {
-                    case .home:
+                    case .home, .settings:
                         state.selectedTab = tab
-                    case .myPage, .settings:
+                    case .myPage:
                         return .send(.internal(.showLoginModal))
                     }
                 } else {
                     state.selectedTab = tab
                 }
                 return .none
+
+            case .settings(.delegate(.loginRequested)):
+                return .send(.internal(.showLoginModal))
 
             case .settings(.delegate(.didLogoutSuccessfully)):
                 state.authInfo = .guest

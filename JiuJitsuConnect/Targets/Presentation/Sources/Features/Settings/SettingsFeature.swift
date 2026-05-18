@@ -57,6 +57,7 @@ public struct SettingsFeature: Sendable {
         public enum ViewAction: Sendable {
             case termsButtonTapped
             case privacyPolicyButtonTapped
+            case loginButtonTapped
             case logoutButtonTapped
             case withdrawalButtonTapped
             case confirmLogout
@@ -64,17 +65,18 @@ public struct SettingsFeature: Sendable {
             case alertDismissed
             case toastButtonTapped(ToastState.Action)
         }
-        
+
         public enum InternalAction: Sendable {
             case logoutResponse(TaskResult<Bool>)
             case withdrawalResponse(TaskResult<Bool>)
             case showToast(ToastState)
             case toastDismissed
         }
-        
+
         public enum DelegateAction: Sendable {
             case didLogoutSuccessfully
             case didWithdrawSuccessfully
+            case loginRequested
         }
     }
     
@@ -105,6 +107,9 @@ public struct SettingsFeature: Sendable {
             case .termsWebCover:
                 return .none
                 
+            case .view(.loginButtonTapped):
+                return .send(.delegate(.loginRequested))
+
             case .view(.logoutButtonTapped):
                 state.alert = .logout
                 return .none

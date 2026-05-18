@@ -64,11 +64,17 @@ public struct SettingsView: View {
                     
                     // MARK: - 계정 관리 섹션
                     SettingsSection {
-                        SettingsInteractiveRow(asset: Assets.Common.Icon.logOut, text: "로그아웃") {
-                            store.send(.view(.logoutButtonTapped))
-                        }
-                        SettingsInteractiveRow(asset: Assets.Common.Icon.secession, text: "회원 탈퇴") {
-                            store.send(.view(.withdrawalButtonTapped))
+                        if store.authInfo.isGuest {
+                            SettingsInteractiveRow(asset: Assets.Common.Icon.logOut, text: "로그인") {
+                                store.send(.view(.loginButtonTapped))
+                            }
+                        } else {
+                            SettingsInteractiveRow(asset: Assets.Common.Icon.logOut, text: "로그아웃") {
+                                store.send(.view(.logoutButtonTapped))
+                            }
+                            SettingsInteractiveRow(asset: Assets.Common.Icon.secession, text: "회원 탈퇴") {
+                                store.send(.view(.withdrawalButtonTapped))
+                            }
                         }
                     }
                 }
