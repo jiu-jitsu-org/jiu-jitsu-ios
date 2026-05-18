@@ -244,7 +244,6 @@ private struct TermsWKWebView: UIViewRepresentable {
         // 이미 load() 호출한 URL — updateUIView에서 중복 로드를 막기 위한 가드.
         var loadedURL: URL?
         private var offsetObservation: NSKeyValueObservation?
-        private var enabledObservation: NSKeyValueObservation?
         private var didLoad = false
 
         init(onScroll: @escaping (CGFloat) -> Void, onLoadFinish: @escaping () -> Void) {
@@ -255,23 +254,10 @@ private struct TermsWKWebView: UIViewRepresentable {
         func observe(scrollView: UIScrollView) {
             offsetObservation = scrollView.observe(\.contentOffset, options: [.new]) { [weak self] scrollView, _ in
                 guard let self else { return }
-                Log.trace("KVO contentOffset.y=\(scrollView.contentOffset.y) isScrollEnabled=\(scrollView.isScrollEnabled) tracking=\(scrollView.isTracking) dragging=\(scrollView.isDragging) decelerating=\(scrollView.isDecelerating) contentSize=\(scrollView.contentSize)", category: .view, level: .debug)
                 // 사용자의 드래그/관성 스크롤만 반응 (프로그래매틱 offset 변경은 무시)
-                guard scrollView.isTracking || scrollView.isDecelerating else {
-                    Log.trace("KVO — skip (programmatic offset)", category: .view, level: .debug)
-                    return
-                }
+                guard scrollView.isTracking || scrollView.isDecelerating else { return }
                 let offset = scrollView.contentOffset.y + scrollView.adjustedContentInset.top
-                Log.trace("KVO → onScroll(\(offset))", category: .view, level: .debug)
                 self.onScroll(offset)
-            }
-            // 진단용: isScrollEnabled 변경을 관찰. WKWebView 내부 토글은
-            // KVO를 발화하지 않으므로 강제 복구는 불가능 (panGesture로 차단).
-            enabledObservation = scrollView.observe(\.isScrollEnabled, options: [.new, .old]) { [weak self] _, change in
-                guard self != nil else { return }
-                let oldValue = change.oldValue ?? false
-                let newValue = change.newValue ?? false
-                Log.trace("KVO isScrollEnabled \(oldValue)→\(newValue)", category: .view, level: .debug)
             }
         }
 
