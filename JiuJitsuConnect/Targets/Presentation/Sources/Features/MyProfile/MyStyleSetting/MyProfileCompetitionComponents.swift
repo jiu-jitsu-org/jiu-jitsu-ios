@@ -127,6 +127,7 @@ private struct CompetitionRowView: View {
             }
             .frame(height: Metrics.height)
             .padding(.horizontal, Metrics.horizontalPadding)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
