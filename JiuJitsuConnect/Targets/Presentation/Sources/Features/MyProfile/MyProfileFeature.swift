@@ -34,6 +34,9 @@ public struct MyProfileFeature: Sendable {
         // 벨트 설정 임시 저장 (최초 설정 시 벨트 정보를 체급 설정으로 전달하기 위해)
         var tempBeltInfo: TempBeltInfo?
 
+        // 우측 상단 "..." 메뉴 노출 여부 (관장 사범 인증 메뉴)
+        var isMoreMenuPresented: Bool = false
+
         public init(authInfo: AuthInfo, communityProfile: CommunityProfile? = nil) {
             self.authInfo = authInfo
             self.communityProfile = communityProfile
@@ -85,6 +88,9 @@ public struct MyProfileFeature: Sendable {
             case toastButtonTapped(ToastState.Action)
             case addCompetitionButtonTapped  // 대회 정보 추가 버튼 탭
             case competitionDetailTapped(Competition)  // 대회 정보 행 탭
+            case moreButtonTapped            // 우측 상단 "..." 버튼 탭
+            case moreMenuDismissed           // 메뉴 외부 영역 탭으로 dismiss
+            case instructorVerificationMenuTapped  // "관장 사범 인증" 메뉴 항목 탭
         }
         
         public enum InternalAction: Sendable {
@@ -122,13 +128,17 @@ public struct MyProfileFeature: Sendable {
         Reduce { state, action in
             switch action {
             case .view(.onAppear):
+                // 게스트 상태에서는 프로필 API를 호출하지 않는다.
+                // AppTabView가 모든 탭을 미리 마운트하므로 게스트일 때도 onAppear가 발화한다.
+                guard !state.authInfo.isGuest else { return .none }
                 guard !state.isLoadingProfile else { return .none }
                 // 이미 프로필 데이터가 있으면 불필요한 재로드 방지
                 // (toast dismiss 등 state 변화로 onAppear가 재트리거되는 경우 차단)
                 guard state.communityProfile == nil else { return .none }
                 return .send(.internal(.loadProfile))
-                
+
             case .internal(.loadProfile):
+                guard !state.authInfo.isGuest else { return .none }
                 state.isLoadingProfile = true
                 return .run { send in
                     await send(.internal(.profileResponse(
@@ -715,6 +725,21 @@ public struct MyProfileFeature: Sendable {
                 state.destination = .competitionInfo(
                     CompetitionInfoFeature.State(mode: .edit(original: competition))
                 )
+                return .none
+
+            case .view(.moreButtonTapped):
+                state.isMoreMenuPresented.toggle()
+                return .none
+
+            case .view(.moreMenuDismissed):
+                guard state.isMoreMenuPresented else { return .none }
+                state.isMoreMenuPresented = false
+                return .none
+
+            case .view(.instructorVerificationMenuTapped):
+                state.isMoreMenuPresented = false
+                // TODO: 관장 사범 인증 플로우 진입 연결
+                Log.trace("관장 사범 인증 메뉴 탭", category: .debug, level: .info)
                 return .none
 
             case .destination, .sheet, .view, .internal, .delegate:

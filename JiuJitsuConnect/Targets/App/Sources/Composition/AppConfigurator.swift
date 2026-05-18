@@ -10,14 +10,32 @@
 import Foundation
 import GoogleSignIn
 import KakaoSDKCommon
+import Data
 
 enum AppConfigurator {
 
     /// 앱 시작 시 한 번 호출되는 진입점.
     /// 각 SDK 초기화는 멱등하므로 재호출에도 안전하지만, 비용을 줄이기 위해 단일 호출을 권장한다.
     static func configureExternalSDKs() {
+        clearKeychainOnFreshInstallIfNeeded()
         configureGoogleSignIn()
         configureKakaoSDK()
+    }
+
+    // MARK: - First-Launch Cleanup
+
+    /// iOS Keychain은 앱 삭제 시 자동으로 비워지지 않는다. UserDefaults는 비워지므로,
+    /// "한 번이라도 실행한 적이 있는가" 플래그를 UserDefaults에 두고 첫 실행이면 Keychain을 정리한다.
+    /// 재설치 시 잔존 토큰으로 인해 의도치 않은 인증 요청이 나가는 것을 막는다.
+    private static func clearKeychainOnFreshInstallIfNeeded() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: Keys.hasLaunchedBefore) else { return }
+        DefaultTokenStorage().clear()
+        defaults.set(true, forKey: Keys.hasLaunchedBefore)
+    }
+
+    private enum Keys {
+        static let hasLaunchedBefore = "hasLaunchedBefore"
     }
 
     // MARK: - SDK Initializers

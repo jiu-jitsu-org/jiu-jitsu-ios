@@ -72,6 +72,7 @@ public struct AppTabView: View {
         ) { loginStore in
             LoginView(store: loginStore)
         }
+        .alert($store.scope(state: \.loginPromptAlert, action: \.loginPromptAlert))
     }
 
     private var tabBarReservedSpace: some View {

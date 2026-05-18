@@ -31,6 +31,8 @@ public struct AppTabFeature: Sendable {
 
         // 로그인 모달
         @Presents var loginCover: LoginFeature.State?
+        // 게스트가 인증 필요 탭(MY)을 탭했을 때 노출되는 로그인 안내 팝업 (FIXME: 정식 디자인 적용 예정)
+        @Presents var loginPromptAlert: AlertState<Action.LoginPromptAlert>?
 
         var authInfo: AuthInfo
 
@@ -52,14 +54,21 @@ public struct AppTabFeature: Sendable {
         case settings(SettingsFeature.Action)
 
         case loginCover(PresentationAction<LoginFeature.Action>)
-        
+        case loginPromptAlert(PresentationAction<LoginPromptAlert>)
+
         @CasePathable
         public enum ViewAction: Sendable {
             case tabSelected(Tab)
         }
-        
+
         public enum InternalAction: Sendable {
+            case showLoginPromptAlert
             case showLoginModal
+        }
+
+        // AlertState<Alert> 요구사항을 충족하기 위해 Equatable 유지
+        public enum LoginPromptAlert: Equatable, Sendable {
+            case loginTapped
         }
     }
     
@@ -86,7 +95,7 @@ public struct AppTabFeature: Sendable {
                     case .home, .settings:
                         state.selectedTab = tab
                     case .myPage:
-                        return .send(.internal(.showLoginModal))
+                        return .send(.internal(.showLoginPromptAlert))
                     }
                 } else {
                     state.selectedTab = tab
@@ -114,9 +123,24 @@ public struct AppTabFeature: Sendable {
                 return .none
                 
             // MARK: - Login Logic
+            case .internal(.showLoginPromptAlert):
+                // FIXME: 정식 로그인 안내 팝업 디자인이 확정되면 커스텀 컴포넌트로 교체한다.
+                state.loginPromptAlert = AlertState {
+                    TextState("로그인이 필요해요")
+                } actions: {
+                    ButtonState(action: .loginTapped) { TextState("로그인") }
+                    ButtonState(role: .cancel) { TextState("취소") }
+                } message: {
+                    TextState("로그인하면 나의 프로필을 확인할 수 있어요.")
+                }
+                return .none
+
             case .internal(.showLoginModal):
                 state.loginCover = LoginFeature.State()
                 return .none
+
+            case .loginPromptAlert(.presented(.loginTapped)):
+                return .send(.internal(.showLoginModal))
                 
             case let .loginCover(.presented(.delegate(delegateAction))):
                 switch delegateAction {
@@ -126,25 +150,29 @@ public struct AppTabFeature: Sendable {
                     state.settings.authInfo = newAuthInfo
                     state.selectedTab = .myPage
                     state.loginCover = nil
-                    return .run { _ in
-                        await FCMAppInfoSync.syncAfterLoginSuccess(
-                            firebaseClient: self.firebaseClient,
-                            userClient: self.userClient
-                        )
-                    }
+                    return .merge(
+                        .send(.myPage(.internal(.loadProfile))),
+                        .run { _ in
+                            await FCMAppInfoSync.syncAfterLoginSuccess(
+                                firebaseClient: self.firebaseClient,
+                                userClient: self.userClient
+                            )
+                        }
+                    )
                     
                 case .skipLogin:
                     state.loginCover = nil
                     return .none
                 }
                 
-            case .loginCover, .view, .internal:
+            case .loginCover, .loginPromptAlert, .view, .internal:
                 return .none
-                
+
             }
         }
         .ifLet(\.$loginCover, action: \.loginCover) {
             LoginFeature()
         }
+        .ifLet(\.$loginPromptAlert, action: \.loginPromptAlert)
     }
 }
