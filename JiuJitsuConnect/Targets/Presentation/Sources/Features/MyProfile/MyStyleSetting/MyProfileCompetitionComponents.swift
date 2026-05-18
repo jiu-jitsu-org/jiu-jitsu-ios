@@ -74,7 +74,7 @@ private struct CompetitionListView: View {
     
     var body: some View {
         VStack(spacing: Metrics.rowSpacing) {
-            ForEach(Array(competitions.enumerated()), id: \.offset) { _, competition in
+            ForEach(Array(sortedCompetitions.enumerated()), id: \.offset) { _, competition in
                 CompetitionRowView(
                     competition: competition,
                     onTapped: { onCompetitionDetailTapped(competition) }
@@ -84,6 +84,16 @@ private struct CompetitionListView: View {
         .padding(.vertical, Metrics.verticalPadding)
         .background(Color.component.skillCard.default.bg)
         .clipShape(RoundedRectangle(cornerRadius: Metrics.cornerRadius))
+    }
+
+    // 참가 날짜(년·월) 기준 최신순. 원본 배열은 그대로 두고 표시 시점에만 정렬한다.
+    private var sortedCompetitions: [Competition] {
+        competitions.sorted { lhs, rhs in
+            if lhs.competitionYear != rhs.competitionYear {
+                return lhs.competitionYear > rhs.competitionYear
+            }
+            return lhs.competitionMonth > rhs.competitionMonth
+        }
     }
 }
 
