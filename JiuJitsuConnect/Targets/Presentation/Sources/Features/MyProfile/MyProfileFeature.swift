@@ -105,7 +105,9 @@ public struct MyProfileFeature: Sendable {
             case positionSaved(CommunityProfile)    // 포지션 저장 → register 시 서브미션 단계로
             case submissionSaved(CommunityProfile)  // 서브미션 저장 → register 시 기술 단계로
             case techniqueSaved(CommunityProfile)   // 기술 저장 → 프로필 화면으로 복귀
-            case competitionAdded(CommunityProfile) // 대회 정보 추가 저장 완료
+            case competitionAdded(CommunityProfile)   // 대회 정보 추가 저장 완료
+            case competitionUpdated(CommunityProfile) // 대회 정보 수정 저장 완료
+            case competitionDeleted(CommunityProfile) // 대회 정보 삭제 저장 완료
             
             case showToast(ToastState)
             case toastDismissed
@@ -623,7 +625,7 @@ public struct MyProfileFeature: Sendable {
                 state.destination = .competitionInfo(CompetitionInfoFeature.State())
                 return .none
 
-            case let .destination(.presented(.competitionInfo(.delegate(.didFinish(competition))))):
+            case let .destination(.presented(.competitionInfo(.delegate(.didFinishAdding(competition))))):
                 guard let profile = state.communityProfile else {
                     state.destination = nil
                     return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
@@ -648,15 +650,71 @@ public struct MyProfileFeature: Sendable {
                     }
                 }
 
+            case let .destination(.presented(.competitionInfo(.delegate(.didFinishEditing(original, updated))))):
+                guard let profile = state.communityProfile else {
+                    state.destination = nil
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                }
+                Log.trace(
+                    "대회 수정 요청: \(original.competitionName) → \(updated.competitionName)",
+                    category: .debug,
+                    level: .info
+                )
+                let updatedProfile = profile.updatingCompetition(original: original, with: updated)
+                state.destination = nil
+                state.isLoadingProfile = true
+                return .run { send in
+                    let result = await TaskResult {
+                        try await communityClient.updateProfile(updatedProfile, .competition)
+                    }
+                    switch result {
+                    case .success(let saved):
+                        await send(.internal(.competitionUpdated(saved)))
+                    case .failure(let error):
+                        await send(.internal(.updateProfileResponse(.failure(error))))
+                    }
+                }
+
+            case let .destination(.presented(.competitionInfo(.delegate(.didDelete(competition))))):
+                guard let profile = state.communityProfile else {
+                    state.destination = nil
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                }
+                Log.trace("대회 삭제 요청: \(competition.competitionName)", category: .debug, level: .info)
+                let updatedProfile = profile.removingCompetition(competition)
+                state.destination = nil
+                state.isLoadingProfile = true
+                return .run { send in
+                    let result = await TaskResult {
+                        try await communityClient.updateProfile(updatedProfile, .competition)
+                    }
+                    switch result {
+                    case .success(let saved):
+                        await send(.internal(.competitionDeleted(saved)))
+                    case .failure(let error):
+                        await send(.internal(.updateProfileResponse(.failure(error))))
+                    }
+                }
+
             case let .internal(.competitionAdded(profile)):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
                 return .send(.internal(.showToast(.init(message: "대회 정보를 추가했어요", style: .info))))
-                
+
+            case let .internal(.competitionUpdated(profile)):
+                state.isLoadingProfile = false
+                state.communityProfile = profile
+                return .send(.internal(.showToast(.init(message: "대회 정보를 수정했어요", style: .info))))
+
+            case let .internal(.competitionDeleted(profile)):
+                state.isLoadingProfile = false
+                state.communityProfile = profile
+                return .send(.internal(.showToast(.init(message: "대회 정보를 삭제했어요", style: .info))))
+
             case let .view(.competitionDetailTapped(competition)):
-                // TODO: 대회 정보 상세 화면으로 네비게이션
-                // 현재는 로그만 출력
-                Log.trace("대회 정보 탭: \(competition.competitionName)", category: .debug, level: .info)
+                state.destination = .competitionInfo(
+                    CompetitionInfoFeature.State(mode: .edit(original: competition))
+                )
                 return .none
 
             case .destination, .sheet, .view, .internal, .delegate:

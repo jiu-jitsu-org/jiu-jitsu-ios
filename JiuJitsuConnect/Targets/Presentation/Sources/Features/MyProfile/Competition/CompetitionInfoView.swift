@@ -61,15 +61,28 @@ struct CompetitionInfoView: View {
 
             Spacer()
 
-            Text("대회 정보 추가")
+            Text(store.mode.headerTitle)
                 .font(Font.pretendard.title3)
                 .foregroundStyle(Color.component.header.text)
 
             Spacer()
 
-            Rectangle()
-                .fill(.clear)
-                .frame(width: 32, height: 32)
+            if store.mode.isEdit {
+                Button {
+                    store.send(.view(.deleteButtonTapped))
+                } label: {
+                    Text("삭제")
+                        .font(Font.pretendard.bodyM)
+                        .foregroundStyle(Color.semantic.error.error)
+                        .frame(height: 36)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            } else {
+                Rectangle()
+                    .fill(.clear)
+                    .frame(width: 32, height: 32)
+            }
         }
         .padding(.horizontal, Style.horizontalPadding)
         .frame(height: Style.headerHeight)

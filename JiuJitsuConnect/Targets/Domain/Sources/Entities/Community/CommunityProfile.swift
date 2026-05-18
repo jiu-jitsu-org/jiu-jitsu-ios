@@ -114,6 +114,30 @@ public struct CommunityProfile: Codable, Equatable, Sendable {
 extension CommunityProfile {
     /// 대회 정보 추가 (서버 저장 전 로컬 반영용)
     public func addingCompetition(_ competition: Competition) -> CommunityProfile {
+        replacingCompetitions(competitions + [competition])
+    }
+
+    /// 대회 정보 수정 — 원본과 값이 동일한 항목을 새 값으로 치환
+    public func updatingCompetition(original: Competition, with updated: Competition) -> CommunityProfile {
+        // Competition은 식별자가 없어 값 비교로 매칭한다. 중복 입력된 동일 값 항목이 있을 경우
+        // 첫 번째 일치 항목만 치환되도록 firstIndex 기반으로 처리한다.
+        var newCompetitions = competitions
+        if let index = newCompetitions.firstIndex(of: original) {
+            newCompetitions[index] = updated
+        }
+        return replacingCompetitions(newCompetitions)
+    }
+
+    /// 대회 정보 삭제 — 원본과 값이 동일한 첫 번째 항목 제거
+    public func removingCompetition(_ competition: Competition) -> CommunityProfile {
+        var newCompetitions = competitions
+        if let index = newCompetitions.firstIndex(of: competition) {
+            newCompetitions.remove(at: index)
+        }
+        return replacingCompetitions(newCompetitions)
+    }
+
+    private func replacingCompetitions(_ newCompetitions: [Competition]) -> CommunityProfile {
         CommunityProfile(
             nickname: nickname,
             profileImageUrl: profileImageUrl,
@@ -122,7 +146,7 @@ extension CommunityProfile {
             gender: gender,
             weightKg: weightKg,
             academyName: academyName,
-            competitions: competitions + [competition],
+            competitions: newCompetitions,
             bestSubmission: bestSubmission,
             favoriteSubmission: favoriteSubmission,
             bestTechnique: bestTechnique,
