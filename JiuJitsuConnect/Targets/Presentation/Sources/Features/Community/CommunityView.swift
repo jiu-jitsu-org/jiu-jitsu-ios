@@ -28,6 +28,9 @@ public struct CommunityView: View {
         static let trailingIconSpacing: CGFloat = 0
         static let trailingPadding: CGFloat = 8
         static let gnbDividerHeight: CGFloat = 1
+        static let floatingButtonSize: CGFloat = 48
+        static let floatingIconSize: CGFloat = 20
+        static let floatingButtonPadding: CGFloat = 12
     }
 
     public var body: some View {
@@ -51,6 +54,8 @@ public struct CommunityView: View {
                 if store.hasError {
                     errorOverlay
                 }
+
+                floatingWriteButton
             }
         }
         .background(Color.component.background.default)
@@ -129,6 +134,27 @@ public struct CommunityView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private var floatingWriteButton: some View {
+        Button {
+            store.send(.view(.writeTapped))
+        } label: {
+            Assets.Common.Icon.pencilLine.swiftUIImage
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: Metrics.floatingIconSize, height: Metrics.floatingIconSize)
+                .foregroundStyle(Color.semantic.primary.onPrimary)
+                .frame(width: Metrics.floatingButtonSize, height: Metrics.floatingButtonSize)
+                .background(
+                    Capsule().fill(Color.semantic.interactive.primary)
+                )
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        .padding(.trailing, Metrics.floatingButtonPadding)
+        .padding(.bottom, Metrics.floatingButtonPadding)
     }
 
     private var loadingOverlay: some View {

@@ -58,6 +58,7 @@ public struct CommunityFeature: Sendable {
             case tabSelected(Tab)
             case notificationTapped
             case searchTapped
+            case writeTapped
         }
 
         public enum InternalAction: Sendable {
@@ -86,6 +87,10 @@ public struct CommunityFeature: Sendable {
 
             // FIXME: 검색 화면 진입 (커뮤니티 검색 기능 도입 시 구현)
             case .view(.searchTapped):
+                return .none
+
+            // FIXME: 글쓰기 화면 진입 (커뮤니티 글쓰기 기능 도입 시 구현)
+            case .view(.writeTapped):
                 return .none
 
             case .view(.retryTapped):
