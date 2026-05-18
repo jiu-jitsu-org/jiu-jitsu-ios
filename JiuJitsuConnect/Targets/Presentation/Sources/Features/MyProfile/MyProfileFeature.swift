@@ -105,6 +105,7 @@ public struct MyProfileFeature: Sendable {
             case positionSaved(CommunityProfile)    // 포지션 저장 → register 시 서브미션 단계로
             case submissionSaved(CommunityProfile)  // 서브미션 저장 → register 시 기술 단계로
             case techniqueSaved(CommunityProfile)   // 기술 저장 → 프로필 화면으로 복귀
+            case competitionAdded(CommunityProfile) // 대회 정보 추가 저장 완료
             
             case showToast(ToastState)
             case toastDismissed
@@ -623,17 +624,33 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case let .destination(.presented(.competitionInfo(.delegate(.didFinish(competition))))):
-                // TODO: 추후 communityClient.addCompetition 등 server-side 저장 연결 필요
-                // 현재는 로컬 프로필 상태에만 반영하여 추가된 대회가 즉시 카드에 보이도록 한다
+                guard let profile = state.communityProfile else {
+                    state.destination = nil
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                }
                 Log.trace(
-                    "대회 추가 완료: \(competition.competitionYear)/\(competition.competitionMonth) \(competition.competitionName) \(competition.competitionRank.displayName)",
+                    "대회 추가 요청: \(competition.competitionYear)/\(competition.competitionMonth) \(competition.competitionName) \(competition.competitionRank.displayName)",
                     category: .debug,
                     level: .info
                 )
-                if let profile = state.communityProfile {
-                    state.communityProfile = profile.addingCompetition(competition)
-                }
+                let updatedProfile = profile.addingCompetition(competition)
                 state.destination = nil
+                state.isLoadingProfile = true
+                return .run { send in
+                    let result = await TaskResult {
+                        try await communityClient.updateProfile(updatedProfile, .competition)
+                    }
+                    switch result {
+                    case .success(let saved):
+                        await send(.internal(.competitionAdded(saved)))
+                    case .failure(let error):
+                        await send(.internal(.updateProfileResponse(.failure(error))))
+                    }
+                }
+
+            case let .internal(.competitionAdded(profile)):
+                state.isLoadingProfile = false
+                state.communityProfile = profile
                 return .send(.internal(.showToast(.init(message: "대회 정보를 추가했어요", style: .info))))
                 
             case let .view(.competitionDetailTapped(competition)):
