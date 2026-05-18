@@ -129,11 +129,11 @@ public struct CommunityFeature: Sendable {
 
     private static func makeCommunityURL() -> URL? {
         guard
-            let urlString = Bundle.main.object(forInfoDictionaryKey: "COMMUNITY_WEB_URL") as? String,
+            let urlString = Bundle.main.object(forInfoDictionaryKey: "WEB_URL") as? String,
             !urlString.isEmpty,
             let url = URL(string: urlString)
         else {
-            Log.trace("COMMUNITY_WEB_URL is not set in Info.plist", category: .system, level: .error)
+            Log.trace("WEB_URL is not set in Info.plist", category: .system, level: .error)
             return nil
         }
         return url
