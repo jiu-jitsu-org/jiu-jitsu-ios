@@ -32,6 +32,7 @@ public enum Assets {
   public enum Common {
     public enum Icon {
       public static let arrowLeft = ImageAsset(name: "Common/Icon/arrow-left")
+      public static let bell = ImageAsset(name: "Common/Icon/bell")
       public static let check = ImageAsset(name: "Common/Icon/check")
       public static let chevronLeft = ImageAsset(name: "Common/Icon/chevron-left")
       public static let chevronRight = ImageAsset(name: "Common/Icon/chevron-right")
@@ -41,6 +42,7 @@ public enum Assets {
       public static let pencil = ImageAsset(name: "Common/Icon/pencil")
       public static let plus = ImageAsset(name: "Common/Icon/plus")
       public static let profile = ImageAsset(name: "Common/Icon/profile")
+      public static let search = ImageAsset(name: "Common/Icon/search")
       public static let secession = ImageAsset(name: "Common/Icon/secession")
       public static let version = ImageAsset(name: "Common/Icon/version")
     }

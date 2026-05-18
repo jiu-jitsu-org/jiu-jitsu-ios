@@ -15,8 +15,21 @@ import Foundation
 public struct CommunityFeature: Sendable {
     public init() {}
 
+    public enum Tab: String, CaseIterable, Sendable, Equatable {
+        case feed
+        case category
+
+        var title: String {
+            switch self {
+            case .feed: return "피드"
+            case .category: return "카테고리"
+            }
+        }
+    }
+
     @ObservableState
     public struct State: Equatable {
+        var selectedTab: Tab = .feed
         var url: URL?
         // 같은 URL로 재시도 시 View가 reload를 인지하도록 토큰을 갱신한다.
         var loadToken: UUID = UUID()
@@ -42,6 +55,9 @@ public struct CommunityFeature: Sendable {
         public enum ViewAction: Sendable {
             case onAppear
             case retryTapped
+            case tabSelected(Tab)
+            case notificationTapped
+            case searchTapped
         }
 
         public enum InternalAction: Sendable {
@@ -58,6 +74,18 @@ public struct CommunityFeature: Sendable {
                 if state.url == nil {
                     state.url = Self.makeCommunityURL()
                 }
+                return .none
+
+            case let .view(.tabSelected(tab)):
+                state.selectedTab = tab
+                return .none
+
+            // FIXME: 알림 화면 진입 (네이티브 알림 센터 도입 시 구현)
+            case .view(.notificationTapped):
+                return .none
+
+            // FIXME: 검색 화면 진입 (커뮤니티 검색 기능 도입 시 구현)
+            case .view(.searchTapped):
                 return .none
 
             case .view(.retryTapped):

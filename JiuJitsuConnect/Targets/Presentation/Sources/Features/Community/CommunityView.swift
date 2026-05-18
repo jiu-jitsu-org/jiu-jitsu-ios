@@ -18,28 +18,117 @@ public struct CommunityView: View {
         self.store = store
     }
 
+    private enum Metrics {
+        static let gnbHeight: CGFloat = 44
+        static let gnbHorizontalPadding: CGFloat = 16
+        static let tabSpacing: CGFloat = 16
+        static let tabIndicatorHeight: CGFloat = 2
+        static let trailingIconSize: CGFloat = 24
+        static let trailingIconButtonSize: CGFloat = 40
+        static let trailingIconSpacing: CGFloat = 0
+        static let trailingPadding: CGFloat = 8
+        static let gnbDividerHeight: CGFloat = 1
+    }
+
     public var body: some View {
-        ZStack {
-            if let url = store.url {
-                CommunityWebView(
-                    url: url,
-                    loadToken: store.loadToken,
-                    onLoadingStarted: { store.send(.internal(.loadingStarted)) },
-                    onLoadingFinished: { store.send(.internal(.loadingFinished)) },
-                    onLoadingFailed: { store.send(.internal(.loadingFailed)) }
-                )
-            }
+        VStack(spacing: 0) {
+            gnb
+            ZStack {
+                if let url = store.url {
+                    CommunityWebView(
+                        url: url,
+                        loadToken: store.loadToken,
+                        onLoadingStarted: { store.send(.internal(.loadingStarted)) },
+                        onLoadingFinished: { store.send(.internal(.loadingFinished)) },
+                        onLoadingFailed: { store.send(.internal(.loadingFailed)) }
+                    )
+                }
 
-            if store.isLoading {
-                loadingOverlay
-            }
+                if store.isLoading {
+                    loadingOverlay
+                }
 
-            if store.hasError {
-                errorOverlay
+                if store.hasError {
+                    errorOverlay
+                }
             }
         }
         .background(Color.component.background.default)
         .onAppear { store.send(.view(.onAppear)) }
+    }
+
+    private var gnb: some View {
+        HStack(spacing: 0) {
+            HStack(spacing: Metrics.tabSpacing) {
+                ForEach(CommunityFeature.Tab.allCases, id: \.self) { tab in
+                    tabButton(tab)
+                }
+            }
+            Spacer(minLength: 0)
+            HStack(spacing: Metrics.trailingIconSpacing) {
+                Button {
+                    store.send(.view(.notificationTapped))
+                } label: {
+                    Assets.Common.Icon.bell.swiftUIImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: Metrics.trailingIconSize, height: Metrics.trailingIconSize)
+                        .foregroundStyle(Color.component.header.iconButton)
+                        .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    store.send(.view(.searchTapped))
+                } label: {
+                    Assets.Common.Icon.search.swiftUIImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: Metrics.trailingIconSize, height: Metrics.trailingIconSize)
+                        .foregroundStyle(Color.component.header.iconButton)
+                        .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.leading, Metrics.gnbHorizontalPadding)
+        .padding(.trailing, Metrics.trailingPadding)
+        .frame(height: Metrics.gnbHeight)
+        .background(Color.component.header.background)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.component.navibar.container.divider)
+                .frame(height: Metrics.gnbDividerHeight)
+        }
+    }
+
+    private func tabButton(_ tab: CommunityFeature.Tab) -> some View {
+        let isSelected = store.selectedTab == tab
+        return Button {
+            store.send(.view(.tabSelected(tab)))
+        } label: {
+            Text(tab.title)
+                .font(Font.pretendard.title3)
+                .foregroundStyle(
+                    isSelected
+                        ? Color.component.navibar.selected.label
+                        : Color.component.navibar.unselected.label
+                )
+                .frame(maxHeight: .infinity)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(
+                            isSelected
+                                ? Color.component.navibar.selected.label
+                                : Color.clear
+                        )
+                        .frame(height: Metrics.tabIndicatorHeight)
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var loadingOverlay: some View {
