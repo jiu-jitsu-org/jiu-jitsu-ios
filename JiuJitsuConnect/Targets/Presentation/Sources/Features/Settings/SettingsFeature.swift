@@ -14,22 +14,30 @@ import CoreKit
 @Reducer
 public struct SettingsFeature: Sendable {
     public init() {}
-    
+
     private enum CancelID { case toast }
-    
+
+    // 약관 문서 URL — 추후 원격/환경 설정으로 분리 검토.
+    private enum TermsURL {
+        static let serviceTerms = URL(string: "https://poppop-seoul.developer-chanq.xyz")
+        static let privacyPolicy = URL(string: "https://poppop-seoul.developer-chanq.xyz")
+    }
+
     @ObservableState
     public struct State: Equatable, Sendable {
         var authInfo: AuthInfo
         var appVersion: String
-        
+
+        @Presents var termsWebCover: TermsWebViewFeature.State?
+
         public enum Alert: Equatable, Sendable {
             case logout
             case withdrawal
         }
-        
+
         var alert: Alert? = nil
         public var toast: ToastState?
-        
+
         public init(authInfo: AuthInfo) {
             self.authInfo = authInfo
             if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
@@ -44,7 +52,8 @@ public struct SettingsFeature: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
         case delegate(DelegateAction)
-        
+        case termsWebCover(PresentationAction<TermsWebViewFeature.Action>)
+
         public enum ViewAction: Sendable {
             case termsButtonTapped
             case privacyPolicyButtonTapped
@@ -80,11 +89,20 @@ public struct SettingsFeature: Sendable {
             switch action {
             // MARK: UI Actions
             case .view(.termsButtonTapped):
-                // TODO: 서비스 이용 약관 화면으로 이동하는 로직
+                guard let url = TermsURL.serviceTerms else { return .none }
+                state.termsWebCover = TermsWebViewFeature.State(url: url)
                 return .none
-                
+
             case .view(.privacyPolicyButtonTapped):
-                // TODO: 개인정보 처리 방침 화면으로 이동하는 로직
+                guard let url = TermsURL.privacyPolicy else { return .none }
+                state.termsWebCover = TermsWebViewFeature.State(url: url)
+                return .none
+
+            case .termsWebCover(.presented(.delegate(.didClose))):
+                state.termsWebCover = nil
+                return .none
+
+            case .termsWebCover:
                 return .none
                 
             case .view(.logoutButtonTapped):
@@ -168,6 +186,9 @@ public struct SettingsFeature: Sendable {
                 // 부모 Reducer에서 처리할 액션입니다.
                 return .none
             }
+        }
+        .ifLet(\.$termsWebCover, action: \.termsWebCover) {
+            TermsWebViewFeature()
         }
     }
 

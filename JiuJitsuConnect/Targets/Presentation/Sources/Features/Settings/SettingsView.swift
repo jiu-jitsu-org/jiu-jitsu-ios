@@ -98,6 +98,11 @@ public struct SettingsView: View {
         )
         .navigationBarHidden(true)
         .ignoresSafeArea(edges: .bottom)
+        .fullScreenCover(
+            item: $store.scope(state: \.termsWebCover, action: \.termsWebCover)
+        ) { termsStore in
+            TermsWebViewView(store: termsStore)
+        }
     }
     
     private var headerView: some View {
