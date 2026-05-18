@@ -17,10 +17,21 @@ public struct SettingsFeature: Sendable {
 
     private enum CancelID { case toast }
 
-    // 약관 문서 URL — 추후 원격/환경 설정으로 분리 검토.
     private enum TermsURL {
-        static let serviceTerms = URL(string: "https://poppop-seoul.developer-chanq.xyz")
-        static let privacyPolicy = URL(string: "https://poppop-seoul.developer-chanq.xyz")
+        static let serviceTerms = makeURL(path: "/service-info")
+        static let privacyPolicy = makeURL(path: "/service-info")
+
+        private static func makeURL(path: String) -> URL? {
+            guard
+                let baseString = Bundle.main.object(forInfoDictionaryKey: "WEB_URL") as? String,
+                !baseString.isEmpty,
+                let base = URL(string: baseString)
+            else {
+                Log.trace("WEB_URL is not set in Info.plist", category: .system, level: .error)
+                return nil
+            }
+            return base.appendingPathComponent(path)
+        }
     }
 
     @ObservableState
