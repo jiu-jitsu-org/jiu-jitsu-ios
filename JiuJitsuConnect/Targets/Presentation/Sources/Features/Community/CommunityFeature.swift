@@ -24,7 +24,14 @@ public struct CommunityFeature: Sendable {
         var hasError: Bool = false
 
         public init() {
-            self.url = CommunityFeature.makeCommunityURL()
+            let url = CommunityFeature.makeCommunityURL()
+            self.url = url
+            // URL 자체를 만들 수 없으면 WKWebView가 생성되지 않아 로딩 콜백이 영영 오지 않는다.
+            // 사용자에게 무한 로딩 대신 재시도 오버레이를 보여주기 위해 에러 상태로 초기화한다.
+            if url == nil {
+                self.isLoading = false
+                self.hasError = true
+            }
         }
     }
 
@@ -54,6 +61,16 @@ public struct CommunityFeature: Sendable {
                 return .none
 
             case .view(.retryTapped):
+                // URL이 아직도 nil이면 WKWebView가 생성되지 않으므로 재시도해도 콜백이 오지 않는다.
+                // 다시 만들어보고, 그래도 실패하면 에러 상태를 유지한다.
+                if state.url == nil {
+                    state.url = Self.makeCommunityURL()
+                }
+                guard state.url != nil else {
+                    state.hasError = true
+                    state.isLoading = false
+                    return .none
+                }
                 state.hasError = false
                 state.isLoading = true
                 state.loadToken = UUID()

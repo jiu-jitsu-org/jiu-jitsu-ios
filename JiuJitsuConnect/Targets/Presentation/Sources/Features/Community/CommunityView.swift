@@ -162,6 +162,26 @@ private struct CommunityWebView: UIViewRepresentable {
             Log.trace("Community webview didFailProvisionalNavigation: \(error)", category: .network, level: .error)
             onLoadingFailed()
         }
+
+        // HTTP 4xx/5xx는 WKWebView 관점에서 "정상 로드"라 didFail이 호출되지 않는다.
+        // 메인 프레임 응답의 상태 코드를 직접 검사해 에러로 처리한다.
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationResponse: WKNavigationResponse,
+            decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
+        ) {
+            if
+                navigationResponse.isForMainFrame,
+                let http = navigationResponse.response as? HTTPURLResponse,
+                !(200..<400).contains(http.statusCode)
+            {
+                Log.trace("Community webview HTTP error: \(http.statusCode)", category: .network, level: .error)
+                decisionHandler(.cancel)
+                onLoadingFailed()
+                return
+            }
+            decisionHandler(.allow)
+        }
     }
 }
 
