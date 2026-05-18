@@ -88,9 +88,8 @@ public struct MyProfileFeature: Sendable {
             case toastButtonTapped(ToastState.Action)
             case addCompetitionButtonTapped  // 대회 정보 추가 버튼 탭
             case competitionDetailTapped(Competition)  // 대회 정보 행 탭
-            case moreButtonTapped            // 우측 상단 "..." 버튼 탭
-            case moreMenuDismissed           // 메뉴 외부 영역 탭으로 dismiss
-            case instructorVerificationMenuTapped  // "관장 사범 인증" 메뉴 항목 탭
+            case moreButtonTapped                   // 우측 상단 "..." 버튼 탭 (토글)
+            case instructorVerificationMenuTapped   // "관장 사범 인증" 메뉴 항목 탭
         }
         
         public enum InternalAction: Sendable {
@@ -729,11 +728,6 @@ public struct MyProfileFeature: Sendable {
 
             case .view(.moreButtonTapped):
                 state.isMoreMenuPresented.toggle()
-                return .none
-
-            case .view(.moreMenuDismissed):
-                guard state.isMoreMenuPresented else { return .none }
-                state.isMoreMenuPresented = false
                 return .none
 
             case .view(.instructorVerificationMenuTapped):

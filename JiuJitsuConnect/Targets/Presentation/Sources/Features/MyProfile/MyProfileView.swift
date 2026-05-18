@@ -62,42 +62,60 @@ public struct MyProfileView: View {
             let cardOverlapHeight = store.communityProfile?.academyName != nil
                 ? Metrics.Card.overlapWithAcademyName
                 : Metrics.Card.overlapWithButton
-            
-            ScrollView(showsIndicators: false) {
-                ZStack(alignment: .bottom) {
-                    // 메인 콘텐츠
-                    VStack(spacing: 0) {
-                        // 1. 헤더 영역
-                        headerView(safeAreaTop: safeAreaTop)
-                            .zIndex(0)
-                        
-                        // 2. 벨트/체급 카드
-                        cardView
-                            .offset(y: -cardOverlapHeight)
-                            .padding(.bottom, -cardOverlapHeight)
-                            .zIndex(1)
-                        
-                        // 3. 콘텐츠 영역
-                        contentView
-                            .padding(.top, Metrics.Content.topPadding)
-                            .padding(.horizontal, Metrics.Content.horizontalPadding)
-                    }
-                    
-                    // 배경 그라데이션 (스타일 정보 없을 때만)
-                    if !hasStyleInfo {
-                        backgroundGradient(safeAreaBottom: safeAreaBottom)
+
+            // ScrollView 위에 "..." 메뉴를 얹은 단순 ZStack 구조.
+            // 메뉴 토글은 헤더의 "..." 버튼 탭으로만 처리한다 (외부 탭 dismiss 없음).
+            ZStack(alignment: .topTrailing) {
+                ScrollView(showsIndicators: false) {
+                    ZStack(alignment: .bottom) {
+                        // 메인 콘텐츠
+                        VStack(spacing: 0) {
+                            // 1. 헤더 영역
+                            headerView(safeAreaTop: safeAreaTop)
+                                .zIndex(0)
+
+                            // 2. 벨트/체급 카드
+                            cardView
+                                .offset(y: -cardOverlapHeight)
+                                .padding(.bottom, -cardOverlapHeight)
+                                .zIndex(1)
+
+                            // 3. 콘텐츠 영역
+                            contentView
+                                .padding(.top, Metrics.Content.topPadding)
+                                .padding(.horizontal, Metrics.Content.horizontalPadding)
+                        }
+
+                        // 배경 그라데이션 (스타일 정보 없을 때만)
+                        if !hasStyleInfo {
+                            backgroundGradient(safeAreaBottom: safeAreaBottom)
+                        }
                     }
                 }
+                .scrollDisabled(false)
+                .onAppear {
+                    UIScrollView.appearance().bounces = false
+                    store.send(.view(.onAppear))
+                }
+                .background(Color.component.background.default)
+
+                // "..." 메뉴 — 아이콘 바로 아래 우측에 배치
+                if store.isMoreMenuPresented {
+                    MyProfileMoreMenuView(
+                        onInstructorVerificationTapped: {
+                            store.send(.view(.instructorVerificationMenuTapped))
+                        }
+                    )
+                    // 아이콘 상단: safeAreaTop + 12, 하단: safeAreaTop + 44
+                    // 8pt 간격을 두고 아래로 배치
+                    .padding(.top, safeAreaTop + 52)
+                    .padding(.trailing, 16)
+                    .transition(.opacity)
+                }
             }
-            .scrollDisabled(false)
-            .onAppear {
-                UIScrollView.appearance().bounces = false
-                store.send(.view(.onAppear))
-            }
-            .background(Color.component.background.default)
+            .animation(.easeInOut(duration: 0.15), value: store.isMoreMenuPresented)
             .ignoresSafeArea(edges: .top)
             .navigationDestinations(store: $store)
-            .moreMenuOverlay(store: store, safeAreaTop: geometry.safeAreaInsets.top)
             .toastOverlay(store: store)
             .sheetPresentation(store: $store)
         }
@@ -236,34 +254,6 @@ private extension View {
             }
     }
     
-    /// 우측 상단 "..." 버튼 메뉴 오버레이
-    ///
-    /// 메뉴 노출 중에는 화면 전체를 덮는 투명 배경이 외부 탭을 흡수해 dismiss 처리한다.
-    /// 메뉴 본체는 safe area 바로 아래 우측 상단에 위치한다.
-    func moreMenuOverlay(store: StoreOf<MyProfileFeature>, safeAreaTop: CGFloat) -> some View {
-        self.overlay(alignment: .topTrailing) {
-            if store.isMoreMenuPresented {
-                ZStack(alignment: .topTrailing) {
-                    // 외부 영역 탭으로 dismiss하기 위한 투명 배경
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .ignoresSafeArea()
-                        .onTapGesture { store.send(.view(.moreMenuDismissed)) }
-
-                    MyProfileMoreMenuView(
-                        onInstructorVerificationTapped: {
-                            store.send(.view(.instructorVerificationMenuTapped))
-                        }
-                    )
-                    .padding(.top, safeAreaTop + 44)
-                    .padding(.trailing, 12)
-                }
-                .transition(.opacity)
-            }
-        }
-        .animation(.easeInOut(duration: 0.15), value: store.isMoreMenuPresented)
-    }
-
     /// 토스트 오버레이
     func toastOverlay(store: StoreOf<MyProfileFeature>) -> some View {
         self.overlay(alignment: .bottom) {
