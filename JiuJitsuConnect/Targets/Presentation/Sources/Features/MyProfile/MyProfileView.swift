@@ -97,6 +97,7 @@ public struct MyProfileView: View {
             .background(Color.component.background.default)
             .ignoresSafeArea(edges: .top)
             .navigationDestinations(store: $store)
+            .moreMenuOverlay(store: store, safeAreaTop: geometry.safeAreaInsets.top)
             .toastOverlay(store: store)
             .sheetPresentation(store: $store)
         }
@@ -113,7 +114,8 @@ public struct MyProfileView: View {
             beltRank: store.communityProfile?.beltRank,
             safeAreaTop: safeAreaTop,
             onNicknameEditTapped: { store.send(.view(.nicknameEditButtonTapped)) },
-            onGymInfoTapped: { store.send(.view(.gymInfoButtonTapped)) }
+            onGymInfoTapped: { store.send(.view(.gymInfoButtonTapped)) },
+            onMoreButtonTapped: { store.send(.view(.moreButtonTapped)) }
         )
     }
     
@@ -234,6 +236,34 @@ private extension View {
             }
     }
     
+    /// 우측 상단 "..." 버튼 메뉴 오버레이
+    ///
+    /// 메뉴 노출 중에는 화면 전체를 덮는 투명 배경이 외부 탭을 흡수해 dismiss 처리한다.
+    /// 메뉴 본체는 safe area 바로 아래 우측 상단에 위치한다.
+    func moreMenuOverlay(store: StoreOf<MyProfileFeature>, safeAreaTop: CGFloat) -> some View {
+        self.overlay(alignment: .topTrailing) {
+            if store.isMoreMenuPresented {
+                ZStack(alignment: .topTrailing) {
+                    // 외부 영역 탭으로 dismiss하기 위한 투명 배경
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .ignoresSafeArea()
+                        .onTapGesture { store.send(.view(.moreMenuDismissed)) }
+
+                    MyProfileMoreMenuView(
+                        onInstructorVerificationTapped: {
+                            store.send(.view(.instructorVerificationMenuTapped))
+                        }
+                    )
+                    .padding(.top, safeAreaTop + 44)
+                    .padding(.trailing, 12)
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.15), value: store.isMoreMenuPresented)
+    }
+
     /// 토스트 오버레이
     func toastOverlay(store: StoreOf<MyProfileFeature>) -> some View {
         self.overlay(alignment: .bottom) {

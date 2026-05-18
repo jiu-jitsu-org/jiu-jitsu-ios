@@ -22,31 +22,38 @@ public struct MyProfileHeaderView: View {
     let profileImageUrl: String?
     let beltRank: BeltRank?
     let safeAreaTop: CGFloat
-    
+
     let onNicknameEditTapped: () -> Void
     let onGymInfoTapped: () -> Void
-    
+    let onMoreButtonTapped: () -> Void
+
     // MARK: - Metrics
-    
+
     private enum Metrics {
         static let topPadding: CGFloat = 68
         static let bottomPaddingWithButton: CGFloat = 82.49
         static let bottomPaddingWithAcademyName: CGFloat = 84
-        
+
         static let profileImageSize: CGFloat = 90
         static let profileImageCornerRadius: CGFloat = 24
         static let profileIconSize: CGFloat = 64
-        
+
         static let nicknameHeight: CGFloat = 29
         static let nicknameTopPadding: CGFloat = 12
-        
+
         static let academyNameHeight: CGFloat = 32
-        
+
         static let buttonTopPadding: CGFloat = 15
         static let buttonHeight: CGFloat = 32
-        
+
         static let editButtonSize: CGFloat = 32
         static let editIconSize: CGFloat = 16
+
+        // 우측 상단 "..." 버튼
+        static let moreButtonSize: CGFloat = 32
+        static let moreIconSize: CGFloat = 16
+        static let moreButtonTopOffset: CGFloat = 12
+        static let moreButtonTrailing: CGFloat = 16
     }
     
     // MARK: - Body
@@ -101,6 +108,22 @@ public struct MyProfileHeaderView: View {
                     Spacer().frame(height: Metrics.bottomPaddingWithButton)
                 }
             }
+
+            // 우측 상단 "..." 버튼 (safe area 상단을 피해서 배치)
+            Button {
+                onMoreButtonTapped()
+            } label: {
+                Assets.Common.Icon.menu.swiftUIImage
+                    .resizable()
+                    .frame(width: Metrics.moreIconSize, height: Metrics.moreIconSize)
+                    .foregroundStyle(Color.component.button.inverted.defaultBg)
+                    .frame(width: Metrics.moreButtonSize, height: Metrics.moreButtonSize)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, safeAreaTop + Metrics.moreButtonTopOffset)
+            .padding(.trailing, Metrics.moreButtonTrailing)
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
 }
@@ -236,7 +259,8 @@ private struct AcademyNameEditRow: View {
         beltRank: .blue,
         safeAreaTop: 47,
         onNicknameEditTapped: { },
-        onGymInfoTapped: { }
+        onGymInfoTapped: { },
+        onMoreButtonTapped: { }
     )
     .background(Color.component.background.default)
 }
@@ -249,7 +273,8 @@ private struct AcademyNameEditRow: View {
         beltRank: .white,
         safeAreaTop: 47,
         onNicknameEditTapped: { },
-        onGymInfoTapped: { }
+        onGymInfoTapped: { },
+        onMoreButtonTapped: { }
     )
     .background(Color.component.background.default)
 }
@@ -267,7 +292,8 @@ private struct AcademyNameEditRow: View {
                     beltRank: selectedBelt,
                     safeAreaTop: 47,
                     onNicknameEditTapped: { },
-                    onGymInfoTapped: { }
+                    onGymInfoTapped: { },
+                    onMoreButtonTapped: { }
                 )
                 
                 Picker("벨트", selection: $selectedBelt) {

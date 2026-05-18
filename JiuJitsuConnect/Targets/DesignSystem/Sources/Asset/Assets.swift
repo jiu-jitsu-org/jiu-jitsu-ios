@@ -38,6 +38,7 @@ public enum Assets {
       public static let chevronRight = ImageAsset(name: "Common/Icon/chevron-right")
       public static let documents = ImageAsset(name: "Common/Icon/documents")
       public static let logOut = ImageAsset(name: "Common/Icon/log-out")
+      public static let menu = ImageAsset(name: "Common/Icon/menu")
       public static let pencilLine = ImageAsset(name: "Common/Icon/pencil-line")
       public static let pencil = ImageAsset(name: "Common/Icon/pencil")
       public static let plus = ImageAsset(name: "Common/Icon/plus")
