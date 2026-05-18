@@ -484,4 +484,21 @@ public struct ComponentColors {
         }
     }
 
+    // MARK: - Tab Bar
+    public let tabBar = TabBar()
+
+    public struct TabBar {
+        public let selected = Selected()
+        public let unselected = Unselected()
+
+        public struct Selected {
+            public let text = Color.semantic.interactive.primary
+            public let underline = Color.semantic.interactive.primary
+        }
+
+        public struct Unselected {
+            public let text = Color.semantic.text.primary
+        }
+    }
+
 }
