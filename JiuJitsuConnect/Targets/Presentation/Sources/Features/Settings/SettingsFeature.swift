@@ -39,6 +39,15 @@ public struct SettingsFeature: Sendable {
         var authInfo: AuthInfo
         var appVersion: String
 
+        // 알림 수신 여부 (마스터 + 카테고리)
+        // 정책: 전체 알림이 OFF면 카테고리 토글은 비활성. 마케팅은 정통망법상 옵트인 → 기본 false.
+        // TODO: 서버 동기화 전까지 임시 로컬 상태. API 연동 후 초기값/저장은 Repository 경유.
+        var isAllNotificationsEnabled: Bool = true
+        var isAccountSecurityNotificationEnabled: Bool = true
+        var isServiceNoticeNotificationEnabled: Bool = true
+        var isCommunityNotificationEnabled: Bool = true
+        var isMarketingNotificationEnabled: Bool = false
+
         @Presents var termsWebCover: TermsWebViewFeature.State?
 
         public enum Alert: Equatable, Sendable {
@@ -75,6 +84,11 @@ public struct SettingsFeature: Sendable {
             case confirmWithdrawal
             case alertDismissed
             case toastButtonTapped(ToastState.Action)
+            case allNotificationsToggled(Bool)
+            case accountSecurityNotificationToggled(Bool)
+            case serviceNoticeNotificationToggled(Bool)
+            case communityNotificationToggled(Bool)
+            case marketingNotificationToggled(Bool)
         }
 
         public enum InternalAction: Sendable {
@@ -178,6 +192,33 @@ public struct SettingsFeature: Sendable {
                 Log.trace("\(error)")
                 return handleError(error)
                 
+            case let .view(.allNotificationsToggled(isOn)):
+                state.isAllNotificationsEnabled = isOn
+                // TODO: 알림 설정 API 연동 - 전체 알림 수신 여부 서버 반영
+                //       OS 푸시 권한과 별개의 앱 레벨 마스터 스위치
+                return .none
+
+            case let .view(.accountSecurityNotificationToggled(isOn)):
+                state.isAccountSecurityNotificationEnabled = isOn
+                // TODO: 알림 설정 API 연동 - 계정·보안 알림 수신 여부 서버 반영
+                return .none
+
+            case let .view(.serviceNoticeNotificationToggled(isOn)):
+                state.isServiceNoticeNotificationEnabled = isOn
+                // TODO: 알림 설정 API 연동 - 서비스 공지 알림 수신 여부 서버 반영
+                return .none
+
+            case let .view(.communityNotificationToggled(isOn)):
+                state.isCommunityNotificationEnabled = isOn
+                // TODO: 알림 설정 API 연동 - 커뮤니티 활동 알림 수신 동의 여부 서버 반영
+                return .none
+
+            case let .view(.marketingNotificationToggled(isOn)):
+                state.isMarketingNotificationEnabled = isOn
+                // TODO: 알림 설정 API 연동 - 마케팅 정보 수신 동의 여부 서버 반영
+                //       정통망법상 광고성 정보는 별도 동의 필요 — 회원가입/약관 흐름과 연동 검토
+                return .none
+
             case .view(.alertDismissed):
                 state.alert = nil
                 return .none

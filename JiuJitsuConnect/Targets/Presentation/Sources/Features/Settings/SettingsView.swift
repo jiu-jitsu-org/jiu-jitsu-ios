@@ -39,6 +39,66 @@ public struct SettingsView: View {
             
             ScrollView {
                 VStack(spacing: Style.sectionSpacing) {
+                    // MARK: - 알림 설정 섹션
+                    // 마스터 토글 + 카테고리별 토글 (우선순위: 보안 > 공지 > 커뮤니티 > 마케팅)
+                    // 마스터 OFF 시 개별 토글은 disabled. 마케팅은 정통망법상 옵트인 → 기본 false.
+                    VStack(spacing: Style.sectionSpacing) {
+                        SettingsSection {
+                            SettingsToggleRow(
+                                asset: Assets.Common.Icon.bell,
+                                text: "전체 알림",
+                                subtitle: nil,
+                                isOn: Binding(
+                                    get: { store.isAllNotificationsEnabled },
+                                    set: { store.send(.view(.allNotificationsToggled($0))) }
+                                )
+                            )
+                        }
+
+                        SettingsSection {
+                            SettingsToggleRow(
+                                asset: Assets.Common.Icon.bell,
+                                text: "계정·보안 알림",
+                                subtitle: "로그인, 신고 처리 결과 등",
+                                isOn: Binding(
+                                    get: { store.isAccountSecurityNotificationEnabled },
+                                    set: { store.send(.view(.accountSecurityNotificationToggled($0))) }
+                                ),
+                                isDisabled: !store.isAllNotificationsEnabled
+                            )
+                            SettingsToggleRow(
+                                asset: Assets.Common.Icon.bell,
+                                text: "서비스 공지 알림",
+                                subtitle: "정책 변경, 공지사항",
+                                isOn: Binding(
+                                    get: { store.isServiceNoticeNotificationEnabled },
+                                    set: { store.send(.view(.serviceNoticeNotificationToggled($0))) }
+                                ),
+                                isDisabled: !store.isAllNotificationsEnabled
+                            )
+                            SettingsToggleRow(
+                                asset: Assets.Common.Icon.bell,
+                                text: "커뮤니티 활동 알림",
+                                subtitle: "댓글, 답글, 언급 등",
+                                isOn: Binding(
+                                    get: { store.isCommunityNotificationEnabled },
+                                    set: { store.send(.view(.communityNotificationToggled($0))) }
+                                ),
+                                isDisabled: !store.isAllNotificationsEnabled
+                            )
+                            SettingsToggleRow(
+                                asset: Assets.Common.Icon.bell,
+                                text: "마케팅 정보 알림",
+                                subtitle: "이벤트, 혜택 안내",
+                                isOn: Binding(
+                                    get: { store.isMarketingNotificationEnabled },
+                                    set: { store.send(.view(.marketingNotificationToggled($0))) }
+                                ),
+                                isDisabled: !store.isAllNotificationsEnabled
+                            )
+                        }
+                    }
+
                     // MARK: - 약관 및 정책 섹션
                     SettingsSection {
                         SettingsInteractiveRow(asset: Assets.Common.Icon.documents, text: "서비스 이용 약관") {
@@ -188,7 +248,7 @@ private struct SettingsInteractiveRow: View {
     let asset: ImageAsset
     let text: String
     let action: () -> Void
-    
+
     var body: some View {
         HStack {
             SettingsRowContent(asset: asset, text: text)
@@ -209,6 +269,46 @@ private struct SettingsInteractiveRow: View {
         .frame(minHeight: Style.rowHeight) // 고정 높이 대신 최소 높이 사용
         .padding(.leading, 16)
         .padding(.trailing, 8)
+    }
+}
+
+private struct SettingsToggleRow: View {
+    let asset: ImageAsset
+    let text: String
+    let subtitle: String?
+    @Binding var isOn: Bool
+    var isDisabled: Bool = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            asset.swiftUIImage
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 18, height: 18)
+                .foregroundStyle(Color.component.list.setting.leadingIcon)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(text)
+                    .font(Font.pretendard.bodyS)
+                    .foregroundStyle(Color.component.list.setting.text)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(Font.pretendard.captionM)
+                        .foregroundStyle(Color.component.list.setting.subText)
+                }
+            }
+
+            Spacer()
+
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .tint(Color.component.switch.on.bg)
+                .disabled(isDisabled)
+        }
+        .opacity(isDisabled ? 0.4 : 1.0)
+        .frame(minHeight: Style.rowHeight)
+        .padding(.horizontal, 16)
+        .padding(.vertical, subtitle == nil ? 0 : 6)
     }
 }
 
