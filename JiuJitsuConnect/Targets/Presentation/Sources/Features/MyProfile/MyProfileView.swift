@@ -133,7 +133,8 @@ public struct MyProfileView: View {
             safeAreaTop: safeAreaTop,
             onNicknameEditTapped: { store.send(.view(.nicknameEditButtonTapped)) },
             onGymInfoTapped: { store.send(.view(.gymInfoButtonTapped)) },
-            onMoreButtonTapped: { store.send(.view(.moreButtonTapped)) }
+            onMoreButtonTapped: { store.send(.view(.moreButtonTapped)) },
+            onProfileImageEditTapped: { store.send(.view(.profileImageEditButtonTapped)) }
         )
     }
     
@@ -298,6 +299,22 @@ private extension View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .presentationDragIndicator(.hidden)
                     .presentationDetents([.height(340)])
+                    .presentationBackground(
+                        Color.component.bottomSheet.selected.container.background
+                    )
+            }
+            .sheet(
+                item: store.scope(
+                    state: \.sheet?.profileImageEdit,
+                    action: \.sheet.profileImageEdit
+                )
+            ) { profileImageEditStore in
+                ProfileImageEditView(store: profileImageEditStore)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .presentationDragIndicator(.hidden)
+                    .presentationDetents([
+                        .height(profileImageEditStore.canDelete ? 340 : 276)
+                    ])
                     .presentationBackground(
                         Color.component.bottomSheet.selected.container.background
                     )

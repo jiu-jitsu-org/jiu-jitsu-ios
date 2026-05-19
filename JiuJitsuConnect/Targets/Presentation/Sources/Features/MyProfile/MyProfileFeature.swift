@@ -61,6 +61,7 @@ public struct MyProfileFeature: Sendable {
     public enum Sheet {
         case beltSetting(BeltSettingFeature)
         case weightClassSetting(WeightClassSettingFeature)
+        case profileImageEdit(ProfileImageEditFeature)
     }
     
     public enum Action: Sendable {
@@ -90,6 +91,7 @@ public struct MyProfileFeature: Sendable {
             case competitionDetailTapped(Competition)  // 대회 정보 행 탭
             case moreButtonTapped                   // 우측 상단 "..." 버튼 탭 (토글)
             case instructorVerificationMenuTapped   // "관장 사범 인증" 메뉴 항목 탭
+            case profileImageEditButtonTapped       // 프로필 이미지 우측 하단 카메라 버튼 탭
         }
         
         public enum InternalAction: Sendable {
@@ -734,6 +736,36 @@ public struct MyProfileFeature: Sendable {
                 state.isMoreMenuPresented = false
                 // TODO: 관장 사범 인증 플로우 진입 연결
                 Log.trace("관장 사범 인증 메뉴 탭", category: .debug, level: .info)
+                return .none
+
+            case .view(.profileImageEditButtonTapped):
+                // 프로필 이미지 수정 옵션 바텀시트 노출
+                let canDelete = (state.communityProfile?.profileImageUrl?.isEmpty == false)
+                state.sheet = .profileImageEdit(
+                    ProfileImageEditFeature.State(canDelete: canDelete)
+                )
+                return .none
+
+            case .sheet(.presented(.profileImageEdit(.delegate(.didSelectCamera)))):
+                state.sheet = nil
+                // FIXME: 카메라 촬영 플로우 진입 연결 (이미지 캡처 → 업로드)
+                Log.trace("프로필 이미지 - 카메라 촬영 선택됨", category: .debug, level: .info)
+                return .none
+
+            case .sheet(.presented(.profileImageEdit(.delegate(.didSelectAlbum)))):
+                state.sheet = nil
+                // FIXME: 앨범 선택 플로우 진입 연결 (PHPickerViewController → 업로드)
+                Log.trace("프로필 이미지 - 앨범에서 찾기 선택됨", category: .debug, level: .info)
+                return .none
+
+            case .sheet(.presented(.profileImageEdit(.delegate(.didSelectDelete)))):
+                state.sheet = nil
+                // FIXME: 프로필 이미지 삭제 API 연결
+                Log.trace("프로필 이미지 - 삭제 선택됨", category: .debug, level: .info)
+                return .none
+
+            case .sheet(.presented(.profileImageEdit(.delegate(.didCancel)))):
+                state.sheet = nil
                 return .none
 
             case .destination, .sheet, .view, .internal, .delegate:

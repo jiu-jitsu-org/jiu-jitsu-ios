@@ -26,6 +26,7 @@ public struct MyProfileHeaderView: View {
     let onNicknameEditTapped: () -> Void
     let onGymInfoTapped: () -> Void
     let onMoreButtonTapped: () -> Void
+    let onProfileImageEditTapped: () -> Void
 
     // MARK: - Metrics
 
@@ -73,7 +74,8 @@ public struct MyProfileHeaderView: View {
                     profileImageUrl: profileImageUrl,
                     size: Metrics.profileImageSize,
                     cornerRadius: Metrics.profileImageCornerRadius,
-                    iconSize: Metrics.profileIconSize
+                    iconSize: Metrics.profileIconSize,
+                    onCameraTapped: onProfileImageEditTapped
                 )
                 
                 // 닉네임 + 수정 버튼
@@ -136,13 +138,20 @@ private struct ProfileImageView: View {
     let size: CGFloat
     let cornerRadius: CGFloat
     let iconSize: CGFloat
-    
+    let onCameraTapped: () -> Void
+
+    private enum CameraButtonMetrics {
+        static let size: CGFloat = 28
+        static let iconSize: CGFloat = 16
+        static let offset: CGFloat = 4
+    }
+
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: cornerRadius)
                 .fill(Color.component.list.setting.background)
                 .frame(width: size, height: size)
-            
+
             if let profileImageUrl = profileImageUrl,
                let url = URL(string: profileImageUrl),
                url.scheme == "https" || url.scheme == "http" {
@@ -166,13 +175,44 @@ private struct ProfileImageView: View {
                 defaultProfileIcon
             }
         }
+        .frame(width: size, height: size)
+        .overlay(alignment: .bottomTrailing) {
+            cameraButton
+                .offset(x: CameraButtonMetrics.offset, y: CameraButtonMetrics.offset)
+        }
     }
-    
+
     private var defaultProfileIcon: some View {
         Assets.Common.Icon.profile.swiftUIImage
             .resizable()
             .foregroundStyle(Color.component.myProfileHeader.profileImageDefaultIcon)
             .frame(width: iconSize, height: iconSize)
+    }
+
+    private var cameraButton: some View {
+        Button(action: onCameraTapped) {
+            ZStack {
+                Circle()
+                    .fill(Color.component.list.setting.background)
+                    .frame(
+                        width: CameraButtonMetrics.size,
+                        height: CameraButtonMetrics.size
+                    )
+
+                Image(systemName: "camera.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(
+                        width: CameraButtonMetrics.iconSize,
+                        height: CameraButtonMetrics.iconSize
+                    )
+                    .foregroundStyle(
+                        Color.component.myProfileHeader.profileImageDefaultIcon
+                    )
+            }
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -260,7 +300,8 @@ private struct AcademyNameEditRow: View {
         safeAreaTop: 47,
         onNicknameEditTapped: { },
         onGymInfoTapped: { },
-        onMoreButtonTapped: { }
+        onMoreButtonTapped: { },
+        onProfileImageEditTapped: { }
     )
     .background(Color.component.background.default)
 }
@@ -274,7 +315,8 @@ private struct AcademyNameEditRow: View {
         safeAreaTop: 47,
         onNicknameEditTapped: { },
         onGymInfoTapped: { },
-        onMoreButtonTapped: { }
+        onMoreButtonTapped: { },
+        onProfileImageEditTapped: { }
     )
     .background(Color.component.background.default)
 }
@@ -293,7 +335,8 @@ private struct AcademyNameEditRow: View {
                     safeAreaTop: 47,
                     onNicknameEditTapped: { },
                     onGymInfoTapped: { },
-                    onMoreButtonTapped: { }
+                    onMoreButtonTapped: { },
+                    onProfileImageEditTapped: { }
                 )
                 
                 Picker("벨트", selection: $selectedBelt) {
