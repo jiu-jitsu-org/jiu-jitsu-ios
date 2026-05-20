@@ -17,24 +17,15 @@ struct StyleCardBack: View {
     let style: any StyleSelectable
     let settingType: MyStyleSettingType
     
-    // MARK: - Metrics
-    
-    private enum Metrics {
-        static let cardWidth: CGFloat = 262
-        static let cardHeight: CGFloat = 394
-        static let cornerRadius: CGFloat = 40
-        static let contentSpacing: CGFloat = 7
-    }
-    
     // MARK: - Body
-    
+
     var body: some View {
         ZStack {
             // 배경 색상 - 고정된 회색
-            RoundedRectangle(cornerRadius: Metrics.cornerRadius)
+            RoundedRectangle(cornerRadius: 40)
                 .fill(Color.primitive.coolGray.cg75)
-            
-            VStack(alignment: .center, spacing: Metrics.contentSpacing) {
+
+            VStack(alignment: .center, spacing: 7) {
                 // 타이틀 - 화면 타입 표시 (포지션/서브미션/기술)
                 Text(settingType.navigationTitle)
                     .font(.pretendard.bodyM)
@@ -47,7 +38,7 @@ struct StyleCardBack: View {
                     .foregroundColor(.primitive.coolGray.cg600)
             }
         }
-        .frame(width: Metrics.cardWidth, height: Metrics.cardHeight)
+        .frame(width: 262, height: 394)
     }
 }
 

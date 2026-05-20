@@ -28,23 +28,12 @@ public struct BeltWeightCardView: View {
     let onRegisterTapped: () -> Void
     
     // MARK: - Metrics
-    
+
     private enum Metrics {
-        static let minHeight: CGFloat = 128
-        static let cornerRadius: CGFloat = 16
-        static let shadowRadius: CGFloat = 4
-        static let shadowOpacity: CGFloat = 0.08
-        static let shadowOffsetY: CGFloat = 4
-        
+        // 카드 외곽 padding과 filledContent 내부 padding 2곳에서 공유
         static let horizontalPadding: CGFloat = 20
-        static let verticalPadding: CGFloat = 20
-        static let sectionSpacing: CGFloat = 24
-        
-        static let dividerWidth: CGFloat = 1
-        static let dividerHeight: CGFloat = 36
-        static let dividerVerticalPadding: CGFloat = 24
     }
-    
+
     // MARK: - Computed Properties
     
     private var hasBeltInfo: Bool {
@@ -58,7 +47,7 @@ public struct BeltWeightCardView: View {
     // MARK: - Body
     
     public var body: some View {
-        VStack(spacing: Metrics.sectionSpacing) {
+        VStack(spacing: 24) {
             if hasBeltInfo && hasWeightInfo {
                 filledContent
             } else {
@@ -66,14 +55,14 @@ public struct BeltWeightCardView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(minHeight: Metrics.minHeight)
+        .frame(minHeight: 128)
         .background(Color.component.beltCard.default.bg)
-        .clipShape(RoundedRectangle(cornerRadius: Metrics.cornerRadius))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(
-            color: Color.black.opacity(Metrics.shadowOpacity),
-            radius: Metrics.shadowRadius,
+            color: Color.black.opacity(0.08),
+            radius: 4,
             x: 0,
-            y: Metrics.shadowOffsetY
+            y: 4
         )
         .padding(.horizontal, Metrics.horizontalPadding)
     }
@@ -93,8 +82,8 @@ public struct BeltWeightCardView: View {
             // 중앙: 구분선
             Rectangle()
                 .fill(Color.primitive.coolGray.cg75)
-                .frame(width: Metrics.dividerWidth, height: Metrics.dividerHeight)
-                .padding(.vertical, Metrics.dividerVerticalPadding)
+                .frame(width: 1, height: 36)
+                .padding(.vertical, 24)
             
             // 오른쪽: 체급 섹션
             WeightSection(
@@ -105,7 +94,7 @@ public struct BeltWeightCardView: View {
             )
             .frame(maxWidth: .infinity)
         }
-        .padding(.vertical, Metrics.verticalPadding)
+        .padding(.vertical, 20)
         .padding(.horizontal, Metrics.horizontalPadding)
     }
     
@@ -173,43 +162,34 @@ private struct BeltSection: View {
     let beltRank: BeltRank?
     let beltStripe: BeltStripe?
     let onTapped: () -> Void
-    
-    private enum Metrics {
-        static let iconSize: CGFloat = 40
-        static let iconCornerRadius: CGFloat = 10
-        static let spacing: CGFloat = 8
-        static let labelHeight: CGFloat = 14
-        static let contentHeight: CGFloat = 18
-        static let nameSpacing: CGFloat = 5
-    }
-    
+
     var body: some View {
-        VStack(alignment: .center, spacing: Metrics.spacing) {
+        VStack(alignment: .center, spacing: 8) {
             Text("벨트")
                 .font(Font.pretendard.labelM)
                 .foregroundStyle(Color.component.beltCard.filled.labelText)
-                .frame(height: Metrics.labelHeight, alignment: .center)
-            
+                .frame(height: 14, alignment: .center)
+
             if let beltRank = beltRank {
                 // 벨트 아이콘
                 beltRank.beltIcon
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: Metrics.iconSize, height: Metrics.iconSize)
-                    .clipShape(RoundedRectangle(cornerRadius: Metrics.iconCornerRadius))
-                
+                    .frame(width: 40, height: 40)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
                 // 벨트명 + 띠
                 if let beltStripe = beltStripe {
-                    HStack(alignment: .center, spacing: Metrics.nameSpacing) {
+                    HStack(alignment: .center, spacing: 5) {
                         Text(beltRank.displayName)
                             .font(Font.pretendard.bodyS)
                             .foregroundStyle(Color.component.beltCard.filled.contentText)
-                        
+
                         Text(beltStripe.displayName)
                             .font(Font.pretendard.bodyS)
                             .foregroundStyle(Color.component.beltCard.filled.contentText)
                     }
-                    .frame(height: Metrics.contentHeight)
+                    .frame(height: 18)
                 }
             }
         }
@@ -230,21 +210,19 @@ private struct WeightSection: View {
     let onVisibilityToggleTapped: () -> Void
     
     private enum Metrics {
-        static let spacing: CGFloat = 8
-        static let labelHeight: CGFloat = 14
         static let weightHeight: CGFloat = 40
         static let toggleButtonHeight: CGFloat = 22
         static let toggleButtonPadding: CGFloat = 12
         static let weightFontSize: CGFloat = 24
         static let innerSpacing: CGFloat = 4
     }
-    
+
     var body: some View {
-        VStack(alignment: .center, spacing: Metrics.spacing) {
+        VStack(alignment: .center, spacing: 8) {
             Text("체급")
                 .font(Font.pretendard.labelM)
                 .foregroundStyle(Color.component.beltCard.filled.labelText)
-                .frame(height: Metrics.labelHeight, alignment: .center)
+                .frame(height: 14, alignment: .center)
             
             if let weightKg = weightKg {
                 if isHidden {

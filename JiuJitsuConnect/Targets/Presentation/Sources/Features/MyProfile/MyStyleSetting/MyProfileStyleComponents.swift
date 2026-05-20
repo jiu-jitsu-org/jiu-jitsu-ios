@@ -21,13 +21,9 @@ public struct MyProfileStyleSectionView: View {
     let favoriteSubmission: (any StyleSelectable)?
     
     let onStyleCardTapped: (MyStyleSettingType, MyStyleSettingFeature.SelectionTab) -> Void
-    
-    private enum Metrics {
-        static let sectionSpacing: CGFloat = 36
-    }
-    
+
     public var body: some View {
-        VStack(alignment: .leading, spacing: Metrics.sectionSpacing) {
+        VStack(alignment: .leading, spacing: 36) {
             // 포지션 섹션
             StyleCategorySection(
                 title: "포지션",
@@ -67,21 +63,16 @@ private struct StyleCategorySection: View {
     let favoriteStyle: (any StyleSelectable)?
     let onBestCardTapped: () -> Void
     let onFavoriteCardTapped: () -> Void
-    
-    private enum Metrics {
-        static let titleBottomPadding: CGFloat = 8
-        static let cardSpacing: CGFloat = 8
-    }
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: Metrics.titleBottomPadding) {
+        VStack(alignment: .leading, spacing: 8) {
             // 섹션 타이틀
             Text(title)
                 .font(.pretendard.title3)
                 .foregroundStyle(Color.component.sectionHeader.title)
-            
+
             // 카드 그리드 (2열)
-            HStack(spacing: Metrics.cardSpacing) {
+            HStack(spacing: 8) {
                 // 왼쪽: 특기 카드
                 if let bestStyle = bestStyle {
                     FilledStyleCardItem(label: "특기", style: bestStyle, onTapped: onBestCardTapped)
@@ -107,27 +98,19 @@ private struct FilledStyleCardItem: View {
     let label: String
     let style: any StyleSelectable
     let onTapped: () -> Void
-    
-    private enum Metrics {
-        static let padding: CGFloat = 16
-        static let contentSpacing: CGFloat = 16
-        static let iconSize: CGFloat = 40
-        static let labelTitleSpacing: CGFloat = 4
-        static let cornerRadius: CGFloat = 18
-    }
-    
+
     var body: some View {
         Button {
             onTapped()
         } label: {
-            VStack(alignment: .leading, spacing: Metrics.contentSpacing) {
+            VStack(alignment: .leading, spacing: 16) {
                 // 아이콘
                 style.iconImage.swiftUIImage
                     .resizable()
                     .scaledToFit()
-                    .frame(width: Metrics.iconSize, height: Metrics.iconSize)
-                
-                VStack(alignment: .leading, spacing: Metrics.labelTitleSpacing) {
+                    .frame(width: 40, height: 40)
+
+                VStack(alignment: .leading, spacing: 4) {
                     // 라벨 (특기/최애)
                     Text(label)
                         .font(Font.pretendard.labelM)
@@ -140,9 +123,9 @@ private struct FilledStyleCardItem: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Metrics.padding)
+            .padding(16)
             .background(Color.component.skillCard.default.bg)
-            .clipShape(RoundedRectangle(cornerRadius: Metrics.cornerRadius))
+            .clipShape(RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(.plain)
     }
@@ -154,27 +137,18 @@ private struct FilledStyleCardItem: View {
 private struct EmptyStyleCardItem: View {
     let label: String
     let onTapped: () -> Void
-    
-    private enum Metrics {
-        static let padding: CGFloat = 16
-        static let contentSpacing: CGFloat = 16
-        static let iconSize: CGFloat = 40
-        static let iconCornerRadius: CGFloat = 14
-        static let labelTitleSpacing: CGFloat = 4
-        static let cornerRadius: CGFloat = 18
-    }
-    
+
     var body: some View {
         Button {
             onTapped()
         } label: {
-            VStack(alignment: .leading, spacing: Metrics.contentSpacing) {
+            VStack(alignment: .leading, spacing: 16) {
                 // 빈 아이콘 배경
-                RoundedRectangle(cornerRadius: Metrics.iconCornerRadius)
+                RoundedRectangle(cornerRadius: 14)
                     .fill(Color.primitive.coolGray.cg50)
-                    .frame(width: Metrics.iconSize, height: Metrics.iconSize)
-                
-                VStack(alignment: .leading, spacing: Metrics.labelTitleSpacing) {
+                    .frame(width: 40, height: 40)
+
+                VStack(alignment: .leading, spacing: 4) {
                     // 라벨 (특기/최애)
                     Text(label)
                         .font(Font.pretendard.labelM)
@@ -187,9 +161,9 @@ private struct EmptyStyleCardItem: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Metrics.padding)
+            .padding(16)
             .background(Color.component.skillCard.default.bg)
-            .clipShape(RoundedRectangle(cornerRadius: Metrics.cornerRadius))
+            .clipShape(RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(.plain)
     }
@@ -200,36 +174,28 @@ private struct EmptyStyleCardItem: View {
 /// 스타일 정보가 전혀 없을 때 표시되는 뷰
 public struct EmptyStyleView: View {
     let onRegisterStyleTapped: () -> Void
-    
-    private enum Metrics {
-        static let titleBottomPadding: CGFloat = 8
-        static let buttonTopPadding: CGFloat = 24
-        static let buttonHeight: CGFloat = 38
-        static let decorativeCardsTopPadding: CGFloat = 16
-        static let decorativeCardsHeight: CGFloat = 282
-    }
-    
+
     public var body: some View {
         VStack(spacing: 0) {
             Text("나의 주짓수를 보여주세요")
                 .font(Font.pretendard.title3)
                 .foregroundStyle(Color.component.sectionHeader.title)
-                .padding(.bottom, Metrics.titleBottomPadding)
+                .padding(.bottom, 8)
 
             Text("특기와 최애 포지션, 기술 등을 등록해보세요.")
                 .font(Font.pretendard.bodyM)
                 .foregroundStyle(Color.component.sectionHeader.subTitle)
-            
+
             Button {
                 onRegisterStyleTapped()
             } label: {
                 AppButtonConfiguration(title: "내 스타일 등록하기", size: .medium)
             }
-            .appButtonStyle(.tint, size: .medium, height: Metrics.buttonHeight)
-            .padding(.top, Metrics.buttonTopPadding)
-            
+            .appButtonStyle(.tint, size: .medium, height: 38)
+            .padding(.top, 24)
+
             DecorativeCardsView()
-                .padding(.top, Metrics.decorativeCardsTopPadding)
+                .padding(.top, 16)
         }
     }
 }
@@ -238,10 +204,6 @@ public struct EmptyStyleView: View {
 
 /// 장식용 스타일 카드 배치 뷰
 private struct DecorativeCardsView: View {
-    private enum Metrics {
-        static let height: CGFloat = 282
-    }
-    
     var body: some View {
         GeometryReader { geometry in
             let centerX = geometry.size.width / 2
@@ -253,7 +215,7 @@ private struct DecorativeCardsView: View {
                 decorativeCard(config: .escapeDefense, centerX: centerX)
             }
         }
-        .frame(height: Metrics.height)
+        .frame(height: 282)
     }
     
     private func decorativeCard(config: DecorativeCardConfig, centerX: CGFloat) -> some View {

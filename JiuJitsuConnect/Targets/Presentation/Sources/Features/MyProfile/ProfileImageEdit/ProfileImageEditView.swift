@@ -20,22 +20,10 @@ public struct ProfileImageEditView: View {
     // MARK: - Metrics
 
     private enum Metrics {
-        static let handleWidth: CGFloat = 48
-        static let handleHeight: CGFloat = 4
-        static let handleAreaHeight: CGFloat = 24
-
-        static let titleAreaHeight: CGFloat = 48
+        // titleSection/optionsSection/cancelButton 3곳에서 공유
         static let horizontalPadding: CGFloat = 20
-
-        static let rowHeight: CGFloat = 56
+        // optionRow 배경과 contentShape 2곳에서 공유
         static let rowCornerRadius: CGFloat = 12
-        static let rowSpacing: CGFloat = 8
-        static let chevronSize: CGFloat = 16
-
-        static let sectionTopPadding: CGFloat = 8
-        static let buttonTopPadding: CGFloat = 16
-        static let buttonHeight: CGFloat = 52
-        static let bottomPadding: CGFloat = 8
     }
 
     // MARK: - Body
@@ -45,10 +33,10 @@ public struct ProfileImageEditView: View {
             handleBar
             titleSection
             optionsSection
-                .padding(.top, Metrics.sectionTopPadding)
+                .padding(.top, 8)
             cancelButton
-                .padding(.top, Metrics.buttonTopPadding)
-                .padding(.bottom, Metrics.bottomPadding)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
         }
         .background(Color.component.bottomSheet.selected.container.background)
     }
@@ -59,10 +47,10 @@ public struct ProfileImageEditView: View {
         ZStack {
             Capsule()
                 .fill(Color.component.bottomSheet.selected.container.handle)
-                .frame(width: Metrics.handleWidth, height: Metrics.handleHeight)
+                .frame(width: 48, height: 4)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: Metrics.handleAreaHeight)
+        .frame(height: 24)
     }
 
     private var titleSection: some View {
@@ -74,12 +62,12 @@ public struct ProfileImageEditView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: Metrics.titleAreaHeight)
+        .frame(height: 48)
         .padding(.horizontal, Metrics.horizontalPadding)
     }
 
     private var optionsSection: some View {
-        VStack(spacing: Metrics.rowSpacing) {
+        VStack(spacing: 8) {
             optionRow(
                 title: "사진 촬영",
                 showsChevron: true,
@@ -124,7 +112,7 @@ public struct ProfileImageEditView: View {
                     Assets.Common.Icon.chevronRight.swiftUIImage
                         .resizable()
                         .scaledToFit()
-                        .frame(width: Metrics.chevronSize, height: Metrics.chevronSize)
+                        .frame(width: 16, height: 16)
                         .foregroundStyle(
                             Color.component.bottomSheet.selected.listItem.followingIcon
                         )
@@ -132,7 +120,7 @@ public struct ProfileImageEditView: View {
             }
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity)
-            .frame(height: Metrics.rowHeight)
+            .frame(height: 56)
             .background(
                 RoundedRectangle(cornerRadius: Metrics.rowCornerRadius)
                     .fill(
@@ -152,7 +140,7 @@ public struct ProfileImageEditView: View {
         } label: {
             AppButtonConfiguration(title: "취소", size: .large)
         }
-        .appButtonStyle(.primary, size: .large, height: Metrics.buttonHeight)
+        .appButtonStyle(.primary, size: .large, height: 52)
         .padding(.horizontal, Metrics.horizontalPadding)
     }
 }

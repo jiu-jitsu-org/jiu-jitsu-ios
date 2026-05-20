@@ -13,22 +13,10 @@ import Domain
 // MARK: - Layout Metrics
 
 private enum Metrics {
+    // 카드가 헤더와 겹치는 높이 — 도장명 유무에 따라 분기 적용
     enum Card {
         static let overlapWithButton: CGFloat = 46.49
         static let overlapWithAcademyName: CGFloat = 71
-    }
-    
-    enum Content {
-        static let topPadding: CGFloat = 36
-        static let horizontalPadding: CGFloat = 20
-        static let sectionSpacing: CGFloat = 36
-        static let bottomPadding: CGFloat = 29
-        static let emptyStyleBottomPadding: CGFloat = 18
-    }
-    
-    enum Gradient {
-        static let height: CGFloat = 433
-        static let bottomOffset: CGFloat = 58
     }
 }
 
@@ -82,8 +70,8 @@ public struct MyProfileView: View {
 
                             // 3. 콘텐츠 영역
                             contentView
-                                .padding(.top, Metrics.Content.topPadding)
-                                .padding(.horizontal, Metrics.Content.horizontalPadding)
+                                .padding(.top, 36)
+                                .padding(.horizontal, 20)
                         }
 
                         // 배경 그라데이션 (스타일 정보 없을 때만)
@@ -156,16 +144,16 @@ public struct MyProfileView: View {
     private var contentView: some View {
         VStack(spacing: 0) {
             if hasStyleInfo {
-                VStack(alignment: .leading, spacing: Metrics.Content.sectionSpacing) {
+                VStack(alignment: .leading, spacing: 36) {
                     styleSection
                     competitionSection
                 }
-                .padding(.bottom, Metrics.Content.bottomPadding)
+                .padding(.bottom, 29)
             } else {
                 EmptyStyleView(
                     onRegisterStyleTapped: { store.send(.view(.registerStyleButtonTapped)) }
                 )
-                .padding(.bottom, Metrics.Content.emptyStyleBottomPadding)
+                .padding(.bottom, 18)
             }
         }
     }
@@ -206,9 +194,9 @@ public struct MyProfileView: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: Metrics.Gradient.height)
+            .frame(height: 433)
         }
-        .offset(y: Metrics.Gradient.bottomOffset + safeAreaBottom)
+        .offset(y: 58 + safeAreaBottom)
         .allowsHitTesting(false)
         .zIndex(-1)
     }

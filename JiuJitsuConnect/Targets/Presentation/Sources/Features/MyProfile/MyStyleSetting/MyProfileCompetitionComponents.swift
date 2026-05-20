@@ -16,15 +16,9 @@ public struct MyProfileCompetitionSection: View {
     let competitions: [Competition]?
     let onAddCompetitionTapped: () -> Void
     let onCompetitionDetailTapped: (Competition) -> Void
-    
-    private enum Metrics {
-        static let titleBottomPadding: CGFloat = 8
-        static let addButtonIconSize: CGFloat = 16
-        static let addButtonSize: CGFloat = 32
-    }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: Metrics.titleBottomPadding) {
+        VStack(alignment: .leading, spacing: 8) {
             // 섹션 타이틀 + 추가 버튼
             HStack(spacing: 0) {
                 Text("대회 정보")
@@ -39,10 +33,10 @@ public struct MyProfileCompetitionSection: View {
                     Assets.Common.Icon.plus.swiftUIImage
                         .resizable()
                         .scaledToFit()
-                        .frame(width: Metrics.addButtonIconSize, height: Metrics.addButtonIconSize)
+                        .frame(width: 16, height: 16)
                         .foregroundStyle(Color.component.button.ghost.defaultText)
                 }
-                .frame(width: Metrics.addButtonSize, height: Metrics.addButtonSize)
+                .frame(width: 32, height: 32)
                 .buttonStyle(.plain)
             }
 
@@ -65,15 +59,9 @@ public struct MyProfileCompetitionSection: View {
 private struct CompetitionListView: View {
     let competitions: [Competition]
     let onCompetitionDetailTapped: (Competition) -> Void
-    
-    private enum Metrics {
-        static let verticalPadding: CGFloat = 8
-        static let rowSpacing: CGFloat = 4
-        static let cornerRadius: CGFloat = 18
-    }
-    
+
     var body: some View {
-        VStack(spacing: Metrics.rowSpacing) {
+        VStack(spacing: 4) {
             ForEach(Array(sortedCompetitions.enumerated()), id: \.offset) { _, competition in
                 CompetitionRowView(
                     competition: competition,
@@ -81,9 +69,9 @@ private struct CompetitionListView: View {
                 )
             }
         }
-        .padding(.vertical, Metrics.verticalPadding)
+        .padding(.vertical, 8)
         .background(Color.component.skillCard.default.bg)
-        .clipShape(RoundedRectangle(cornerRadius: Metrics.cornerRadius))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 
     // 참가 날짜(년·월) 기준 최신순. 원본 배열은 그대로 두고 표시 시점에만 정렬한다.
@@ -103,24 +91,17 @@ private struct CompetitionListView: View {
 private struct CompetitionRowView: View {
     let competition: Competition
     let onTapped: () -> Void
-    
-    private enum Metrics {
-        static let height: CGFloat = 40
-        static let horizontalPadding: CGFloat = 16
-        static let iconSize: CGFloat = 18
-        static let contentSpacing: CGFloat = 8
-    }
-    
+
     var body: some View {
         Button {
             onTapped()
         } label: {
-            HStack(spacing: Metrics.contentSpacing) {
+            HStack(spacing: 8) {
                 // 메달 아이콘
                 competition.competitionRank.medalImage
                     .resizable()
                     .scaledToFit()
-                    .frame(width: Metrics.iconSize, height: Metrics.iconSize)
+                    .frame(width: 18, height: 18)
                 
                 // 대회 이름
                 Text(competition.competitionName)
@@ -135,8 +116,8 @@ private struct CompetitionRowView: View {
                     .font(.pretendard.labelM)
                     .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
             }
-            .frame(height: Metrics.height)
-            .padding(.horizontal, Metrics.horizontalPadding)
+            .frame(height: 40)
+            .padding(.horizontal, 16)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -148,34 +129,30 @@ private struct CompetitionRowView: View {
 /// 대회 정보가 없을 때의 뷰
 private struct EmptyCompetitionView: View {
     let onAddCompetitionTapped: () -> Void
-    
+
     private enum Metrics {
-        static let height: CGFloat = 56
-        static let leadingPadding: CGFloat = 12
-        static let trailingPadding: CGFloat = 20
+        // 메달 아이콘과 chevron 아이콘 2곳에서 공유
         static let iconSize: CGFloat = 18
-        static let contentSpacing: CGFloat = 8
-        static let cornerRadius: CGFloat = 18
     }
-    
+
     var body: some View {
         Button {
             onAddCompetitionTapped()
         } label: {
-            HStack(spacing: Metrics.contentSpacing) {
+            HStack(spacing: 8) {
                 // 메달 아이콘
                 Assets.MyProfile.Icon.medalDefaultDisable.swiftUIImage
                     .resizable()
                     .scaledToFit()
                     .frame(width: Metrics.iconSize, height: Metrics.iconSize)
-                
+
                 // 텍스트
                 Text("출전한 대회 정보를 입력해주세요")
                     .font(.pretendard.bodyS)
                     .foregroundStyle(Color.component.list.setting.text)
-                
+
                 Spacer()
-                
+
                 // Chevron 아이콘
                 Assets.Common.Icon.chevronRight.swiftUIImage
                     .resizable()
@@ -183,11 +160,11 @@ private struct EmptyCompetitionView: View {
                     .frame(width: Metrics.iconSize, height: Metrics.iconSize)
                     .foregroundStyle(Color.component.list.setting.icon)
             }
-            .frame(height: Metrics.height)
-            .padding(.leading, Metrics.leadingPadding)
-            .padding(.trailing, Metrics.trailingPadding)
+            .frame(height: 56)
+            .padding(.leading, 12)
+            .padding(.trailing, 20)
             .background(Color.component.list.setting.background)
-            .clipShape(RoundedRectangle(cornerRadius: Metrics.cornerRadius))
+            .clipShape(RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(.plain)
     }

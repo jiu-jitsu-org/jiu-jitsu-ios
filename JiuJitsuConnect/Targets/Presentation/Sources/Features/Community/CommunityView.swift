@@ -19,17 +19,10 @@ public struct CommunityView: View {
     }
 
     private enum Metrics {
-        static let gnbHeight: CGFloat = 44
-        static let gnbHorizontalPadding: CGFloat = 16
-        static let tabSpacing: CGFloat = 16
-        static let tabIndicatorHeight: CGFloat = 2
+        // 알림·검색 아이콘 버튼 2곳에서 공유
         static let trailingIconSize: CGFloat = 24
         static let trailingIconButtonSize: CGFloat = 40
-        static let trailingIconSpacing: CGFloat = 0
-        static let trailingPadding: CGFloat = 8
-        static let gnbDividerHeight: CGFloat = 1
-        static let floatingButtonSize: CGFloat = 48
-        static let floatingIconSize: CGFloat = 20
+        // 플로팅 버튼 trailing·bottom padding 2곳에서 공유
         static let floatingButtonPadding: CGFloat = 12
     }
 
@@ -64,13 +57,13 @@ public struct CommunityView: View {
 
     private var gnb: some View {
         HStack(spacing: 0) {
-            HStack(spacing: Metrics.tabSpacing) {
+            HStack(spacing: 16) {
                 ForEach(CommunityFeature.Tab.allCases, id: \.self) { tab in
                     tabButton(tab)
                 }
             }
             Spacer(minLength: 0)
-            HStack(spacing: Metrics.trailingIconSpacing) {
+            HStack(spacing: 0) {
                 Button {
                     store.send(.view(.notificationTapped))
                 } label: {
@@ -98,14 +91,14 @@ public struct CommunityView: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.leading, Metrics.gnbHorizontalPadding)
-        .padding(.trailing, Metrics.trailingPadding)
-        .frame(height: Metrics.gnbHeight)
+        .padding(.leading, 16)
+        .padding(.trailing, 8)
+        .frame(height: 44)
         .background(Color.component.header.background)
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(Color.component.navibar.container.divider)
-                .frame(height: Metrics.gnbDividerHeight)
+                .frame(height: 1)
         }
     }
 
@@ -115,21 +108,21 @@ public struct CommunityView: View {
             store.send(.view(.tabSelected(tab)))
         } label: {
             Text(tab.title)
-                .font(Font.pretendard.title3)
+                .font(Font.pretendard.bodyM)
                 .foregroundStyle(
                     isSelected
-                        ? Color.component.navibar.selected.label
-                        : Color.component.navibar.unselected.label
+                    ? Color.component.tabBar.selected.text
+                    : Color.component.tabBar.unselected.text
                 )
                 .frame(maxHeight: .infinity)
                 .overlay(alignment: .bottom) {
                     Rectangle()
                         .fill(
                             isSelected
-                                ? Color.component.navibar.selected.label
+                            ? Color.component.tabBar.selected.underline
                                 : Color.clear
                         )
-                        .frame(height: Metrics.tabIndicatorHeight)
+                        .frame(height: 2)
                 }
                 .contentShape(Rectangle())
         }
@@ -144,9 +137,9 @@ public struct CommunityView: View {
                 .renderingMode(.template)
                 .resizable()
                 .scaledToFit()
-                .frame(width: Metrics.floatingIconSize, height: Metrics.floatingIconSize)
+                .frame(width: 20, height: 20)
                 .foregroundStyle(Color.semantic.primary.onPrimary)
-                .frame(width: Metrics.floatingButtonSize, height: Metrics.floatingButtonSize)
+                .frame(width: 48, height: 48)
                 .background(
                     Capsule().fill(Color.semantic.interactive.primary)
                 )

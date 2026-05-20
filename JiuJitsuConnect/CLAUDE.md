@@ -414,6 +414,43 @@ Log.trace("닉네임 저장 요청: \(nickname)", category: .debug, level: .info
 - **Preview:** 신규 View는 `#Preview`를 작성한다. mock store는 `XxxClient.previewValue` 활용.
 - **`@ViewAction` 매크로:** 현재 미사용. 도입 시 코드 일관성을 위해 별도 합의를 거친다.
 
+### 7.1 SwiftUI 레이아웃 값 상수화 기준
+
+`padding` / `frame` / `cornerRadius` 등 레이아웃 수치는 **무조건 상수화하지 않는다.**
+단발성 리터럴까지 `enum Metrics`로 추출하면 상수명이 모디파이어 이름을 반복할 뿐
+정보량이 늘지 않고, 실제 값을 보려면 enum까지 스크롤해야 해서 view body의 가독성이 떨어진다.
+
+**상수화한다 (`private enum Metrics`로 추출):**
+- 한 파일에서 **2회 이상** 쓰이는 값 (단일 소스 오브 트루스 — 한 곳만 고치면 됨)
+- `isSelected ? A : B` 처럼 **조건 분기**되는 값 (이름이 분기 의미를 설명)
+- 값 자체로 의미가 드러나지 않는 **비자명한 수치** (애니메이션 duration, opacity 등)
+- 다른 값과 **결합**되어 쓰이는 값 (`safeAreaTop + topPadding`)
+
+**상수화하지 않는다 (리터럴 인라인):**
+- 정확히 **1회만** 쓰이고, 모디파이어가 이미 의미를 설명하는 값
+
+```swift
+// ❌ 1회성 리터럴까지 상수화 — 이름이 모디파이어를 반복할 뿐
+private enum Metrics {
+    static let iconBottomPadding: CGFloat = 54
+    static let titleHeight: CGFloat = 54
+}
+.padding(.bottom, Metrics.iconBottomPadding)
+.frame(height: Metrics.titleHeight)
+
+// ✅ 1회성은 인라인 — body만 봐도 레이아웃 파악
+.padding(.bottom, 54)
+.frame(height: 54)
+
+// ✅ 2회 이상 재사용 / 조건 분기는 상수화
+private enum Metrics {
+    static let cardWidth: CGFloat = 262   // 배경 frame + 외곽 frame 2곳
+    static let cardHeight: CGFloat = 394
+}
+```
+
+- 폰트 크기는 로컬 `Metrics`가 아니라 `DesignSystem`의 Typography 토큰을 쓴다.
+
 ---
 
 ## 8. 테스트 원칙
@@ -438,7 +475,7 @@ Log.trace("닉네임 저장 요청: \(nickname)", category: .debug, level: .info
 - 강제 언래핑(`!`) 사용 금지 → `guard let` / 옵셔널 체이닝
 - 전역 변수 사용 금지 → `@Dependency` / TCA Store를 통한 상태 전달
 - 하드코딩 hex 컬러 사용 금지 → `DesignSystem` Color 토큰
-- 의미가 모호한 매직 넘버는 적절히 상수/`enum`으로 추출 (UI padding 같이 일회성·통일 기준이 없는 값은 예외)
+- 의미가 모호한 매직 넘버는 적절히 상수/`enum`으로 추출하되, SwiftUI 레이아웃 수치는 §7.1 기준을 따른다 (1회성 `padding`/`frame` 리터럴은 인라인)
 
 ### 9.2 iOS 버전
 - deployment target = 26.0이므로 `#available(iOS …, *)` 분기는 **불필요**. (외부 SDK 호환 등 정당한 사유가 있을 때만 추가하고 사유를 주석으로 남긴다.)

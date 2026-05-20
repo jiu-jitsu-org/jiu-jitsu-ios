@@ -17,15 +17,6 @@ import DesignSystem
 struct MyProfileMoreMenuView: View {
     let onInstructorVerificationTapped: () -> Void
 
-    private enum Metrics {
-        static let horizontalPadding: CGFloat = 16
-        static let verticalPadding: CGFloat = 12
-        static let cornerRadius: CGFloat = 12
-        static let shadowRadius: CGFloat = 8
-        static let shadowOffsetY: CGFloat = 2
-        static let shadowOpacity: Double = 0.12
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             Button {
@@ -34,20 +25,20 @@ struct MyProfileMoreMenuView: View {
                 Text("관장 사범 인증")
                     .font(Font.pretendard.bodyS)
                     .foregroundStyle(Color.component.list.setting.text)
-                    .padding(.horizontal, Metrics.horizontalPadding)
-                    .padding(.vertical, Metrics.verticalPadding)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
         .background(Color.component.list.setting.background)
-        .clipShape(RoundedRectangle(cornerRadius: Metrics.cornerRadius))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(
-            color: Color.black.opacity(Metrics.shadowOpacity),
-            radius: Metrics.shadowRadius,
+            color: Color.black.opacity(0.12),
+            radius: 8,
             x: 0,
-            y: Metrics.shadowOffsetY
+            y: 2
         )
         .fixedSize(horizontal: true, vertical: false)
     }

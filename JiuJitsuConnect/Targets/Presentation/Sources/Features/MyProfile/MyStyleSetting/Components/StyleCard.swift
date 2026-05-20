@@ -18,26 +18,13 @@ struct StyleCard: View {
     let isSelected: Bool
     
     // MARK: - Metrics
-    
+
     private enum Metrics {
+        // 배경 이미지 frame과 외곽 frame 2곳에서 공유
         static let cardWidth: CGFloat = 262
         static let cardHeight: CGFloat = 394
-        static let cornerRadius: CGFloat = 40
-        
-        static let iconSize: CGFloat = 93
-        static let iconBottomPadding: CGFloat = 54
-        
-        static let titleFontSize: CGFloat = 40
-        static let titleHeight: CGFloat = 54
-        static let titleBottomPadding: CGFloat = 20
-        
-        static let descriptionFontSize: CGFloat = 16
-        static let descriptionHeight: CGFloat = 72
-        static let descriptionLineSpacing: CGFloat = 4
-        static let descriptionHorizontalPadding: CGFloat = 25
-        static let descriptionBottomPadding: CGFloat = 32
     }
-    
+
     // MARK: - Body
     
     var body: some View {
@@ -54,30 +41,30 @@ struct StyleCard: View {
                 style.iconImage.swiftUIImage
                     .resizable()
                     .scaledToFit()
-                    .frame(width: Metrics.iconSize, height: Metrics.iconSize)
-                    .padding(.bottom, Metrics.iconBottomPadding)
-                
+                    .frame(width: 93, height: 93)
+                    .padding(.bottom, 54)
+
                 // 풀 타이틀
                 Text(style.fullTitle)
-                    .font(.cookieRun.custom(weight: .black, size: Metrics.titleFontSize))
+                    .font(.cookieRun.custom(weight: .black, size: 40))
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
-                    .frame(height: Metrics.titleHeight)
-                    .padding(.bottom, Metrics.titleBottomPadding)
-                
+                    .frame(height: 54)
+                    .padding(.bottom, 20)
+
                 // 카드 설명
                 Text(style.cardDescription)
-                    .font(.pretendard.custom(weight: .medium, size: Metrics.descriptionFontSize))
+                    .font(.pretendard.custom(weight: .medium, size: 16))
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
-                    .lineSpacing(Metrics.descriptionLineSpacing)
-                    .frame(height: Metrics.descriptionHeight)
-                    .padding(.horizontal, Metrics.descriptionHorizontalPadding)
-                    .padding(.bottom, Metrics.descriptionBottomPadding)
+                    .lineSpacing(4)
+                    .frame(height: 72)
+                    .padding(.horizontal, 25)
+                    .padding(.bottom, 32)
             }
         }
         .frame(width: Metrics.cardWidth, height: Metrics.cardHeight)
-        .cornerRadius(Metrics.cornerRadius)
+        .cornerRadius(40)
     }
 }
 

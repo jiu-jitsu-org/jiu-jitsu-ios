@@ -16,55 +16,43 @@ struct EmptySelectionCard: View {
     let onTap: () -> Void
     
     // MARK: - Metrics
-    
+
     private enum Metrics {
-        static let width: CGFloat = 262
-        static let height: CGFloat = 394
+        // 배경 fill·테두리·외곽 clip 3곳에서 공유
         static let cornerRadius: CGFloat = 40
-        static let borderWidth: CGFloat = 2
-        static let dashPattern: [CGFloat] = [8, 8]
-        
-        static let iconFontSize: CGFloat = 80
-        static let titleFontSize: CGFloat = 20
-        static let titleHeight: CGFloat = 27
-        static let titleTopOffset: CGFloat = -5
-        static let contentOffsetY: CGFloat = -13.5
     }
-    
+
     // MARK: - Body
-    
+
     var body: some View {
         ZStack {
             // 배경 - 점선 테두리와 어두운 배경
             RoundedRectangle(cornerRadius: Metrics.cornerRadius)
                 .fill(Color.primitive.coolGray.cg900)
-            
+
             RoundedRectangle(cornerRadius: Metrics.cornerRadius)
                 .strokeBorder(
-                    style: StrokeStyle(
-                        lineWidth: Metrics.borderWidth,
-                        dash: Metrics.dashPattern
-                    )
+                    style: StrokeStyle(lineWidth: 2, dash: [8, 8])
                 )
                 .foregroundColor(Color.primitive.coolGray.cg200)
-            
+
             // + 아이콘을 중앙에 배치
             VStack(spacing: 0) {
                 // + 아이콘 (배경 원 없이)
                 Text("+")
-                    .font(Font.cookieRun.custom(weight: .black, size: Metrics.iconFontSize))
+                    .font(Font.cookieRun.custom(weight: .black, size: 80))
                     .foregroundColor(Color.primitive.coolGray.cg100)
-                
+
                 // "선택하기" 텍스트
                 Text("선택하기")
-                    .font(Font.cookieRun.custom(weight: .black, size: Metrics.titleFontSize))
+                    .font(Font.cookieRun.custom(weight: .black, size: 20))
                     .foregroundColor(Color.primitive.coolGray.cg100)
-                    .frame(height: Metrics.titleHeight)
-                    .padding(.top, Metrics.titleTopOffset)
+                    .frame(height: 27)
+                    .padding(.top, -5)
             }
-            .offset(y: Metrics.contentOffsetY)
+            .offset(y: -13.5)
         }
-        .frame(width: Metrics.width, height: Metrics.height)
+        .frame(width: 262, height: 394)
         .cornerRadius(Metrics.cornerRadius)
     }
 }

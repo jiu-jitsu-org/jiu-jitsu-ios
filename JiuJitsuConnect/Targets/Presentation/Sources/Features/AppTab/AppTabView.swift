@@ -18,16 +18,8 @@ public struct AppTabView: View {
     }
 
     private enum Metrics {
+        // tabBarReservedSpace(safeAreaInset)와 bottomTabBar 2곳에서 공유
         static let tabBarHeight: CGFloat = 58
-        static let tabBarHorizontalPadding: CGFloat = 20
-        static let iconSize: CGFloat = 24
-        static let itemSpacing: CGFloat = 4
-        static let topBorderHeight: CGFloat = 1
-
-        // Drop shadow: x=0, y=-4, blur=12, spread=0, #000000 8% (Figma 기준)
-        static let shadowColor = Color.black.opacity(0.08)
-        static let shadowRadius: CGFloat = 6   // SwiftUI radius ≈ Figma blur / 2
-        static let shadowY: CGFloat = -4
     }
 
     public var body: some View {
@@ -109,18 +101,19 @@ public struct AppTabView: View {
             tabBarButton(tab: .settings, asset: Assets.Bottom.Icon.setting, label: "설정")
         }
         .frame(height: Metrics.tabBarHeight)
-        .padding(.horizontal, Metrics.tabBarHorizontalPadding)
+        .padding(.horizontal, 20)
         .background(Color.component.navibar.container.background)
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(Color.component.navibar.container.divider)
-                .frame(height: Metrics.topBorderHeight)
+                .frame(height: 1)
         }
+        // Figma drop shadow(y=-4, blur=12, #000000 8%) → SwiftUI radius ≈ blur/2
         .shadow(
-            color: Metrics.shadowColor,
-            radius: Metrics.shadowRadius,
+            color: Color.black.opacity(0.08),
+            radius: 6,
             x: 0,
-            y: Metrics.shadowY
+            y: -4
         )
     }
 
@@ -140,12 +133,12 @@ public struct AppTabView: View {
         return Button {
             store.send(.view(.tabSelected(tab)))
         } label: {
-            VStack(spacing: Metrics.itemSpacing) {
+            VStack(spacing: 4) {
                 asset.swiftUIImage
                     .renderingMode(.template)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: Metrics.iconSize, height: Metrics.iconSize)
+                    .frame(width: 24, height: 24)
                     .foregroundStyle(iconColor)
                 Text(label)
                     .font(Font.pretendard.buttonS)

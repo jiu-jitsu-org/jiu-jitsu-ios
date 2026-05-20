@@ -28,35 +28,6 @@ public struct MyProfileHeaderView: View {
     let onMoreButtonTapped: () -> Void
     let onProfileImageEditTapped: () -> Void
 
-    // MARK: - Metrics
-
-    private enum Metrics {
-        static let topPadding: CGFloat = 68
-        static let bottomPaddingWithButton: CGFloat = 82.49
-        static let bottomPaddingWithAcademyName: CGFloat = 84
-
-        static let profileImageSize: CGFloat = 90
-        static let profileImageCornerRadius: CGFloat = 24
-        static let profileIconSize: CGFloat = 64
-
-        static let nicknameHeight: CGFloat = 29
-        static let nicknameTopPadding: CGFloat = 12
-
-        static let academyNameHeight: CGFloat = 32
-
-        static let buttonTopPadding: CGFloat = 15
-        static let buttonHeight: CGFloat = 32
-
-        static let editButtonSize: CGFloat = 32
-        static let editIconSize: CGFloat = 16
-
-        // 우측 상단 "..." 버튼
-        static let moreButtonSize: CGFloat = 32
-        static let moreIconSize: CGFloat = 16
-        static let moreButtonTopOffset: CGFloat = 12
-        static let moreButtonTrailing: CGFloat = 16
-    }
-    
     // MARK: - Body
     
     public var body: some View {
@@ -67,36 +38,36 @@ public struct MyProfileHeaderView: View {
 
             VStack(spacing: 0) {
                 // 상단 여백
-                Spacer().frame(height: safeAreaTop + Metrics.topPadding)
-                
+                Spacer().frame(height: safeAreaTop + 68)
+
                 // 프로필 이미지
                 ProfileImageView(
                     profileImageUrl: profileImageUrl,
-                    size: Metrics.profileImageSize,
-                    cornerRadius: Metrics.profileImageCornerRadius,
-                    iconSize: Metrics.profileIconSize,
+                    size: 90,
+                    cornerRadius: 24,
+                    iconSize: 64,
                     onCameraTapped: onProfileImageEditTapped
                 )
-                
+
                 // 닉네임 + 수정 버튼
                 NicknameEditRow(
                     nickname: nickname,
-                    height: Metrics.nicknameHeight,
+                    height: 29,
                     onEditTapped: onNicknameEditTapped
                 )
-                .padding(.top, Metrics.nicknameTopPadding)
-                
+                .padding(.top, 12)
+
                 // 도장명 + 수정 버튼 (있는 경우)
                 if let academyName = academyName {
                     AcademyNameEditRow(
                         academyName: academyName,
-                        height: Metrics.academyNameHeight,
+                        height: 32,
                         onEditTapped: onGymInfoTapped
                     )
-                    
-                    Spacer().frame(height: Metrics.bottomPaddingWithAcademyName)
+
+                    Spacer().frame(height: 84)
                 }
-                
+
                 // "도장 정보 입력하기" 버튼 (도장명이 없을 때만)
                 if academyName == nil {
                     Button {
@@ -104,10 +75,10 @@ public struct MyProfileHeaderView: View {
                     } label: {
                         AppButtonConfiguration(title: "도장 정보 입력하기", size: .small)
                     }
-                    .appButtonStyle(.tint, size: .small, height: Metrics.buttonHeight)
-                    .padding(.top, Metrics.buttonTopPadding)
+                    .appButtonStyle(.tint, size: .small, height: 32)
+                    .padding(.top, 15)
 
-                    Spacer().frame(height: Metrics.bottomPaddingWithButton)
+                    Spacer().frame(height: 82.49)
                 }
             }
 
@@ -117,14 +88,14 @@ public struct MyProfileHeaderView: View {
             } label: {
                 Assets.Common.Icon.menu.swiftUIImage
                     .resizable()
-                    .frame(width: Metrics.moreIconSize, height: Metrics.moreIconSize)
+                    .frame(width: 16, height: 16)
                     .foregroundStyle(Color.component.button.inverted.defaultBg)
-                    .frame(width: Metrics.moreButtonSize, height: Metrics.moreButtonSize)
+                    .frame(width: 32, height: 32)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.top, safeAreaTop + Metrics.moreButtonTopOffset)
-            .padding(.trailing, Metrics.moreButtonTrailing)
+            .padding(.top, safeAreaTop + 12)
+            .padding(.trailing, 16)
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
@@ -139,12 +110,6 @@ private struct ProfileImageView: View {
     let cornerRadius: CGFloat
     let iconSize: CGFloat
     let onCameraTapped: () -> Void
-
-    private enum CameraButtonMetrics {
-        static let size: CGFloat = 28
-        static let iconSize: CGFloat = 16
-        static let offset: CGFloat = 4
-    }
 
     var body: some View {
         ZStack {
@@ -178,7 +143,7 @@ private struct ProfileImageView: View {
         .frame(width: size, height: size)
         .overlay(alignment: .bottomTrailing) {
             cameraButton
-                .offset(x: CameraButtonMetrics.offset, y: CameraButtonMetrics.offset)
+                .offset(x: 4, y: 4)
         }
     }
 
@@ -194,18 +159,12 @@ private struct ProfileImageView: View {
             ZStack {
                 Circle()
                     .fill(Color.component.list.setting.background)
-                    .frame(
-                        width: CameraButtonMetrics.size,
-                        height: CameraButtonMetrics.size
-                    )
+                    .frame(width: 28, height: 28)
 
                 Image(systemName: "camera.fill")
                     .resizable()
                     .scaledToFit()
-                    .frame(
-                        width: CameraButtonMetrics.iconSize,
-                        height: CameraButtonMetrics.iconSize
-                    )
+                    .frame(width: 16, height: 16)
                     .foregroundStyle(
                         Color.component.myProfileHeader.profileImageDefaultIcon
                     )
@@ -223,28 +182,22 @@ private struct NicknameEditRow: View {
     let nickname: String
     let height: CGFloat
     let onEditTapped: () -> Void
-    
-    private enum Metrics {
-        static let editButtonSize: CGFloat = 32
-        static let editIconSize: CGFloat = 16
-        static let editIconOpacity: CGFloat = 0.5
-    }
-    
+
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
             Text(nickname)
                 .font(Font.pretendard.title3)
                 .foregroundStyle(Color.component.list.setting.background)
-            
+
             Button(action: onEditTapped) {
                 ZStack {
                     Assets.Common.Icon.pencil.swiftUIImage
                         .resizable()
                         .scaledToFit()
-                        .frame(width: Metrics.editIconSize, height: Metrics.editIconSize)
-                        .foregroundStyle(Color.white.opacity(Metrics.editIconOpacity))
+                        .frame(width: 16, height: 16)
+                        .foregroundStyle(Color.white.opacity(0.5))
                 }
-                .frame(width: Metrics.editButtonSize, height: Metrics.editButtonSize)
+                .frame(width: 32, height: 32)
             }
             .buttonStyle(.plain)
         }
@@ -259,29 +212,22 @@ private struct AcademyNameEditRow: View {
     let academyName: String
     let height: CGFloat
     let onEditTapped: () -> Void
-    
-    private enum Metrics {
-        static let editButtonSize: CGFloat = 32
-        static let editIconSize: CGFloat = 16
-        static let editIconOpacity: CGFloat = 0.5
-        static let textOpacity: CGFloat = 0.7
-    }
-    
+
     var body: some View {
         HStack(spacing: 0) {
             Text(academyName)
                 .font(Font.pretendard.bodyS)
-                .foregroundStyle(Color.component.list.setting.background.opacity(Metrics.textOpacity))
-            
+                .foregroundStyle(Color.component.list.setting.background.opacity(0.7))
+
             Button(action: onEditTapped) {
                 ZStack {
                     Assets.Common.Icon.pencil.swiftUIImage
                         .resizable()
                         .scaledToFit()
-                        .frame(width: Metrics.editIconSize, height: Metrics.editIconSize)
-                        .foregroundStyle(Color.white.opacity(Metrics.editIconOpacity))
+                        .frame(width: 16, height: 16)
+                        .foregroundStyle(Color.white.opacity(0.5))
                 }
-                .frame(width: Metrics.editButtonSize, height: Metrics.editButtonSize)
+                .frame(width: 32, height: 32)
             }
             .buttonStyle(.plain)
         }

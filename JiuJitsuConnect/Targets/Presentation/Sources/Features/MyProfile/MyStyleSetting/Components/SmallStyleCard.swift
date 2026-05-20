@@ -32,11 +32,7 @@ struct SmallStyleCard: View {
             static let selected: CGFloat = 19.29
             static let unselected: CGFloat = 14.4
         }
-        
-        enum Font {
-            static let size: CGFloat = 16
-        }
-        
+
         enum Padding {
             static let selectedTop: CGFloat = 20
             static let unselectedTop: CGFloat = 14.7
@@ -71,7 +67,7 @@ struct SmallStyleCard: View {
             
             // 짧은 타이틀을 상단에 배치 - 중앙 정렬
             Text(style.shortTitle)
-                .font(.cookieRun.custom(weight: .black, size: Metrics.Font.size))
+                .font(.cookieRun.custom(weight: .black, size: 16))
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.top, topPadding)

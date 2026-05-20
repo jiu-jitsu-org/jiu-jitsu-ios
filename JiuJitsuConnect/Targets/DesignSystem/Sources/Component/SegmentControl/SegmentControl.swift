@@ -46,19 +46,7 @@ public struct SegmentControl: View {
     private let rightItem: SegmentItem
     private let selectedSide: Side
     private let onSelectionChange: (Side) -> Void
-    
-    // MARK: - Metrics
-    
-    private enum Metrics {
-        static let containerWidth: CGFloat = 262
-        static let containerHeight: CGFloat = 67
-        static let containerCornerRadius: CGFloat = 28
-        static let itemCornerRadius: CGFloat = 24
-        static let itemHeight: CGFloat = 59
-        static let itemPadding: CGFloat = 4
-        static let contentVerticalSpacing: CGFloat = 4
-    }
-    
+
     // MARK: - Initialization
     
     /// SegmentControl을 생성합니다.
@@ -99,9 +87,9 @@ public struct SegmentControl: View {
                 onSelectionChange(.right)
             }
         }
-        .frame(width: Metrics.containerWidth, height: Metrics.containerHeight)
+        .frame(width: 262, height: 67)
         .background(Color.component.segment.container.bg)
-        .cornerRadius(Metrics.containerCornerRadius)
+        .cornerRadius(28)
     }
 }
 
@@ -132,21 +120,13 @@ private struct SegmentButton: View {
     let item: SegmentItem
     let isSelected: Bool
     let action: () -> Void
-    
-    private enum Metrics {
-        static let itemCornerRadius: CGFloat = 24
-        static let itemHeight: CGFloat = 59
-        static let itemPadding: CGFloat = 4
-        static let contentVerticalSpacing: CGFloat = 4
-        static let titleFontSize: CGFloat = 18
-    }
-    
+
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: Metrics.contentVerticalSpacing) {
+            VStack(alignment: .leading, spacing: 4) {
                 // 타이틀
                 Text(item.title)
-                    .font(.pretendard.custom(weight: .semiBold, size: Metrics.titleFontSize))
+                    .font(.pretendard.custom(weight: .semiBold, size: 18))
                     .foregroundColor(
                         isSelected
                             ? Color.component.segment.selected.titleText
@@ -163,14 +143,14 @@ private struct SegmentButton: View {
                     )
             }
             .frame(maxWidth: .infinity)
-            .frame(height: Metrics.itemHeight)
+            .frame(height: 59)
             .background(
                 isSelected
                     ? Color.component.segment.selected.bg
                     : Color.component.segment.unselected.bg
             )
-            .cornerRadius(Metrics.itemCornerRadius)
-            .padding(Metrics.itemPadding)
+            .cornerRadius(24)
+            .padding(4)
         }
         .buttonStyle(.plain)
     }
