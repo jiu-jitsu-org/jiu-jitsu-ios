@@ -56,50 +56,53 @@ public struct CommunityView: View {
     }
 
     private var gnb: some View {
-        HStack(spacing: 0) {
-            HStack(spacing: 16) {
-                ForEach(CommunityFeature.Tab.allCases, id: \.self) { tab in
-                    tabButton(tab)
-                }
-            }
-            Spacer(minLength: 0)
-            HStack(spacing: 0) {
-                Button {
-                    store.send(.view(.notificationTapped))
-                } label: {
-                    Assets.Common.Icon.bell.swiftUIImage
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: Metrics.trailingIconSize, height: Metrics.trailingIconSize)
-                        .foregroundStyle(Color.component.header.iconButton)
-                        .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    store.send(.view(.searchTapped))
-                } label: {
-                    Assets.Common.Icon.search.swiftUIImage
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: Metrics.trailingIconSize, height: Metrics.trailingIconSize)
-                        .foregroundStyle(Color.component.header.iconButton)
-                        .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.leading, 16)
-        .padding(.trailing, 8)
-        .frame(height: 44)
-        .background(Color.component.header.background)
-        .overlay(alignment: .bottom) {
+        // 디바이더(1pt)를 탭 콘텐츠보다 뒤 레이어에 깔아야
+        // 탭 인디케이터(2pt)가 디바이더에 가려지지 않고 온전히 그려진다.
+        ZStack(alignment: .bottom) {
             Rectangle()
                 .fill(Color.component.navibar.container.divider)
                 .frame(height: 1)
+
+            HStack(spacing: 0) {
+                HStack(spacing: 16) {
+                    ForEach(CommunityFeature.Tab.allCases, id: \.self) { tab in
+                        tabButton(tab)
+                    }
+                }
+                Spacer(minLength: 0)
+                HStack(spacing: 0) {
+                    Button {
+                        store.send(.view(.notificationTapped))
+                    } label: {
+                        Assets.Common.Icon.bell.swiftUIImage
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: Metrics.trailingIconSize, height: Metrics.trailingIconSize)
+                            .foregroundStyle(Color.component.header.iconButton)
+                            .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        store.send(.view(.searchTapped))
+                    } label: {
+                        Assets.Common.Icon.search.swiftUIImage
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: Metrics.trailingIconSize, height: Metrics.trailingIconSize)
+                            .foregroundStyle(Color.component.header.iconButton)
+                            .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.leading, 16)
+            .padding(.trailing, 8)
         }
+        .frame(height: 44)
+        .background(Color.component.header.background)
     }
 
     private func tabButton(_ tab: CommunityFeature.Tab) -> some View {
