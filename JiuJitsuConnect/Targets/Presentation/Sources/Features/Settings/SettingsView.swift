@@ -12,73 +12,33 @@ import CoreKit
 
 private enum Style {
     static let headerHeight: CGFloat = 44
-    
+
     static let horizontalPadding: CGFloat = 20
     static let verticalPadding: CGFloat = 24
-    
+
     static let sectionSpacing: CGFloat = 16
-    static let sectionCornerRadius: CGFloat = 16
-    static let sectionVerticalPadding: CGFloat = 8
-    
-    static let rowSpacing: CGFloat = 4
-    static let rowHeight: CGFloat = 40
 }
 
 public struct SettingsView: View {
     @Bindable var store: StoreOf<SettingsFeature>
-    
+
     public init(store: StoreOf<SettingsFeature>) {
         self.store = store
     }
-    
+
     private var appVersion: String { "99.99" }
-    
+
     public var body: some View {
         VStack(spacing: 0) {
             headerView
-            
+
             ScrollView {
                 VStack(spacing: Style.sectionSpacing) {
-                    // MARK: - 알림 설정 섹션
-                    // 카테고리별 토글 (우선순위: 보안 > 공지 > 커뮤니티 > 마케팅)
-                    // 마케팅은 정통망법상 옵트인 → 기본 false.
+                    // MARK: - 알림 설정 진입 섹션 (카테고리별 토글은 NotificationSettingView로 분리)
                     SettingsSection {
-                        SettingsToggleRow(
-                            asset: Assets.Common.Icon.bell,
-                            text: "계정·보안 알림",
-                            subtitle: "로그인, 신고 처리 결과 등",
-                            isOn: Binding(
-                                get: { store.isAccountSecurityNotificationEnabled },
-                                set: { store.send(.view(.accountSecurityNotificationToggled($0))) }
-                            )
-                        )
-                        SettingsToggleRow(
-                            asset: Assets.Common.Icon.bell,
-                            text: "서비스 공지 알림",
-                            subtitle: "정책 변경, 공지사항",
-                            isOn: Binding(
-                                get: { store.isServiceNoticeNotificationEnabled },
-                                set: { store.send(.view(.serviceNoticeNotificationToggled($0))) }
-                            )
-                        )
-                        SettingsToggleRow(
-                            asset: Assets.Common.Icon.bell,
-                            text: "커뮤니티 활동 알림",
-                            subtitle: "댓글, 답글, 언급 등",
-                            isOn: Binding(
-                                get: { store.isCommunityNotificationEnabled },
-                                set: { store.send(.view(.communityNotificationToggled($0))) }
-                            )
-                        )
-                        SettingsToggleRow(
-                            asset: Assets.Common.Icon.bell,
-                            text: "마케팅 정보 알림",
-                            subtitle: "이벤트, 혜택 안내",
-                            isOn: Binding(
-                                get: { store.isMarketingNotificationEnabled },
-                                set: { store.send(.view(.marketingNotificationToggled($0))) }
-                            )
-                        )
+                        SettingsInteractiveRow(asset: Assets.Common.Icon.bell, text: "알림") {
+                            store.send(.view(.notificationButtonTapped))
+                        }
                     }
 
                     // MARK: - 약관 및 정책 섹션
@@ -90,7 +50,7 @@ public struct SettingsView: View {
                             store.send(.view(.privacyPolicyButtonTapped))
                         }
                     }
-                    
+
                     // MARK: - 버전 정보 섹션
                     SettingsSection {
                         HStack {
@@ -100,10 +60,10 @@ public struct SettingsView: View {
                                 .font(Font.pretendard.captionM)
                                 .foregroundStyle(Color.component.list.setting.valueText)
                         }
-                        .frame(minHeight: Style.rowHeight)
+                        .frame(minHeight: SettingsListMetrics.rowHeight)
                         .padding(.horizontal, 16)
                     }
-                    
+
                     // MARK: - 계정 관리 섹션
                     SettingsSection {
                         if store.authInfo.isGuest {
@@ -146,13 +106,21 @@ public struct SettingsView: View {
         )
         .navigationBarHidden(true)
         .ignoresSafeArea(edges: .bottom)
+        .navigationDestination(
+            item: $store.scope(
+                state: \.destination?.notificationSetting,
+                action: \.destination.notificationSetting
+            )
+        ) { notificationStore in
+            NotificationSettingView(store: notificationStore)
+        }
         .fullScreenCover(
             item: $store.scope(state: \.termsWebCover, action: \.termsWebCover)
         ) { termsStore in
             TermsWebViewView(store: termsStore)
         }
     }
-    
+
     private var headerView: some View {
         HStack {
             Text("설정")
@@ -164,7 +132,7 @@ public struct SettingsView: View {
         .frame(height: Style.headerHeight)
         .background(Color.component.background.default.ignoresSafeArea(edges: .top))
     }
-    
+
     // MARK: - Alert Configuration Helper
     private func alertConfiguration(for alertType: SettingsFeature.State.Alert?) -> AppAlertConfiguration {
         switch alertType {
@@ -186,108 +154,6 @@ public struct SettingsView: View {
             // Alert가 보이지 않을 때를 위한 기본값. 내용은 중요하지 않습니다.
             return .init(title: "", message: "", primaryButton: .init(title: "", action: {}), secondaryButton: nil)
         }
-    }
-}
-
-// MARK: - Reusable Section Container
-private struct SettingsSection<Content: View>: View {
-    let content: Content
-    
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-    
-    var body: some View {
-        VStack(spacing: Style.rowSpacing) {
-            content
-        }
-        .padding(.vertical, Style.sectionVerticalPadding)
-        .background(Color.component.list.setting.background)
-        .clipShape(RoundedRectangle(cornerRadius: Style.sectionCornerRadius))
-    }
-}
-
-// MARK: - Reusable Row Views
-private struct SettingsRowContent: View {
-    let asset: ImageAsset
-    let text: String
-    
-    var body: some View {
-        HStack(spacing: 8) {
-            asset.swiftUIImage
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 18, height: 18)
-                .foregroundStyle(Color.component.list.setting.leadingIcon)
-            Text(text)
-                .font(Font.pretendard.bodyS)
-                .foregroundStyle(Color.component.list.setting.text)
-        }
-    }
-}
-
-private struct SettingsInteractiveRow: View {
-    let asset: ImageAsset
-    let text: String
-    let action: () -> Void
-
-    var body: some View {
-        HStack {
-            SettingsRowContent(asset: asset, text: text)
-            Spacer()
-            Button(action: action) {
-                ZStack {
-                    Assets.Common.Icon.chevronRight.swiftUIImage
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 18, height: 18)
-                        .foregroundStyle(Color.component.bottomSheet.unselected.listItem.followingIcon)
-                }
-                .frame(width: 34, height: 34)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        }
-        .frame(minHeight: Style.rowHeight) // 고정 높이 대신 최소 높이 사용
-        .padding(.leading, 16)
-        .padding(.trailing, 8)
-    }
-}
-
-private struct SettingsToggleRow: View {
-    let asset: ImageAsset
-    let text: String
-    let subtitle: String?
-    @Binding var isOn: Bool
-
-    var body: some View {
-        HStack(spacing: 8) {
-            asset.swiftUIImage
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 18, height: 18)
-                .foregroundStyle(Color.component.list.setting.leadingIcon)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(text)
-                    .font(Font.pretendard.bodyS)
-                    .foregroundStyle(Color.component.list.setting.text)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(Font.pretendard.captionM)
-                        .foregroundStyle(Color.component.list.setting.subText)
-                }
-            }
-
-            Spacer()
-
-            Toggle("", isOn: $isOn)
-                .labelsHidden()
-                .tint(Color.component.switch.on.bg)
-        }
-        .frame(minHeight: Style.rowHeight)
-        .padding(.horizontal, 16)
-        .padding(.vertical, subtitle == nil ? 0 : 6)
     }
 }
 

@@ -39,13 +39,7 @@ public struct SettingsFeature: Sendable {
         var authInfo: AuthInfo
         var appVersion: String
 
-        // 알림 수신 여부 (카테고리별). 마케팅은 정통망법상 옵트인 → 기본 false.
-        // TODO: 서버 동기화 전까지 임시 로컬 상태. API 연동 후 초기값/저장은 Repository 경유.
-        var isAccountSecurityNotificationEnabled: Bool = true
-        var isServiceNoticeNotificationEnabled: Bool = true
-        var isCommunityNotificationEnabled: Bool = true
-        var isMarketingNotificationEnabled: Bool = false
-
+        @Presents var destination: Destination.State?
         @Presents var termsWebCover: TermsWebViewFeature.State?
 
         public enum Alert: Equatable, Sendable {
@@ -65,14 +59,21 @@ public struct SettingsFeature: Sendable {
             }
         }
     }
-    
+
+    @Reducer(state: .equatable, .sendable, action: .sendable)
+    public enum Destination {
+        case notificationSetting(NotificationSettingFeature)
+    }
+
     public enum Action: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
         case delegate(DelegateAction)
+        case destination(PresentationAction<Destination.Action>)
         case termsWebCover(PresentationAction<TermsWebViewFeature.Action>)
 
         public enum ViewAction: Sendable {
+            case notificationButtonTapped
             case termsButtonTapped
             case privacyPolicyButtonTapped
             case loginButtonTapped
@@ -82,10 +83,6 @@ public struct SettingsFeature: Sendable {
             case confirmWithdrawal
             case alertDismissed
             case toastButtonTapped(ToastState.Action)
-            case accountSecurityNotificationToggled(Bool)
-            case serviceNoticeNotificationToggled(Bool)
-            case communityNotificationToggled(Bool)
-            case marketingNotificationToggled(Bool)
         }
 
         public enum InternalAction: Sendable {
@@ -101,17 +98,21 @@ public struct SettingsFeature: Sendable {
             case loginRequested
         }
     }
-    
+
     // MARK: - Dependencies
     @Dependency(\.authClient) var authClient
     @Dependency(\.userClient) var userClient
     @Dependency(\.continuousClock) var clock
-    
+
     // MARK: - Reducer Body
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
             // MARK: UI Actions
+            case .view(.notificationButtonTapped):
+                state.destination = .notificationSetting(NotificationSettingFeature.State())
+                return .none
+
             case .view(.termsButtonTapped):
                 guard let url = TermsURL.serviceTerms else { return .none }
                 state.termsWebCover = TermsWebViewFeature.State(url: url)
@@ -128,18 +129,18 @@ public struct SettingsFeature: Sendable {
 
             case .termsWebCover:
                 return .none
-                
+
             case .view(.loginButtonTapped):
                 return .send(.delegate(.loginRequested))
 
             case .view(.logoutButtonTapped):
                 state.alert = .logout
                 return .none
-                
+
             case .view(.withdrawalButtonTapped):
                 state.alert = .withdrawal
                 return .none
-                
+
             // MARK: Alert Actions
             case .view(.confirmLogout):
 //                    state.isLoading = true
@@ -148,7 +149,7 @@ public struct SettingsFeature: Sendable {
                         await TaskResult { try await authClient.serverLogout() }
                     )))
                 }
-                
+
             case .view(.confirmWithdrawal):
                 // TODO: 실제 회원 탈퇴 API 호출
                 return .run { send in
@@ -158,11 +159,11 @@ public struct SettingsFeature: Sendable {
                         }
                     )))
                 }
-                
+
             case let .internal(.logoutResponse(.success(isSuccess))):
 //                state.isLoading = false
                 Log.trace("\(isSuccess)")
-                
+
                 if isSuccess {
                     return .run { send in
                         await authClient.signOut()
@@ -171,7 +172,7 @@ public struct SettingsFeature: Sendable {
                 } else {
                     return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info))))
                 }
-                
+
             case let .internal(.logoutResponse(.failure(error))):
                 Log.trace("\(error)")
                 return handleError(error)
@@ -188,32 +189,11 @@ public struct SettingsFeature: Sendable {
             case let .internal(.withdrawalResponse(.failure(error))):
                 Log.trace("\(error)")
                 return handleError(error)
-                
-            case let .view(.accountSecurityNotificationToggled(isOn)):
-                state.isAccountSecurityNotificationEnabled = isOn
-                // TODO: 알림 설정 API 연동 - 계정·보안 알림 수신 여부 서버 반영
-                return .none
-
-            case let .view(.serviceNoticeNotificationToggled(isOn)):
-                state.isServiceNoticeNotificationEnabled = isOn
-                // TODO: 알림 설정 API 연동 - 서비스 공지 알림 수신 여부 서버 반영
-                return .none
-
-            case let .view(.communityNotificationToggled(isOn)):
-                state.isCommunityNotificationEnabled = isOn
-                // TODO: 알림 설정 API 연동 - 커뮤니티 활동 알림 수신 동의 여부 서버 반영
-                return .none
-
-            case let .view(.marketingNotificationToggled(isOn)):
-                state.isMarketingNotificationEnabled = isOn
-                // TODO: 알림 설정 API 연동 - 마케팅 정보 수신 동의 여부 서버 반영
-                //       정통망법상 광고성 정보는 별도 동의 필요 — 회원가입/약관 흐름과 연동 검토
-                return .none
 
             case .view(.alertDismissed):
                 state.alert = nil
                 return .none
-                
+
             // MARK: - Toast Actions
             case let .internal(.showToast(toastState)):
                 state.toast = toastState
@@ -222,19 +202,23 @@ public struct SettingsFeature: Sendable {
                     await send(.internal(.toastDismissed))
                 }
                 .cancellable(id: CancelID.toast)
-                
+
             case .internal(.toastDismissed):
                 state.toast = nil
                 return .cancel(id: CancelID.toast)
-                
+
             case .view(.toastButtonTapped):
                 return .send(.internal(.toastDismissed))
-                
+
+            case .destination:
+                return .none
+
             case .delegate, .view, .internal:
                 // 부모 Reducer에서 처리할 액션입니다.
                 return .none
             }
         }
+        .ifLet(\.$destination, action: \.destination)
         .ifLet(\.$termsWebCover, action: \.termsWebCover) {
             TermsWebViewFeature()
         }

@@ -64,7 +64,31 @@ public struct AppTabView: View {
         ) { loginStore in
             LoginView(store: loginStore)
         }
-        .alert($store.scope(state: \.loginPromptAlert, action: \.loginPromptAlert))
+        .appAlert(
+            isPresented: Binding(
+                get: { store.isLoginPromptPresented },
+                set: { if !$0 { store.send(.view(.loginPromptDismissed)) } }
+            ),
+            configuration: loginPromptAlertConfiguration
+        )
+    }
+
+    // 게스트가 MY 탭을 탭했을 때 노출되는 공통 AppAlert 구성. 다른 화면(설정 로그아웃 등)과 톤을 통일.
+    private var loginPromptAlertConfiguration: AppAlertConfiguration {
+        AppAlertConfiguration(
+            title: "로그인이 필요해요",
+            message: "로그인하면 나의 프로필을 확인할 수 있어요.",
+            primaryButton: .init(
+                title: "로그인",
+                style: .primary,
+                action: { store.send(.view(.loginPromptLoginTapped)) }
+            ),
+            secondaryButton: .init(
+                title: "취소",
+                style: .neutral,
+                action: { store.send(.view(.loginPromptDismissed)) }
+            )
+        )
     }
 
     private var tabBarReservedSpace: some View {
@@ -79,7 +103,7 @@ public struct AppTabView: View {
         case .myPage:
             return store.myPage.destination != nil
         case .settings:
-            return false
+            return store.settings.destination != nil
         }
     }
 

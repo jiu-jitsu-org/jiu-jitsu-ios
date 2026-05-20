@@ -31,8 +31,8 @@ public struct AppTabFeature: Sendable {
 
         // 로그인 모달
         @Presents var loginCover: LoginFeature.State?
-        // 게스트가 인증 필요 탭(MY)을 탭했을 때 노출되는 로그인 안내 팝업 (FIXME: 정식 디자인 적용 예정)
-        @Presents var loginPromptAlert: AlertState<Action.LoginPromptAlert>?
+        // 게스트가 인증 필요 탭(MY)을 탭했을 때 노출되는 공통 AppAlert 표시 여부
+        var isLoginPromptPresented: Bool = false
 
         var authInfo: AuthInfo
 
@@ -54,21 +54,17 @@ public struct AppTabFeature: Sendable {
         case settings(SettingsFeature.Action)
 
         case loginCover(PresentationAction<LoginFeature.Action>)
-        case loginPromptAlert(PresentationAction<LoginPromptAlert>)
 
         @CasePathable
         public enum ViewAction: Sendable {
             case tabSelected(Tab)
+            case loginPromptLoginTapped
+            case loginPromptDismissed
         }
 
         public enum InternalAction: Sendable {
             case showLoginPromptAlert
             case showLoginModal
-        }
-
-        // AlertState<Alert> 요구사항을 충족하기 위해 Equatable 유지
-        public enum LoginPromptAlert: Equatable, Sendable {
-            case loginTapped
         }
     }
     
@@ -124,24 +120,21 @@ public struct AppTabFeature: Sendable {
                 
             // MARK: - Login Logic
             case .internal(.showLoginPromptAlert):
-                // FIXME: 정식 로그인 안내 팝업 디자인이 확정되면 커스텀 컴포넌트로 교체한다.
-                state.loginPromptAlert = AlertState {
-                    TextState("로그인이 필요해요")
-                } actions: {
-                    ButtonState(action: .loginTapped) { TextState("로그인") }
-                    ButtonState(role: .cancel) { TextState("취소") }
-                } message: {
-                    TextState("로그인하면 나의 프로필을 확인할 수 있어요.")
-                }
+                state.isLoginPromptPresented = true
                 return .none
 
             case .internal(.showLoginModal):
                 state.loginCover = LoginFeature.State()
                 return .none
 
-            case .loginPromptAlert(.presented(.loginTapped)):
+            case .view(.loginPromptLoginTapped):
+                state.isLoginPromptPresented = false
                 return .send(.internal(.showLoginModal))
-                
+
+            case .view(.loginPromptDismissed):
+                state.isLoginPromptPresented = false
+                return .none
+
             case let .loginCover(.presented(.delegate(delegateAction))):
                 switch delegateAction {
                 case let .didLogin(newAuthInfo):
@@ -165,7 +158,7 @@ public struct AppTabFeature: Sendable {
                     return .none
                 }
                 
-            case .loginCover, .loginPromptAlert, .view, .internal:
+            case .loginCover, .view, .internal:
                 return .none
 
             }
@@ -173,6 +166,5 @@ public struct AppTabFeature: Sendable {
         .ifLet(\.$loginCover, action: \.loginCover) {
             LoginFeature()
         }
-        .ifLet(\.$loginPromptAlert, action: \.loginPromptAlert)
     }
 }
