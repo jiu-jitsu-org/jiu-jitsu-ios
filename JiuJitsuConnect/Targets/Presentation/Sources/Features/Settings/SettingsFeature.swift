@@ -60,7 +60,7 @@ public struct SettingsFeature: Sendable {
         }
     }
 
-    @Reducer(state: .equatable, .sendable, action: .sendable)
+    @Reducer
     public enum Destination {
         case notificationSetting(NotificationSettingFeature)
     }
@@ -237,3 +237,6 @@ public struct SettingsFeature: Sendable {
         }
     }
 }
+
+extension SettingsFeature.Destination.State: Equatable, Sendable {}
+extension SettingsFeature.Destination.Action: Sendable {}
