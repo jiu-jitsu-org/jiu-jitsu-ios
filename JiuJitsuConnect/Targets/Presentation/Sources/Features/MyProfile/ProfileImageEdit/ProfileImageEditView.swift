@@ -23,7 +23,7 @@ public struct ProfileImageEditView: View {
         // titleSection/optionsSection/cancelButton 3곳에서 공유
         static let horizontalPadding: CGFloat = 20
         // optionRow 배경과 contentShape 2곳에서 공유
-        static let rowCornerRadius: CGFloat = 12
+        static let rowCornerRadius: CGFloat = 10
     }
 
     // MARK: - Body
@@ -33,10 +33,9 @@ public struct ProfileImageEditView: View {
             handleBar
             titleSection
             optionsSection
-                .padding(.top, 8)
+                .padding(.top, 36)
+                .padding(.bottom, 24)
             cancelButton
-                .padding(.top, 16)
-                .padding(.bottom, 8)
         }
         .background(Color.component.bottomSheet.selected.container.background)
     }
@@ -58,7 +57,7 @@ public struct ProfileImageEditView: View {
             Spacer()
             Text("프로필 이미지 수정")
                 .font(Font.pretendard.title2)
-                .foregroundStyle(Color.component.bottomSheet.selected.container.title)
+                .foregroundStyle(Color.component.sectionHeader.title)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity)
@@ -71,14 +70,12 @@ public struct ProfileImageEditView: View {
             optionRow(
                 title: "사진 촬영",
                 showsChevron: true,
-                hasBackground: true,
                 action: { store.send(.view(.cameraTapped)) }
             )
 
             optionRow(
                 title: "앨범에서 찾기",
                 showsChevron: true,
-                hasBackground: false,
                 action: { store.send(.view(.albumTapped)) }
             )
 
@@ -86,25 +83,22 @@ public struct ProfileImageEditView: View {
                 optionRow(
                     title: "삭제",
                     showsChevron: false,
-                    hasBackground: false,
                     action: { store.send(.view(.deleteTapped)) }
                 )
             }
         }
-        .padding(.horizontal, Metrics.horizontalPadding)
     }
 
     private func optionRow(
         title: String,
         showsChevron: Bool,
-        hasBackground: Bool,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             HStack(spacing: 0) {
                 Text(title)
-                    .font(Font.pretendard.bodyM)
-                    .foregroundStyle(Color.component.bottomSheet.selected.listItem.label)
+                    .font(Font.pretendard.bodyS)
+                    .foregroundStyle(Color.component.bottomSheet.unselected.listItem.label)
 
                 Spacer()
 
@@ -112,36 +106,51 @@ public struct ProfileImageEditView: View {
                     Assets.Common.Icon.chevronRight.swiftUIImage
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 16, height: 16)
+                        .frame(width: 24, height: 24)
                         .foregroundStyle(
                             Color.component.bottomSheet.selected.listItem.followingIcon
                         )
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 8)
             .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .background(
-                RoundedRectangle(cornerRadius: Metrics.rowCornerRadius)
-                    .fill(
-                        hasBackground
-                            ? Color.component.list.setting.background
-                            : Color.clear
-                    )
-            )
+            .frame(height: 51)
             .contentShape(RoundedRectangle(cornerRadius: Metrics.rowCornerRadius))
         }
-        .buttonStyle(.plain)
+        // 기본 상태는 모두 비선택 — 탭(터치 다운) 동안에만 배경 하이라이트 노출
+        .buttonStyle(PressableRowButtonStyle(cornerRadius: Metrics.rowCornerRadius))
+        .padding(.horizontal, Metrics.horizontalPadding)
     }
 
     private var cancelButton: some View {
-        Button {
-            store.send(.view(.cancelTapped))
-        } label: {
-            AppButtonConfiguration(title: "취소", size: .large)
-        }
-        .appButtonStyle(.primary, size: .large, height: 52)
+        CTAButton(
+            title: "취소",
+            action: {
+                store.send(.view(.cancelTapped))
+            }
+        )
         .padding(.horizontal, Metrics.horizontalPadding)
+        .padding(.top, 8)
+        .padding(.bottom, 24)
+    }
+}
+
+// MARK: - PressableRowButtonStyle
+
+/// 터치 다운 동안에만 배경을 노출하는 옵션 행 버튼 스타일
+private struct PressableRowButtonStyle: ButtonStyle {
+    let cornerRadius: CGFloat
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(
+                        configuration.isPressed
+                            ? Color.component.picker.itemSelectedBg
+                            : Color.clear
+                    )
+            )
     }
 }
 
