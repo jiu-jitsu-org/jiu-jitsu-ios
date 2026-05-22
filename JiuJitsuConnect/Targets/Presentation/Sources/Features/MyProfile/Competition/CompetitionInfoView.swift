@@ -79,9 +79,16 @@ struct CompetitionInfoView: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                Rectangle()
-                    .fill(.clear)
-                    .frame(width: 32, height: 32)
+                Button {
+                    store.send(.view(.cancelButtonTapped))
+                } label: {
+                    Text("취소")
+                        .font(Font.pretendard.bodyM)
+                        .foregroundStyle(Color.component.button.text.defaultText)
+                        .frame(height: 36)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, Style.horizontalPadding)

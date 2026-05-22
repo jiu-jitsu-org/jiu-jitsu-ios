@@ -71,6 +71,7 @@ public struct CompetitionInfoFeature: Sendable {
         public enum ViewAction: Sendable {
             case backButtonTapped
             case nextButtonTapped
+            case cancelButtonTapped
             case deleteButtonTapped
             case yearSelected(Int)
             case monthSelected(Int)
@@ -125,6 +126,10 @@ public struct CompetitionInfoFeature: Sendable {
                     state.step = .name
                     return .none
                 }
+
+            case .view(.cancelButtonTapped):
+                // 입력 중단: 스텝과 무관하게 플로우 전체를 종료한다.
+                return .run { _ in await self.dismiss() }
 
             case .view(.deleteButtonTapped):
                 guard case let .edit(original) = state.mode else { return .none }
