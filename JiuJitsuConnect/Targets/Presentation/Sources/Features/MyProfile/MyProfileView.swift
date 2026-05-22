@@ -94,9 +94,9 @@ public struct MyProfileView: View {
                             store.send(.view(.instructorVerificationMenuTapped))
                         }
                     )
-                    // 아이콘 상단: safeAreaTop + 12, 하단: safeAreaTop + 44
-                    // 8pt 간격을 두고 아래로 배치
-                    .padding(.top, safeAreaTop + 52)
+                    // "..." 버튼(safeAreaTop + 12 ~ safeAreaTop + 44) 하단에 간격 없이 붙임
+                    // 우측은 버튼 trailing(16)과 동일하게 정렬
+                    .padding(.top, safeAreaTop + 44)
                     .padding(.trailing, 16)
                     .transition(.opacity)
                 }
