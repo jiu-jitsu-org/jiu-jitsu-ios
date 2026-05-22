@@ -25,9 +25,7 @@ struct MyProfileMoreMenuView: View {
                 Text("관장 사범 인증")
                     .font(Font.pretendard.bodyS)
                     .foregroundStyle(Color.component.list.setting.text)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(width: 140, height: 48)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -40,7 +38,6 @@ struct MyProfileMoreMenuView: View {
             x: 0,
             y: 2
         )
-        .fixedSize(horizontal: true, vertical: false)
     }
 }
 

@@ -86,7 +86,7 @@ public struct MyProfileHeaderView: View {
             Button {
                 onMoreButtonTapped()
             } label: {
-                Assets.Common.Icon.menu.swiftUIImage
+                Assets.MyProfile.Icon.menu.swiftUIImage
                     .resizable()
                     .frame(width: 16, height: 16)
                     .foregroundStyle(Color.component.button.inverted.defaultBg)
@@ -143,7 +143,7 @@ private struct ProfileImageView: View {
         .frame(width: size, height: size)
         .overlay(alignment: .bottomTrailing) {
             cameraButton
-                .offset(x: 4, y: 4)
+                .offset(x: 5, y: 4)
         }
     }
 
@@ -157,19 +157,16 @@ private struct ProfileImageView: View {
     private var cameraButton: some View {
         Button(action: onCameraTapped) {
             ZStack {
-                Circle()
-                    .fill(Color.component.list.setting.background)
-                    .frame(width: 28, height: 28)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.component.button.neutral.defaultBg)
+                    .frame(width: 36, height: 36)
 
-                Image(systemName: "camera.fill")
+                Assets.MyProfile.Icon.camera.swiftUIImage
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 16, height: 16)
-                    .foregroundStyle(
-                        Color.component.myProfileHeader.profileImageDefaultIcon
-                    )
+                    .frame(width: 20, height: 20)
             }
-            .contentShape(Circle())
+            .contentShape(RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
     }
