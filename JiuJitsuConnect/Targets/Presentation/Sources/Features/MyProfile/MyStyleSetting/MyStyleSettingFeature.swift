@@ -525,12 +525,14 @@ public struct MyStyleSettingFeature: Sendable {
             case .view(.completeButtonTapped):
                 guard state.canComplete else { return .none }
 
-                // register 모드 + 특기 탭이면 API 호출 없이 최애 탭으로만 전환
-                if state.mode == .register, state.selectedTab == .best {
+                // 특기 탭이면서 최애가 아직 설정되지 않았으면 저장 없이 최애 탭으로 전환
+                // (mode와 무관 — 최애 입력을 먼저 유도)
+                if state.selectedTab == .best, state.selectedFavoriteStyle == nil {
                     return .send(.internal(.switchToFavoriteTab))
                 }
 
-                // 그 외 케이스(register + favorite, edit + best/favorite) → 한 번에 저장
+                // 그 외 → 특기/최애를 한 번에 저장
+                // (register 모드면 부모가 다음 스타일 단계로, edit 모드면 화면을 닫음)
                 let bestKey = state.selectedBestStyle?.rawValue
                 let favoriteKey = state.selectedFavoriteStyle?.rawValue
                 return .send(.delegate(.didConfirmStyle(

@@ -166,13 +166,12 @@ public struct MyStyleSettingView: View {
     }
     
     private var completeButtonTitle: String {
-        if store.selectedBestStyle == nil {
+        // 특기 탭이면서 최애가 비어있으면 다음 단계(최애 입력)로 유도
+        if store.selectedTab == .best, store.selectedFavoriteStyle == nil {
             return "특기 설정 완료"
-        } else if store.selectedTab == .best {
-            return "특기 설정 완료"
-        } else {
-            return "최애 설정 완료"
         }
+        // 그 외 → 현재 타입 전체 저장 의미 ("포지션 설정 완료" 등)
+        return "\(store.settingType.title) 설정 완료"
     }
     
     private var backButton: some View {
