@@ -26,6 +26,16 @@ public struct ProfileImageEditView: View {
         static let rowCornerRadius: CGFloat = 10
     }
 
+    // MARK: - Sheet Content Height (safe area 미포함)
+
+    /// 바텀 시트 detent용 본문 고정 높이.
+    /// 공통: 24(handle) + 48(title) + 16+20(optionsTop) + (rows) + 20(optionsBottom) + 8+51+24(CTA)
+    /// - 삭제 가능(rows = 3): rows = 51*3 + 8*2 = 169 → 총 380
+    /// - 삭제 불가(rows = 2): rows = 51*2 + 8     = 110 → 총 321
+    public static func contentHeight(canDelete: Bool) -> CGFloat {
+        canDelete ? 380 : 321
+    }
+
     // MARK: - Body
 
     public var body: some View {
@@ -33,8 +43,7 @@ public struct ProfileImageEditView: View {
             handleBar
             titleSection
             optionsSection
-                .padding(.top, 36)
-                .padding(.bottom, 24)
+                .padding(.top, 16)
             cancelButton
         }
         .background(Color.component.bottomSheet.selected.container.background)
@@ -87,6 +96,7 @@ public struct ProfileImageEditView: View {
                 )
             }
         }
+        .padding(.vertical, 20)
     }
 
     private func optionRow(
