@@ -61,7 +61,15 @@ public struct AppAlertView: View {
             .background(Color.component.dialog.containerBg)
             .cornerRadius(20)
             .padding(.horizontal, 27.5)
-            .transition(.scale.combined(with: .opacity))
+            // 외부 .animation이 마운트 transaction을 통해 자식까지 전파되면
+            // Button(maxWidth: .infinity)이 처음 측정될 때의 layout 변화까지
+            // implicit animation으로 잡혀 "버튼이 길었다 줄어드는" 잔상이 발생한다.
+            // 박스 subtree로 흐르는 transaction의 animation을 끊어, 등장은 외부 transition만
+            // animate되게 하고 내부 layout은 즉시 결정되도록 한다.
+            // (ButtonStyle의 isPressed animation은 자기 transaction을 따로 만들기 때문에 영향 없음.)
+            .transaction { transaction in
+                transaction.animation = nil
+            }
         }
     }
 }
