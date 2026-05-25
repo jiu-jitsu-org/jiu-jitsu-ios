@@ -11,13 +11,17 @@ import DesignSystem
 import Domain
 
 public struct BeltSettingView: View {
-    
+
+    /// 바텀 시트 detent에 사용되는 본문 콘텐츠의 고정 높이 (safe area 미포함)
+    /// 24(handle) + 48(title) +16+ 28+109+28(picker) + 8+51+24(CTA) = 362
+    public static let contentHeight: CGFloat = 336
+
     @Bindable var store: StoreOf<BeltSettingFeature>
-    
+
     public init(store: StoreOf<BeltSettingFeature>) {
         self.store = store
     }
-    
+
     public var body: some View {
         VStack(spacing: 0) {
             handleBar
@@ -80,6 +84,7 @@ public struct BeltSettingView: View {
             Spacer()
         }
         .padding(.vertical, 28)
+        .padding(.top, 16)
     }
     
     private var confirmButton: some View {
