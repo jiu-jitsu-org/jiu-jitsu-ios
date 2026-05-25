@@ -24,6 +24,11 @@ struct WeightComponent: Identifiable, Hashable {
 }
 
 public struct WeightClassSettingView: View {
+
+    /// 바텀 시트 detent에 사용되는 본문 콘텐츠의 고정 높이 (safe area 미포함)
+    /// 24(handle) + 24+28(title+toggle) + 16+28+109+28(picker) 8+51+24(CTA) = 382
+    public static let contentHeight: CGFloat = 340
+
     let store: StoreOf<WeightClassSettingFeature>
     
     // 성별 아이템 (여성 → 남성)
@@ -164,6 +169,7 @@ public struct WeightClassSettingView: View {
             
             Spacer()
         }
+        .frame(height: 109)
         .padding(.vertical, 28)
         .padding(.top, 16)
     }
