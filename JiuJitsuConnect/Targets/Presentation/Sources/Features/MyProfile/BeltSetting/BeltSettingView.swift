@@ -29,6 +29,9 @@ public struct BeltSettingView: View {
             pickerSection
             confirmButton
         }
+        // detent > 본문 시 남는 공간이 위로 떨어져 핸들이 내려오는 현상 방지.
+        // 시트 가용 영역 전체를 채우면서 본문을 상단에 못박는다.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color.component.bottomSheet.selected.container.background)
     }
     
