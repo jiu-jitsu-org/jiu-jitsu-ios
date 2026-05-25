@@ -11,3 +11,6 @@ TEST_BASE_URL =
 
 // Web URLs
 WEB_URL =
+
+// ImageKit (https://imagekit.io)
+IMAGEKIT_PUBLIC_KEY =

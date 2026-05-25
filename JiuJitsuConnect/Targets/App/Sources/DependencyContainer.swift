@@ -29,6 +29,7 @@ public final class DependencyContainer {
     private lazy var authRepository: AuthRepository = RepositoryFactory.makeAuthRepository()
     private lazy var userRepository: UserRepository = RepositoryFactory.makeUserRepository()
     private lazy var communityRepository: CommunityRepository = RepositoryFactory.makeCommunityRepository()
+    private lazy var imageUploadRepository: ImageUploadRepository = RepositoryFactory.makeImageUploadRepository()
 
     // MARK: - Firebase Client (shared instance)
     private lazy var sharedFirebaseClient: FirebaseClient = FirebaseClientFactory.make()
@@ -95,6 +96,14 @@ public final class DependencyContainer {
             },
             updateProfile: { profile, section in
                 try await self.communityRepository.updateProfile(profile, section: section)
+            }
+        )
+    }
+
+    public func configureImageUploadClient() -> ImageUploadClient {
+        return ImageUploadClient(
+            uploadProfileImage: { data in
+                try await self.imageUploadRepository.uploadProfileImage(data)
             }
         )
     }

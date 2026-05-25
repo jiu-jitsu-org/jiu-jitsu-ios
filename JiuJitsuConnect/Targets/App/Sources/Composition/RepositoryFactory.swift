@@ -25,4 +25,8 @@ enum RepositoryFactory {
     static func makeCommunityRepository() -> CommunityRepository {
         CommunityRepositoryImpl()
     }
+
+    static func makeImageUploadRepository() -> ImageUploadRepository {
+        ImageUploadRepositoryImpl()
+    }
 }

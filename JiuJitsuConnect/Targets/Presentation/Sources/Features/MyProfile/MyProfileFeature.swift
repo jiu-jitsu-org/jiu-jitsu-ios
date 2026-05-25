@@ -15,8 +15,8 @@ import CoreKit
 public struct MyProfileFeature: Sendable {
     public init() {}
     
-    private enum CancelID { case toast }
-    
+    private enum CancelID { case toast, profileImageUpload }
+
     @ObservableState
     public struct State: Equatable, Sendable {
         @Presents var destination: Destination.State?
@@ -137,13 +137,19 @@ public struct MyProfileFeature: Sendable {
             // 프로필 이미지 수정 흐름 — 시트/풀스크린 전환 사이에 짧은 딜레이를 두고 발화
             case presentImageCaptureSource(State.ImageCaptureSource)
             case presentImageCrop(Data)
+
+            // 프로필 이미지 업로드/반영 응답
+            case profileImageUploadResponse(TaskResult<String>)            // ImageKit 호스팅 URL
+            case profileImageUpdateResponse(TaskResult<CommunityProfile>)  // /api/community/profile 반영 결과
         }
     }
     
     // MARK: - Dependencies
     @Dependency(\.continuousClock) var clock
     @Dependency(\.communityClient) var communityClient
-    
+    @Dependency(\.imageUploadClient) var imageUploadClient
+
+
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
@@ -463,7 +469,7 @@ public struct MyProfileFeature: Sendable {
                 case .academy:
                     updatedProfile = profile.updatingAcademy(value)
 
-                case .beltWeight, .position, .submission, .technique, .competition, .instructorInfo:
+                case .beltWeight, .position, .submission, .technique, .competition, .instructorInfo, .profileImage:
                     // TODO: 다른 섹션 업데이트 구현
                     return .none
                 }
@@ -782,9 +788,23 @@ public struct MyProfileFeature: Sendable {
 
             case .sheet(.presented(.profileImageEdit(.delegate(.didSelectDelete)))):
                 state.sheet = nil
-                // FIXME: 프로필 이미지 삭제 API 연결
-                Log.trace("프로필 이미지 - 삭제 선택됨", category: .debug, level: .info)
-                return .none
+                // ImageKit 측 orphan 파일 정리는 BE-only (private API key 필요) — 본 흐름에서는
+                // profileImageUrl을 nil로 갱신하는 것까지만 처리한다.
+                guard let profile = state.communityProfile else {
+                    return .send(.internal(.showToast(.init(
+                        message: "프로필 정보를 불러올 수 없어요", style: .info
+                    ))))
+                }
+                let updatedProfile = profile.updatingProfileImageUrl(nil)
+                state.isLoadingProfile = true
+                Log.trace("프로필 이미지 - 삭제 요청", category: .network, level: .info)
+                return .run { send in
+                    await send(.internal(.profileImageUpdateResponse(
+                        await TaskResult {
+                            try await communityClient.updateProfile(updatedProfile, .profileImage)
+                        }
+                    )))
+                }
 
             case .sheet(.presented(.profileImageEdit(.delegate(.didCancel)))):
                 state.sheet = nil
@@ -811,14 +831,71 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case let .imageCropCover(.presented(.delegate(.didConfirm(croppedData)))):
+                // 크롭 화면을 즉시 닫고 MY 헤더 로딩 상태로 전환 (다른 섹션 업데이트 UX와 동일)
                 state.imageCropCover = nil
-                // FIXME: 크롭된 이미지 업로드 API 연결
-                Log.trace("프로필 이미지 - 크롭 완료 (\(croppedData.count) bytes)", category: .debug, level: .info)
-                return .send(.internal(.showToast(.init(message: "프로필 이미지를 변경했어요", style: .info))))
+                guard state.communityProfile != nil else {
+                    return .send(.internal(.showToast(.init(
+                        message: "프로필 정보를 불러올 수 없어요", style: .info
+                    ))))
+                }
+                state.isLoadingProfile = true
+                Log.trace(
+                    "프로필 이미지 - 업로드 시작 (\(croppedData.count) bytes)",
+                    category: .network,
+                    level: .info
+                )
+                return .run { send in
+                    await send(.internal(.profileImageUploadResponse(
+                        await TaskResult {
+                            try await imageUploadClient.uploadProfileImage(croppedData)
+                        }
+                    )))
+                }
+                .cancellable(id: CancelID.profileImageUpload)
 
             case .imageCropCover(.presented(.delegate(.didCancel))):
                 state.imageCropCover = nil
                 return .none
+
+            case let .internal(.profileImageUploadResponse(.success(url))):
+                guard let profile = state.communityProfile else {
+                    state.isLoadingProfile = false
+                    return .send(.internal(.showToast(.init(
+                        message: "프로필 정보를 불러올 수 없어요", style: .info
+                    ))))
+                }
+                let updatedProfile = profile.updatingProfileImageUrl(url)
+                return .run { send in
+                    await send(.internal(.profileImageUpdateResponse(
+                        await TaskResult {
+                            try await communityClient.updateProfile(updatedProfile, .profileImage)
+                        }
+                    )))
+                }
+                .cancellable(id: CancelID.profileImageUpload)
+
+            case let .internal(.profileImageUploadResponse(.failure(error))):
+                state.isLoadingProfile = false
+                Log.trace("Failed to upload profile image: \(error)", category: .network, level: .error)
+                return .send(.internal(.showToast(.init(
+                    message: "이미지 업로드에 실패했어요. 다시 시도해주세요", style: .info
+                ))))
+
+            case let .internal(.profileImageUpdateResponse(.success(updatedProfile))):
+                state.isLoadingProfile = false
+                state.communityProfile = updatedProfile
+                // 업로드/삭제 동일 핸들러로 통합 — profileImageUrl 유무로 토스트 문구 분기
+                let message = updatedProfile.profileImageUrl == nil
+                    ? "프로필 이미지를 삭제했어요"
+                    : "프로필 이미지를 변경했어요"
+                return .send(.internal(.showToast(.init(message: message, style: .info))))
+
+            case let .internal(.profileImageUpdateResponse(.failure(error))):
+                state.isLoadingProfile = false
+                Log.trace("Failed to update profile image url: \(error)", category: .network, level: .error)
+                return .send(.internal(.showToast(.init(
+                    message: "프로필 저장에 실패했어요. 다시 시도해주세요", style: .info
+                ))))
 
             case .destination, .sheet, .imageCropCover, .view, .internal, .delegate:
                 return .none

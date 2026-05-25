@@ -70,6 +70,7 @@ let appInfoPlist: [String: Plist.Value] = {
         "BASE_URL": "$(BASE_URL)",
         "TEST_BASE_URL": "$(TEST_BASE_URL)",
         "WEB_URL": "$(WEB_URL)",
+        "IMAGEKIT_PUBLIC_KEY": "$(IMAGEKIT_PUBLIC_KEY)",
         "LSApplicationQueriesSchemes": [
             "kakaokompassauth",
             "kakaolink"
