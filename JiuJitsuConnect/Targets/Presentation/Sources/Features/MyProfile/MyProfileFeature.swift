@@ -109,9 +109,9 @@ public struct MyProfileFeature: Sendable {
 
             // 응답 처리
             case updateProfileResponse(TaskResult<CommunityProfile>)
-            case positionSaved(CommunityProfile)    // 포지션 저장 → register 시 서브미션 단계로
-            case submissionSaved(CommunityProfile)  // 서브미션 저장 → register 시 기술 단계로
-            case techniqueSaved(CommunityProfile)   // 기술 저장 → 프로필 화면으로 복귀
+            case positionSaved(CommunityProfile)    // 포지션 저장 → register 시 기술 단계로
+            case submissionSaved(CommunityProfile)  // 서브미션 저장 → 프로필 화면으로 복귀
+            case techniqueSaved(CommunityProfile)   // 기술 저장 → register 시 서브미션 단계로
             case competitionAdded(CommunityProfile)   // 대회 정보 추가 저장 완료
             case competitionUpdated(CommunityProfile) // 대회 정보 수정 저장 완료
             case competitionDeleted(CommunityProfile) // 대회 정보 삭제 저장 완료
@@ -534,25 +534,6 @@ public struct MyProfileFeature: Sendable {
                     state.destination = nil
                     return .send(.internal(.showToast(.init(message: "포지션을 저장했어요", style: .info))))
                 } else {
-                    // register 플로우: 다음 단계(서브미션)로 이동
-                    state.destination = .myStyleSetting(
-                        MyStyleSettingFeature.State(
-                            settingType: .submission,
-                            mode: .register,
-                            bestSubmission: profile.bestSubmission,
-                            favoriteSubmission: profile.favoriteSubmission
-                        )
-                    )
-                }
-                return .none
-
-            case let .internal(.submissionSaved(profile)):
-                state.isLoadingProfile = false
-                state.communityProfile = profile
-                if case let .myStyleSetting(styleState) = state.destination, styleState.mode == .edit {
-                    state.destination = nil
-                    return .send(.internal(.showToast(.init(message: "서브미션을 저장했어요", style: .info))))
-                } else {
                     // register 플로우: 다음 단계(기술)로 이동
                     state.destination = .myStyleSetting(
                         MyStyleSettingFeature.State(
@@ -571,6 +552,25 @@ public struct MyProfileFeature: Sendable {
                 if case let .myStyleSetting(styleState) = state.destination, styleState.mode == .edit {
                     state.destination = nil
                     return .send(.internal(.showToast(.init(message: "기술을 저장했어요", style: .info))))
+                } else {
+                    // register 플로우: 다음 단계(서브미션)로 이동
+                    state.destination = .myStyleSetting(
+                        MyStyleSettingFeature.State(
+                            settingType: .submission,
+                            mode: .register,
+                            bestSubmission: profile.bestSubmission,
+                            favoriteSubmission: profile.favoriteSubmission
+                        )
+                    )
+                }
+                return .none
+
+            case let .internal(.submissionSaved(profile)):
+                state.isLoadingProfile = false
+                state.communityProfile = profile
+                if case let .myStyleSetting(styleState) = state.destination, styleState.mode == .edit {
+                    state.destination = nil
+                    return .send(.internal(.showToast(.init(message: "서브미션을 저장했어요", style: .info))))
                 }
                 // register 플로우 마지막 단계: 프로필 화면으로 복귀
                 state.destination = nil

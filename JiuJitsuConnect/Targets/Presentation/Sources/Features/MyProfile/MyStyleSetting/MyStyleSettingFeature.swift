@@ -319,7 +319,7 @@ public struct MyStyleSettingFeature: Sendable {
     public init() {}
     
     /// 화면 진입 모드
-    /// - register: 최초 등록 플로우 (포지션 → 서브미션 → 기술 순차 진행)
+    /// - register: 최초 등록 플로우 (포지션 → 기술 → 서브미션 순차 진행)
     /// - edit: 개별 수정 (해당 타입만 수정 후 화면 닫기)
     public enum Mode: Sendable, Equatable {
         case register
