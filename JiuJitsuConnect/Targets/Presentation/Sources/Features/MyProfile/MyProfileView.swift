@@ -18,14 +18,6 @@ private enum Metrics {
         static let overlapWithButton: CGFloat = 46.49
         static let overlapWithAcademyName: CGFloat = 71
     }
-
-    enum BottomSheet {
-        /// 시트 본문 콘텐츠 외에 추가로 확보해야 하는 영역.
-        /// iOS는 `presentationDetents`의 height에 하단 safe area(home indicator)를
-        /// 포함시키므로, 콘텐츠가 잘리지 않으려면 detent를 그만큼 더 키워야 한다.
-        /// Face ID iPhone 기준 34pt + 약간의 여유.
-        static let safeAreaBottomBuffer: CGFloat = 40
-    }
 }
 
 // MARK: - MyProfileView
@@ -268,10 +260,13 @@ private extension View {
     }
     
     /// 시트 프레젠테이션
+    ///
+    /// 모든 시트는 본문에 `.ignoresSafeArea(.container, edges: .bottom)`를 적용해
+    /// home indicator safe area를 시트 자기 영역으로 흡수한다. 따라서 detent는
+    /// 본문 자연 높이(`contentHeight`)와 정확히 동일하게 잡고, 별도 safe area
+    /// buffer를 더하지 않는다.
     @ViewBuilder
     func sheetPresentation(store: Bindable<StoreOf<MyProfileFeature>>) -> some View {
-        let buffer = Metrics.BottomSheet.safeAreaBottomBuffer
-
         self
             .sheet(
                 item: store.scope(
@@ -281,9 +276,7 @@ private extension View {
             ) { beltSettingStore in
                 BeltSettingView(store: beltSettingStore)
                     .presentationDragIndicator(.hidden)
-                    .presentationDetents([
-                        .height(BeltSettingView.contentHeight + buffer)
-                    ])
+                    .presentationDetents([.height(BeltSettingView.contentHeight)])
                     .presentationBackground(
                         Color.component.bottomSheet.selected.container.background
                     )
@@ -296,9 +289,7 @@ private extension View {
             ) { weightClassSettingStore in
                 WeightClassSettingView(store: weightClassSettingStore)
                     .presentationDragIndicator(.hidden)
-                    .presentationDetents([
-                        .height(WeightClassSettingView.contentHeight + buffer)
-                    ])
+                    .presentationDetents([.height(WeightClassSettingView.contentHeight)])
                     .presentationBackground(
                         Color.component.bottomSheet.selected.container.background
                     )
@@ -315,7 +306,7 @@ private extension View {
                         .height(
                             ProfileImageEditView.contentHeight(
                                 canDelete: profileImageEditStore.canDelete
-                            ) + buffer
+                            )
                         )
                     ])
                     .presentationBackground(
@@ -331,7 +322,7 @@ private extension View {
                 InstructorVerificationView(store: instructorVerificationStore)
                     .presentationDragIndicator(.hidden)
                     .presentationDetents([
-                        .height(InstructorVerificationView.contentHeight + buffer)
+                        .height(InstructorVerificationView.contentHeight)
                     ])
                     .presentationBackground(
                         Color.component.bottomSheet.selected.container.background

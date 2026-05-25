@@ -69,6 +69,9 @@ public struct WeightClassSettingView: View {
         // 시트 가용 영역 전체를 채우면서 본문을 상단에 못박는다.
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color.component.bottomSheet.selected.container.background)
+        // CTA `.padding(.bottom, 24)`가 home indicator safe area 위로 밀려나지 않고
+        // 디바이스 바닥에서 정확히 24pt 위에 부착되도록 하단 safe area 무시.
+        .ignoresSafeArea(.container, edges: .bottom)
     }
     
     // MARK: - View Components
