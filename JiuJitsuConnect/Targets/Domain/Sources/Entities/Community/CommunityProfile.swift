@@ -513,7 +513,7 @@ public enum SubmissionType: String, Codable, Equatable, Sendable, CaseIterable, 
 public enum TechniqueType: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
     case guardPasses = "GUARD_PASSES"
     case sweeps = "SWEEPS"
-    case takedowns = "TAKEDOWNS"
+    case takedowns = "TAKE_DOWNS"
     case escapes = "ESCAPES"
     
     public var id: String { rawValue }
