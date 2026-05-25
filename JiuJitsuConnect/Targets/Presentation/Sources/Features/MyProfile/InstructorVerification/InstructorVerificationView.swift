@@ -15,14 +15,9 @@ public struct InstructorVerificationView: View {
 
     @Bindable var store: StoreOf<InstructorVerificationFeature>
 
-    /// 본문 자연 높이.
-    /// noticeBox 안 다국행 텍스트의 줄바꿈이 디바이스 폭에 따라 달라져
-    /// 정적 contentHeight 상수로는 detent와 본문 실측 높이 사이에 빈 공간이 생긴다
-    /// (= noticeBox-CTA 간격이 디자인 의도 28pt보다 커 보이는 원인).
-    /// GeometryReader로 측정해 detent에 흘려보내면 자연 padding(20+8)만으로
-    /// 의도된 간격이 정확히 유지되고, CTA는 디바이스 바닥에서 항상 16pt 위에 고정.
-    /// 첫 프레임만 추정치(409)로 시작했다가 측정 직후 정확한 값으로 수렴한다.
-    @State private var measuredHeight: CGFloat = 409
+    /// 시트 본문 자연 높이 — 호출부에서 `presentationDetents`에 사용.
+    /// 다른 시트(`BeltSettingView` 등)와 동일한 정적 상수 패턴.
+    public static let contentHeight: CGFloat = 369
 
     public init(store: StoreOf<InstructorVerificationFeature>) {
         self.store = store
@@ -46,33 +41,7 @@ public struct InstructorVerificationView: View {
                 .padding(.top, 16)
             ctaSection
         }
-        // 본문 자연 높이 측정 — `.ignoresSafeArea`보다 먼저 적용해야 safe area를
-        // 무시하기 전(= 순수 레이아웃) 높이를 잡을 수 있다.
-        .background(
-            GeometryReader { geo in
-                Color.clear.preference(
-                    key: ContentHeightKey.self,
-                    value: geo.size.height
-                )
-            }
-        )
-        .background(Color.component.bottomSheet.selected.container.background)
-        // 디자이너 의도: CTA가 home indicator safe area 위가 아닌 디바이스 바닥에서
-        // 16pt 위에 붙어야 하므로 하단 safe area를 무시한다.
-        .ignoresSafeArea(.container, edges: .bottom)
-        .onPreferenceChange(ContentHeightKey.self) { newValue in
-            // 0pt 일시적 보고/identity 값 거름. 측정값이 들어오면 detent에 반영.
-            if newValue > 0 {
-                measuredHeight = newValue
-            }
-        }
-        // 시트 자체가 본문 자연 높이에 맞춰 detent를 잡는다 (호출부 MyProfileView는
-        // 이 시트의 detent/배경을 따로 설정하지 않는다 — 다른 정적 시트들과 다른 패턴).
-        .presentationDetents([.height(measuredHeight)])
-        .presentationDragIndicator(.hidden)
-        .presentationBackground(
-            Color.component.bottomSheet.selected.container.background
-        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     // MARK: - View Components
@@ -175,16 +144,6 @@ public struct InstructorVerificationView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-}
-
-// MARK: - PreferenceKey
-
-/// 본문 자연 높이를 detent로 전파하기 위한 PreferenceKey.
-private struct ContentHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
     }
 }
 

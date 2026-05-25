@@ -328,10 +328,14 @@ private extension View {
                     action: \.sheet.instructorVerification
                 )
             ) { instructorVerificationStore in
-                // 다른 시트들과 달리 본문 콘텐츠 높이가 디바이스/텍스트 줄바꿈에 따라
-                // 가변이라, 시트가 자기 detent / 배경 / dragIndicator를 GeometryReader
-                // 측정값 기반으로 직접 설정한다. 호출부에서 별도 modifier를 붙이지 않는다.
                 InstructorVerificationView(store: instructorVerificationStore)
+                    .presentationDragIndicator(.hidden)
+                    .presentationDetents([
+                        .height(InstructorVerificationView.contentHeight + buffer)
+                    ])
+                    .presentationBackground(
+                        Color.component.bottomSheet.selected.container.background
+                    )
             }
     }
 
