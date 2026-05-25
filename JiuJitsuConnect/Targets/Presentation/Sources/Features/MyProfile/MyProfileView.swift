@@ -104,6 +104,8 @@ public struct MyProfileView: View {
             .navigationDestinations(store: $store)
             .toastOverlay(store: store)
             .sheetPresentation(store: $store)
+            .imageCapturePresentation(store: $store)
+            .imageCropPresentation(store: $store)
         }
     }
 
@@ -305,6 +307,69 @@ private extension View {
                         Color.component.bottomSheet.selected.container.background
                     )
             }
+    }
+
+    /// 카메라/앨범 풀스크린 픽커 프레젠테이션
+    @ViewBuilder
+    func imageCapturePresentation(store: Bindable<StoreOf<MyProfileFeature>>) -> some View {
+        let isCameraPresented = Binding<Bool>(
+            get: { store.wrappedValue.imageCaptureSource == .camera },
+            set: { newValue in
+                if !newValue {
+                    store.wrappedValue.send(.view(.imagePickerCancelled))
+                }
+            }
+        )
+        let isLibraryPresented = Binding<Bool>(
+            get: { store.wrappedValue.imageCaptureSource == .photoLibrary },
+            set: { newValue in
+                if !newValue {
+                    store.wrappedValue.send(.view(.imagePickerCancelled))
+                }
+            }
+        )
+
+        self
+            .fullScreenCover(isPresented: isCameraPresented) {
+                CameraPickerView(
+                    onPicked: { image in
+                        if let data = image.jpegData(compressionQuality: 0.95) {
+                            store.wrappedValue.send(.view(.imagePicked(data)))
+                        } else {
+                            store.wrappedValue.send(.view(.imagePickerCancelled))
+                        }
+                    },
+                    onCancel: {
+                        store.wrappedValue.send(.view(.imagePickerCancelled))
+                    }
+                )
+                .ignoresSafeArea()
+            }
+            .fullScreenCover(isPresented: isLibraryPresented) {
+                PhotoLibraryPickerView(
+                    onPicked: { image in
+                        if let data = image.jpegData(compressionQuality: 0.95) {
+                            store.wrappedValue.send(.view(.imagePicked(data)))
+                        } else {
+                            store.wrappedValue.send(.view(.imagePickerCancelled))
+                        }
+                    },
+                    onCancel: {
+                        store.wrappedValue.send(.view(.imagePickerCancelled))
+                    }
+                )
+                .ignoresSafeArea()
+            }
+    }
+
+    /// 1:1 크롭 풀스크린 프레젠테이션
+    @ViewBuilder
+    func imageCropPresentation(store: Bindable<StoreOf<MyProfileFeature>>) -> some View {
+        self.fullScreenCover(
+            item: store.scope(state: \.imageCropCover, action: \.imageCropCover)
+        ) { cropStore in
+            ProfileImageCropView(store: cropStore)
+        }
     }
 }
 

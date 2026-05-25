@@ -37,6 +37,17 @@ public struct MyProfileFeature: Sendable {
         // 우측 상단 "..." 메뉴 노출 여부 (관장 사범 인증 메뉴)
         var isMoreMenuPresented: Bool = false
 
+        // 프로필 이미지 캡처 픽커 (카메라/앨범 풀스크린)
+        var imageCaptureSource: ImageCaptureSource?
+
+        // 1:1 크롭 화면 풀스크린 커버
+        @Presents var imageCropCover: ProfileImageCropFeature.State?
+
+        public enum ImageCaptureSource: Equatable, Sendable {
+            case camera
+            case photoLibrary
+        }
+
         public init(authInfo: AuthInfo, communityProfile: CommunityProfile? = nil) {
             self.authInfo = authInfo
             self.communityProfile = communityProfile
@@ -73,7 +84,9 @@ public struct MyProfileFeature: Sendable {
         case destination(PresentationAction<Destination.Action>)
         // 시트 액션
         case sheet(PresentationAction<Sheet.Action>)
-        
+        // 1:1 크롭 풀스크린 커버 액션
+        case imageCropCover(PresentationAction<ProfileImageCropFeature.Action>)
+
         public enum DelegateAction: Sendable {}
 
         public enum ViewAction: Sendable {
@@ -92,6 +105,8 @@ public struct MyProfileFeature: Sendable {
             case moreButtonTapped                   // 우측 상단 "..." 버튼 탭 (토글)
             case instructorVerificationMenuTapped   // "관장 사범 인증" 메뉴 항목 탭
             case profileImageEditButtonTapped       // 프로필 이미지 우측 하단 카메라 버튼 탭
+            case imagePicked(Data)                  // 카메라/앨범 픽커에서 이미지 선택됨
+            case imagePickerCancelled               // 픽커 취소 (시스템 dismiss 포함)
         }
         
         public enum InternalAction: Sendable {
@@ -118,6 +133,10 @@ public struct MyProfileFeature: Sendable {
             
             case showToast(ToastState)
             case toastDismissed
+
+            // 프로필 이미지 수정 흐름 — 시트/풀스크린 전환 사이에 짧은 딜레이를 두고 발화
+            case presentImageCaptureSource(State.ImageCaptureSource)
+            case presentImageCrop(Data)
         }
     }
     
@@ -747,16 +766,19 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case .sheet(.presented(.profileImageEdit(.delegate(.didSelectCamera)))):
+                // 시트가 완전히 닫힌 뒤에 풀스크린 커버를 띄워야 안정적으로 전환된다.
                 state.sheet = nil
-                // FIXME: 카메라 촬영 플로우 진입 연결 (이미지 캡처 → 업로드)
-                Log.trace("프로필 이미지 - 카메라 촬영 선택됨", category: .debug, level: .info)
-                return .none
+                return .run { send in
+                    try await clock.sleep(for: .milliseconds(300))
+                    await send(.internal(.presentImageCaptureSource(.camera)))
+                }
 
             case .sheet(.presented(.profileImageEdit(.delegate(.didSelectAlbum)))):
                 state.sheet = nil
-                // FIXME: 앨범 선택 플로우 진입 연결 (PHPickerViewController → 업로드)
-                Log.trace("프로필 이미지 - 앨범에서 찾기 선택됨", category: .debug, level: .info)
-                return .none
+                return .run { send in
+                    try await clock.sleep(for: .milliseconds(300))
+                    await send(.internal(.presentImageCaptureSource(.photoLibrary)))
+                }
 
             case .sheet(.presented(.profileImageEdit(.delegate(.didSelectDelete)))):
                 state.sheet = nil
@@ -768,9 +790,39 @@ public struct MyProfileFeature: Sendable {
                 state.sheet = nil
                 return .none
 
-            case .destination, .sheet, .view, .internal, .delegate:
+            case let .internal(.presentImageCaptureSource(source)):
+                state.imageCaptureSource = source
                 return .none
-                
+
+            case let .view(.imagePicked(data)):
+                // 픽커 dismiss → 크롭 화면 진입까지의 전환 안정화를 위해 짧은 딜레이
+                state.imageCaptureSource = nil
+                return .run { send in
+                    try await clock.sleep(for: .milliseconds(300))
+                    await send(.internal(.presentImageCrop(data)))
+                }
+
+            case .view(.imagePickerCancelled):
+                state.imageCaptureSource = nil
+                return .none
+
+            case let .internal(.presentImageCrop(data)):
+                state.imageCropCover = ProfileImageCropFeature.State(originalImageData: data)
+                return .none
+
+            case let .imageCropCover(.presented(.delegate(.didConfirm(croppedData)))):
+                state.imageCropCover = nil
+                // FIXME: 크롭된 이미지 업로드 API 연결
+                Log.trace("프로필 이미지 - 크롭 완료 (\(croppedData.count) bytes)", category: .debug, level: .info)
+                return .send(.internal(.showToast(.init(message: "프로필 이미지를 변경했어요", style: .info))))
+
+            case .imageCropCover(.presented(.delegate(.didCancel))):
+                state.imageCropCover = nil
+                return .none
+
+            case .destination, .sheet, .imageCropCover, .view, .internal, .delegate:
+                return .none
+
             }
         }
         .ifLet(\.$destination, action: \.destination) {
@@ -778,6 +830,9 @@ public struct MyProfileFeature: Sendable {
         }
         .ifLet(\.$sheet, action: \.sheet) {
             Sheet.body
+        }
+        .ifLet(\.$imageCropCover, action: \.imageCropCover) {
+            ProfileImageCropFeature()
         }
     }
 }

@@ -77,7 +77,11 @@ let appInfoPlist: [String: Plist.Value] = {
         "UIBackgroundModes": [
             "remote-notification"
         ],
-        "FirebaseAppDelegateProxyEnabled": false
+        "FirebaseAppDelegateProxyEnabled": false,
+        // 프로필 이미지 수정 — 카메라 촬영
+        "NSCameraUsageDescription": "프로필 이미지를 촬영하기 위해 카메라를 사용합니다.",
+        // PHPickerViewController는 사용자가 명시적으로 선택한 사진만 전달하므로
+        // NSPhotoLibraryUsageDescription 없이도 동작한다(추가 필요 없음).
     ]
     return base
 }()
