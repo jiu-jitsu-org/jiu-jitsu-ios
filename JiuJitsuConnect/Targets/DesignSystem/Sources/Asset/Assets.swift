@@ -94,6 +94,7 @@ public enum Assets {
       public static let styleSweep = ImageAsset(name: "MyProfile/Icon/style-sweep")
       public static let styleTakedown = ImageAsset(name: "MyProfile/Icon/style-takedown")
       public static let styleTopPosition = ImageAsset(name: "MyProfile/Icon/style-top-position")
+      public static let triangleAlert = ImageAsset(name: "MyProfile/Icon/triangle-alert")
     }
   }
   public enum Signup {

@@ -73,6 +73,7 @@ public struct MyProfileFeature: Sendable {
         case beltSetting(BeltSettingFeature)
         case weightClassSetting(WeightClassSettingFeature)
         case profileImageEdit(ProfileImageEditFeature)
+        case instructorVerification(InstructorVerificationFeature)
     }
     
     public enum Action: Sendable {
@@ -86,7 +87,7 @@ public struct MyProfileFeature: Sendable {
         case sheet(PresentationAction<Sheet.Action>)
         // 1:1 크롭 풀스크린 커버 액션
         case imageCropCover(PresentationAction<ProfileImageCropFeature.Action>)
-
+        
         public enum DelegateAction: Sendable {}
 
         public enum ViewAction: Sendable {
@@ -104,9 +105,9 @@ public struct MyProfileFeature: Sendable {
             case competitionDetailTapped(Competition)  // 대회 정보 행 탭
             case moreButtonTapped                   // 우측 상단 "..." 버튼 탭 (토글)
             case instructorVerificationMenuTapped   // "관장 사범 인증" 메뉴 항목 탭
-            case profileImageEditButtonTapped       // 프로필 이미지 우측 하단 카메라 버튼 탭
             case imagePicked(Data)                  // 카메라/앨범 픽커에서 이미지 선택됨
             case imagePickerCancelled               // 픽커 취소 (시스템 dismiss 포함)
+            case profileImageEditButtonTapped       // 프로필 이미지 우측 하단 카메라 버튼 탭
         }
         
         public enum InternalAction: Sendable {
@@ -759,13 +760,23 @@ public struct MyProfileFeature: Sendable {
 
             case .view(.instructorVerificationMenuTapped):
                 state.isMoreMenuPresented = false
-                // TODO: 관장 사범 인증 플로우 진입 연결
-                Log.trace("관장 사범 인증 메뉴 탭", category: .debug, level: .info)
+                state.sheet = .instructorVerification(InstructorVerificationFeature.State())
+                return .none
+
+            case .sheet(.presented(.instructorVerification(.delegate(.didSelectUpload)))):
+                state.sheet = nil
+                // FIXME: 인증 사진 업로드 플로우 진입 연결 (사진 선택 → 업로드 → 검수 대기)
+                Log.trace("관장 사범 인증 - 사진 업로드 선택됨", category: .debug, level: .info)
+                return .none
+
+            case .sheet(.presented(.instructorVerification(.delegate(.didCancel)))):
+                state.sheet = nil
                 return .none
 
             case .view(.profileImageEditButtonTapped):
                 // 프로필 이미지 수정 옵션 바텀시트 노출
-                let canDelete = (state.communityProfile?.profileImageUrl?.isEmpty == false)
+                // 실제로 이미지가 렌더링되는 상태일 때만 '삭제' 옵션 노출
+                let canDelete = state.communityProfile?.hasProfileImage ?? false
                 state.sheet = .profileImageEdit(
                     ProfileImageEditFeature.State(canDelete: canDelete)
                 )

@@ -18,6 +18,14 @@ private enum Metrics {
         static let overlapWithButton: CGFloat = 46.49
         static let overlapWithAcademyName: CGFloat = 71
     }
+
+    enum BottomSheet {
+        /// 시트 본문 콘텐츠 외에 추가로 확보해야 하는 영역.
+        /// iOS는 `presentationDetents`의 height에 하단 safe area(home indicator)를
+        /// 포함시키므로, 콘텐츠가 잘리지 않으려면 detent를 그만큼 더 키워야 한다.
+        /// Face ID iPhone 기준 34pt + 약간의 여유.
+        static let safeAreaBottomBuffer: CGFloat = 40
+    }
 }
 
 // MARK: - MyProfileView
@@ -262,6 +270,8 @@ private extension View {
     /// 시트 프레젠테이션
     @ViewBuilder
     func sheetPresentation(store: Bindable<StoreOf<MyProfileFeature>>) -> some View {
+        let buffer = Metrics.BottomSheet.safeAreaBottomBuffer
+
         self
             .sheet(
                 item: store.scope(
@@ -270,9 +280,10 @@ private extension View {
                 )
             ) { beltSettingStore in
                 BeltSettingView(store: beltSettingStore)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .presentationDragIndicator(.hidden)
-                    .presentationDetents([.height(336)])
+                    .presentationDetents([
+                        .height(BeltSettingView.contentHeight + buffer)
+                    ])
                     .presentationBackground(
                         Color.component.bottomSheet.selected.container.background
                     )
@@ -284,9 +295,10 @@ private extension View {
                 )
             ) { weightClassSettingStore in
                 WeightClassSettingView(store: weightClassSettingStore)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .presentationDragIndicator(.hidden)
-                    .presentationDetents([.height(340)])
+                    .presentationDetents([
+                        .height(WeightClassSettingView.contentHeight + buffer)
+                    ])
                     .presentationBackground(
                         Color.component.bottomSheet.selected.container.background
                     )
@@ -298,14 +310,28 @@ private extension View {
                 )
             ) { profileImageEditStore in
                 ProfileImageEditView(store: profileImageEditStore)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .presentationDragIndicator(.hidden)
                     .presentationDetents([
-                        .height(profileImageEditStore.canDelete ? 340 : 276)
+                        .height(
+                            ProfileImageEditView.contentHeight(
+                                canDelete: profileImageEditStore.canDelete
+                            ) + buffer
+                        )
                     ])
                     .presentationBackground(
                         Color.component.bottomSheet.selected.container.background
                     )
+            }
+            .sheet(
+                item: store.scope(
+                    state: \.sheet?.instructorVerification,
+                    action: \.sheet.instructorVerification
+                )
+            ) { instructorVerificationStore in
+                // 다른 시트들과 달리 본문 콘텐츠 높이가 디바이스/텍스트 줄바꿈에 따라
+                // 가변이라, 시트가 자기 detent / 배경 / dragIndicator를 GeometryReader
+                // 측정값 기반으로 직접 설정한다. 호출부에서 별도 modifier를 붙이지 않는다.
+                InstructorVerificationView(store: instructorVerificationStore)
             }
     }
 
