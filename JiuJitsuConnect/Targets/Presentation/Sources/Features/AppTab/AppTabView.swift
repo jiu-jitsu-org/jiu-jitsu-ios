@@ -71,9 +71,6 @@ public struct AppTabView: View {
             ),
             configuration: loginPromptAlertConfiguration
         )
-        // 어디서 호출된 .appAlert든 이 host의 overlay에 표시된다.
-        // ZStack 위 layer라 탭바를 포함한 화면 전체를 dim이 덮는다.
-        .appAlertHost()
     }
 
     // 게스트가 MY 탭을 탭했을 때 노출되는 공통 AppAlert 구성. 다른 화면(설정 로그아웃 등)과 톤을 통일.

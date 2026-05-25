@@ -9,51 +9,46 @@ import SwiftUI
 
 // MARK: - AppAlertView
 public struct AppAlertView: View {
-
+    
     let configuration: AppAlertConfiguration
-    let dismiss: () -> Void
-
-    public init(configuration: AppAlertConfiguration, dismiss: @escaping () -> Void) {
-        self.configuration = configuration
-        self.dismiss = dismiss
-    }
-
+    @Binding var isPresented: Bool
+    
     public var body: some View {
         ZStack {
             Color.component.dialog.dimBg
                 .ignoresSafeArea()
                 .onTapGesture {
-                    // Dimmed 영역을 탭하면 닫고 싶다면 dismiss() 호출.
-                    // dismiss()
+                    // Dimmed 영역을 탭하면 닫히도록 할 수 있습니다 (선택 사항).
+                    // isPresented = false
                 }
-
+            
             VStack(alignment: .leading, spacing: 8) {
                 Text(configuration.title)
                     .font(.pretendard.title2)
                     .foregroundColor(Color.component.dialog.titleText)
                     .lineLimit(2)
-
+                
                 Text(configuration.message)
                     .font(.pretendard.bodyM)
                     .foregroundColor(Color.component.dialog.descriptionText)
                     .lineLimit(3)
                     .lineSpacing(4) // .lineHeight(8) 대신 사용
-
+                
                 HStack(spacing: 8) {
                     if let secondaryButton = configuration.secondaryButton {
                         Button(action: {
                             secondaryButton.action()
-                            dismiss()
+                            isPresented = false
                         }) {
                             AppButtonConfiguration(title: secondaryButton.title, size: .large)
                                 .frame(maxWidth: .infinity)
                         }
                         .appButtonStyle(secondaryButton.style, size: .large, height: 51)
                     }
-
+                    
                     Button(action: {
                         configuration.primaryButton.action()
-                        dismiss()
+                        isPresented = false
                     }) {
                         AppButtonConfiguration(title: configuration.primaryButton.title, size: .large)
                             .frame(maxWidth: .infinity)
@@ -83,13 +78,13 @@ public struct AppAlertView: View {
 struct AppAlertPreview: View {
     @State private var showAlertWithOneButton = false
     @State private var showAlertWithTwoButtons = false
-
+    
     var body: some View {
         VStack(spacing: 20) {
             Button("Show Alert (1 Button)") {
                 showAlertWithOneButton = true
             }
-
+            
             Button("Show Alert (2 Buttons)") {
                 showAlertWithTwoButtons = true
             }
@@ -110,9 +105,6 @@ struct AppAlertPreview: View {
                 secondaryButton: .init(title: "취소", action: { })
             )
         )
-        // 알럿은 .appAlertHost()가 적용된 view 위에 표시된다.
-        // Preview에서도 host modifier를 적용해야 알럿이 보인다. 실서비스에서는 AppTabView가 호스트한다.
-        .appAlertHost()
     }
 }
 
