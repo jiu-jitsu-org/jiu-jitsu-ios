@@ -51,56 +51,54 @@ public struct MyProfileView: View {
                 ? Metrics.Card.overlapWithAcademyName
                 : Metrics.Card.overlapWithButton
 
-            // ScrollView 위에 "..." 메뉴를 얹은 단순 ZStack 구조.
-            // 메뉴 토글은 헤더의 "..." 버튼 탭으로만 처리한다 (외부 탭 dismiss 없음).
-            ZStack(alignment: .topTrailing) {
-                ScrollView(showsIndicators: false) {
-                    ZStack(alignment: .bottom) {
-                        // 메인 콘텐츠
-                        VStack(spacing: 0) {
-                            // 1. 헤더 영역
-                            headerView(safeAreaTop: safeAreaTop)
-                                .zIndex(0)
+            // 메뉴는 헤더 위 overlay로 부착해 스크롤에 따라 함께 이동한다.
+            // ("..." 버튼 탭으로만 토글되며 외부 탭 dismiss는 없음)
+            ScrollView(showsIndicators: false) {
+                ZStack(alignment: .bottom) {
+                    // 메인 콘텐츠
+                    VStack(spacing: 0) {
+                        // 1. 헤더 영역 — "..." 메뉴는 헤더 우상단에 오버레이
+                        headerView(safeAreaTop: safeAreaTop)
+                            .overlay(alignment: .topTrailing) {
+                                if store.isMoreMenuPresented {
+                                    MyProfileMoreMenuView(
+                                        onInstructorVerificationTapped: {
+                                            store.send(.view(.instructorVerificationMenuTapped))
+                                        }
+                                    )
+                                    // "..." 버튼(safeAreaTop + 12 ~ safeAreaTop + 44) 하단에 간격 없이 붙임
+                                    // 우측은 버튼 trailing(16)과 동일하게 정렬
+                                    .padding(.top, safeAreaTop + 44)
+                                    .padding(.trailing, 16)
+                                    .transition(.opacity)
+                                }
+                            }
+                            .zIndex(0)
 
-                            // 2. 벨트/체급 카드
-                            cardView
-                                .offset(y: -cardOverlapHeight)
-                                .padding(.bottom, -cardOverlapHeight)
-                                .zIndex(1)
+                        // 2. 벨트/체급 카드
+                        cardView
+                            .offset(y: -cardOverlapHeight)
+                            .padding(.bottom, -cardOverlapHeight)
+                            .zIndex(1)
 
-                            // 3. 콘텐츠 영역
-                            contentView
-                                .padding(.top, 36)
-                                .padding(.horizontal, 20)
-                        }
+                        // 3. 콘텐츠 영역
+                        contentView
+                            .padding(.top, 36)
+                            .padding(.horizontal, 20)
+                    }
 
-                        // 배경 그라데이션 (스타일 정보 없을 때만)
-                        if !hasStyleInfo {
-                            backgroundGradient(safeAreaBottom: safeAreaBottom)
-                        }
+                    // 배경 그라데이션 (스타일 정보 없을 때만)
+                    if !hasStyleInfo {
+                        backgroundGradient(safeAreaBottom: safeAreaBottom)
                     }
                 }
-                .scrollDisabled(false)
-                .onAppear {
-                    UIScrollView.appearance().bounces = false
-                    store.send(.view(.onAppear))
-                }
-                .background(Color.component.background.default)
-
-                // "..." 메뉴 — 아이콘 바로 아래 우측에 배치
-                if store.isMoreMenuPresented {
-                    MyProfileMoreMenuView(
-                        onInstructorVerificationTapped: {
-                            store.send(.view(.instructorVerificationMenuTapped))
-                        }
-                    )
-                    // "..." 버튼(safeAreaTop + 12 ~ safeAreaTop + 44) 하단에 간격 없이 붙임
-                    // 우측은 버튼 trailing(16)과 동일하게 정렬
-                    .padding(.top, safeAreaTop + 44)
-                    .padding(.trailing, 16)
-                    .transition(.opacity)
-                }
             }
+            .scrollDisabled(false)
+            .onAppear {
+                UIScrollView.appearance().bounces = false
+                store.send(.view(.onAppear))
+            }
+            .background(Color.component.background.default)
             .animation(.easeInOut(duration: 0.15), value: store.isMoreMenuPresented)
             .ignoresSafeArea(edges: .top)
             .navigationDestinations(store: $store)
