@@ -26,8 +26,6 @@ public struct SettingsView: View {
         self.store = store
     }
 
-    private var appVersion: String { "99.99" }
-
     public var body: some View {
         VStack(spacing: 0) {
             headerView
@@ -56,7 +54,7 @@ public struct SettingsView: View {
                         HStack {
                             SettingsRowContent(asset: Assets.Common.Icon.version, text: "버전 정보")
                             Spacer()
-                            Text(appVersion)
+                            Text(store.appVersion)
                                 .font(Font.pretendard.captionM)
                                 .foregroundStyle(Color.component.list.setting.valueText)
                         }
