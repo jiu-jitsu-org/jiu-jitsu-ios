@@ -83,7 +83,11 @@ public struct BeltSettingView: View {
             
             Spacer()
         }
-        .padding(.vertical, 28)
+        // SheetPickerView 실제 높이가 151pt(45*3 + 8*2)라서 상하 28pt 패딩(=56pt)을
+        // 그대로 두면 본문이 contentHeight(336)를 넘어 핸들이 클립된다.
+        // 디자인상 picker section(여백 포함) 높이 165pt(=28+109+28) 유지를 위해
+        // 165 - 151 = 14pt → 위아래 7pt씩으로 보정.
+        .padding(.vertical, 7)
         .padding(.top, 16)
     }
     
