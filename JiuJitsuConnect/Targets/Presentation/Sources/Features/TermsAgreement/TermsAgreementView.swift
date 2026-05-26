@@ -61,5 +61,10 @@ public struct TermsAgreementView: View {
         .background(
             Color.component.bottomSheet.selected.container.background
         )
+        .fullScreenCover(
+            item: $store.scope(state: \.termsWebCover, action: \.termsWebCover)
+        ) { termsStore in
+            TermsWebViewView(store: termsStore)
+        }
     }
 }
