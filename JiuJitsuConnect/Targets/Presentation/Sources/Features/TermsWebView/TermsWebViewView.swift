@@ -65,7 +65,7 @@ public struct TermsWebViewView: View {
                 .opacity(isWebViewReady ? 1 : 0)
         }
         .background(
-            Color.component.background.default
+            Color.primitive.bw.trueWhite
                 .ignoresSafeArea()
         )
     }
@@ -189,6 +189,11 @@ private struct TermsWKWebView: UIViewRepresentable {
         // 시스템 자동 인셋을 끄고, SwiftUI에서 계산한 값을 직접 주입한다.
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.allowsBackForwardNavigationGestures = false
+        // WKWebView 기본 배경(systemBackground)이 contentInset 영역(상태바·홈인디케이터 뒤)에
+        // 덮여 회색 띠처럼 보이는 현상 방지. 투명화하여 SwiftUI 배경(흰색)이 그대로 보이도록 한다.
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        webView.scrollView.backgroundColor = .clear
         // 로드 완료 전까지 스크롤을 차단. WKWebView 내부가 isScrollEnabled을
         // 토글할 수 있으므로 pan/pinch gesture를 직접 비활성화한다.
         Self.setScrollBlocked(true, on: webView.scrollView)
