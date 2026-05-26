@@ -71,10 +71,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             // 카카오톡 앱으로 로그인 시도
             if UserApi.isKakaoTalkLoginAvailable() {
                 UserApi.shared.loginWithKakaoTalk { [weak self] (oauthToken, error) in
-                    guard let self else { return }
-                    UserApi.shared.loginWithKakaoTalk { [weak self] (oauthToken, error) in
-                        self?.handleKakaoResponse(oauthToken: oauthToken, error: error, continuation: continuation)
-                    }
+                    self?.handleKakaoResponse(oauthToken: oauthToken, error: error, continuation: continuation)
                 }
             } else {
                 // 카카오 계정(웹뷰)으로 로그인 시도
