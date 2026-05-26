@@ -8,10 +8,12 @@
 import Foundation
 import Domain
 
-/// 커뮤니티 프로필 업데이트 요청 DTO
+/// 커뮤니티 프로필 업데이트 요청 DTO.
+///
+/// 프로필 이미지(`profileImageUrl`)는 user-level 데이터로 분리되어
+/// `PUT /api/user/profile`에서 처리한다 — 본 DTO에는 포함하지 않는다.
 struct PostCommunityProfileRequestDTO: Codable {
     let profileRequestType: String
-    let profileImageUrl: String?
     let beltRank: String?
     let beltStripe: String?
     let gender: String?
@@ -36,7 +38,6 @@ struct PostCommunityProfileRequestDTO: Codable {
     init(from profile: CommunityProfile, section: ProfileSection = .academy) {
         // Domain의 비즈니스 개념 → API의 기술적 파라미터로 변환
         self.profileRequestType = section.rawValue
-        self.profileImageUrl = profile.profileImageUrl
         self.beltRank = profile.beltRank?.rawValue
         self.beltStripe = profile.beltStripe?.rawValue
         self.gender = profile.gender?.rawValue

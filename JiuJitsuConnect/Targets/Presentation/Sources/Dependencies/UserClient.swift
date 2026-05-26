@@ -18,19 +18,26 @@ public struct UserClient {
     public var registerAppInfo: @Sendable (AppInfo) async throws -> Void
     /// 로그인 등 이후 FCM 토큰만 갱신해 동일 API로 재등록
     public var updateFCMToken: @Sendable (String) async throws -> Void
+    /// 사용자 프로필 갱신 (PUT `/api/user/profile`).
+    ///
+    /// nickname은 항상 현재값/새 값을 전달 (BE required).
+    /// 이미지 삭제는 `profileImageUrl = nil` → JSON `null`로 명시 전송.
+    public var updateProfile: @Sendable (_ nickname: String, _ profileImageUrl: String?) async throws -> Void
 
     public init(
         signup: @Sendable @escaping (Domain.SignupInfo) async throws -> Domain.AuthInfo,
         checkNickname: @Sendable @escaping (Domain.CheckNicknameInfo) async throws -> Bool,
         withdrawal: @Sendable @escaping () async throws -> Bool,
         registerAppInfo: @Sendable @escaping (AppInfo) async throws -> Void,
-        updateFCMToken: @Sendable @escaping (String) async throws -> Void
+        updateFCMToken: @Sendable @escaping (String) async throws -> Void,
+        updateProfile: @Sendable @escaping (String, String?) async throws -> Void
     ) {
         self.signup = signup
         self.checkNickname = checkNickname
         self.withdrawal = withdrawal
         self.registerAppInfo = registerAppInfo
         self.updateFCMToken = updateFCMToken
+        self.updateProfile = updateProfile
     }
 }
 
@@ -53,7 +60,8 @@ extension UserClient: DependencyKey {
             true
         },
         registerAppInfo: { _ in },
-        updateFCMToken: { _ in }
+        updateFCMToken: { _ in },
+        updateProfile: { _, _ in }
     )
 }
 
@@ -81,6 +89,9 @@ extension UserClient {
         },
         updateFCMToken: { _ in
             fatalError("unimplemented.updateFCMToken is not implemented")
+        },
+        updateProfile: { _, _ in
+            fatalError("unimplemented.updateProfile is not implemented")
         }
     )
 }

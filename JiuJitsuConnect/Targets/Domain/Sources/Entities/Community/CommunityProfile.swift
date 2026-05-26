@@ -199,6 +199,31 @@ extension CommunityProfile {
         )
     }
 
+    /// 닉네임 업데이트
+    public func updatingNickname(_ newNickname: String) -> CommunityProfile {
+        CommunityProfile(
+            nickname: newNickname,
+            profileImageUrl: profileImageUrl,
+            beltRank: beltRank,
+            beltStripe: beltStripe,
+            gender: gender,
+            weightKg: weightKg,
+            academyName: academyName,
+            competitions: competitions,
+            bestSubmission: bestSubmission,
+            favoriteSubmission: favoriteSubmission,
+            bestTechnique: bestTechnique,
+            favoriteTechnique: favoriteTechnique,
+            bestPosition: bestPosition,
+            favoritePosition: favoritePosition,
+            isWeightHidden: isWeightHidden,
+            isOwner: isOwner,
+            teachingPhilosophy: teachingPhilosophy,
+            teachingStartDate: teachingStartDate,
+            teachingDetail: teachingDetail
+        )
+    }
+
     /// 프로필 이미지 URL 업데이트 (`nil` 전달 시 삭제 의미)
     public func updatingProfileImageUrl(_ url: String?) -> CommunityProfile {
         CommunityProfile(
@@ -434,8 +459,8 @@ public enum ProfileSection: String, Codable, Sendable, CaseIterable, Equatable {
     /// 지도자 정보 (teachingPhilosophy, teachingStartDate, teachingDetail)
     case instructorInfo = "OWNER_INFO"
 
-    /// 프로필 이미지 (profileImageUrl)
-    case profileImage = "PROFILE_IMAGE"
+    // NOTE: 프로필 이미지(`profileImageUrl`)는 커뮤니티 프로필 섹션이 아닌
+    // user-level 데이터로 분리되어 `PUT /api/user/profile`로 갱신한다.
 
     /// 섹션의 한글 이름
     public var displayName: String {
@@ -454,8 +479,6 @@ public enum ProfileSection: String, Codable, Sendable, CaseIterable, Equatable {
             return "대회 기록"
         case .instructorInfo:
             return "지도자 정보"
-        case .profileImage:
-            return "프로필 이미지"
         }
     }
 }

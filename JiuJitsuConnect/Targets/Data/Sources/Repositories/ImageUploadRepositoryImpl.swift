@@ -30,6 +30,17 @@ public final class ImageUploadRepositoryImpl: ImageUploadRepository {
 
     public func uploadProfileImage(_ data: Data) async throws -> String {
         do {
+            // 0) 업로드 페이로드 정규화 — 1024px 다운샘플 + JPEG 0.8 재인코딩.
+            //    원본 풀해상도(예: 12MP)를 그대로 올리면 모바일 전용 표시 용도엔 과한 데다
+            //    ImageKit 무료 플랜 스토리지/대역폭을 빠르게 잠식한다.
+            //    실패 시 원본 data로 fallback해 업로드는 계속 진행.
+            let payload = ImageDownsampler.normalizeForUpload(data) ?? data
+            Log.trace(
+                "프로필 이미지 정규화 — \(data.count) → \(payload.count) bytes",
+                category: .network,
+                level: .info
+            )
+
             // 1) 서명 발급
             let auth: ImageKitAuthResponseDTO = try await networkService.request(
                 endpoint: ImageKitAuthEndpoint.fetchAuthParams
@@ -45,13 +56,13 @@ public final class ImageUploadRepositoryImpl: ImageUploadRepository {
             builder.appendField(name: "fileName",  value: filename)
             builder.appendField(name: "folder",    value: ImageKitConfig.uploadFolder)
             builder.appendField(name: "useUniqueFileName", value: "true")
-            builder.appendFile(name: "file", filename: filename, mimeType: "image/jpeg", data: data)
+            builder.appendFile(name: "file", filename: filename, mimeType: "image/jpeg", data: payload)
 
             let boundary = builder.boundary
             let body = builder.finalize()
 
             Log.trace(
-                "ImageKit 업로드 시작 — \(data.count) bytes, boundary=\(boundary)",
+                "ImageKit 업로드 시작 — \(payload.count) bytes, boundary=\(boundary)",
                 category: .network,
                 level: .info
             )

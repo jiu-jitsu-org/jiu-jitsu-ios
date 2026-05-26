@@ -25,7 +25,7 @@ extension ImageKitAuthEndpoint: Endpoint {
     var path: String {
         switch self {
         case .fetchAuthParams:
-            return "/image/auth"
+            return "/api/image/auth"
         }
     }
 

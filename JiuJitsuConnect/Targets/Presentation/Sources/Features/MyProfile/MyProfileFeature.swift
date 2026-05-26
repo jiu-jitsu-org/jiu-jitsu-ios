@@ -141,7 +141,10 @@ public struct MyProfileFeature: Sendable {
 
             // 프로필 이미지 업로드/반영 응답
             case profileImageUploadResponse(TaskResult<String>)            // ImageKit 호스팅 URL
-            case profileImageUpdateResponse(TaskResult<CommunityProfile>)  // /api/community/profile 반영 결과
+            case profileImageUpdateResponse(TaskResult<CommunityProfile>)  // PUT /api/user/profile 반영 결과
+
+            // 닉네임 갱신 응답 (이미지와 동일한 PUT /api/user/profile 사용)
+            case nicknameUpdateResponse(TaskResult<CommunityProfile>)
         }
     }
     
@@ -149,6 +152,7 @@ public struct MyProfileFeature: Sendable {
     @Dependency(\.continuousClock) var clock
     @Dependency(\.communityClient) var communityClient
     @Dependency(\.imageUploadClient) var imageUploadClient
+    @Dependency(\.userClient) var userClient
 
 
     public var body: some ReducerOf<Self> {
@@ -291,10 +295,25 @@ public struct MyProfileFeature: Sendable {
                 return .none
                 
             case let .destination(.presented(.nicknameSetting(.delegate(.saveNickname(nickname))))):
-                // 닉네임 저장 요청 받음 → TODO: API 호출 구현 필요
+                // 닉네임 저장 — 프로필 이미지와 동일한 PUT /api/user/profile 사용
                 Log.trace("닉네임 저장 요청: \(nickname)", category: .debug, level: .info)
                 state.destination = nil
-                return .send(.internal(.showToast(.init(message: "닉네임 수정을 완료했어요", style: .info))))
+                guard let profile = state.communityProfile else {
+                    return .send(.internal(.showToast(.init(
+                        message: "프로필 정보를 불러올 수 없어요", style: .info
+                    ))))
+                }
+                let updatedProfile = profile.updatingNickname(nickname)
+                state.isLoadingProfile = true
+                return .run { [currentImageUrl = profile.profileImageUrl] send in
+                    await send(.internal(.nicknameUpdateResponse(
+                        await TaskResult {
+                            // BE가 PUT 전체 교체 시맨틱이라 두 값 모두 전달.
+                            try await userClient.updateProfile(nickname, currentImageUrl)
+                            return updatedProfile
+                        }
+                    )))
+                }
                 
             case .destination(.presented(.nicknameSetting(.delegate(.cancel)))):
                 // 취소 - 아무것도 하지 않음
@@ -470,7 +489,7 @@ public struct MyProfileFeature: Sendable {
                 case .academy:
                     updatedProfile = profile.updatingAcademy(value)
 
-                case .beltWeight, .position, .submission, .technique, .competition, .instructorInfo, .profileImage:
+                case .beltWeight, .position, .submission, .technique, .competition, .instructorInfo:
                     // TODO: 다른 섹션 업데이트 구현
                     return .none
                 }
@@ -809,10 +828,13 @@ public struct MyProfileFeature: Sendable {
                 let updatedProfile = profile.updatingProfileImageUrl(nil)
                 state.isLoadingProfile = true
                 Log.trace("프로필 이미지 - 삭제 요청", category: .network, level: .info)
-                return .run { send in
+                return .run { [nickname = profile.nickname] send in
                     await send(.internal(.profileImageUpdateResponse(
                         await TaskResult {
-                            try await communityClient.updateProfile(updatedProfile, .profileImage)
+                            // BE가 PUT 전체 교체 시맨틱이라 nickname을 함께 전달.
+                            // 이미지 nil → DTO에서 JSON `null`로 명시 전송 → "삭제" 의도.
+                            try await userClient.updateProfile(nickname, nil)
+                            return updatedProfile
                         }
                     )))
                 }
@@ -876,10 +898,12 @@ public struct MyProfileFeature: Sendable {
                     ))))
                 }
                 let updatedProfile = profile.updatingProfileImageUrl(url)
-                return .run { send in
+                return .run { [nickname = profile.nickname] send in
                     await send(.internal(.profileImageUpdateResponse(
                         await TaskResult {
-                            try await communityClient.updateProfile(updatedProfile, .profileImage)
+                            // BE가 PUT 전체 교체 시맨틱이라 nickname을 함께 전달.
+                            try await userClient.updateProfile(nickname, url)
+                            return updatedProfile
                         }
                     )))
                 }
@@ -906,6 +930,20 @@ public struct MyProfileFeature: Sendable {
                 Log.trace("Failed to update profile image url: \(error)", category: .network, level: .error)
                 return .send(.internal(.showToast(.init(
                     message: "프로필 저장에 실패했어요. 다시 시도해주세요", style: .info
+                ))))
+
+            case let .internal(.nicknameUpdateResponse(.success(updatedProfile))):
+                state.isLoadingProfile = false
+                state.communityProfile = updatedProfile
+                return .send(.internal(.showToast(.init(
+                    message: "닉네임 수정을 완료했어요", style: .info
+                ))))
+
+            case let .internal(.nicknameUpdateResponse(.failure(error))):
+                state.isLoadingProfile = false
+                Log.trace("Failed to update nickname: \(error)", category: .network, level: .error)
+                return .send(.internal(.showToast(.init(
+                    message: "닉네임 저장에 실패했어요. 다시 시도해주세요", style: .info
                 ))))
 
             case .destination, .sheet, .imageCropCover, .view, .internal, .delegate:

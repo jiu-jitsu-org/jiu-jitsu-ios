@@ -85,6 +85,12 @@ public final class DependencyContainer {
                 }
                 _ = try await self.userRepository.registerAppInfo(info: info)
                 self.sharedFirebaseClient.cacheToken(token)
+            },
+            updateProfile: { nickname, profileImageUrl in
+                _ = try await self.userRepository.updateProfile(
+                    nickname: nickname,
+                    profileImageUrl: profileImageUrl
+                )
             }
         )
     }

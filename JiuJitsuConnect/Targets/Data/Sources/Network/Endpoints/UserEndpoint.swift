@@ -14,6 +14,9 @@ enum UserEndpoint {
     case withdrawal
     /// 회원 앱 정보 등록 (Swagger: POST `/user/appInfo` — 서버 라우팅에 맞춰 `/api/user/appInfo`)
     case registerAppInfo(request: AppInfoRequestDTO)
+    /// 사용자 프로필 갱신 (PUT `/api/user/profile`) — 프로필 이미지 URL 등 user-level 필드.
+    /// 커뮤니티 프로필(`/api/community/profile`)과는 데이터 도메인이 다르다.
+    case updateProfile(request: UpdateUserProfileRequestDTO)
 }
 
 extension UserEndpoint: Endpoint {
@@ -24,7 +27,7 @@ extension UserEndpoint: Endpoint {
         }
         return baseURL
     }
-    
+
     var path: String {
         switch self {
         case .signup, .withdrawal:
@@ -33,9 +36,11 @@ extension UserEndpoint: Endpoint {
             return "/api/user/check/nickname"
         case .registerAppInfo:
             return "/api/user/appInfo"
+        case .updateProfile:
+            return "/api/user/profile"
         }
     }
-    
+
     var method: HTTPMethod {
         switch self {
         case .checkNickname:
@@ -44,9 +49,11 @@ extension UserEndpoint: Endpoint {
             return .post
         case .withdrawal:
             return .delete
+        case .updateProfile:
+            return .put
         }
     }
-    
+
     var headers: [String: String]? {
         switch self {
         case .signup(_, let tempToken):
@@ -63,17 +70,19 @@ extension UserEndpoint: Endpoint {
         default: return nil
         }
     }
-    
+
     var body: Data? {
         switch self {
         case .signup(let request, _):
             return try? JSONEncoder().encode(request)
         case .registerAppInfo(let request):
             return try? JSONEncoder().encode(request)
+        case .updateProfile(let request):
+            return try? JSONEncoder().encode(request)
         default: return nil
         }
     }
-    
+
 }
 
 private extension Encodable {

@@ -304,7 +304,9 @@ private final class CropScrollContainerView: UIView, UIScrollViewDelegate {
         }
 
         let croppedImage = UIImage(cgImage: cropped, scale: orientedImage.scale, orientation: .up)
-        guard let data = croppedImage.jpegData(compressionQuality: 0.9) else {
+        // 업로드 직전 Repository에서 1024px/quality 0.8로 재인코딩되므로,
+        // 중간 단계 손실을 줄이기 위해 여기선 quality를 약간 높게 둔다.
+        guard let data = croppedImage.jpegData(compressionQuality: 0.95) else {
             Log.trace("CropScrollContainerView: JPEG 인코딩 실패", category: .system, level: .error)
             return
         }

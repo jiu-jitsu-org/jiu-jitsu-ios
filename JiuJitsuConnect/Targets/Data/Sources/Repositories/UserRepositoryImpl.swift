@@ -100,7 +100,25 @@ public final class UserRepositoryImpl: UserRepository {
             throw DomainError.unknown(error.localizedDescription)
         }
     }
-    
+
+    public func updateProfile(nickname: String, profileImageUrl: String?) async throws -> Bool {
+        do {
+            let requestDTO = UpdateUserProfileRequestDTO(
+                nickname: nickname,
+                profileImageUrl: profileImageUrl
+            )
+            let endpoint = UserEndpoint.updateProfile(request: requestDTO)
+            // BE는 갱신된 user 객체를 반환한다. 호출 측은 성공 여부만 알면 되지만
+            // BaseResponseDTO.success 검증 경로를 타려면 data 디코딩이 성공해야 한다.
+            let _: UpdateUserProfileResponseDTO = try await networkService.request(endpoint: endpoint)
+            return true
+        } catch let error as NetworkError {
+            throw error.toDomainError()
+        } catch {
+            throw DomainError.unknown(error.localizedDescription)
+        }
+    }
+
     // MARK: - Error Mapping
-    
+
 }
