@@ -65,13 +65,14 @@ public struct WeightClassSettingView: View {
             pickerSection
             confirmButton
         }
-        // detent > 본문 시 남는 공간이 위로 떨어져 핸들이 내려오는 현상 방지.
-        // 시트 가용 영역 전체를 채우면서 본문을 상단에 못박는다.
+        // body 내재 높이 = detent (= contentHeight) > 시트 내부 가용 영역(detent - safe area)
+        // 이면 VStack이 safe area 안쪽으로 자연스럽게 오버플로우해서 body 바닥이
+        // 디바이스 바닥에 닿게 된다. 그 결과 CTA는 `.padding(.bottom, 24)`만큼만
+        // 디바이스 바닥에서 떨어진 위치에 정확히 부착된다.
+        // `.ignoresSafeArea(.container, edges: .bottom)`를 명시하면 iOS 26 시트가
+        // 별도 내부 inset을 끼워 넣어 오히려 CTA가 더 위로 밀려나므로 사용하지 않는다.
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color.component.bottomSheet.selected.container.background)
-        // CTA `.padding(.bottom, 24)`가 home indicator safe area 위로 밀려나지 않고
-        // 디바이스 바닥에서 정확히 24pt 위에 부착되도록 하단 safe area 무시.
-        .ignoresSafeArea(.container, edges: .bottom)
     }
     
     // MARK: - View Components
