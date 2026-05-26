@@ -96,8 +96,9 @@ public struct NicknameSettingFeature: Sendable {
     public enum Alert: Equatable, Sendable {}
     
     // MARK: - Dependencies
-    
+
     @Dependency(\.userClient) var userClient
+    @Dependency(\.dismiss) var dismiss
     
     public var body: some ReducerOf<Self> {
         BindingReducer()
@@ -179,7 +180,11 @@ public struct NicknameSettingFeature: Sendable {
                 }
                 
             case .view(.backButtonTapped):
-                return .send(.delegate(.cancel))
+                // 수정 모드에서만 노출되는 뒤로가기 — 부모에 cancel 위임 후 화면 dismiss
+                return .concatenate(
+                    .send(.delegate(.cancel)),
+                    .run { _ in await self.dismiss() }
+                )
                 
             case let .internal(.checkNicknameResponse(.success(isAvailable))):
                 if isAvailable {

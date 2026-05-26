@@ -2,17 +2,26 @@ import SwiftUI
 import ComposableArchitecture
 import DesignSystem
 
+private enum Style {
+    static let headerHeight: CGFloat = 60
+    static let horizontalPadding: CGFloat = 16
+}
+
 public struct NicknameSettingView: View {
-    
+
     @Bindable var store: StoreOf<NicknameSettingFeature>
     @FocusState private var isKeyboardVisible: Bool
-    
+
     public init(store: StoreOf<NicknameSettingFeature>) {
         self.store = store
     }
-    
+
     public var body: some View {
         VStack(spacing: 0) {
+            // 수정 모드에서만 헤더(뒤로가기)를 노출한다. 최초 닉네임 설정에는 미노출.
+            if store.mode == .edit {
+                headerView
+            }
             titleSection
             textFieldSection
             Spacer()
@@ -33,7 +42,43 @@ public struct NicknameSettingView: View {
 
 // MARK: - Private Views
 private extension NicknameSettingView {
-    
+
+    var headerView: some View {
+        HStack {
+            Button(action: { store.send(.view(.backButtonTapped)) }) {
+                ZStack {
+                    // 라운드 배경
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.primitive.blue.b50)
+
+                    // 화살표 아이콘
+                    Assets.Common.Icon.arrowLeft.swiftUIImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
+                        .foregroundStyle(Color.primitive.blue.b500p)
+                }
+                .frame(width: 36, height: 36)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            Text(store.mode.headerTitle)
+                .font(Font.pretendard.title3)
+                .foregroundStyle(Color.component.header.text)
+
+            Spacer()
+
+            Rectangle()
+                .fill(.clear)
+                .frame(width: 32, height: 32)
+        }
+        .padding(.horizontal, Style.horizontalPadding)
+        .frame(height: Style.headerHeight)
+    }
+
     var titleSection: some View {
         Text(store.validationState.message)
             .font(Font.pretendard.display1)
