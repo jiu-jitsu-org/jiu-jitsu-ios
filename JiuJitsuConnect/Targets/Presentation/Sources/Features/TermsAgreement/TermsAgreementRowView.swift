@@ -22,7 +22,9 @@ struct TermsAgreementRowView: View {
             typeTextColor: typeTextColor,
             followingIconColor: followingIconColor,
             onCheckTapped: { store.send(.checkTapped) },
-            onSeeDetailsTapped: { store.send(.seeDetailsTapped) }
+            onSeeDetailsTapped: store.term.contentURL != nil
+                ? { store.send(.seeDetailsTapped) }
+                : nil
         )
     }
     
