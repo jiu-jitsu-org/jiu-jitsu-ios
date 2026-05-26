@@ -18,8 +18,8 @@ public struct SettingsFeature: Sendable {
     private enum CancelID { case toast }
 
     private enum TermsURL {
-        static let serviceTerms = makeURL(path: "/service-info")
-        static let privacyPolicy = makeURL(path: "/service-info")
+        static let serviceTerms = makeURL(path: "/policies/terms-of-service")
+        static let privacyPolicy = makeURL(path: "/policies/privacy-policy")
 
         private static func makeURL(path: String) -> URL? {
             guard
