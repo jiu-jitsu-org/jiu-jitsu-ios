@@ -17,6 +17,8 @@ enum UserEndpoint {
     /// 사용자 프로필 갱신 (PUT `/api/user/profile`) — 프로필 이미지 URL 등 user-level 필드.
     /// 커뮤니티 프로필(`/api/community/profile`)과는 데이터 도메인이 다르다.
     case updateProfile(request: UpdateUserProfileRequestDTO)
+    /// 닉네임 단독 수정 (PUT `/api/user/profile/nickname`) — nickname 쿼리 파라미터 전달.
+    case updateNickname(nickname: String)
 }
 
 extension UserEndpoint: Endpoint {
@@ -38,6 +40,8 @@ extension UserEndpoint: Endpoint {
             return "/api/user/appInfo"
         case .updateProfile:
             return "/api/user/profile"
+        case .updateNickname:
+            return "/api/user/profile/nickname"
         }
     }
 
@@ -49,7 +53,7 @@ extension UserEndpoint: Endpoint {
             return .post
         case .withdrawal:
             return .delete
-        case .updateProfile:
+        case .updateProfile, .updateNickname:
             return .put
         }
     }
@@ -67,6 +71,8 @@ extension UserEndpoint: Endpoint {
         switch self {
         case .checkNickname(let request):
             return ["nickname": request.nickname]
+        case .updateNickname(let nickname):
+            return ["nickname": nickname]
         default: return nil
         }
     }

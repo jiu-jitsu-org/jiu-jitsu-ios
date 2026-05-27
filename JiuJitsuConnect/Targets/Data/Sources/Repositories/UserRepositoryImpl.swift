@@ -119,6 +119,18 @@ public final class UserRepositoryImpl: UserRepository {
         }
     }
 
+    public func updateNickname(_ nickname: String) async throws -> Bool {
+        do {
+            let endpoint = UserEndpoint.updateNickname(nickname: nickname)
+            let _: UpdateUserProfileResponseDTO = try await networkService.request(endpoint: endpoint)
+            return true
+        } catch let error as NetworkError {
+            throw error.toDomainError()
+        } catch {
+            throw DomainError.unknown(error.localizedDescription)
+        }
+    }
+
     // MARK: - Error Mapping
 
 }

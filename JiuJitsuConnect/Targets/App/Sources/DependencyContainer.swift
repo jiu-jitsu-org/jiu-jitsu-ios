@@ -91,6 +91,9 @@ public final class DependencyContainer {
                     nickname: nickname,
                     profileImageUrl: profileImageUrl
                 )
+            },
+            updateNickname: { nickname in
+                _ = try await self.userRepository.updateNickname(nickname)
             }
         )
     }

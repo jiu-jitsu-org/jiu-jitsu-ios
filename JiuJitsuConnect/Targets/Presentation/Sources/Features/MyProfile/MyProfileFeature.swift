@@ -295,7 +295,6 @@ public struct MyProfileFeature: Sendable {
                 return .none
                 
             case let .destination(.presented(.nicknameSetting(.delegate(.saveNickname(nickname))))):
-                // 닉네임 저장 — 프로필 이미지와 동일한 PUT /api/user/profile 사용
                 Log.trace("닉네임 저장 요청: \(nickname)", category: .debug, level: .info)
                 state.destination = nil
                 guard let profile = state.communityProfile else {
@@ -305,11 +304,11 @@ public struct MyProfileFeature: Sendable {
                 }
                 let updatedProfile = profile.updatingNickname(nickname)
                 state.isLoadingProfile = true
-                return .run { [currentImageUrl = profile.profileImageUrl] send in
+                return .run { send in
                     await send(.internal(.nicknameUpdateResponse(
                         await TaskResult {
-                            // BE가 PUT 전체 교체 시맨틱이라 두 값 모두 전달.
-                            try await userClient.updateProfile(nickname, currentImageUrl)
+                            // 닉네임 전용 엔드포인트 (PUT /api/user/profile/nickname, 쿼리 파라미터)
+                            try await userClient.updateNickname(nickname)
                             return updatedProfile
                         }
                     )))

@@ -23,6 +23,10 @@ public struct UserClient {
     /// nickname은 항상 현재값/새 값을 전달 (BE required).
     /// 이미지 삭제는 `profileImageUrl = nil` → JSON `null`로 명시 전송.
     public var updateProfile: @Sendable (_ nickname: String, _ profileImageUrl: String?) async throws -> Void
+    /// 닉네임 단독 수정 (PUT `/api/user/profile/nickname`).
+    ///
+    /// 쿼리 파라미터로 nickname만 전달한다.
+    public var updateNickname: @Sendable (_ nickname: String) async throws -> Void
 
     public init(
         signup: @Sendable @escaping (Domain.SignupInfo) async throws -> Domain.AuthInfo,
@@ -30,7 +34,8 @@ public struct UserClient {
         withdrawal: @Sendable @escaping () async throws -> Bool,
         registerAppInfo: @Sendable @escaping (AppInfo) async throws -> Void,
         updateFCMToken: @Sendable @escaping (String) async throws -> Void,
-        updateProfile: @Sendable @escaping (String, String?) async throws -> Void
+        updateProfile: @Sendable @escaping (String, String?) async throws -> Void,
+        updateNickname: @Sendable @escaping (String) async throws -> Void
     ) {
         self.signup = signup
         self.checkNickname = checkNickname
@@ -38,6 +43,7 @@ public struct UserClient {
         self.registerAppInfo = registerAppInfo
         self.updateFCMToken = updateFCMToken
         self.updateProfile = updateProfile
+        self.updateNickname = updateNickname
     }
 }
 
@@ -61,7 +67,8 @@ extension UserClient: DependencyKey {
         },
         registerAppInfo: { _ in },
         updateFCMToken: { _ in },
-        updateProfile: { _, _ in }
+        updateProfile: { _, _ in },
+        updateNickname: { _ in }
     )
 }
 
@@ -92,6 +99,9 @@ extension UserClient {
         },
         updateProfile: { _, _ in
             fatalError("unimplemented.updateProfile is not implemented")
+        },
+        updateNickname: { _ in
+            fatalError("unimplemented.updateNickname is not implemented")
         }
     )
 }
