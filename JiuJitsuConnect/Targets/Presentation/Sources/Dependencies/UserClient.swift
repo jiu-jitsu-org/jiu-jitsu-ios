@@ -27,6 +27,11 @@ public struct UserClient {
     ///
     /// 쿼리 파라미터로 nickname만 전달한다.
     public var updateNickname: @Sendable (_ nickname: String) async throws -> Void
+    /// 프로필 이미지 URL 갱신 (PUT `/api/user/profile/image`).
+    ///
+    /// 쿼리 파라미터로 profileImageUrl을 전달한다.
+    /// 이미지 삭제(nil)는 이 메서드로 처리하지 않는다.
+    public var updateProfileImage: @Sendable (_ profileImageUrl: String) async throws -> Void
 
     public init(
         signup: @Sendable @escaping (Domain.SignupInfo) async throws -> Domain.AuthInfo,
@@ -35,7 +40,8 @@ public struct UserClient {
         registerAppInfo: @Sendable @escaping (AppInfo) async throws -> Void,
         updateFCMToken: @Sendable @escaping (String) async throws -> Void,
         updateProfile: @Sendable @escaping (String, String?) async throws -> Void,
-        updateNickname: @Sendable @escaping (String) async throws -> Void
+        updateNickname: @Sendable @escaping (String) async throws -> Void,
+        updateProfileImage: @Sendable @escaping (String) async throws -> Void
     ) {
         self.signup = signup
         self.checkNickname = checkNickname
@@ -44,6 +50,7 @@ public struct UserClient {
         self.updateFCMToken = updateFCMToken
         self.updateProfile = updateProfile
         self.updateNickname = updateNickname
+        self.updateProfileImage = updateProfileImage
     }
 }
 
@@ -68,7 +75,8 @@ extension UserClient: DependencyKey {
         registerAppInfo: { _ in },
         updateFCMToken: { _ in },
         updateProfile: { _, _ in },
-        updateNickname: { _ in }
+        updateNickname: { _ in },
+        updateProfileImage: { _ in }
     )
 }
 
@@ -102,6 +110,9 @@ extension UserClient {
         },
         updateNickname: { _ in
             fatalError("unimplemented.updateNickname is not implemented")
+        },
+        updateProfileImage: { _ in
+            fatalError("unimplemented.updateProfileImage is not implemented")
         }
     )
 }

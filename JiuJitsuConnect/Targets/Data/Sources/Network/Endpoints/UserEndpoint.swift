@@ -19,6 +19,9 @@ enum UserEndpoint {
     case updateProfile(request: UpdateUserProfileRequestDTO)
     /// 닉네임 단독 수정 (PUT `/api/user/profile/nickname`) — nickname 쿼리 파라미터 전달.
     case updateNickname(nickname: String)
+    /// 프로필 이미지 URL 갱신 (PUT `/api/user/profile/image`) — profileImageUrl 쿼리 파라미터 전달.
+    /// 이미지 삭제(nil)는 이 엔드포인트로 처리하지 않는다.
+    case updateProfileImage(profileImageUrl: String)
 }
 
 extension UserEndpoint: Endpoint {
@@ -42,6 +45,8 @@ extension UserEndpoint: Endpoint {
             return "/api/user/profile"
         case .updateNickname:
             return "/api/user/profile/nickname"
+        case .updateProfileImage:
+            return "/api/user/profile/image"
         }
     }
 
@@ -53,7 +58,7 @@ extension UserEndpoint: Endpoint {
             return .post
         case .withdrawal:
             return .delete
-        case .updateProfile, .updateNickname:
+        case .updateProfile, .updateNickname, .updateProfileImage:
             return .put
         }
     }
@@ -73,6 +78,8 @@ extension UserEndpoint: Endpoint {
             return ["nickname": request.nickname]
         case .updateNickname(let nickname):
             return ["nickname": nickname]
+        case .updateProfileImage(let profileImageUrl):
+            return ["profileImageUrl": profileImageUrl]
         default: return nil
         }
     }

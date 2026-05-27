@@ -119,6 +119,18 @@ public final class UserRepositoryImpl: UserRepository {
         }
     }
 
+    public func updateProfileImage(_ profileImageUrl: String) async throws -> Bool {
+        do {
+            let endpoint = UserEndpoint.updateProfileImage(profileImageUrl: profileImageUrl)
+            let _: UpdateUserProfileResponseDTO = try await networkService.request(endpoint: endpoint)
+            return true
+        } catch let error as NetworkError {
+            throw error.toDomainError()
+        } catch {
+            throw DomainError.unknown(error.localizedDescription)
+        }
+    }
+
     public func updateNickname(_ nickname: String) async throws -> Bool {
         do {
             let endpoint = UserEndpoint.updateNickname(nickname: nickname)

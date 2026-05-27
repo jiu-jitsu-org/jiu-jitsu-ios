@@ -830,8 +830,8 @@ public struct MyProfileFeature: Sendable {
                 return .run { [nickname = profile.nickname] send in
                     await send(.internal(.profileImageUpdateResponse(
                         await TaskResult {
-                            // BE가 PUT 전체 교체 시맨틱이라 nickname을 함께 전달.
-                            // 이미지 nil → DTO에서 JSON `null`로 명시 전송 → "삭제" 의도.
+                            // PUT /api/user/profile/image 는 profileImageUrl required라 nil 전달 불가.
+                            // 이미지 삭제는 기존 /api/user/profile 경로를 유지한다.
                             try await userClient.updateProfile(nickname, nil)
                             return updatedProfile
                         }
@@ -897,11 +897,11 @@ public struct MyProfileFeature: Sendable {
                     ))))
                 }
                 let updatedProfile = profile.updatingProfileImageUrl(url)
-                return .run { [nickname = profile.nickname] send in
+                return .run { send in
                     await send(.internal(.profileImageUpdateResponse(
                         await TaskResult {
-                            // BE가 PUT 전체 교체 시맨틱이라 nickname을 함께 전달.
-                            try await userClient.updateProfile(nickname, url)
+                            // 이미지 URL 전용 엔드포인트 (PUT /api/user/profile/image, 쿼리 파라미터)
+                            try await userClient.updateProfileImage(url)
                             return updatedProfile
                         }
                     )))

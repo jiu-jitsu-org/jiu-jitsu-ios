@@ -22,4 +22,9 @@ public protocol UserRepository: Sendable {
     ///
     /// 쿼리 파라미터로 nickname만 전달한다.
     func updateNickname(_ nickname: String) async throws -> Bool
+    /// 프로필 이미지 URL 갱신 (PUT `/api/user/profile/image`).
+    ///
+    /// 쿼리 파라미터로 profileImageUrl을 전달한다.
+    /// 이미지 삭제(nil)는 이 메서드로 처리하지 않는다.
+    func updateProfileImage(_ profileImageUrl: String) async throws -> Bool
 }
