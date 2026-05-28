@@ -16,20 +16,54 @@ import Domain
 /// 배경색, 프로필 이미지, 닉네임, 도장명, 버튼을 포함하는 헤더 영역입니다.
 public struct MyProfileHeaderView: View {
     // MARK: - Properties
-    
+
     let nickname: String
     let academyName: String?
     let profileImageUrl: String?
     let beltRank: BeltRank?
     let safeAreaTop: CGFloat
 
+    // Optimistic Update 입력 — 업로드/삭제 진행 중 표시
+    let pendingProfileImageData: Data?
+    let isProfileImageDeleting: Bool
+    let isProfileImageBusy: Bool
+
     let onNicknameEditTapped: () -> Void
     let onGymInfoTapped: () -> Void
     let onMoreButtonTapped: () -> Void
     let onProfileImageEditTapped: () -> Void
 
+    // 기존 호출처 호환 유지를 위한 기본값 init
+    public init(
+        nickname: String,
+        academyName: String?,
+        profileImageUrl: String?,
+        beltRank: BeltRank?,
+        safeAreaTop: CGFloat,
+        pendingProfileImageData: Data? = nil,
+        isProfileImageDeleting: Bool = false,
+        isProfileImageBusy: Bool = false,
+        onNicknameEditTapped: @escaping () -> Void,
+        onGymInfoTapped: @escaping () -> Void,
+        onMoreButtonTapped: @escaping () -> Void,
+        onProfileImageEditTapped: @escaping () -> Void
+    ) {
+        self.nickname = nickname
+        self.academyName = academyName
+        self.profileImageUrl = profileImageUrl
+        self.beltRank = beltRank
+        self.safeAreaTop = safeAreaTop
+        self.pendingProfileImageData = pendingProfileImageData
+        self.isProfileImageDeleting = isProfileImageDeleting
+        self.isProfileImageBusy = isProfileImageBusy
+        self.onNicknameEditTapped = onNicknameEditTapped
+        self.onGymInfoTapped = onGymInfoTapped
+        self.onMoreButtonTapped = onMoreButtonTapped
+        self.onProfileImageEditTapped = onProfileImageEditTapped
+    }
+
     // MARK: - Body
-    
+
     public var body: some View {
         ZStack(alignment: .top) {
             // 배경색 (벨트 등급에 따라 변경)
@@ -43,6 +77,9 @@ public struct MyProfileHeaderView: View {
                 // 프로필 이미지
                 ProfileImageView(
                     profileImageUrl: profileImageUrl,
+                    pendingImageData: pendingProfileImageData,
+                    isDeleting: isProfileImageDeleting,
+                    isBusy: isProfileImageBusy,
                     size: 90,
                     cornerRadius: 24,
                     iconSize: 64,
@@ -103,9 +140,20 @@ public struct MyProfileHeaderView: View {
 
 // MARK: - ProfileImageView
 
-/// 프로필 이미지 컴포넌트
+/// 프로필 이미지 컴포넌트.
+///
+/// 표시 우선순위:
+/// 1. `isDeleting`이면 기본 아이콘 (삭제 진행 중 즉시 반영)
+/// 2. `pendingImageData`가 있으면 로컬 미리보기 (Optimistic Update)
+/// 3. `profileImageUrl`이 유효한 http/https면 AsyncImage
+/// 4. 그 외 기본 아이콘
+///
+/// `isBusy`가 true면 이미지를 살짝 흐리게 + 중앙에 스피너를 띄워 "처리 중"을 시각화한다.
 private struct ProfileImageView: View {
     let profileImageUrl: String?
+    let pendingImageData: Data?
+    let isDeleting: Bool
+    let isBusy: Bool
     let size: CGFloat
     let cornerRadius: CGFloat
     let iconSize: CGFloat
@@ -117,27 +165,14 @@ private struct ProfileImageView: View {
                 .fill(Color.component.list.setting.background)
                 .frame(width: size, height: size)
 
-            if let profileImageUrl = profileImageUrl,
-               let url = URL(string: profileImageUrl),
-               url.scheme == "https" || url.scheme == "http" {
-                // 실제 프로필 이미지
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: size, height: size)
-                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                    case .failure, .empty:
-                        defaultProfileIcon
-                    @unknown default:
-                        defaultProfileIcon
-                    }
-                }
-            } else {
-                // 기본 아이콘
-                defaultProfileIcon
+            imageContent
+                .frame(width: size, height: size)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                .opacity(isBusy ? 0.6 : 1.0)
+                .animation(.easeInOut(duration: 0.2), value: isBusy)
+
+            if isBusy {
+                busyOverlay
             }
         }
         .frame(width: size, height: size)
@@ -145,6 +180,64 @@ private struct ProfileImageView: View {
             cameraButton
                 .offset(x: 5, y: 4)
         }
+    }
+
+    @ViewBuilder
+    private var imageContent: some View {
+        if isDeleting {
+            // 삭제 진행 중 — 헤더를 즉시 기본 상태로 전환
+            defaultProfileIcon
+        } else if let profileImageUrl = profileImageUrl,
+                  let url = URL(string: profileImageUrl),
+                  url.scheme == "https" || url.scheme == "http" {
+            // 서버 URL이 있는 경로. 업로드 성공 직후엔 새 URL의 AsyncImage가 `.empty`로
+            // 시작하면서 잠깐 기본 아이콘이 깜빡일 수 있는데, 그 사이를 로컬 미리보기로 덮어
+            // 사용자에게는 무중단 전환처럼 보이도록 한다.
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                case .empty, .failure:
+                    pendingPreviewOrDefault
+                @unknown default:
+                    pendingPreviewOrDefault
+                }
+            }
+        } else if let data = pendingImageData, let uiImage = UIImage(data: data) {
+            // URL이 아직 없거나(예: 최초 등록 진행 중) 비http인 경우 — 로컬 미리보기
+            Image(uiImage: uiImage)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+        } else {
+            defaultProfileIcon
+        }
+    }
+
+    @ViewBuilder
+    private var pendingPreviewOrDefault: some View {
+        if let data = pendingImageData, let uiImage = UIImage(data: data) {
+            Image(uiImage: uiImage)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+        } else {
+            defaultProfileIcon
+        }
+    }
+
+    private var busyOverlay: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(Color.black.opacity(0.18))
+                .frame(width: size, height: size)
+
+            ProgressView()
+                .progressViewStyle(.circular)
+                .tint(Color.component.list.setting.background)
+                .scaleEffect(1.1)
+        }
+        .transition(.opacity)
     }
 
     private var defaultProfileIcon: some View {

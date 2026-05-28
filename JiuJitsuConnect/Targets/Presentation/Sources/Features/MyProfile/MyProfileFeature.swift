@@ -43,6 +43,17 @@ public struct MyProfileFeature: Sendable {
         // 1:1 크롭 화면 풀스크린 커버
         @Presents var imageCropCover: ProfileImageCropFeature.State?
 
+        // MARK: - 프로필 이미지 Optimistic Update 상태
+        //
+        // ImageKit 업로드 + BE 반영까지 2~5초 걸리는 동안 사용자가 변화를 즉시 인지하도록
+        // 크롭 직후 로컬 데이터를 헤더에 미리 표시한다. 응답 성공 시 communityProfile.profileImageUrl로
+        // 자연스럽게 전환되고, 실패 시 두 필드를 비워 이전 이미지로 롤백한다.
+
+        /// 업로드 진행 중 헤더에 미리 노출할 로컬 이미지 데이터
+        var pendingProfileImageData: Data?
+        /// 이미지 삭제 진행 중 — 헤더를 기본 아이콘으로 미리 전환
+        var isProfileImageDeleting: Bool = false
+
         public enum ImageCaptureSource: Equatable, Sendable {
             case camera
             case photoLibrary
@@ -826,6 +837,8 @@ public struct MyProfileFeature: Sendable {
                 }
                 let updatedProfile = profile.updatingProfileImageUrl(nil)
                 state.isLoadingProfile = true
+                // Optimistic UX — 헤더를 즉시 기본 아이콘으로 전환
+                state.isProfileImageDeleting = true
                 Log.trace("프로필 이미지 - 삭제 요청", category: .network, level: .info)
                 return .run { [nickname = profile.nickname] send in
                     await send(.internal(.profileImageUpdateResponse(
@@ -871,6 +884,8 @@ public struct MyProfileFeature: Sendable {
                     ))))
                 }
                 state.isLoadingProfile = true
+                // Optimistic UX — 크롭 결과를 헤더에 즉시 노출 (네트워크와 무관하게)
+                state.pendingProfileImageData = croppedData
                 Log.trace(
                     "프로필 이미지 - 업로드 시작 (\(croppedData.count) bytes)",
                     category: .network,
@@ -910,6 +925,8 @@ public struct MyProfileFeature: Sendable {
 
             case let .internal(.profileImageUploadResponse(.failure(error))):
                 state.isLoadingProfile = false
+                // 업로드 실패 → 미리보기 롤백
+                state.pendingProfileImageData = nil
                 Log.trace("Failed to upload profile image: \(error)", category: .network, level: .error)
                 return .send(.internal(.showToast(.init(
                     message: "이미지 업로드에 실패했어요. 다시 시도해주세요", style: .info
@@ -918,6 +935,14 @@ public struct MyProfileFeature: Sendable {
             case let .internal(.profileImageUpdateResponse(.success(updatedProfile))):
                 state.isLoadingProfile = false
                 state.communityProfile = updatedProfile
+                state.isProfileImageDeleting = false
+                // 업로드 성공 시에는 pendingProfileImageData를 유지한다.
+                // AsyncImage가 새 URL을 가져오는 동안 `.empty` 단계에서 기본 아이콘이
+                // 잠깐 깜빡이는 걸 fallback으로 덮기 위함. 다음 업로드 때 새 값으로 덮어쓰고,
+                // 삭제 케이스에서는 명시적으로 nil로 정리한다.
+                if updatedProfile.profileImageUrl == nil {
+                    state.pendingProfileImageData = nil
+                }
                 // 업로드/삭제 동일 핸들러로 통합 — profileImageUrl 유무로 토스트 문구 분기
                 let message = updatedProfile.profileImageUrl == nil
                     ? "프로필 이미지를 삭제했어요"
@@ -926,6 +951,9 @@ public struct MyProfileFeature: Sendable {
 
             case let .internal(.profileImageUpdateResponse(.failure(error))):
                 state.isLoadingProfile = false
+                // BE 반영 실패 → 미리보기/삭제 표시 롤백
+                state.pendingProfileImageData = nil
+                state.isProfileImageDeleting = false
                 Log.trace("Failed to update profile image url: \(error)", category: .network, level: .error)
                 return .send(.internal(.showToast(.init(
                     message: "프로필 저장에 실패했어요. 다시 시도해주세요", style: .info
