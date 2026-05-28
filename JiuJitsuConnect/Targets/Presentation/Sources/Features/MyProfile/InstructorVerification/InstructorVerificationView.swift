@@ -17,7 +17,9 @@ public struct InstructorVerificationView: View {
 
     /// 시트 본문 자연 높이 — 호출부에서 `presentationDetents`에 사용.
     /// 다른 시트(`BeltSettingView` 등)와 동일한 정적 상수 패턴.
-    public static let contentHeight: CGFloat = 369
+    /// Figma 디자인 가이드 기준 전체 바텀 시트 높이 = 409
+    /// (본문 내재 369 + iOS 26 Liquid Glass partial sheet 내부 inset 보정 ~40)
+    public static let contentHeight: CGFloat = 409
 
     public init(store: StoreOf<InstructorVerificationFeature>) {
         self.store = store
@@ -39,6 +41,10 @@ public struct InstructorVerificationView: View {
             titleSection
             noticeBox
                 .padding(.top, 16)
+            // contentHeight(409) - body 자식 합(369) = 40pt의 빈 공간이 어딘가에 들어가야 한다.
+            // 이 Spacer 없으면 40pt가 CTA 아래에 쌓여 CTA가 디바이스 바닥에서 멀어진다.
+            // Spacer로 noticeBox와 CTA 사이가 흡수하면 CTA가 시트 바닥에 못박힌다.
+            Spacer(minLength: 0)
             ctaSection
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -121,6 +127,9 @@ public struct InstructorVerificationView: View {
         }
         .padding(.top, 8)
         .padding(.horizontal, Metrics.horizontalPadding)
+        // iOS 26 Liquid Glass partial 시트 외곽에 시스템이 ~10pt floating gap을 두므로
+        // 시각적 거리는 padding + 10pt가 되지만, iOS 기본 패턴을 거스르지 않기 위해
+        // 디자인 토큰 그대로 16pt를 둔다.
         .padding(.bottom, 16)
     }
 
