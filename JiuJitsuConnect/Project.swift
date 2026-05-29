@@ -136,6 +136,7 @@ let project = Project(
             settings: .settings(
                 base: [
                     "CODE_SIGN_STYLE": "Automatic",
+                    "DEVELOPMENT_TEAM": "$(DEVELOPMENT_TEAM)",
                     "MARKETING_VERSION": SettingValue(stringLiteral: version),
                     "CODE_SIGN_IDENTITY": "iPhone Developer",
                     "CODE_SIGNING_REQUIRED": "YES",
