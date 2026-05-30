@@ -18,20 +18,12 @@ public struct UserClient {
     public var registerAppInfo: @Sendable (AppInfo) async throws -> Void
     /// 로그인 등 이후 FCM 토큰만 갱신해 동일 API로 재등록
     public var updateFCMToken: @Sendable (String) async throws -> Void
-    /// 사용자 프로필 갱신 (PUT `/api/user/profile`).
-    ///
-    /// nickname은 항상 현재값/새 값을 전달 (BE required).
-    /// 이미지 삭제는 `profileImageUrl = nil` → JSON `null`로 명시 전송.
-    public var updateProfile: @Sendable (_ nickname: String, _ profileImageUrl: String?) async throws -> Void
     /// 닉네임 단독 수정 (PUT `/api/user/profile/nickname`).
-    ///
-    /// 쿼리 파라미터로 nickname만 전달한다.
     public var updateNickname: @Sendable (_ nickname: String) async throws -> Void
-    /// 프로필 이미지 URL 갱신 (PUT `/api/user/profile/image`).
+    /// 프로필 이미지 URL 갱신/삭제 (PUT `/api/user/profile/image`).
     ///
-    /// 쿼리 파라미터로 profileImageUrl을 전달한다.
-    /// 이미지 삭제(nil)는 이 메서드로 처리하지 않는다.
-    public var updateProfileImage: @Sendable (_ profileImageUrl: String) async throws -> Void
+    /// `nil` 전달 시 삭제 의도 — Data 레이어가 BE sentinel로 매핑해 같은 엔드포인트로 보낸다.
+    public var updateProfileImage: @Sendable (_ profileImageUrl: String?) async throws -> Void
 
     public init(
         signup: @Sendable @escaping (Domain.SignupInfo) async throws -> Domain.AuthInfo,
@@ -39,16 +31,14 @@ public struct UserClient {
         withdrawal: @Sendable @escaping () async throws -> Bool,
         registerAppInfo: @Sendable @escaping (AppInfo) async throws -> Void,
         updateFCMToken: @Sendable @escaping (String) async throws -> Void,
-        updateProfile: @Sendable @escaping (String, String?) async throws -> Void,
         updateNickname: @Sendable @escaping (String) async throws -> Void,
-        updateProfileImage: @Sendable @escaping (String) async throws -> Void
+        updateProfileImage: @Sendable @escaping (String?) async throws -> Void
     ) {
         self.signup = signup
         self.checkNickname = checkNickname
         self.withdrawal = withdrawal
         self.registerAppInfo = registerAppInfo
         self.updateFCMToken = updateFCMToken
-        self.updateProfile = updateProfile
         self.updateNickname = updateNickname
         self.updateProfileImage = updateProfileImage
     }
@@ -74,7 +64,6 @@ extension UserClient: DependencyKey {
         },
         registerAppInfo: { _ in },
         updateFCMToken: { _ in },
-        updateProfile: { _, _ in },
         updateNickname: { _ in },
         updateProfileImage: { _ in }
     )
@@ -104,9 +93,6 @@ extension UserClient {
         },
         updateFCMToken: { _ in
             fatalError("unimplemented.updateFCMToken is not implemented")
-        },
-        updateProfile: { _, _ in
-            fatalError("unimplemented.updateProfile is not implemented")
         },
         updateNickname: { _ in
             fatalError("unimplemented.updateNickname is not implemented")

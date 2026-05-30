@@ -35,7 +35,8 @@ extension LoginResponseDTO.UserInfo {
             userId: self.userId,
             email: self.email,
             nickname: self.nickname,
-            profileImageUrl: self.profileImageUrl,
+            // BE sentinel "default" → nil 정규화
+            profileImageUrl: ProfileImageSentinel.normalize(self.profileImageUrl),
             snsProvider: self.snsProvider,
             deactivatedWithinGrace: self.deactivatedWithinGrace
         )
@@ -60,7 +61,8 @@ extension RefreshResponseDTO.UserInfo {
             userId: self.userId,
             email: self.email,
             nickname: self.nickname,
-            profileImageUrl: self.profileImageUrl,
+            // BE sentinel "default" → nil 정규화
+            profileImageUrl: ProfileImageSentinel.normalize(self.profileImageUrl),
             snsProvider: self.snsProvider,
             deactivatedWithinGrace: self.deactivatedWithinGrace
         )

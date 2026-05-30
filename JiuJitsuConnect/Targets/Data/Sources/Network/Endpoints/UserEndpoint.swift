@@ -14,13 +14,10 @@ enum UserEndpoint {
     case withdrawal
     /// 회원 앱 정보 등록 (Swagger: POST `/user/appInfo` — 서버 라우팅에 맞춰 `/api/user/appInfo`)
     case registerAppInfo(request: AppInfoRequestDTO)
-    /// 사용자 프로필 갱신 (PUT `/api/user/profile`) — 프로필 이미지 URL 등 user-level 필드.
-    /// 커뮤니티 프로필(`/api/community/profile`)과는 데이터 도메인이 다르다.
-    case updateProfile(request: UpdateUserProfileRequestDTO)
     /// 닉네임 단독 수정 (PUT `/api/user/profile/nickname`) — nickname 쿼리 파라미터 전달.
     case updateNickname(nickname: String)
-    /// 프로필 이미지 URL 갱신 (PUT `/api/user/profile/image`) — profileImageUrl 쿼리 파라미터 전달.
-    /// 이미지 삭제(nil)는 이 엔드포인트로 처리하지 않는다.
+    /// 프로필 이미지 URL 갱신/삭제 (PUT `/api/user/profile/image`) — profileImageUrl 쿼리 파라미터 전달.
+    /// 삭제는 호출부에서 BE 합의 sentinel(`"default"`)로 매핑되어 같은 엔드포인트로 전달된다.
     case updateProfileImage(profileImageUrl: String)
 }
 
@@ -41,8 +38,6 @@ extension UserEndpoint: Endpoint {
             return "/api/user/check/nickname"
         case .registerAppInfo:
             return "/api/user/appInfo"
-        case .updateProfile:
-            return "/api/user/profile"
         case .updateNickname:
             return "/api/user/profile/nickname"
         case .updateProfileImage:
@@ -58,7 +53,7 @@ extension UserEndpoint: Endpoint {
             return .post
         case .withdrawal:
             return .delete
-        case .updateProfile, .updateNickname, .updateProfileImage:
+        case .updateNickname, .updateProfileImage:
             return .put
         }
     }
@@ -89,8 +84,6 @@ extension UserEndpoint: Endpoint {
         case .signup(let request, _):
             return try? JSONEncoder().encode(request)
         case .registerAppInfo(let request):
-            return try? JSONEncoder().encode(request)
-        case .updateProfile(let request):
             return try? JSONEncoder().encode(request)
         default: return nil
         }

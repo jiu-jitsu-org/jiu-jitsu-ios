@@ -86,12 +86,6 @@ public final class DependencyContainer {
                 _ = try await self.userRepository.registerAppInfo(info: info)
                 self.sharedFirebaseClient.cacheToken(token)
             },
-            updateProfile: { nickname, profileImageUrl in
-                _ = try await self.userRepository.updateProfile(
-                    nickname: nickname,
-                    profileImageUrl: profileImageUrl
-                )
-            },
             updateNickname: { nickname in
                 _ = try await self.userRepository.updateNickname(nickname)
             },
@@ -114,8 +108,8 @@ public final class DependencyContainer {
 
     public func configureImageUploadClient() -> ImageUploadClient {
         return ImageUploadClient(
-            uploadProfileImage: { data in
-                try await self.imageUploadRepository.uploadProfileImage(data)
+            uploadImage: { data, purpose in
+                try await self.imageUploadRepository.uploadImage(data, purpose: purpose)
             }
         )
     }

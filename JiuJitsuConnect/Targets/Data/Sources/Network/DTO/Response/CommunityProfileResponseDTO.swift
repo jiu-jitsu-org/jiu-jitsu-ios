@@ -34,7 +34,8 @@ struct CommunityProfileResponseDTO: Codable {
     func toDomain() -> CommunityProfile {
         CommunityProfile(
             nickname: nickname,
-            profileImageUrl: profileImageUrl,
+            // BE sentinel "default" → nil 정규화 (도메인은 sentinel을 알지 못함)
+            profileImageUrl: ProfileImageSentinel.normalize(profileImageUrl),
             beltRank: beltRank.flatMap { BeltRank(rawValue: $0) },
             beltStripe: beltStripe.flatMap { BeltStripe(rawValue: $0) },
             gender: gender.flatMap { Gender(rawValue: $0) },

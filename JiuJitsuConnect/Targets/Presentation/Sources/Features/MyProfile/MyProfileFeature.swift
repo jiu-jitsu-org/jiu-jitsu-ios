@@ -840,12 +840,12 @@ public struct MyProfileFeature: Sendable {
                 // Optimistic UX — 헤더를 즉시 기본 아이콘으로 전환
                 state.isProfileImageDeleting = true
                 Log.trace("프로필 이미지 - 삭제 요청", category: .network, level: .info)
-                return .run { [nickname = profile.nickname] send in
+                return .run { send in
                     await send(.internal(.profileImageUpdateResponse(
                         await TaskResult {
-                            // PUT /api/user/profile/image 는 profileImageUrl required라 nil 전달 불가.
-                            // 이미지 삭제는 기존 /api/user/profile 경로를 유지한다.
-                            try await userClient.updateProfile(nickname, nil)
+                            // 삭제도 등록/변경과 동일한 PUT /api/user/profile/image 사용.
+                            // nil은 Data 레이어에서 BE sentinel("default")로 매핑되어 전달된다.
+                            try await userClient.updateProfileImage(nil)
                             return updatedProfile
                         }
                     )))
