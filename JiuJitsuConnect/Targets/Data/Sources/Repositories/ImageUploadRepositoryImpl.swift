@@ -11,9 +11,9 @@ import CoreKit
 
 /// ImageKit 기반 `ImageUploadRepository` 구현.
 ///
-/// 흐름:
+/// 흐름 (모든 purpose 공통):
 /// 1. 우리 BE의 `/api/imagekit/auth`로부터 `token`/`expire`/`signature` 발급
-/// 2. multipart 본문 구성
+/// 2. multipart 본문 구성 (폴더/파일명 prefix는 purpose에서 도출)
 /// 3. `upload.imagekit.io/api/v1/files/upload`에 직접 업로드 → 호스팅된 URL 반환
 public final class ImageUploadRepositoryImpl: ImageUploadRepository {
 
@@ -28,15 +28,20 @@ public final class ImageUploadRepositoryImpl: ImageUploadRepository {
         self.decoder = d
     }
 
-    public func uploadProfileImage(_ data: Data) async throws -> String {
+    public func uploadImage(_ data: Data, purpose: ImageUploadPurpose) async throws -> String {
         do {
-            // 0) 업로드 페이로드 정규화 — 1024px 다운샘플 + JPEG 0.8 재인코딩.
-            //    원본 풀해상도(예: 12MP)를 그대로 올리면 모바일 전용 표시 용도엔 과한 데다
-            //    ImageKit 무료 플랜 스토리지/대역폭을 빠르게 잠식한다.
+            // 0) 업로드 페이로드 정규화 — purpose별 maxPixel/quality 적용.
+            //    프로필은 헤더 표시 전용이라 공격적으로 줄이고, 인증 사진은 관리자 검수에서
+            //    텍스트/디테일 가독성이 중요하므로 보수적으로 압축한다.
             //    실패 시 원본 data로 fallback해 업로드는 계속 진행.
-            let payload = ImageDownsampler.normalizeForUpload(data) ?? data
+            let compression = ImageKitConfig.uploadCompression(for: purpose)
+            let payload = ImageDownsampler.normalizeForUpload(
+                data,
+                maxPixel: compression.maxPixel,
+                quality: compression.quality
+            ) ?? data
             Log.trace(
-                "프로필 이미지 정규화 — \(data.count) → \(payload.count) bytes",
+                "이미지 정규화 (\(purpose.logLabel), \(Int(compression.maxPixel))px / q\(compression.quality)) — \(data.count) → \(payload.count) bytes",
                 category: .network,
                 level: .info
             )
@@ -46,15 +51,17 @@ public final class ImageUploadRepositoryImpl: ImageUploadRepository {
                 endpoint: ImageKitAuthEndpoint.fetchAuthParams
             )
 
-            // 2) multipart 본문 구성
+            // 2) multipart 본문 구성 — folder/prefix는 purpose-aware
             var builder = MultipartFormDataBuilder()
-            let filename = "profile_\(Int(Date().timeIntervalSince1970)).jpg"
+            let prefix = ImageKitConfig.filenamePrefix(for: purpose)
+            let folder = ImageKitConfig.uploadFolder(for: purpose)
+            let filename = "\(prefix)_\(Int(Date().timeIntervalSince1970)).jpg"
             builder.appendField(name: "publicKey", value: ImageKitConfig.publicKey)
             builder.appendField(name: "signature", value: auth.signature)
             builder.appendField(name: "token",     value: auth.token)
             builder.appendField(name: "expire",    value: String(auth.expire))
             builder.appendField(name: "fileName",  value: filename)
-            builder.appendField(name: "folder",    value: ImageKitConfig.uploadFolder)
+            builder.appendField(name: "folder",    value: folder)
             builder.appendField(name: "useUniqueFileName", value: "true")
             builder.appendFile(name: "file", filename: filename, mimeType: "image/jpeg", data: payload)
 
@@ -62,7 +69,7 @@ public final class ImageUploadRepositoryImpl: ImageUploadRepository {
             let body = builder.finalize()
 
             Log.trace(
-                "ImageKit 업로드 시작 — \(payload.count) bytes, boundary=\(boundary)",
+                "ImageKit 업로드 시작 (\(purpose.logLabel)) — \(payload.count) bytes, folder=\(folder), boundary=\(boundary)",
                 category: .network,
                 level: .info
             )
@@ -74,7 +81,7 @@ public final class ImageUploadRepositoryImpl: ImageUploadRepository {
             let dto = try decoder.decode(ImageKitUploadResponseDTO.self, from: raw)
 
             Log.trace(
-                "ImageKit 업로드 완료 — url=\(dto.url)",
+                "ImageKit 업로드 완료 (\(purpose.logLabel)) — url=\(dto.url)",
                 category: .network,
                 level: .info
             )
@@ -86,6 +93,17 @@ public final class ImageUploadRepositoryImpl: ImageUploadRepository {
             throw domainError
         } catch {
             throw DomainError.unknown(error.localizedDescription)
+        }
+    }
+}
+
+// MARK: - Log label (Data 내부 디버깅용 — Presentation의 표시 텍스트와 분리)
+
+private extension ImageUploadPurpose {
+    var logLabel: String {
+        switch self {
+        case .profileImage:           return "프로필 이미지"
+        case .instructorVerification: return "관장 사범 인증"
         }
     }
 }

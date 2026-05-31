@@ -71,7 +71,7 @@ public struct ProfileImageEditView: View {
     private var titleSection: some View {
         VStack {
             Spacer()
-            Text("프로필 이미지 수정")
+            Text(store.title)
                 .font(Font.pretendard.title2)
                 .foregroundStyle(Color.component.sectionHeader.title)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -187,6 +187,19 @@ private struct PressableRowButtonStyle: ButtonStyle {
     ProfileImageEditView(
         store: Store(
             initialState: ProfileImageEditFeature.State(canDelete: false)
+        ) {
+            ProfileImageEditFeature()
+        }
+    )
+}
+
+#Preview("관장 사범 인증 - 사진 첨부") {
+    ProfileImageEditView(
+        store: Store(
+            initialState: ProfileImageEditFeature.State(
+                purpose: .instructorVerification,
+                canDelete: false
+            )
         ) {
             ProfileImageEditFeature()
         }

@@ -103,8 +103,10 @@ public struct MyProfileView: View {
             .ignoresSafeArea(edges: .top)
             .navigationDestinations(store: $store)
             .toastOverlay(store: store)
+            // picker 프레젠테이션은 시트 content 안쪽에서 적용된다
+            // (iOS는 한 presenter에서 sheet + fullScreenCover 동시 제시를 막으므로
+            //  picker가 시트 위에 stacking되려면 시트 자체가 presenter여야 한다)
             .sheetPresentation(store: $store)
-            .imageCapturePresentation(store: $store)
             .imageCropPresentation(store: $store)
         }
     }
@@ -317,6 +319,9 @@ private extension View {
                     .presentationBackground(
                         Color.component.bottomSheet.selected.container.background
                     )
+                    // 시트 위에 카메라/앨범 picker stacking — 시트가 자체 presenter가
+                    // 되어야 iOS의 sheet + fullScreenCover 동시 제시 제약을 우회할 수 있다
+                    .imageCapturePresentation(store: store)
             }
             .sheet(
                 item: store.scope(

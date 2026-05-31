@@ -15,7 +15,7 @@ import CoreKit
 public struct MyProfileFeature: Sendable {
     public init() {}
     
-    private enum CancelID { case toast, profileImageUpload }
+    private enum CancelID { case toast, profileImageUpload, instructorVerificationUpload }
 
     @ObservableState
     public struct State: Equatable, Sendable {
@@ -42,6 +42,11 @@ public struct MyProfileFeature: Sendable {
 
         // 1:1 크롭 화면 풀스크린 커버
         @Presents var imageCropCover: ProfileImageCropFeature.State?
+
+        // 현재 진행 중인 이미지 픽 흐름의 목적 — 픽커→크롭→업로드 파이프라인 전반에 걸쳐
+        // 어느 사용처(프로필 이미지 vs. 관장 사범 인증)에서 시작됐는지 식별하기 위함.
+        // 시트가 닫힌 뒤(파일러/크롭 진행 중)에도 유지되어야 하므로 별도 상태로 둔다.
+        var pendingImagePurpose: ProfileImageEditFeature.Purpose?
 
         // MARK: - 프로필 이미지 Optimistic Update 상태
         //
@@ -149,10 +154,16 @@ public struct MyProfileFeature: Sendable {
             // 프로필 이미지 수정 흐름 — 시트/풀스크린 전환 사이에 짧은 딜레이를 두고 발화
             case presentImageCaptureSource(State.ImageCaptureSource)
             case presentImageCrop(Data)
+            // 관장 사범 인증 → 사진 첨부 시트로의 시트-시트 전환을 위한 딜레이 발화
+            case presentImageEditSheet(ProfileImageEditFeature.Purpose, canDelete: Bool)
 
             // 프로필 이미지 업로드/반영 응답
             case profileImageUploadResponse(TaskResult<String>)            // ImageKit 호스팅 URL
             case profileImageUpdateResponse(TaskResult<CommunityProfile>)  // PUT /api/user/profile 반영 결과
+
+            // 관장 사범 인증 사진 업로드 응답 (ImageKit 호스팅 URL)
+            // BE 제출 엔드포인트는 별도 정의 예정 — 현재는 ImageKit URL 확보까지가 스코프
+            case instructorVerificationImageUploadResponse(TaskResult<String>)
 
             // 닉네임 갱신 응답 (이미지와 동일한 PUT /api/user/profile 사용)
             case nicknameUpdateResponse(TaskResult<CommunityProfile>)
@@ -793,13 +804,22 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case .sheet(.presented(.instructorVerification(.delegate(.didSelectUpload)))):
+                // 시트→시트 전환 — 안내 시트 dismiss 후 짧은 딜레이를 두고 사진 첨부 시트 노출
+                // (`.sheet(item:)` 모디파이어가 케이스마다 분리되어 있어 즉시 교체 시 한쪽이 누락될 수 있음)
                 state.sheet = nil
-                // FIXME: 인증 사진 업로드 플로우 진입 연결 (사진 선택 → 업로드 → 검수 대기)
-                Log.trace("관장 사범 인증 - 사진 업로드 선택됨", category: .debug, level: .info)
-                return .none
+                return .run { send in
+                    try await clock.sleep(for: .milliseconds(300))
+                    await send(.internal(.presentImageEditSheet(.instructorVerification, canDelete: false)))
+                }
 
             case .sheet(.presented(.instructorVerification(.delegate(.didCancel)))):
                 state.sheet = nil
+                return .none
+
+            case let .internal(.presentImageEditSheet(purpose, canDelete)):
+                state.sheet = .profileImageEdit(
+                    ProfileImageEditFeature.State(purpose: purpose, canDelete: canDelete)
+                )
                 return .none
 
             case .view(.profileImageEditButtonTapped):
@@ -812,19 +832,18 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case .sheet(.presented(.profileImageEdit(.delegate(.didSelectCamera)))):
-                // 시트가 완전히 닫힌 뒤에 풀스크린 커버를 띄워야 안정적으로 전환된다.
-                state.sheet = nil
-                return .run { send in
-                    try await clock.sleep(for: .milliseconds(300))
-                    await send(.internal(.presentImageCaptureSource(.camera)))
-                }
+                // 액션 시트는 유지한 채 picker를 위에 띄운다 — picker 취소 시 시트가 그대로
+                // 남아 사용자가 즉시 다른 옵션을 다시 선택할 수 있게 한다(2-depth 재진입 제거).
+                // purpose는 picker→crop→업로드 파이프라인 분기에 필요하므로 시트가 살아있는
+                // 동안 별도 상태에 보관해둔다.
+                state.pendingImagePurpose = state.sheet?.profileImageEdit?.purpose ?? .profileImage
+                state.imageCaptureSource = .camera
+                return .none
 
             case .sheet(.presented(.profileImageEdit(.delegate(.didSelectAlbum)))):
-                state.sheet = nil
-                return .run { send in
-                    try await clock.sleep(for: .milliseconds(300))
-                    await send(.internal(.presentImageCaptureSource(.photoLibrary)))
-                }
+                state.pendingImagePurpose = state.sheet?.profileImageEdit?.purpose ?? .profileImage
+                state.imageCaptureSource = .photoLibrary
+                return .none
 
             case .sheet(.presented(.profileImageEdit(.delegate(.didSelectDelete)))):
                 state.sheet = nil
@@ -853,6 +872,11 @@ public struct MyProfileFeature: Sendable {
 
             case .sheet(.presented(.profileImageEdit(.delegate(.didCancel)))):
                 state.sheet = nil
+                // 시트가 사라지면 시트 안에서 attach된 picker도 같이 해제되므로
+                // 관련 상태를 모두 정리해 다음 시트 오픈 시 stale 상태로 picker가
+                // 자동 재현하지 않도록 한다
+                state.imageCaptureSource = nil
+                state.pendingImagePurpose = nil
                 return .none
 
             case let .internal(.presentImageCaptureSource(source)):
@@ -860,14 +884,45 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case let .view(.imagePicked(data)):
-                // 픽커 dismiss → 크롭 화면 진입까지의 전환 안정화를 위해 짧은 딜레이
+                // 사진 선택 완료 — picker dismiss + 액션 시트 정리.
+                // purpose에 따라 다음 단계 분기:
+                //   - 프로필 이미지: 1:1 크롭 단계로 진행 (헤더 아바타는 정사각형이라 필수)
+                //   - 관장 사범 인증: 크롭 생략, 바로 ImageKit 업로드
+                //     (검수용 사진은 자격증/명판 등 원본 컴포지션 유지가 중요)
                 state.imageCaptureSource = nil
-                return .run { send in
-                    try await clock.sleep(for: .milliseconds(300))
-                    await send(.internal(.presentImageCrop(data)))
+                state.sheet = nil
+
+                let purpose = state.pendingImagePurpose ?? .profileImage
+
+                switch purpose {
+                case .profileImage:
+                    return .run { send in
+                        try await clock.sleep(for: .milliseconds(300))
+                        await send(.internal(.presentImageCrop(data)))
+                    }
+
+                case .instructorVerification:
+                    // 파이프라인이 여기서 끝나므로 purpose 리셋
+                    state.pendingImagePurpose = nil
+                    Log.trace(
+                        "관장 사범 인증 - 크롭 생략, 원본 업로드 시작 (\(data.count) bytes)",
+                        category: .network,
+                        level: .info
+                    )
+                    return .run { send in
+                        await send(.internal(.instructorVerificationImageUploadResponse(
+                            await TaskResult {
+                                try await imageUploadClient.uploadImage(data, .instructorVerification)
+                            }
+                        )))
+                    }
+                    .cancellable(id: CancelID.instructorVerificationUpload)
                 }
 
             case .view(.imagePickerCancelled):
+                // picker만 닫고 액션 시트와 purpose는 그대로 유지 — 사용자가 같은 시트에서
+                // 다른 옵션을 즉시 재선택할 수 있도록 (pendingImagePurpose는 시트 자체가
+                // 닫히는 경로(didCancel) 또는 크롭 단계 종료 시 리셋된다)
                 state.imageCaptureSource = nil
                 return .none
 
@@ -876,8 +931,11 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case let .imageCropCover(.presented(.delegate(.didConfirm(croppedData)))):
-                // 크롭 화면을 즉시 닫고 MY 헤더 로딩 상태로 전환 (다른 섹션 업데이트 UX와 동일)
+                // 크롭 단계는 프로필 이미지 흐름 전용 — 관장 사범 인증은 imagePicked에서
+                // 크롭을 생략하고 바로 ImageKit으로 업로드된다. 따라서 여기서는 purpose
+                // 분기 없이 프로필 업로드 경로만 처리한다.
                 state.imageCropCover = nil
+                state.pendingImagePurpose = nil
                 guard state.communityProfile != nil else {
                     return .send(.internal(.showToast(.init(
                         message: "프로필 정보를 불러올 수 없어요", style: .info
@@ -894,7 +952,7 @@ public struct MyProfileFeature: Sendable {
                 return .run { send in
                     await send(.internal(.profileImageUploadResponse(
                         await TaskResult {
-                            try await imageUploadClient.uploadProfileImage(croppedData)
+                            try await imageUploadClient.uploadImage(croppedData, .profileImage)
                         }
                     )))
                 }
@@ -902,6 +960,8 @@ public struct MyProfileFeature: Sendable {
 
             case .imageCropCover(.presented(.delegate(.didCancel))):
                 state.imageCropCover = nil
+                // 크롭 단계 취소 → 파이프라인 종료, purpose 리셋
+                state.pendingImagePurpose = nil
                 return .none
 
             case let .internal(.profileImageUploadResponse(.success(url))):
@@ -930,6 +990,26 @@ public struct MyProfileFeature: Sendable {
                 Log.trace("Failed to upload profile image: \(error)", category: .network, level: .error)
                 return .send(.internal(.showToast(.init(
                     message: "이미지 업로드에 실패했어요. 다시 시도해주세요", style: .info
+                ))))
+
+            case let .internal(.instructorVerificationImageUploadResponse(.success(url))):
+                // ImageKit URL 확보 완료. BE 검수 요청 엔드포인트 연결은 별도 합의 후 진행 —
+                // 본 단계에서는 업로드 성공 사실을 사용자에게 토스트로 안내한다.
+                // (안내 문구: 검수가 비동기이므로 "업로드했어요" 정도가 정확함)
+                Log.trace(
+                    "관장 사범 인증 - ImageKit 업로드 완료. url=\(url) (BE 검수 요청 엔드포인트 미연결)",
+                    category: .network,
+                    level: .info
+                )
+                // TODO: BE 합의 후 검수 요청 API 호출 체이닝 (PUT /api/user/owner/verification 등)
+                return .send(.internal(.showToast(.init(
+                    message: "사진을 업로드했어요. 관리자 검토 후 알려드릴게요", style: .info
+                ))))
+
+            case let .internal(.instructorVerificationImageUploadResponse(.failure(error))):
+                Log.trace("Failed to upload instructor verification image: \(error)", category: .network, level: .error)
+                return .send(.internal(.showToast(.init(
+                    message: "사진 업로드에 실패했어요. 다시 시도해주세요", style: .info
                 ))))
 
             case let .internal(.profileImageUpdateResponse(.success(updatedProfile))):
