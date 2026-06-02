@@ -12,6 +12,8 @@ enum UserEndpoint {
     case signup(request: SignupRequestDTO, tempToken: String)
     case checkNickname(request: CheckNicknameRequestDTO)
     case withdrawal
+    /// 사용자 프로필 조회 (GET `/api/user/profile`) — 계정/권한/관장사범 인증 상태 포함.
+    case getProfile
     /// 회원 앱 정보 등록 (Swagger: POST `/user/appInfo` — 서버 라우팅에 맞춰 `/api/user/appInfo`)
     case registerAppInfo(request: AppInfoRequestDTO)
     /// 닉네임 단독 수정 (PUT `/api/user/profile/nickname`) — nickname 쿼리 파라미터 전달.
@@ -19,6 +21,8 @@ enum UserEndpoint {
     /// 프로필 이미지 URL 갱신/삭제 (PUT `/api/user/profile/image`) — profileImageUrl 쿼리 파라미터 전달.
     /// 삭제는 호출부에서 BE 합의 sentinel(`"default"`)로 매핑되어 같은 엔드포인트로 전달된다.
     case updateProfileImage(profileImageUrl: String)
+    /// 관장/사범 인증 요청 (PUT `/api/user/owner`) — 인증 이미지 URL을 imageUrl 쿼리 파라미터로 전달하고 권한을 요청한다.
+    case requestOwnerVerification(imageUrl: String)
 }
 
 extension UserEndpoint: Endpoint {
@@ -34,6 +38,8 @@ extension UserEndpoint: Endpoint {
         switch self {
         case .signup, .withdrawal:
             return "/api/user"
+        case .getProfile:
+            return "/api/user/profile"
         case .checkNickname:
             return "/api/user/check/nickname"
         case .registerAppInfo:
@@ -42,18 +48,20 @@ extension UserEndpoint: Endpoint {
             return "/api/user/profile/nickname"
         case .updateProfileImage:
             return "/api/user/profile/image"
+        case .requestOwnerVerification:
+            return "/api/user/owner"
         }
     }
 
     var method: HTTPMethod {
         switch self {
-        case .checkNickname:
+        case .checkNickname, .getProfile:
             return .get
         case .signup, .registerAppInfo:
             return .post
         case .withdrawal:
             return .delete
-        case .updateNickname, .updateProfileImage:
+        case .updateNickname, .updateProfileImage, .requestOwnerVerification:
             return .put
         }
     }
@@ -75,6 +83,8 @@ extension UserEndpoint: Endpoint {
             return ["nickname": nickname]
         case .updateProfileImage(let profileImageUrl):
             return ["profileImageUrl": profileImageUrl]
+        case .requestOwnerVerification(let imageUrl):
+            return ["imageUrl": imageUrl]
         default: return nil
         }
     }

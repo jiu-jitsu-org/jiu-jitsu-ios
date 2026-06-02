@@ -76,6 +76,9 @@ public final class DependencyContainer {
             withdrawal: {
                 try await self.userRepository.withdrawal()
             },
+            fetchUserProfile: {
+                try await self.userRepository.fetchUserProfile()
+            },
             registerAppInfo: { info in
                 _ = try await self.userRepository.registerAppInfo(info: info)
             },
@@ -91,6 +94,9 @@ public final class DependencyContainer {
             },
             updateProfileImage: { profileImageUrl in
                 _ = try await self.userRepository.updateProfileImage(profileImageUrl)
+            },
+            requestOwnerVerification: { imageUrl in
+                _ = try await self.userRepository.requestOwnerVerification(imageUrl: imageUrl)
             }
         )
     }

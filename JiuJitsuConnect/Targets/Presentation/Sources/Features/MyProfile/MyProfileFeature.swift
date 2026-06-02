@@ -27,6 +27,10 @@ public struct MyProfileFeature: Sendable {
         // 커뮤니티 프로필 정보
         var communityProfile: CommunityProfile?
         var isLoadingProfile: Bool = false
+
+        // user-level 프로필 — 관장사범 인증 상태(ownerRequested)·제출 이미지(ownerRequestImageUrl) 등.
+        // 닉네임/프로필이미지 등 community와 겹치는 필드는 표시에 쓰지 않는다(단일 소스는 communityProfile).
+        var userProfile: UserProfile?
         
         // 토스트 메시지 상태
         var toast: ToastState?
@@ -129,6 +133,9 @@ public struct MyProfileFeature: Sendable {
         public enum InternalAction: Sendable {
             case loadProfile
             case profileResponse(TaskResult<CommunityProfile>)
+            // user-level 프로필(GET /api/user/profile) 응답 — 관장사범 인증 상태(ownerRequested) 등.
+            // community 프로필과 독립적으로 처리해 한쪽 실패가 다른 쪽을 막지 않게 한다.
+            case userProfileResponse(TaskResult<UserProfile>)
             case updateProfileSection(ProfileSection, String?)
             case saveBeltAndWeightInfo(rank: BeltRank, stripe: BeltStripe, gender: Gender, weightKg: Double, isWeightHidden: Bool)
             case saveBeltInfoOnly(rank: BeltRank, stripe: BeltStripe)
@@ -162,8 +169,10 @@ public struct MyProfileFeature: Sendable {
             case profileImageUpdateResponse(TaskResult<CommunityProfile>)  // PUT /api/user/profile 반영 결과
 
             // 관장 사범 인증 사진 업로드 응답 (ImageKit 호스팅 URL)
-            // BE 제출 엔드포인트는 별도 정의 예정 — 현재는 ImageKit URL 확보까지가 스코프
+            // 성공 시 확보한 URL로 BE 인증 요청(PUT /api/user/owner)을 체이닝한다.
             case instructorVerificationImageUploadResponse(TaskResult<String>)
+            // 관장 사범 인증 요청 응답 (PUT /api/user/owner)
+            case instructorVerificationRequestResponse(TaskResult<Bool>)
 
             // 닉네임 갱신 응답 (이미지와 동일한 PUT /api/user/profile 사용)
             case nicknameUpdateResponse(TaskResult<CommunityProfile>)
@@ -193,15 +202,28 @@ public struct MyProfileFeature: Sendable {
             case .internal(.loadProfile):
                 guard !state.authInfo.isGuest else { return .none }
                 state.isLoadingProfile = true
+                // community 프로필과 user 프로필을 병렬 조회 — 둘은 서로 다른 엔드포인트이고
+                // 의존성이 없어 직렬로 기다릴 이유가 없다. 각각 독립 TaskResult로 흘려보내
+                // user 조회 실패가 화면(community) 로딩을 막지 않게 한다.
                 return .run { send in
-                    await send(.internal(.profileResponse(
-                        await TaskResult { try await communityClient.fetchProfile() }
-                    )))
+                    async let communityResult = TaskResult { try await communityClient.fetchProfile() }
+                    async let userResult = TaskResult { try await userClient.fetchUserProfile() }
+                    await send(.internal(.profileResponse(communityResult)))
+                    await send(.internal(.userProfileResponse(userResult)))
                 }
-                
+
             case let .internal(.profileResponse(.success(profile))):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
+                return .none
+
+            case let .internal(.userProfileResponse(.success(profile))):
+                state.userProfile = profile
+                return .none
+
+            case let .internal(.userProfileResponse(.failure(error))):
+                // user 프로필 조회 실패는 화면 표시를 막지 않는다(인증 뱃지 등 부가 정보 한정).
+                Log.trace("Failed to load user profile: \(error)", category: .network, level: .error)
                 return .none
                 
             case let .internal(.profileResponse(.failure(error))):
@@ -904,6 +926,13 @@ public struct MyProfileFeature: Sendable {
                 case .instructorVerification:
                     // 파이프라인이 여기서 끝나므로 purpose 리셋
                     state.pendingImagePurpose = nil
+                    // FIXME: 업로드 진행 피드백 부재 (구현 보류). 사진 선택 즉시 시트가 닫힌 뒤
+                    //   순차 3-홉(ImageKit 토큰 발급 → ImageKit 업로드 → PUT /api/user/owner)이
+                    //   끝날 때까지 2~5초간 화면에 표시가 없어, 사용자가 실패로 오인하거나 메뉴
+                    //   재진입으로 중복 인증요청을 보낼 수 있다. 인증 사진은 노출되지 않는 검수용이라
+                    //   프로필 이미지의 Optimistic Update는 적용 불가.
+                    //   구현 방향(합의됨): 로딩 오버레이(화면 딤 + 인디케이터)로 업로드 내내 진행을
+                    //   표시하고 터치를 막아 중복 제출을 차단, 완료 시 오버레이 제거 + 결과 토스트.
                     Log.trace(
                         "관장 사범 인증 - 크롭 생략, 원본 업로드 시작 (\(data.count) bytes)",
                         category: .network,
@@ -993,23 +1022,55 @@ public struct MyProfileFeature: Sendable {
                 ))))
 
             case let .internal(.instructorVerificationImageUploadResponse(.success(url))):
-                // ImageKit URL 확보 완료. BE 검수 요청 엔드포인트 연결은 별도 합의 후 진행 —
-                // 본 단계에서는 업로드 성공 사실을 사용자에게 토스트로 안내한다.
-                // (안내 문구: 검수가 비동기이므로 "업로드했어요" 정도가 정확함)
+                // ImageKit URL 확보 완료 → 확보한 URL로 BE 인증 요청(PUT /api/user/owner) 체이닝.
                 Log.trace(
-                    "관장 사범 인증 - ImageKit 업로드 완료. url=\(url) (BE 검수 요청 엔드포인트 미연결)",
+                    "관장 사범 인증 - ImageKit 업로드 완료. url=\(url), 인증 요청 시작",
                     category: .network,
                     level: .info
                 )
-                // TODO: BE 합의 후 검수 요청 API 호출 체이닝 (PUT /api/user/owner/verification 등)
-                return .send(.internal(.showToast(.init(
-                    message: "사진을 업로드했어요. 관리자 검토 후 알려드릴게요", style: .info
-                ))))
+                return .run { send in
+                    await send(.internal(.instructorVerificationRequestResponse(
+                        await TaskResult {
+                            try await userClient.requestOwnerVerification(url)
+                            return true
+                        }
+                    )))
+                }
+                .cancellable(id: CancelID.instructorVerificationUpload)
 
             case let .internal(.instructorVerificationImageUploadResponse(.failure(error))):
                 Log.trace("Failed to upload instructor verification image: \(error)", category: .network, level: .error)
                 return .send(.internal(.showToast(.init(
                     message: "사진 업로드에 실패했어요. 다시 시도해주세요", style: .info
+                ))))
+
+            case .internal(.instructorVerificationRequestResponse(.success)):
+                // 인증 요청 접수 완료. 검수는 비동기이므로 "업로드했어요" 안내가 정확하다.
+                Log.trace("관장 사범 인증 - 인증 요청 완료", category: .network, level: .info)
+                // Optimistic — BE 응답을 기다리지 않고 ownerRequested를 즉시 반영해
+                // MY 탭 뱃지 등 인증 상태 UI가 바로 업데이트되도록 한다.
+                // 다음 MY 진입 시 loadProfile이 실제값으로 덮어쓰므로 드리프트가 남지 않는다.
+                state.userProfile = state.userProfile.map {
+                    UserProfile(
+                        userId: $0.userId,
+                        email: $0.email,
+                        nickname: $0.nickname,
+                        profileImageUrl: $0.profileImageUrl,
+                        snsProvider: $0.snsProvider,
+                        ownerRequested: true,
+                        ownerRequestImageUrl: $0.ownerRequestImageUrl,
+                        role: $0.role,
+                        status: $0.status
+                    )
+                }
+                return .send(.internal(.showToast(.init(
+                    message: "사진을 업로드했어요. 관리자 검토 후 알려드릴게요", style: .info
+                ))))
+
+            case let .internal(.instructorVerificationRequestResponse(.failure(error))):
+                Log.trace("Failed to request owner verification: \(error)", category: .network, level: .error)
+                return .send(.internal(.showToast(.init(
+                    message: "인증 요청에 실패했어요. 다시 시도해주세요", style: .info
                 ))))
 
             case let .internal(.profileImageUpdateResponse(.success(updatedProfile))):

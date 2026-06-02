@@ -22,6 +22,8 @@ public struct MyProfileHeaderView: View {
     let profileImageUrl: String?
     let beltRank: BeltRank?
     let safeAreaTop: CGFloat
+    /// 관장/사범 인증 완료 여부 — `true`이면 닉네임 왼쪽에 인증 뱃지 표시
+    let isOwner: Bool
 
     // Optimistic Update 입력 — 업로드/삭제 진행 중 표시
     let pendingProfileImageData: Data?
@@ -40,6 +42,7 @@ public struct MyProfileHeaderView: View {
         profileImageUrl: String?,
         beltRank: BeltRank?,
         safeAreaTop: CGFloat,
+        isOwner: Bool = false,
         pendingProfileImageData: Data? = nil,
         isProfileImageDeleting: Bool = false,
         isProfileImageBusy: Bool = false,
@@ -53,6 +56,7 @@ public struct MyProfileHeaderView: View {
         self.profileImageUrl = profileImageUrl
         self.beltRank = beltRank
         self.safeAreaTop = safeAreaTop
+        self.isOwner = isOwner
         self.pendingProfileImageData = pendingProfileImageData
         self.isProfileImageDeleting = isProfileImageDeleting
         self.isProfileImageBusy = isProfileImageBusy
@@ -89,6 +93,7 @@ public struct MyProfileHeaderView: View {
                 // 닉네임 + 수정 버튼
                 NicknameEditRow(
                     nickname: nickname,
+                    isOwner: isOwner,
                     height: 29,
                     onEditTapped: onNicknameEditTapped
                 )
@@ -270,11 +275,27 @@ private struct ProfileImageView: View {
 /// 닉네임 + 수정 버튼 행
 private struct NicknameEditRow: View {
     let nickname: String
+    /// `true`이면 닉네임 왼쪽에 관장/사범 인증 뱃지를 표시한다.
+    let isOwner: Bool
     let height: CGFloat
     let onEditTapped: () -> Void
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
+            // FIXME: 임시 뱃지 — 디자인 확정 후 교체 예정
+            if isOwner {
+                Text("관장")
+                    .font(Font.pretendard.labelS)
+                    .foregroundStyle(Color.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(0.25))
+                    )
+                    .padding(.trailing, 6)
+            }
+
             Text(nickname)
                 .font(Font.pretendard.title3)
                 .foregroundStyle(Color.component.list.setting.background)
@@ -334,6 +355,22 @@ private struct AcademyNameEditRow: View {
         profileImageUrl: nil,
         beltRank: .blue,
         safeAreaTop: 47,
+        onNicknameEditTapped: { },
+        onGymInfoTapped: { },
+        onMoreButtonTapped: { },
+        onProfileImageEditTapped: { }
+    )
+    .background(Color.component.background.default)
+}
+
+#Preview("MyProfileHeaderView - 관장/사범 인증 (OWNER)") {
+    MyProfileHeaderView(
+        nickname: "그라시에 관장",
+        academyName: "그라시에 바하 주짓수",
+        profileImageUrl: nil,
+        beltRank: .black,
+        safeAreaTop: 47,
+        isOwner: true,
         onNicknameEditTapped: { },
         onGymInfoTapped: { },
         onMoreButtonTapped: { },

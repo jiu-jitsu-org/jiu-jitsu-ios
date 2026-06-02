@@ -121,6 +121,7 @@ public struct MyProfileView: View {
             profileImageUrl: store.communityProfile?.profileImageUrl,
             beltRank: store.communityProfile?.beltRank,
             safeAreaTop: safeAreaTop,
+            isOwner: store.userProfile?.userRole == .owner,
             // Optimistic Update — 업로드/삭제 진행 중 헤더 이미지 미리보기·로딩 표시
             pendingProfileImageData: store.pendingProfileImageData,
             isProfileImageDeleting: store.isProfileImageDeleting,
