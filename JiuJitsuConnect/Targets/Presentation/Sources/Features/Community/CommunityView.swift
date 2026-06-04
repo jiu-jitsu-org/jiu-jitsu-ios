@@ -227,6 +227,17 @@ private struct CommunityWebView: UIViewRepresentable {
         webView.allowsBackForwardNavigationGestures = true
         webView.scrollView.contentInsetAdjustmentBehavior = .never
 
+        // 풀다운 리프레시: 페이지를 가리는 전면 로딩 오버레이 대신 네이티브 스피너만 노출한다.
+        let refreshControl = UIRefreshControl()
+        refreshControl.tintColor = UIColor(Color.semantic.interactive.primary)
+        refreshControl.addTarget(
+            context.coordinator,
+            action: #selector(Coordinator.handleRefresh),
+            for: .valueChanged
+        )
+        webView.scrollView.refreshControl = refreshControl
+        context.coordinator.bind(webView: webView, refreshControl: refreshControl)
+
         context.coordinator.load(url: url, token: loadToken, in: webView)
         return webView
     }
@@ -261,6 +272,14 @@ private struct CommunityWebView: UIViewRepresentable {
         // 이미 evaluateJavaScript로 전달한 아웃바운드 id. updateUIView가 여러 번
         // 호출돼도 같은 메시지를 중복 주입하지 않도록 가드한다.
         private var deliveredOutboundIDs: Set<UUID> = []
+
+        // 풀다운 리프레시용 약한 참조. target-action 콜백에는 델리게이트 메서드와 달리
+        // webView가 인자로 오지 않아 직접 보관한다.
+        private weak var webView: WKWebView?
+        private weak var refreshControl: UIRefreshControl?
+        // 현재 로드가 풀다운 리프레시로 시작됐는지. true면 전면 로딩 오버레이를
+        // 띄우지 않고 리프레시 스피너만 유지한다.
+        private var isRefreshing = false
 
         init(
             onLoadingStarted: @escaping () -> Void,
@@ -301,6 +320,27 @@ private struct CommunityWebView: UIViewRepresentable {
             webView.load(URLRequest(url: url))
         }
 
+        // 풀다운 리프레시 대상 webView·컨트롤을 보관한다.
+        func bind(webView: WKWebView, refreshControl: UIRefreshControl) {
+            self.webView = webView
+            self.refreshControl = refreshControl
+        }
+
+        @objc func handleRefresh() {
+            guard let webView else { return }
+            isRefreshing = true
+            // 리프레시로 웹 컨텍스트가 재초기화되므로 전달 기록을 비워
+            // 재로드 후 WEBVIEW_READY 핸드셰이크에서 상태가 다시 동기화되게 한다.
+            deliveredOutboundIDs.removeAll()
+            webView.reload()
+        }
+
+        private func endRefreshing() {
+            guard isRefreshing else { return }
+            isRefreshing = false
+            refreshControl?.endRefreshing()
+        }
+
         // 대기열의 아웃바운드 메시지를 순서대로 웹에 주입한다.
         func flushOutbox(_ outbox: [WebBridgeOutboundEnvelope], in webView: WKWebView) {
             for envelope in outbox where !deliveredOutboundIDs.contains(envelope.id) {
@@ -332,20 +372,25 @@ private struct CommunityWebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            // 풀다운 리프레시 중에는 페이지를 가리는 전면 오버레이 대신 스피너만 유지한다.
+            guard !isRefreshing else { return }
             onLoadingStarted()
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            endRefreshing()
             onLoadingFinished()
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
             Log.trace("Community webview didFail: \(error)", category: .network, level: .error)
+            endRefreshing()
             onLoadingFailed()
         }
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
             Log.trace("Community webview didFailProvisionalNavigation: \(error)", category: .network, level: .error)
+            endRefreshing()
             onLoadingFailed()
         }
 
@@ -363,6 +408,7 @@ private struct CommunityWebView: UIViewRepresentable {
             {
                 Log.trace("Community webview HTTP error: \(http.statusCode)", category: .network, level: .error)
                 decisionHandler(.cancel)
+                endRefreshing()
                 onLoadingFailed()
                 return
             }
