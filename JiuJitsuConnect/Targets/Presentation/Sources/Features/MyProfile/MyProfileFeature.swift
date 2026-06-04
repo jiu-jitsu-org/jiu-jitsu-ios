@@ -165,12 +165,12 @@ public struct MyProfileFeature: Sendable {
             case presentImageEditSheet(ProfileImageEditFeature.Purpose, canDelete: Bool)
 
             // 프로필 이미지 업로드/반영 응답
-            case profileImageUploadResponse(TaskResult<String>)            // ImageKit 호스팅 URL
+            case profileImageUploadResponse(TaskResult<RegisteredImage>)   // CDN 업로드 + 서버 등록 결과(id 포함)
             case profileImageUpdateResponse(TaskResult<CommunityProfile>)  // PUT /api/user/profile 반영 결과
 
             // 관장 사범 인증 사진 업로드 응답 (ImageKit 호스팅 URL)
             // 성공 시 확보한 URL로 BE 인증 요청(PUT /api/user/owner)을 체이닝한다.
-            case instructorVerificationImageUploadResponse(TaskResult<String>)
+            case instructorVerificationImageUploadResponse(TaskResult<RegisteredImage>)
             // 관장 사범 인증 요청 응답 (PUT /api/user/owner)
             case instructorVerificationRequestResponse(TaskResult<Bool>)
 
@@ -183,6 +183,7 @@ public struct MyProfileFeature: Sendable {
     @Dependency(\.continuousClock) var clock
     @Dependency(\.communityClient) var communityClient
     @Dependency(\.imageUploadClient) var imageUploadClient
+    @Dependency(\.imageClient) var imageClient
     @Dependency(\.userClient) var userClient
 
 
@@ -869,24 +870,28 @@ public struct MyProfileFeature: Sendable {
 
             case .sheet(.presented(.profileImageEdit(.delegate(.didSelectDelete)))):
                 state.sheet = nil
-                // ImageKit 측 orphan 파일 정리는 BE-only (private API key 필요) — 본 흐름에서는
-                // profileImageUrl을 nil로 갱신하는 것까지만 처리한다.
                 guard let profile = state.communityProfile else {
                     return .send(.internal(.showToast(.init(
                         message: "프로필 정보를 불러올 수 없어요", style: .info
+                    ))))
+                }
+                // 삭제는 DELETE /api/image/{id} 사용 — 현재 이미지의 서버 파일 id가 필요하다.
+                // id는 프로필 조회 응답(GET /api/user/profile)의 profileImage.id에서 온다.
+                guard let imageFileId = state.userProfile?.profileImageFileId else {
+                    Log.trace("프로필 이미지 - 삭제 불가(파일 id 없음)", category: .network, level: .error)
+                    return .send(.internal(.showToast(.init(
+                        message: "이미지 정보를 불러올 수 없어 삭제하지 못했어요", style: .info
                     ))))
                 }
                 let updatedProfile = profile.updatingProfileImageUrl(nil)
                 state.isLoadingProfile = true
                 // Optimistic UX — 헤더를 즉시 기본 아이콘으로 전환
                 state.isProfileImageDeleting = true
-                Log.trace("프로필 이미지 - 삭제 요청", category: .network, level: .info)
+                Log.trace("프로필 이미지 - 삭제 요청 (imageFileId=\(imageFileId))", category: .network, level: .info)
                 return .run { send in
                     await send(.internal(.profileImageUpdateResponse(
                         await TaskResult {
-                            // 삭제도 등록/변경과 동일한 PUT /api/user/profile/image 사용.
-                            // nil은 Data 레이어에서 BE sentinel("default")로 매핑되어 전달된다.
-                            try await userClient.updateProfileImage(nil)
+                            try await imageClient.deleteImage(imageFileId)
                             return updatedProfile
                         }
                     )))
@@ -993,19 +998,21 @@ public struct MyProfileFeature: Sendable {
                 state.pendingImagePurpose = nil
                 return .none
 
-            case let .internal(.profileImageUploadResponse(.success(url))):
+            case let .internal(.profileImageUploadResponse(.success(registeredImage))):
                 guard let profile = state.communityProfile else {
                     state.isLoadingProfile = false
                     return .send(.internal(.showToast(.init(
                         message: "프로필 정보를 불러올 수 없어요", style: .info
                     ))))
                 }
-                let updatedProfile = profile.updatingProfileImageUrl(url)
+                // 헤더 표시는 등록된 이미지 URL을, BE 반영은 발급된 id를 사용한다.
+                let updatedProfile = profile.updatingProfileImageUrl(registeredImage.imageUrl)
+                let imageFileId = registeredImage.id
                 return .run { send in
                     await send(.internal(.profileImageUpdateResponse(
                         await TaskResult {
-                            // 이미지 URL 전용 엔드포인트 (PUT /api/user/profile/image, 쿼리 파라미터)
-                            try await userClient.updateProfileImage(url)
+                            // 4단계: 서버 등록 id로 프로필 이미지 설정 (PUT /api/user/profile/image?imageFileId=)
+                            try await userClient.setProfileImage(imageFileId)
                             return updatedProfile
                         }
                     )))
@@ -1021,17 +1028,18 @@ public struct MyProfileFeature: Sendable {
                     message: "이미지 업로드에 실패했어요. 다시 시도해주세요", style: .info
                 ))))
 
-            case let .internal(.instructorVerificationImageUploadResponse(.success(url))):
-                // ImageKit URL 확보 완료 → 확보한 URL로 BE 인증 요청(PUT /api/user/owner) 체이닝.
+            case let .internal(.instructorVerificationImageUploadResponse(.success(registeredImage))):
+                // CDN 업로드 + 서버 등록 완료 → 발급된 id로 BE 인증 요청(PUT /api/user/owner) 체이닝.
                 Log.trace(
-                    "관장 사범 인증 - ImageKit 업로드 완료. url=\(url), 인증 요청 시작",
+                    "관장 사범 인증 - 이미지 등록 완료. imageFileId=\(registeredImage.id), 인증 요청 시작",
                     category: .network,
                     level: .info
                 )
+                let imageFileId = registeredImage.id
                 return .run { send in
                     await send(.internal(.instructorVerificationRequestResponse(
                         await TaskResult {
-                            try await userClient.requestOwnerVerification(url)
+                            try await userClient.requestOwnerVerification(imageFileId)
                             return true
                         }
                     )))
@@ -1056,6 +1064,7 @@ public struct MyProfileFeature: Sendable {
                         email: $0.email,
                         nickname: $0.nickname,
                         profileImageUrl: $0.profileImageUrl,
+                        profileImageFileId: $0.profileImageFileId,
                         snsProvider: $0.snsProvider,
                         ownerRequested: true,
                         ownerRequestImageUrl: $0.ownerRequestImageUrl,
@@ -1064,7 +1073,7 @@ public struct MyProfileFeature: Sendable {
                     )
                 }
                 return .send(.internal(.showToast(.init(
-                    message: "사진을 업로드했어요. 관리자 검토 후 알려드릴게요", style: .info
+                    message: "업로드 완료! 관리자 검토 후 결과를 알려드릴게요.", style: .info
                 ))))
 
             case let .internal(.instructorVerificationRequestResponse(.failure(error))):

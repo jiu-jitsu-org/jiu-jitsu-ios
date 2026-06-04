@@ -26,6 +26,9 @@ public struct UserProfile: Equatable, Sendable {
     public let email: String?
     public let nickname: String?
     public let profileImageUrl: String?
+    /// 현재 프로필 이미지의 서버 파일 id. 삭제(`DELETE /api/image/{id}`)에 사용한다.
+    /// BE 프로필 응답이 내려줄 때만 채워지며, 없으면 `nil`(삭제 불가).
+    public let profileImageFileId: Int64?
     public let snsProvider: String?
     /// 관장/사범 인증 요청 여부. `true`면 이미 인증을 신청해 검토 대기/완료 상태.
     public let ownerRequested: Bool
@@ -45,6 +48,7 @@ public struct UserProfile: Equatable, Sendable {
         email: String? = nil,
         nickname: String? = nil,
         profileImageUrl: String? = nil,
+        profileImageFileId: Int64? = nil,
         snsProvider: String? = nil,
         ownerRequested: Bool = false,
         ownerRequestImageUrl: String? = nil,
@@ -55,6 +59,7 @@ public struct UserProfile: Equatable, Sendable {
         self.email = email
         self.nickname = nickname
         self.profileImageUrl = profileImageUrl
+        self.profileImageFileId = profileImageFileId
         self.snsProvider = snsProvider
         self.ownerRequested = ownerRequested
         self.ownerRequestImageUrl = ownerRequestImageUrl

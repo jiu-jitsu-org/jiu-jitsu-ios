@@ -18,11 +18,10 @@ enum UserEndpoint {
     case registerAppInfo(request: AppInfoRequestDTO)
     /// 닉네임 단독 수정 (PUT `/api/user/profile/nickname`) — nickname 쿼리 파라미터 전달.
     case updateNickname(nickname: String)
-    /// 프로필 이미지 URL 갱신/삭제 (PUT `/api/user/profile/image`) — profileImageUrl 쿼리 파라미터 전달.
-    /// 삭제는 호출부에서 BE 합의 sentinel(`"default"`)로 매핑되어 같은 엔드포인트로 전달된다.
-    case updateProfileImage(profileImageUrl: String)
-    /// 관장/사범 인증 요청 (PUT `/api/user/owner`) — 인증 이미지 URL을 imageUrl 쿼리 파라미터로 전달하고 권한을 요청한다.
-    case requestOwnerVerification(imageUrl: String)
+    /// 프로필 이미지 설정 (PUT `/api/user/profile/image`) — 서버 등록 이미지 파일 id를 imageFileId 쿼리 파라미터로 전달.
+    case setProfileImage(imageFileId: Int64)
+    /// 관장/사범 인증 요청 (PUT `/api/user/owner`) — 서버 등록 인증 이미지 파일 id를 imageFileId 쿼리 파라미터로 전달하고 권한을 요청한다.
+    case requestOwnerVerification(imageFileId: Int64)
 }
 
 extension UserEndpoint: Endpoint {
@@ -46,7 +45,7 @@ extension UserEndpoint: Endpoint {
             return "/api/user/appInfo"
         case .updateNickname:
             return "/api/user/profile/nickname"
-        case .updateProfileImage:
+        case .setProfileImage:
             return "/api/user/profile/image"
         case .requestOwnerVerification:
             return "/api/user/owner"
@@ -61,7 +60,7 @@ extension UserEndpoint: Endpoint {
             return .post
         case .withdrawal:
             return .delete
-        case .updateNickname, .updateProfileImage, .requestOwnerVerification:
+        case .updateNickname, .setProfileImage, .requestOwnerVerification:
             return .put
         }
     }
@@ -81,10 +80,10 @@ extension UserEndpoint: Endpoint {
             return ["nickname": request.nickname]
         case .updateNickname(let nickname):
             return ["nickname": nickname]
-        case .updateProfileImage(let profileImageUrl):
-            return ["profileImageUrl": profileImageUrl]
-        case .requestOwnerVerification(let imageUrl):
-            return ["imageUrl": imageUrl]
+        case .setProfileImage(let imageFileId):
+            return ["imageFileId": String(imageFileId)]
+        case .requestOwnerVerification(let imageFileId):
+            return ["imageFileId": String(imageFileId)]
         default: return nil
         }
     }

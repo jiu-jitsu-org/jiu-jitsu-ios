@@ -22,14 +22,15 @@ public struct UserClient {
     public var updateFCMToken: @Sendable (String) async throws -> Void
     /// 닉네임 단독 수정 (PUT `/api/user/profile/nickname`).
     public var updateNickname: @Sendable (_ nickname: String) async throws -> Void
-    /// 프로필 이미지 URL 갱신/삭제 (PUT `/api/user/profile/image`).
+    /// 프로필 이미지 설정 (PUT `/api/user/profile/image`).
     ///
-    /// `nil` 전달 시 삭제 의도 — Data 레이어가 BE sentinel로 매핑해 같은 엔드포인트로 보낸다.
-    public var updateProfileImage: @Sendable (_ profileImageUrl: String?) async throws -> Void
+    /// 서버 등록(`POST /api/image`)으로 발급된 이미지 파일 id를 전달한다.
+    /// (삭제는 `imageClient.deleteImage(id:)` 경로 사용.)
+    public var setProfileImage: @Sendable (_ imageFileId: Int64) async throws -> Void
     /// 관장/사범 인증 요청 (PUT `/api/user/owner`).
     ///
-    /// 인증 이미지 URL(ImageKit 호스팅)을 전달해 권한 요청을 등록한다.
-    public var requestOwnerVerification: @Sendable (_ imageUrl: String) async throws -> Void
+    /// 서버 등록으로 발급된 인증 이미지 파일 id를 전달해 권한 요청을 등록한다.
+    public var requestOwnerVerification: @Sendable (_ imageFileId: Int64) async throws -> Void
 
     public init(
         signup: @Sendable @escaping (Domain.SignupInfo) async throws -> Domain.AuthInfo,
@@ -39,8 +40,8 @@ public struct UserClient {
         registerAppInfo: @Sendable @escaping (AppInfo) async throws -> Void,
         updateFCMToken: @Sendable @escaping (String) async throws -> Void,
         updateNickname: @Sendable @escaping (String) async throws -> Void,
-        updateProfileImage: @Sendable @escaping (String?) async throws -> Void,
-        requestOwnerVerification: @Sendable @escaping (String) async throws -> Void
+        setProfileImage: @Sendable @escaping (Int64) async throws -> Void,
+        requestOwnerVerification: @Sendable @escaping (Int64) async throws -> Void
     ) {
         self.signup = signup
         self.checkNickname = checkNickname
@@ -49,7 +50,7 @@ public struct UserClient {
         self.registerAppInfo = registerAppInfo
         self.updateFCMToken = updateFCMToken
         self.updateNickname = updateNickname
-        self.updateProfileImage = updateProfileImage
+        self.setProfileImage = setProfileImage
         self.requestOwnerVerification = requestOwnerVerification
     }
 }
@@ -88,7 +89,7 @@ extension UserClient: DependencyKey {
         registerAppInfo: { _ in },
         updateFCMToken: { _ in },
         updateNickname: { _ in },
-        updateProfileImage: { _ in },
+        setProfileImage: { _ in },
         requestOwnerVerification: { _ in }
     )
 }
@@ -124,8 +125,8 @@ extension UserClient {
         updateNickname: { _ in
             fatalError("unimplemented.updateNickname is not implemented")
         },
-        updateProfileImage: { _ in
-            fatalError("unimplemented.updateProfileImage is not implemented")
+        setProfileImage: { _ in
+            fatalError("unimplemented.setProfileImage is not implemented")
         },
         requestOwnerVerification: { _ in
             fatalError("unimplemented.requestOwnerVerification is not implemented")

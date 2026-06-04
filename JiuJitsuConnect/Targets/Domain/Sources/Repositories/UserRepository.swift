@@ -17,13 +17,13 @@ public protocol UserRepository: Sendable {
     func registerAppInfo(info: AppInfo) async throws -> Bool
     /// 닉네임 단독 수정 (PUT `/api/user/profile/nickname`).
     func updateNickname(_ nickname: String) async throws -> Bool
-    /// 프로필 이미지 URL 갱신/삭제 (PUT `/api/user/profile/image`).
+    /// 프로필 이미지 설정 (PUT `/api/user/profile/image`).
     ///
-    /// `nil` 전달 시 "이미지 삭제" 의도 — Data 레이어에서 BE 합의 sentinel로 매핑되어
-    /// 같은 엔드포인트의 쿼리 파라미터로 전달된다.
-    func updateProfileImage(_ profileImageUrl: String?) async throws -> Bool
+    /// 서버 등록(`POST /api/image`)으로 발급된 이미지 파일 id를 `imageFileId` 쿼리 파라미터로 전달한다.
+    /// (이미지 삭제는 별도 `ImageRepository.deleteImage(id:)` 경로를 사용한다.)
+    func setProfileImage(imageFileId: Int64) async throws -> Bool
     /// 관장/사범 인증 요청 (PUT `/api/user/owner`).
     ///
-    /// 인증 이미지 URL(ImageKit 호스팅)을 imageUrl 쿼리 파라미터로 전달해 권한 요청을 등록한다.
-    func requestOwnerVerification(imageUrl: String) async throws -> Bool
+    /// 서버 등록으로 발급된 인증 이미지 파일 id를 `imageFileId` 쿼리 파라미터로 전달해 권한 요청을 등록한다.
+    func requestOwnerVerification(imageFileId: Int64) async throws -> Bool
 }

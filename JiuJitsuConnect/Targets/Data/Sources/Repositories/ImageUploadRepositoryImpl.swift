@@ -28,7 +28,7 @@ public final class ImageUploadRepositoryImpl: ImageUploadRepository {
         self.decoder = d
     }
 
-    public func uploadImage(_ data: Data, purpose: ImageUploadPurpose) async throws -> String {
+    public func uploadImage(_ data: Data, purpose: ImageUploadPurpose) async throws -> UploadedImage {
         do {
             // 0) 업로드 페이로드 정규화 — purpose별 maxPixel/quality 적용.
             //    프로필은 헤더 표시 전용이라 공격적으로 줄이고, 인증 사진은 관리자 검수에서
@@ -81,11 +81,12 @@ public final class ImageUploadRepositoryImpl: ImageUploadRepository {
             let dto = try decoder.decode(ImageKitUploadResponseDTO.self, from: raw)
 
             Log.trace(
-                "ImageKit 업로드 완료 (\(purpose.logLabel)) — url=\(dto.url)",
+                "ImageKit 업로드 완료 (\(purpose.logLabel)) — fileId=\(dto.fileId), url=\(dto.url)",
                 category: .network,
                 level: .info
             )
-            return dto.url
+            // 후속 서버 등록(POST /api/image)을 위해 cdnId(=fileId)와 url을 함께 올려보낸다.
+            return UploadedImage(cdnId: dto.fileId, imageUrl: dto.url)
 
         } catch let error as NetworkError {
             throw error.toDomainError()

@@ -93,11 +93,11 @@ public final class DependencyContainer {
             updateNickname: { nickname in
                 _ = try await self.userRepository.updateNickname(nickname)
             },
-            updateProfileImage: { profileImageUrl in
-                _ = try await self.userRepository.updateProfileImage(profileImageUrl)
+            setProfileImage: { imageFileId in
+                _ = try await self.userRepository.setProfileImage(imageFileId: imageFileId)
             },
-            requestOwnerVerification: { imageUrl in
-                _ = try await self.userRepository.requestOwnerVerification(imageUrl: imageUrl)
+            requestOwnerVerification: { imageFileId in
+                _ = try await self.userRepository.requestOwnerVerification(imageFileId: imageFileId)
             }
         )
     }
@@ -116,7 +116,13 @@ public final class DependencyContainer {
     public func configureImageUploadClient() -> ImageUploadClient {
         return ImageUploadClient(
             uploadImage: { data, purpose in
-                try await self.imageUploadRepository.uploadImage(data, purpose: purpose)
+                // 1·2단계: CDN(ImageKit) 업로드 → cdnId/imageUrl 확보
+                let uploaded = try await self.imageUploadRepository.uploadImage(data, purpose: purpose)
+                // 3단계: 우리 서버 등록(POST /api/image) → Int id 발급
+                return try await self.imageRepository.registerImage(
+                    cdnId: uploaded.cdnId,
+                    imageUrl: uploaded.imageUrl
+                )
             }
         )
     }

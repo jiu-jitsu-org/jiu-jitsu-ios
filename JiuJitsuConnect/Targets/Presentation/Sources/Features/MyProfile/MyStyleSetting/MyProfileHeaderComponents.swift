@@ -287,7 +287,7 @@ private struct NicknameEditRow: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 24, height: 24)
-                    .padding(.trailing, 4)
+                    .padding(.trailing, 5)
             }
 
             Text(nickname)
