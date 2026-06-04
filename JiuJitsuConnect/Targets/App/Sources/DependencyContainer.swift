@@ -30,6 +30,7 @@ public final class DependencyContainer {
     private lazy var userRepository: UserRepository = RepositoryFactory.makeUserRepository()
     private lazy var communityRepository: CommunityRepository = RepositoryFactory.makeCommunityRepository()
     private lazy var imageUploadRepository: ImageUploadRepository = RepositoryFactory.makeImageUploadRepository()
+    private lazy var imageRepository: ImageRepository = RepositoryFactory.makeImageRepository()
 
     // MARK: - Firebase Client (shared instance)
     private lazy var sharedFirebaseClient: FirebaseClient = FirebaseClientFactory.make()
@@ -116,6 +117,17 @@ public final class DependencyContainer {
         return ImageUploadClient(
             uploadImage: { data, purpose in
                 try await self.imageUploadRepository.uploadImage(data, purpose: purpose)
+            }
+        )
+    }
+
+    public func configureImageClient() -> ImageClient {
+        return ImageClient(
+            registerImage: { cdnId, imageUrl in
+                try await self.imageRepository.registerImage(cdnId: cdnId, imageUrl: imageUrl)
+            },
+            deleteImage: { id in
+                try await self.imageRepository.deleteImage(id: id)
             }
         )
     }
