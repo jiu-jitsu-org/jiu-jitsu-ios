@@ -36,7 +36,16 @@ public struct CommunityFeature: Sendable {
         var isLoading: Bool = true
         var hasError: Bool = false
 
-        public init() {
+        // 현재 백엔드 access token. 로그인 상태면 값이 있고, 게스트면 nil.
+        // WEBVIEW_READY 핸드셰이크 시 초기 로그인 상태 동기화에 사용한다.
+        // (정책: 웹에는 accessToken만 전달, refreshToken은 네이티브 Keychain에만 보관)
+        var accessToken: String?
+        // 네이티브 → 웹으로 보낼 브릿지 메시지 대기열. View가 evaluateJavaScript로
+        // 전달한 뒤 outboundDelivered로 제거한다.
+        var outbox: [WebBridgeOutboundEnvelope] = []
+
+        public init(accessToken: String? = nil) {
+            self.accessToken = accessToken
             let url = CommunityFeature.makeCommunityURL()
             self.url = url
             // URL 자체를 만들 수 없으면 WKWebView가 생성되지 않아 로딩 콜백이 영영 오지 않는다.
@@ -51,6 +60,9 @@ public struct CommunityFeature: Sendable {
     public enum Action: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
+        case delegate(DelegateAction)
+        // 부모(AppTabFeature)가 세션 변화를 주입해 웹뷰에 전파시키는 통로.
+        case session(SessionAction)
 
         public enum ViewAction: Sendable {
             case onAppear
@@ -65,6 +77,27 @@ public struct CommunityFeature: Sendable {
             case loadingStarted
             case loadingFinished
             case loadingFailed
+            // 웹뷰가 AppBridge로 보내온 인바운드 메시지(WKScriptMessageHandler 경유).
+            case bridgeMessageReceived(WebBridgeInboundMessage)
+            // View가 outbox의 메시지를 evaluateJavaScript로 전달 완료했음을 통지.
+            case outboundDelivered(id: UUID)
+        }
+
+        public enum DelegateAction: Sendable {
+            // 비로그인 행위 시도 → 부모가 "로그인이 필요해요" 안내 알럿을 띄운다.
+            case loginPromptRequested(reason: String?)
+            // 비로그인 행위 시도 → 부모가 로그인 모달을 즉시 띄운다(다이렉트).
+            case loginModalRequested(reason: String?)
+            // 웹 주도 로그아웃 요청(선택) → 부모가 네이티브 로그아웃을 수행한다.
+            case logoutRequested
+        }
+
+        /// 부모가 세션 상태 변화를 알려주면 그에 맞는 아웃바운드 메시지를 웹에 주입한다.
+        public enum SessionAction: Sendable {
+            case loggedIn(accessToken: String, expiresAt: Int?)
+            case loginCancelled
+            case loggedOut
+            case sessionExpired
         }
     }
 
@@ -123,8 +156,68 @@ public struct CommunityFeature: Sendable {
                 state.isLoading = false
                 state.hasError = true
                 return .none
+
+            // MARK: - Web Bridge (인바운드)
+
+            case let .internal(.bridgeMessageReceived(message)):
+                switch message {
+                case .webViewReady:
+                    // 초기 로그인 상태 동기화: 이미 로그인 상태면 즉시 토큰을 주입하고,
+                    // 게스트면 아무것도 보내지 않는다(웹은 비로그인 상태로 시작).
+                    if let accessToken = state.accessToken {
+                        Self.enqueue(.authLoginSuccess(accessToken: accessToken, expiresAt: nil), into: &state)
+                    }
+                    return .none
+
+                case let .authLoginPrompt(reason):
+                    return .send(.delegate(.loginPromptRequested(reason: reason)))
+
+                case let .authLoginModal(reason):
+                    return .send(.delegate(.loginModalRequested(reason: reason)))
+
+                case .authLogoutRequest:
+                    return .send(.delegate(.logoutRequested))
+
+                case let .unknown(type):
+                    // 계약에 없는 타입 — 한쪽만 먼저 배포된 경우를 대비해 무시한다.
+                    Log.trace("WebBridge 미지원 메시지 무시: \(type)", category: .network, level: .info)
+                    return .none
+                }
+
+            case let .internal(.outboundDelivered(id)):
+                state.outbox.removeAll { $0.id == id }
+                return .none
+
+            // MARK: - Session (부모 주입 → 아웃바운드)
+
+            case let .session(.loggedIn(accessToken, expiresAt)):
+                state.accessToken = accessToken
+                Self.enqueue(.authLoginSuccess(accessToken: accessToken, expiresAt: expiresAt), into: &state)
+                return .none
+
+            case .session(.loginCancelled):
+                Self.enqueue(.authLoginCancelled, into: &state)
+                return .none
+
+            case .session(.loggedOut):
+                state.accessToken = nil
+                Self.enqueue(.authLogout, into: &state)
+                return .none
+
+            case .session(.sessionExpired):
+                state.accessToken = nil
+                Self.enqueue(.authSessionExpired, into: &state)
+                return .none
+
+            case .delegate:
+                return .none
             }
         }
+    }
+
+    /// 아웃바운드 메시지를 식별자와 함께 대기열에 추가한다.
+    private static func enqueue(_ message: WebBridgeOutboundMessage, into state: inout State) {
+        state.outbox.append(WebBridgeOutboundEnvelope(id: UUID(), message: message))
     }
 
     private static func makeCommunityURL() -> URL? {

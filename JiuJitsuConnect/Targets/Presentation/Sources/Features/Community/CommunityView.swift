@@ -34,9 +34,12 @@ public struct CommunityView: View {
                     CommunityWebView(
                         url: url,
                         loadToken: store.loadToken,
+                        outbox: store.outbox,
                         onLoadingStarted: { store.send(.internal(.loadingStarted)) },
                         onLoadingFinished: { store.send(.internal(.loadingFinished)) },
-                        onLoadingFailed: { store.send(.internal(.loadingFailed)) }
+                        onLoadingFailed: { store.send(.internal(.loadingFailed)) },
+                        onBridgeMessage: { store.send(.internal(.bridgeMessageReceived($0))) },
+                        onOutboundDelivered: { store.send(.internal(.outboundDelivered(id: $0))) }
                     )
                 }
 
@@ -186,21 +189,38 @@ private struct CommunityWebView: UIViewRepresentable {
     let url: URL
     // 같은 URL로 강제 reload를 트리거하기 위한 토큰.
     let loadToken: UUID
+    // 네이티브 → 웹으로 전달 대기 중인 브릿지 메시지.
+    let outbox: [WebBridgeOutboundEnvelope]
     let onLoadingStarted: () -> Void
     let onLoadingFinished: () -> Void
     let onLoadingFailed: () -> Void
+    // 웹 → 네이티브 인바운드 메시지(AppBridge) 수신 콜백.
+    let onBridgeMessage: (WebBridgeInboundMessage) -> Void
+    // 아웃바운드 메시지를 evaluateJavaScript로 실제 전달한 뒤 호출.
+    let onOutboundDelivered: (UUID) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             onLoadingStarted: onLoadingStarted,
             onLoadingFinished: onLoadingFinished,
-            onLoadingFailed: onLoadingFailed
+            onLoadingFailed: onLoadingFailed,
+            onBridgeMessage: onBridgeMessage,
+            onOutboundDelivered: onOutboundDelivered
         )
     }
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
+
+        // 웹 → 네이티브 단일 라우터(AppBridge) 등록.
+        // WKUserContentController가 핸들러를 strong 참조하므로 약한 프록시를 끼워 누수를 막는다.
+        let contentController = WKUserContentController()
+        contentController.add(
+            WebBridgeScriptMessageProxy(delegate: context.coordinator),
+            name: WebBridge.appBridgeHandlerName
+        )
+        config.userContentController = contentController
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
@@ -215,37 +235,59 @@ private struct CommunityWebView: UIViewRepresentable {
         context.coordinator.update(
             onLoadingStarted: onLoadingStarted,
             onLoadingFinished: onLoadingFinished,
-            onLoadingFailed: onLoadingFailed
+            onLoadingFailed: onLoadingFailed,
+            onBridgeMessage: onBridgeMessage,
+            onOutboundDelivered: onOutboundDelivered
         )
         context.coordinator.load(url: url, token: loadToken, in: webView)
+        context.coordinator.flushOutbox(outbox, in: webView)
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate {
+    static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
+        // 핸들러를 정리해 WKUserContentController가 잔존 참조를 들고 있지 않도록 한다.
+        webView.configuration.userContentController
+            .removeScriptMessageHandler(forName: WebBridge.appBridgeHandlerName)
+    }
+
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         private var onLoadingStarted: () -> Void
         private var onLoadingFinished: () -> Void
         private var onLoadingFailed: () -> Void
+        private var onBridgeMessage: (WebBridgeInboundMessage) -> Void
+        private var onOutboundDelivered: (UUID) -> Void
 
         private var lastLoadedURL: URL?
         private var lastLoadToken: UUID?
+        // 이미 evaluateJavaScript로 전달한 아웃바운드 id. updateUIView가 여러 번
+        // 호출돼도 같은 메시지를 중복 주입하지 않도록 가드한다.
+        private var deliveredOutboundIDs: Set<UUID> = []
 
         init(
             onLoadingStarted: @escaping () -> Void,
             onLoadingFinished: @escaping () -> Void,
-            onLoadingFailed: @escaping () -> Void
+            onLoadingFailed: @escaping () -> Void,
+            onBridgeMessage: @escaping (WebBridgeInboundMessage) -> Void,
+            onOutboundDelivered: @escaping (UUID) -> Void
         ) {
             self.onLoadingStarted = onLoadingStarted
             self.onLoadingFinished = onLoadingFinished
             self.onLoadingFailed = onLoadingFailed
+            self.onBridgeMessage = onBridgeMessage
+            self.onOutboundDelivered = onOutboundDelivered
         }
 
         func update(
             onLoadingStarted: @escaping () -> Void,
             onLoadingFinished: @escaping () -> Void,
-            onLoadingFailed: @escaping () -> Void
+            onLoadingFailed: @escaping () -> Void,
+            onBridgeMessage: @escaping (WebBridgeInboundMessage) -> Void,
+            onOutboundDelivered: @escaping (UUID) -> Void
         ) {
             self.onLoadingStarted = onLoadingStarted
             self.onLoadingFinished = onLoadingFinished
             self.onLoadingFailed = onLoadingFailed
+            self.onBridgeMessage = onBridgeMessage
+            self.onOutboundDelivered = onOutboundDelivered
         }
 
         func load(url: URL, token: UUID, in webView: WKWebView) {
@@ -253,7 +295,40 @@ private struct CommunityWebView: UIViewRepresentable {
             guard lastLoadedURL != url || lastLoadToken != token else { return }
             lastLoadedURL = url
             lastLoadToken = token
+            // 재로드(재시도) 시 웹 컨텍스트가 초기화되므로 전달 기록도 비운다.
+            // 재로드 후 다시 WEBVIEW_READY가 오면 초기 동기화가 새로 일어난다.
+            deliveredOutboundIDs.removeAll()
             webView.load(URLRequest(url: url))
+        }
+
+        // 대기열의 아웃바운드 메시지를 순서대로 웹에 주입한다.
+        func flushOutbox(_ outbox: [WebBridgeOutboundEnvelope], in webView: WKWebView) {
+            for envelope in outbox where !deliveredOutboundIDs.contains(envelope.id) {
+                guard let script = envelope.message.makeJavaScript() else {
+                    // 직렬화 실패한 메시지는 영구히 막히지 않도록 전달 처리해 대기열에서 제거한다.
+                    deliveredOutboundIDs.insert(envelope.id)
+                    onOutboundDelivered(envelope.id)
+                    continue
+                }
+                deliveredOutboundIDs.insert(envelope.id)
+                webView.evaluateJavaScript(script) { [weak self] _, error in
+                    if let error {
+                        Log.trace("WebBridge outbound 전달 실패: \(error)", category: .network, level: .error)
+                    }
+                    self?.onOutboundDelivered(envelope.id)
+                }
+            }
+        }
+
+        // MARK: WKScriptMessageHandler
+        func userContentController(
+            _ userContentController: WKUserContentController,
+            didReceive message: WKScriptMessage
+        ) {
+            guard message.name == WebBridge.appBridgeHandlerName else { return }
+            guard let inbound = WebBridgeInboundMessage.decode(from: message.body) else { return }
+            Log.trace("WebBridge inbound 수신: \(inbound)", category: .network, level: .debug)
+            onBridgeMessage(inbound)
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
