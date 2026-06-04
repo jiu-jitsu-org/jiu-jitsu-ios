@@ -171,8 +171,9 @@ public struct MyProfileFeature: Sendable {
             // 관장 사범 인증 사진 업로드 응답 (ImageKit 호스팅 URL)
             // 성공 시 확보한 URL로 BE 인증 요청(PUT /api/user/owner)을 체이닝한다.
             case instructorVerificationImageUploadResponse(TaskResult<RegisteredImage>)
-            // 관장 사범 인증 요청 응답 (PUT /api/user/owner)
-            case instructorVerificationRequestResponse(TaskResult<Bool>)
+            // 관장 사범 인증 요청 응답 (PUT /api/user/owner). 성공 시 방금 업로드한 인증 이미지 URL을
+            // 함께 실어, 시트 재진입 시 최신 사진이 반영되도록 Optimistic 갱신에 사용한다.
+            case instructorVerificationRequestResponse(TaskResult<String>)
 
             // 닉네임 갱신 응답 (이미지와 동일한 PUT /api/user/profile 사용)
             case nicknameUpdateResponse(TaskResult<CommunityProfile>)
@@ -823,7 +824,13 @@ public struct MyProfileFeature: Sendable {
 
             case .view(.instructorVerificationMenuTapped):
                 state.isMoreMenuPresented = false
-                state.sheet = .instructorVerification(InstructorVerificationFeature.State())
+                // 이미 인증 사진을 제출한 상태(ownerRequested=true & 이미지 존재)면 시트에 미리보기로 노출.
+                let existingImageUrl = state.userProfile?.ownerRequested == true
+                    ? state.userProfile?.ownerRequestImageUrl
+                    : nil
+                state.sheet = .instructorVerification(
+                    InstructorVerificationFeature.State(existingImageUrl: existingImageUrl)
+                )
                 return .none
 
             case .sheet(.presented(.instructorVerification(.delegate(.didSelectUpload)))):
@@ -1036,11 +1043,13 @@ public struct MyProfileFeature: Sendable {
                     level: .info
                 )
                 let imageFileId = registeredImage.id
+                let imageUrl = registeredImage.imageUrl
                 return .run { send in
                     await send(.internal(.instructorVerificationRequestResponse(
                         await TaskResult {
                             try await userClient.requestOwnerVerification(imageFileId)
-                            return true
+                            // 인증 요청 성공 시 방금 업로드한 이미지 URL을 그대로 전달 (시트 재진입 반영용)
+                            return imageUrl
                         }
                     )))
                 }
@@ -1052,11 +1061,11 @@ public struct MyProfileFeature: Sendable {
                     message: "사진 업로드에 실패했어요. 다시 시도해주세요", style: .info
                 ))))
 
-            case .internal(.instructorVerificationRequestResponse(.success)):
+            case let .internal(.instructorVerificationRequestResponse(.success(uploadedImageUrl))):
                 // 인증 요청 접수 완료. 검수는 비동기이므로 "업로드했어요" 안내가 정확하다.
                 Log.trace("관장 사범 인증 - 인증 요청 완료", category: .network, level: .info)
-                // Optimistic — BE 응답을 기다리지 않고 ownerRequested를 즉시 반영해
-                // MY 탭 뱃지 등 인증 상태 UI가 바로 업데이트되도록 한다.
+                // Optimistic — BE 응답을 기다리지 않고 ownerRequested + 방금 업로드한 이미지 URL을
+                // 즉시 반영해 MY 탭 뱃지/시트 재진입 시 최신 상태가 보이도록 한다.
                 // 다음 MY 진입 시 loadProfile이 실제값으로 덮어쓰므로 드리프트가 남지 않는다.
                 state.userProfile = state.userProfile.map {
                     UserProfile(
@@ -1067,7 +1076,7 @@ public struct MyProfileFeature: Sendable {
                         profileImageFileId: $0.profileImageFileId,
                         snsProvider: $0.snsProvider,
                         ownerRequested: true,
-                        ownerRequestImageUrl: $0.ownerRequestImageUrl,
+                        ownerRequestImageUrl: uploadedImageUrl,
                         role: $0.role,
                         status: $0.status
                     )

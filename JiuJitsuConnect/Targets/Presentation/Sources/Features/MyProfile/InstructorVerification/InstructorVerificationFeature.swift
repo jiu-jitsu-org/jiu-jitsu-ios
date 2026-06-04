@@ -17,7 +17,13 @@ public struct InstructorVerificationFeature: Sendable {
 
     @ObservableState
     public struct State: Equatable, Sendable {
-        public init() {}
+        /// 이미 제출된 인증 사진 URL. 존재하면(ownerRequested=true & 이미지 있음) 시트에
+        /// 미리보기로 노출하고 CTA를 "재업로드"로 바꾼다. 미제출이면 `nil`.
+        public let existingImageUrl: String?
+
+        public init(existingImageUrl: String? = nil) {
+            self.existingImageUrl = existingImageUrl
+        }
     }
 
     public enum Action: Sendable {

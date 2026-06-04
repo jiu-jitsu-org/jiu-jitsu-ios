@@ -343,7 +343,9 @@ private extension View {
                 InstructorVerificationView(store: instructorVerificationStore)
                     .presentationDragIndicator(.hidden)
                     .presentationDetents([
-                        .height(InstructorVerificationView.contentHeight)
+                        .height(InstructorVerificationView.contentHeight(
+                            hasImage: instructorVerificationStore.existingImageUrl != nil
+                        ))
                     ])
                     .presentationBackground(
                         Color.component.bottomSheet.selected.container.background

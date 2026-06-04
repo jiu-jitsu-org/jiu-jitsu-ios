@@ -19,7 +19,10 @@ public struct InstructorVerificationView: View {
     /// 다른 시트(`BeltSettingView` 등)와 동일한 정적 상수 패턴.
     /// Figma 디자인 가이드 기준 전체 바텀 시트 높이 = 409
     /// (본문 내재 369 + iOS 26 Liquid Glass partial sheet 내부 inset 보정 ~40)
-    public static let contentHeight: CGFloat = 409
+    /// - 기존 인증 사진 미리보기가 있으면 이미지 블록(top 16 + 80) 만큼 더 높게 잡는다.
+    public static func contentHeight(hasImage: Bool) -> CGFloat {
+        hasImage ? 505 : 409
+    }
 
     public init(store: StoreOf<InstructorVerificationFeature>) {
         self.store = store
@@ -31,6 +34,9 @@ public struct InstructorVerificationView: View {
         // titleSection / noticeBox / ctaSection 3곳에서 공유되는 좌우 여백
         static let horizontalPadding: CGFloat = 20
         static let noticeCornerRadius: CGFloat = 15
+        // 기존 인증 사진 미리보기 — 정사각 썸네일
+        static let imageSize: CGFloat = 90
+        static let imageCornerRadius: CGFloat = 15
     }
 
     // MARK: - Body
@@ -39,8 +45,14 @@ public struct InstructorVerificationView: View {
         VStack(spacing: 0) {
             handleBar
             titleSection
-            noticeBox
-                .padding(.top, 16)
+            VStack(spacing: 0) {
+                // 이미 제출한 인증 사진이 있으면 타이틀과 안내박스 사이에 미리보기로 노출
+                existingImageSection
+                    .padding(.top, 20)
+                noticeBox
+                    .padding(.bottom, 20)
+            }
+            .padding(.top, 16)
             // contentHeight(409) - body 자식 합(369) = 40pt의 빈 공간이 어딘가에 들어가야 한다.
             // 이 Spacer 없으면 40pt가 CTA 아래에 쌓여 CTA가 디바이스 바닥에서 멀어진다.
             // Spacer로 noticeBox와 CTA 사이가 흡수하면 CTA가 시트 바닥에 못박힌다.
@@ -80,6 +92,30 @@ public struct InstructorVerificationView: View {
         .padding(.horizontal, Metrics.horizontalPadding)
     }
 
+    /// 이미 제출한 인증 사진 미리보기. 미제출(`existingImageUrl == nil`)이면 렌더링하지 않는다.
+    @ViewBuilder
+    private var existingImageSection: some View {
+        if let urlString = store.existingImageUrl,
+           let url = URL(string: urlString) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                default:
+                    RoundedRectangle(cornerRadius: Metrics.imageCornerRadius)
+                        .fill(Color.primitive.coolGray.cg100)
+                }
+            }
+            .frame(width: Metrics.imageSize, height: Metrics.imageSize)
+            .clipShape(RoundedRectangle(cornerRadius: Metrics.imageCornerRadius))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Metrics.horizontalPadding)
+            .padding(.bottom, 10)
+        }
+    }
+
     private var noticeBox: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 4) {
@@ -113,13 +149,14 @@ public struct InstructorVerificationView: View {
             RoundedRectangle(cornerRadius: Metrics.noticeCornerRadius)
                 .fill(Color.primitive.coolGray.cg25)
         )
-        .padding(Metrics.horizontalPadding)
+        .padding(.horizontal, Metrics.horizontalPadding)
     }
 
     private var ctaSection: some View {
         VStack(spacing: 0) {
             CTAButton(
-                title: "사진 업로드",
+                // 기존 인증 사진이 있으면 "재업로드"로 안내
+                title: store.existingImageUrl == nil ? "사진 업로드" : "사진 재업로드",
                 action: { store.send(.view(.uploadTapped)) }
             )
 
@@ -158,9 +195,21 @@ public struct InstructorVerificationView: View {
 
 // MARK: - Previews
 
-#Preview("관장 사범 인증") {
+#Preview("관장 사범 인증 - 최초") {
     InstructorVerificationView(
         store: Store(initialState: InstructorVerificationFeature.State()) {
+            InstructorVerificationFeature()
+        }
+    )
+}
+
+#Preview("관장 사범 인증 - 사진 제출됨") {
+    InstructorVerificationView(
+        store: Store(
+            initialState: InstructorVerificationFeature.State(
+                existingImageUrl: "https://ik.imagekit.io/preview/verification_preview.jpg"
+            )
+        ) {
             InstructorVerificationFeature()
         }
     )
