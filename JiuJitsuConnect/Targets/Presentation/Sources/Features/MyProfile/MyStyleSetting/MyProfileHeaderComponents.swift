@@ -282,18 +282,12 @@ private struct NicknameEditRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
-            // FIXME: 임시 뱃지 — 디자인 확정 후 교체 예정
             if isOwner {
-                Text("관장")
-                    .font(Font.pretendard.labelS)
-                    .foregroundStyle(Color.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule()
-                            .fill(Color.white.opacity(0.25))
-                    )
-                    .padding(.trailing, 6)
+                Assets.MyProfile.Icon.badgeCheckLight.swiftUIImage
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 24, height: 24)
+                    .padding(.trailing, 4)
             }
 
             Text(nickname)

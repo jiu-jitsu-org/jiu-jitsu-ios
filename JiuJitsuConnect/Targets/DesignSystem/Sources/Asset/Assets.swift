@@ -73,6 +73,7 @@ public enum Assets {
       public static let styleTopPosition = ImageAsset(name: "MyProfile/Card/style-top-position")
     }
     public enum Icon {
+      public static let badgeCheckLight = ImageAsset(name: "MyProfile/Icon/badge-check-light")
       public static let beltBlack = ImageAsset(name: "MyProfile/Icon/belt-black")
       public static let beltBlue = ImageAsset(name: "MyProfile/Icon/belt-blue")
       public static let beltBrown = ImageAsset(name: "MyProfile/Icon/belt-brown")
