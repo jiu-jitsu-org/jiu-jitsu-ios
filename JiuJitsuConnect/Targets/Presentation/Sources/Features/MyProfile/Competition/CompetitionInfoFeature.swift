@@ -39,6 +39,8 @@ public struct CompetitionInfoFeature: Sendable {
         var month: Int = 1
 
         // 2단계: 대회명 (TextField 직접 바인딩)
+        // 대회명은 닉네임과 달리 중복을 허용하므로 별도 검증 없이 "빈 값" 여부만 본다.
+        // 빈 값이면 다음 버튼을 비활성화하므로(View의 .disabled) 별도 검증 상태/문구는 두지 않는다.
         var name: String = ""
 
         // 3단계: 결과 — Picker UI 특성상 초기 선택값이 필요하므로 옵셔널이 아닌 기본값 사용
@@ -98,6 +100,11 @@ public struct CompetitionInfoFeature: Sendable {
                     state.step = .name
                     return .none
                 case .name:
+                    // 빈 값(공백 포함)일 때 다음 버튼은 View에서 비활성화되지만,
+                    // 빈 대회명이 result 단계로 새지 않도록 방어적으로 한 번 더 막는다.
+                    guard !state.name.trimmingCharacters(in: .whitespaces).isEmpty else {
+                        return .none
+                    }
                     state.step = .result
                     return .none
                 case .result:

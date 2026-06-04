@@ -62,6 +62,8 @@ struct CompetitionNameView: View {
                 store.send(.view(.nextButtonTapped))
             }
         )
+        // 대회명이 비어있으면(공백만 입력 포함) 진행 불가 — 처음부터 비활성화한다.
+        .disabled(store.name.trimmingCharacters(in: .whitespaces).isEmpty)
     }
 }
 
