@@ -5,7 +5,11 @@ import DesignSystem
 struct CompetitionDateView: View {
     let store: StoreOf<CompetitionInfoFeature>
 
-    private let years: [YearItem] = (2020...2025).reversed().map(YearItem.init)
+    // 상한은 현재 연도(매년 자동 반영), 하한은 2000년. 최신 연도가 위로 오도록 내림차순.
+    private let years: [YearItem] = {
+        let currentYear = Calendar.current.component(.year, from: Date())
+        return (2000...currentYear).reversed().map(YearItem.init)
+    }()
     private let months: [MonthItem] = (1...12).reversed().map(MonthItem.init)
 
     var body: some View {

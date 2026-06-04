@@ -34,8 +34,8 @@ public struct CompetitionInfoFeature: Sendable {
         var mode: Mode = .add
         var step: Step = .date
 
-        // 1단계: 날짜
-        var year: Int = 2025
+        // 1단계: 날짜 — 기본 선택 연도는 가장 최신(현재) 연도. 연도 Picker 상한과 일치한다.
+        var year: Int = Calendar.current.component(.year, from: Date())
         var month: Int = 1
 
         // 2단계: 대회명 (TextField 직접 바인딩)
