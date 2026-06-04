@@ -40,6 +40,16 @@ public struct MyProfileView: View {
                profile?.bestTechnique != nil ||
                profile?.favoriteTechnique != nil
     }
+
+    private var hasCompetitionInfo: Bool {
+        !(store.communityProfile?.competitions.isEmpty ?? true)
+    }
+
+    /// 스타일·대회 정보가 모두 없을 때만 디폴트(빈) 화면을 노출한다.
+    /// 스타일이 비어 있어도 대회 정보가 1개 이상이면 빈 스타일 카드 + 대회 UI를 보여준다.
+    private var showsDefaultScreen: Bool {
+        !hasStyleInfo && !hasCompetitionInfo
+    }
     
     // MARK: - Body
     
@@ -87,8 +97,8 @@ public struct MyProfileView: View {
                             .padding(.horizontal, 20)
                     }
 
-                    // 배경 그라데이션 (스타일 정보 없을 때만)
-                    if !hasStyleInfo {
+                    // 배경 그라데이션 (디폴트 화면일 때만)
+                    if showsDefaultScreen {
                         backgroundGradient(safeAreaBottom: safeAreaBottom)
                     }
                 }
@@ -151,17 +161,17 @@ public struct MyProfileView: View {
     /// 콘텐츠 영역 (스타일 + 대회)
     private var contentView: some View {
         VStack(spacing: 0) {
-            if hasStyleInfo {
+            if showsDefaultScreen {
+                EmptyStyleView(
+                    onRegisterStyleTapped: { store.send(.view(.registerStyleButtonTapped)) }
+                )
+                .padding(.bottom, 18)
+            } else {
                 VStack(alignment: .leading, spacing: 36) {
                     styleSection
                     competitionSection
                 }
                 .padding(.bottom, 29)
-            } else {
-                EmptyStyleView(
-                    onRegisterStyleTapped: { store.send(.view(.registerStyleButtonTapped)) }
-                )
-                .padding(.bottom, 18)
             }
         }
     }
