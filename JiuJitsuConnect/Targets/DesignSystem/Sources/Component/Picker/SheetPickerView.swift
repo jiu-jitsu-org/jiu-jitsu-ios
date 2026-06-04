@@ -29,41 +29,38 @@ import SwiftUI
 /// )
 /// ```
 public struct SheetPickerView<Item: Identifiable & Hashable>: View {
-    
+
     // MARK: - Properties
-    
+
     /// 표시할 항목 배열
     let items: [Item]
-    
+
     /// 현재 선택된 항목
     let selectedItem: Item
-    
+
     /// 항목의 표시 텍스트를 반환하는 클로저
     let displayText: (Item) -> String
-    
+
     /// 항목 선택 시 호출되는 클로저
     let onSelect: (Item) -> Void
-    
+
     /// 피커의 너비 (기본값: 130)
     let width: CGFloat
-    
+
     /// 각 항목의 높이 (기본값: 45)
     let itemHeight: CGFloat
-    
+
     /// 항목 간 간격 (기본값: 8)
     let itemSpacing: CGFloat
-    
+
     // MARK: - State
-    
-    @State private var currentSelectedId: Item.ID
-    @State private var scrollOffset: CGFloat = 0
-    @State private var isScrolling: Bool = false
-    @State private var scrollStopWorkItem: DispatchWorkItem?
-    @State private var isInternalSelection: Bool = false  // 내부 선택인지 외부 변경인지 구분
-    @State private var isDragging: Bool = false  // 사용자가 드래그 중인지
-    
+
+    /// 현재 화면 중앙에 정렬된 항목의 id.
+    /// `scrollPosition(id:anchor:.center)`이 스크롤에 맞춰 갱신하고, 외부 선택 변경 시 여기에 써 넣어 해당 항목으로 스크롤한다.
+    @State private var scrolledID: Item.ID?
+
     // MARK: - Initialization
-    
+
     /// SheetPickerView 초기화
     /// - Parameters:
     ///   - items: 표시할 항목 배열
@@ -89,164 +86,97 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
         self.itemHeight = itemHeight
         self.itemSpacing = itemSpacing
         self.onSelect = onSelect
-        self._currentSelectedId = State(initialValue: selectedItem.id)
+        self._scrolledID = State(initialValue: selectedItem.id)
     }
-    
+
+    // MARK: - Layout Metrics
+
+    /// 스냅 격자의 기준이 되는 한 슬롯(항목 높이 + 간격)의 높이
+    private var slotPitch: CGFloat { itemHeight + itemSpacing }
+
+    /// 정확히 3개 항목이 노출되는 뷰포트 높이
+    private var viewportHeight: CGFloat { itemHeight * 3 + itemSpacing * 2 }
+
     // MARK: - Body
-    
+
     public var body: some View {
-        ScrollViewReader { proxy in
-            contentView(proxy: proxy)
-        }
-    }
-    
-    @ViewBuilder
-    private func contentView(proxy: ScrollViewProxy) -> some View {
-        GeometryReader { geometry in
-            ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: itemSpacing) {
-                    // 상단 여백 (투명한 spacer 역할)
-                    Color.clear
-                        .frame(height: itemHeight + itemSpacing)
-                    
-                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                        pickerItemView(item, index: index, proxy: proxy, geometryProxy: geometry)
-                    }
-                    
-                    // 하단 여백 (투명한 spacer 역할)
-                    Color.clear
-                        .frame(height: itemHeight + itemSpacing)
+        ScrollView(.vertical, showsIndicators: false) {
+            LazyVStack(spacing: itemSpacing) {
+                ForEach(items) { item in
+                    pickerItemView(item)
                 }
             }
-            .frame(width: width, height: itemHeight * 3 + itemSpacing * 2) // 정확히 3개 항목 노출
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in
-                        // 사용자가 직접 드래그 시작
-                        if !isDragging {
-                            isDragging = true
-                        }
-                        isScrolling = true
-                        scrollStopWorkItem?.cancel()
-                    }
-                    .onEnded { _ in
-                        // 드래그 종료 후 0.3초 뒤에 스크롤 완료로 간주하고 선택 확정
-                        let workItem = DispatchWorkItem { [self] in
-                            isScrolling = false
-                            isDragging = false
-                        }
-                        scrollStopWorkItem = workItem
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
-                    }
-            )
+            .scrollTargetLayout()
         }
-        .frame(width: width, height: itemHeight * 3 + itemSpacing * 2)
-        .onAppear {
-            currentSelectedId = selectedItem.id
-            isScrolling = true
-            scrollStopWorkItem?.cancel()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                proxy.scrollTo(selectedItem.id, anchor: .center)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    isScrolling = false
-                }
-            }
+        // 중앙 정렬은 아래 contentMargins + 스냅 격자가 전담한다.
+        // anchor: .center를 함께 주면 초기 레이아웃에서 정렬이 이중 적용되어 선택 항목이 한 슬롯 밀린다.
+        .scrollPosition(id: $scrolledID)
+        // 자유 스크롤 대신 슬롯 격자에 스냅 → 손을 떼면 항상 항목이 정확히 중앙에 정렬되어
+        // 여러 피커를 나란히 둘 때 행끼리 수평 정렬이 어긋나지 않는다.
+        .scrollTargetBehavior(SlotSnapScrollBehavior(pitch: slotPitch))
+        // 첫/마지막 항목도 중앙까지 올라올 수 있도록 위·아래로 한 슬롯만큼 스크롤 여백을 둔다.
+        // 이 여백 덕분에 스크롤 오프셋 0에서 첫 항목이 중앙에 정렬된다.
+        .contentMargins(.vertical, slotPitch, for: .scrollContent)
+        .frame(width: width, height: viewportHeight)
+        .onChange(of: scrolledID) { _, newID in
+            // 사용자 스크롤로 중앙 항목이 바뀌면 선택을 전달 (외부 선택과 동일하면 무시)
+            guard let newID, newID != selectedItem.id,
+                  let item = items.first(where: { $0.id == newID }) else { return }
+            onSelect(item)
         }
-        .onChange(of: selectedItem.id) { _, newValue in
-            // 내부 선택에 의한 변경이면 무시 (이미 스크롤되었음)
-            guard !isInternalSelection else {
-                return
-            }
-            
-            // 외부에서 selectedItem이 변경된 경우에만 스크롤
-            currentSelectedId = newValue
-            isScrolling = true
-            scrollStopWorkItem?.cancel()
+        .onChange(of: selectedItem.id) { _, newID in
+            // 외부에서 선택이 바뀐 경우에만 해당 항목으로 스크롤 (사용자 스크롤 → onSelect → 재스크롤 피드백 루프 방지)
+            guard scrolledID != newID else { return }
             withAnimation(.easeInOut(duration: 0.3)) {
-                proxy.scrollTo(newValue, anchor: .center)
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                isScrolling = false
+                scrolledID = newID
             }
         }
     }
-    
-    // 가장 가까운 항목으로 스냅 (드래그 후 가장 가까운 항목 선택)
-    private func snapToNearestItem(proxy: ScrollViewProxy, geometry: GeometryProxy) {
-        // 현재 뷰 중앙과 가장 가까운 항목 찾기
-        _ = geometry.frame(in: .global).midY
-        
-        // 모든 항목을 순회하면서 가장 중앙에 가까운 항목 찾기
-        for item in items where item.id != currentSelectedId {
-            // 각 항목의 ID를 기준으로 현재 위치 확인이 어려우므로
-            // 대신 현재 화면에 보이는 항목 중 중앙에 가까운 것을 찾습니다
-            // (이미 선택된 항목은 제외됨)
-        }
-        
-        // ScrollView의 현재 위치를 정확히 알기 어렵기 때문에
-        // onChange로 드래그 중 중앙 항목 추적
-    }
-    
+
     // MARK: - Private Views
-    
+
     @ViewBuilder
-    private func pickerItemView(_ item: Item, index: Int, proxy: ScrollViewProxy, geometryProxy: GeometryProxy) -> some View {
-        GeometryReader { itemGeometry in
-            let globalFrame = itemGeometry.frame(in: .global)
-            let containerFrame = geometryProxy.frame(in: .global)
-            let containerCenter = containerFrame.midY
-            let itemCenter = globalFrame.midY
-            let distance = abs(containerCenter - itemCenter)
-            let isNearCenter = distance < itemHeight / 2
-            
-            Button(action: {
-                isInternalSelection = true  // 내부 선택 플래그 설정
-                isScrolling = true
-                scrollStopWorkItem?.cancel()
-                currentSelectedId = item.id
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    proxy.scrollTo(item.id, anchor: .center)
-                }
-                onSelect(item)
-                // 애니메이션 완료 후 충분한 시간을 두고 플래그 해제
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    isScrolling = false
-                    isInternalSelection = false
-                }
-            }) {
-                Text(displayText(item))
-                    .font(isNearCenter
-                          ? .pretendard.custom(weight: .medium, size: 24)
-                          : .pretendard.custom(weight: .medium, size: 20))
-                    .foregroundStyle(isNearCenter
-                                     ? Color.component.picker.itemSelectedText
-                                     : Color.component.picker.itemUnselectedText)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: itemHeight)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(isNearCenter
-                                  ? Color.component.picker.itemSelectedBg
-                                  : Color.clear)
-                    )
-                    .animation(.easeOut(duration: 0.15), value: isNearCenter)
+    private func pickerItemView(_ item: Item) -> some View {
+        let isSelected = scrolledID == item.id
+        Button {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                scrolledID = item.id
             }
-            .buttonStyle(.plain)
-            .onChange(of: isNearCenter) { _, newValue in
-                // 드래그 중에만 중앙 항목 자동 선택
-                if isDragging && newValue && item.id != currentSelectedId {
-                    isInternalSelection = true
-                    currentSelectedId = item.id
-                    onSelect(item)
-                    // 0.1초 후 플래그 해제 (드래그가 계속되고 있으므로 빠르게)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        isInternalSelection = false
-                    }
-                }
-            }
+        } label: {
+            Text(displayText(item))
+                .font(isSelected
+                      ? .pretendard.custom(weight: .medium, size: 24)
+                      : .pretendard.custom(weight: .medium, size: 20))
+                .foregroundStyle(isSelected
+                                 ? Color.component.picker.itemSelectedText
+                                 : Color.component.picker.itemUnselectedText)
+                .frame(maxWidth: .infinity)
+                .frame(height: itemHeight)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(isSelected
+                              ? Color.component.picker.itemSelectedBg
+                              : Color.clear)
+                )
+                .animation(.easeOut(duration: 0.15), value: isSelected)
         }
-        .frame(height: itemHeight)
-        .id(item.id)
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Scroll Snap Behavior
+
+/// 스크롤 종료 지점을 슬롯(항목 높이 + 간격) 격자에 스냅시키는 동작.
+///
+/// 네이티브 `ScrollView`의 관성 스크롤은 임의 위치에서 멈추므로, 여러 피커를 나란히 둘 때
+/// 컬럼마다 미세하게 다른 오프셋에 정착해 행 정렬이 어긋난다. 모든 피커가 동일한 격자에
+/// 스냅하도록 강제해 항상 항목이 정확히 중앙에 정렬되게 한다.
+private struct SlotSnapScrollBehavior: ScrollTargetBehavior {
+    let pitch: CGFloat
+
+    func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
+        guard pitch > 0 else { return }
+        target.rect.origin.y = (target.rect.minY / pitch).rounded() * pitch
     }
 }
 
