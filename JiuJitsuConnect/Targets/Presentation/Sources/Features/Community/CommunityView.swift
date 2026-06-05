@@ -351,6 +351,7 @@ private struct CommunityWebView: UIViewRepresentable {
                     continue
                 }
                 deliveredOutboundIDs.insert(envelope.id)
+                WebBridge.logOutbound(envelope.message)
                 webView.evaluateJavaScript(script) { [weak self] _, error in
                     if let error {
                         Log.trace("WebBridge outbound 전달 실패: \(error)", category: .network, level: .error)
@@ -367,7 +368,7 @@ private struct CommunityWebView: UIViewRepresentable {
         ) {
             guard message.name == WebBridge.appBridgeHandlerName else { return }
             guard let inbound = WebBridgeInboundMessage.decode(from: message.body) else { return }
-            Log.trace("WebBridge inbound 수신: \(inbound)", category: .network, level: .debug)
+            WebBridge.logInbound(inbound)
             onBridgeMessage(inbound)
         }
 

@@ -24,6 +24,64 @@ enum WebBridge {
 
     /// 메시지 봉투(Envelope) 스키마 버전. 계약이 바뀌면 증가시켜 하위호환을 분기한다.
     static let schemaVersion = 1
+
+    // MARK: - Logging
+
+    /// 브릿지 트래픽 전용 로그 카테고리. 네트워크 로그처럼 한곳에 모여 보이도록 분리한다.
+    /// (`static let`은 Swift 6 strict concurrency에서 Sendable 제약이 걸리므로 함수로 제공)
+    private static func logCategory() -> Log.Category {
+        .custom(label: "Bridge", emoji: "🌉")
+    }
+
+    /// 웹 → 네이티브 수신 메시지를 한 줄로 기록한다.
+    static func logInbound(_ message: WebBridgeInboundMessage) {
+        Log.trace("⬇︎ IN  \(message.logSummary)", category: logCategory(), level: .info)
+    }
+
+    /// 네이티브 → 웹 전송 메시지를 한 줄로 기록한다.
+    static func logOutbound(_ message: WebBridgeOutboundMessage) {
+        Log.trace("⬆︎ OUT \(message.logSummary)", category: logCategory(), level: .info)
+    }
+
+    /// 로그에 토큰 원문을 남기지 않도록 마스킹한다(앞 8자 + 길이만 노출).
+    static func maskToken(_ token: String) -> String {
+        guard token.count > 8 else { return "***(len=\(token.count))" }
+        return "\(token.prefix(8))…(len=\(token.count))"
+    }
+}
+
+// MARK: - Log Summaries (가독성용 한 줄 요약)
+
+private extension WebBridgeInboundMessage {
+    var logSummary: String {
+        switch self {
+        case .webViewReady:
+            return "WEBVIEW_READY"
+        case let .authLoginPrompt(reason):
+            return "AUTH_LOGIN_PROMPT  reason=\(reason ?? "-")"
+        case let .authLoginModal(reason):
+            return "AUTH_LOGIN_MODAL  reason=\(reason ?? "-")"
+        case .authLogoutRequest:
+            return "AUTH_LOGOUT_REQUEST"
+        case let .unknown(type):
+            return "\(type)  (unsupported)"
+        }
+    }
+}
+
+private extension WebBridgeOutboundMessage {
+    var logSummary: String {
+        switch self {
+        case let .authLoginSuccess(accessToken, expiresAt):
+            return "AUTH_LOGIN_SUCCESS  accessToken=\(WebBridge.maskToken(accessToken)) expiresAt=\(expiresAt.map(String.init) ?? "nil")"
+        case .authLoginCancelled:
+            return "AUTH_LOGIN_CANCELLED"
+        case .authSessionExpired:
+            return "AUTH_SESSION_EXPIRED"
+        case .authLogout:
+            return "AUTH_LOGOUT"
+        }
+    }
 }
 
 // MARK: - Inbound (웹 → 네이티브)
