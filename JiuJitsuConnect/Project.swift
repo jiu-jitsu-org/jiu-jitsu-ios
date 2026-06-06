@@ -71,6 +71,15 @@ let appInfoPlist: [String: Plist.Value] = {
         "TEST_BASE_URL": "$(TEST_BASE_URL)",
         "WEB_URL": "$(WEB_URL)",
         "IMAGEKIT_PUBLIC_KEY": "$(IMAGEKIT_PUBLIC_KEY)",
+        // 테스트용 커뮤니티 웹뷰 도메인 변경(IP/HTTP) 지원을 위한 ATS 예외.
+        // - NSAllowsArbitraryLoadsInWebContent: WKWebView가 임의 http(IP 포함)를 로드 가능.
+        // - NSAllowsLocalNetworking: LAN/사설망(192.168.x, 172.16~31.x 등) 및 .local 접근 허용.
+        // 네이티브 API 통신은 이 키들의 영향을 받지 않고 여전히 ATS(https)로 보호된다.
+        // 도메인 변경 진입 버튼은 DEBUG/BETA 빌드에서만 노출되므로 릴리즈 실사용 노출은 없다.
+        "NSAppTransportSecurity": [
+            "NSAllowsArbitraryLoadsInWebContent": true,
+            "NSAllowsLocalNetworking": true,
+        ],
         "LSApplicationQueriesSchemes": [
             "kakaokompassauth",
             "kakaolink"
