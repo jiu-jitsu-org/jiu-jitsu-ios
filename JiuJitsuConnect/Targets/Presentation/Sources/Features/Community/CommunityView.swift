@@ -56,6 +56,7 @@ public struct CommunityView: View {
         }
         .background(Color.component.background.default)
         .onAppear { store.send(.view(.onAppear)) }
+        .modifier(DebugDomainAlert(store: store))
     }
 
     private var gnb: some View {
@@ -74,6 +75,19 @@ public struct CommunityView: View {
                 }
                 Spacer(minLength: 0)
                 HStack(spacing: 0) {
+                    #if DEBUG || BETA
+                    Button {
+                        store.send(.view(.debugChangeDomainTapped))
+                    } label: {
+                        Image(systemName: "network")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.red)
+                            .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    #endif
+
                     Button {
                         store.send(.view(.notificationTapped))
                     } label: {
@@ -183,6 +197,41 @@ public struct CommunityView: View {
     }
 }
 
+// MARK: - 테스트용 웹뷰 도메인 변경 Alert
+
+/// IP/도메인을 입력받아 즉시 해당 주소의 웹뷰를 다시 로드하는 테스트용 입력 다이얼로그.
+/// DEBUG/BETA 빌드에서만 트리거되며, 릴리즈에서는 진입 버튼이 노출되지 않는다.
+private struct DebugDomainAlert: ViewModifier {
+    let store: StoreOf<CommunityFeature>
+
+    func body(content: Content) -> some View {
+        content.alert(
+            "웹뷰 도메인 변경 (테스트)",
+            isPresented: Binding(
+                get: { store.isDebugURLAlertPresented },
+                set: { if !$0 { store.send(.view(.debugURLAlertDismissed)) } }
+            )
+        ) {
+            TextField(
+                "http://192.168.0.10:3000",
+                text: Binding(
+                    get: { store.debugURLInput },
+                    set: { store.send(.view(.debugURLInputChanged($0))) }
+                )
+            )
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .keyboardType(.URL)
+
+            Button("적용") { store.send(.view(.debugURLApplyTapped)) }
+            Button("기본값 복원", role: .destructive) { store.send(.view(.debugURLResetTapped)) }
+            Button("취소", role: .cancel) {}
+        } message: {
+            Text("불러올 웹뷰 주소를 입력하세요.\n스킴(http/https)을 생략하면 http로 처리됩니다.")
+        }
+    }
+}
+
 // MARK: - WKWebView Bridge
 
 private struct CommunityWebView: UIViewRepresentable {
@@ -226,6 +275,11 @@ private struct CommunityWebView: UIViewRepresentable {
         webView.navigationDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
         webView.scrollView.contentInsetAdjustmentBehavior = .never
+
+        #if DEBUG
+        // Safari > 개발자용 메뉴에서 이 웹뷰를 인스펙트할 수 있게 허용한다. (DEBUG 전용)
+        webView.isInspectable = true
+        #endif
 
         // 풀다운 리프레시: 페이지를 가리는 전면 로딩 오버레이 대신 네이티브 스피너만 노출한다.
         let refreshControl = UIRefreshControl()

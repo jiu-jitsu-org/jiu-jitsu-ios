@@ -44,6 +44,10 @@ public struct CommunityFeature: Sendable {
         // 전달한 뒤 outboundDelivered로 제거한다.
         var outbox: [WebBridgeOutboundEnvelope] = []
 
+        // 테스트용 웹뷰 도메인 변경 입력 다이얼로그 상태. (DEBUG/BETA 빌드에서만 노출)
+        var isDebugURLAlertPresented = false
+        var debugURLInput = ""
+
         public init(accessToken: String? = nil) {
             self.accessToken = accessToken
             let url = CommunityFeature.makeCommunityURL()
@@ -71,6 +75,14 @@ public struct CommunityFeature: Sendable {
             case notificationTapped
             case searchTapped
             case writeTapped
+
+            // MARK: 테스트용 웹뷰 도메인 변경
+            // IP/도메인을 입력받아 즉시 해당 주소의 웹뷰를 다시 로드한다. (DEBUG/BETA 전용)
+            case debugChangeDomainTapped
+            case debugURLInputChanged(String)
+            case debugURLApplyTapped
+            case debugURLResetTapped
+            case debugURLAlertDismissed
         }
 
         public enum InternalAction: Sendable {
@@ -140,6 +152,35 @@ public struct CommunityFeature: Sendable {
                 state.hasError = false
                 state.isLoading = true
                 state.loadToken = UUID()
+                return .none
+
+            // MARK: - 테스트용 웹뷰 도메인 변경
+
+            case .view(.debugChangeDomainTapped):
+                // 현재 적용된 주소를 입력 필드 기본값으로 채워 수정 출발점을 제공한다.
+                state.debugURLInput = state.url?.absoluteString ?? ""
+                state.isDebugURLAlertPresented = true
+                return .none
+
+            case let .view(.debugURLInputChanged(text)):
+                state.debugURLInput = text
+                return .none
+
+            case .view(.debugURLApplyTapped):
+                state.isDebugURLAlertPresented = false
+                Self.setDebugOverrideURLString(Self.normalizedURLString(state.debugURLInput))
+                Self.reloadCommunity(&state)
+                return .none
+
+            case .view(.debugURLResetTapped):
+                // 오버라이드를 지우면 다시 Info.plist의 WEB_URL로 로드된다.
+                state.isDebugURLAlertPresented = false
+                Self.setDebugOverrideURLString(nil)
+                Self.reloadCommunity(&state)
+                return .none
+
+            case .view(.debugURLAlertDismissed):
+                state.isDebugURLAlertPresented = false
                 return .none
 
             case .internal(.loadingStarted):
@@ -221,6 +262,13 @@ public struct CommunityFeature: Sendable {
     }
 
     private static func makeCommunityURL() -> URL? {
+#if DEBUG || BETA
+        // 테스트용 도메인 오버라이드가 설정돼 있으면 WEB_URL보다 우선 사용한다.
+        if let override = debugOverrideURL() {
+            Log.trace("커뮤니티 웹뷰 도메인 오버라이드 사용: \(override.absoluteString)", category: .system, level: .info)
+            return override
+        }
+#endif
         guard
             let urlString = Bundle.main.object(forInfoDictionaryKey: "WEB_URL") as? String,
             !urlString.isEmpty,
@@ -231,4 +279,55 @@ public struct CommunityFeature: Sendable {
         }
         return url
     }
+
+    // MARK: - 테스트용 도메인 오버라이드 (UserDefaults)
+
+    private static let debugURLOverrideKey = "debug.community.webURLOverride"
+
+    /// 입력 주소로 URL을 다시 만들고 강제 reload되도록 상태를 초기화한다.
+    private static func reloadCommunity(_ state: inout State) {
+        let url = makeCommunityURL()
+        state.url = url
+        // URL이 동일해도 View가 reload를 인지하도록 토큰을 갱신한다.
+        state.loadToken = UUID()
+        // 도메인이 바뀌면 이전 웹 컨텍스트의 전달 대기 메시지는 의미가 없다.
+        state.outbox.removeAll()
+        if url == nil {
+            state.isLoading = false
+            state.hasError = true
+        } else {
+            state.isLoading = true
+            state.hasError = false
+        }
+    }
+
+    /// 사용자가 입력한 문자열을 로드 가능한 URL 문자열로 정규화한다.
+    /// 스킴을 생략하면(`192.168.0.10:3000`) http로 처리해 ip만 입력해도 바로 열리게 한다.
+    private static func normalizedURLString(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return trimmed.contains("://") ? trimmed : "http://\(trimmed)"
+    }
+
+    private static func setDebugOverrideURLString(_ value: String?) {
+        let defaults = UserDefaults.standard
+        if let value, !value.isEmpty {
+            defaults.set(value, forKey: debugURLOverrideKey)
+        } else {
+            defaults.removeObject(forKey: debugURLOverrideKey)
+        }
+    }
+
+#if DEBUG || BETA
+    private static func debugOverrideURL() -> URL? {
+        guard
+            let override = UserDefaults.standard.string(forKey: debugURLOverrideKey),
+            !override.isEmpty,
+            let url = URL(string: override)
+        else {
+            return nil
+        }
+        return url
+    }
+#endif
 }
