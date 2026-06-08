@@ -29,9 +29,16 @@ public struct AppTabView: View {
                 // safeAreaInset은 NavigationStack 내부의 root view에만 적용하여
                 // push된 destination은 탭바 영역까지 풀스크린으로 차지하도록 한다.
                 tabContainer(for: .home) {
-                    NavigationStack {
+                    NavigationStack(
+                        path: $store.scope(state: \.home.path, action: \.home.path)
+                    ) {
                         CommunityView(store: store.scope(state: \.home, action: \.home))
                             .safeAreaInset(edge: .bottom, spacing: 0) { tabBarReservedSpace }
+                    } destination: { destinationStore in
+                        switch destinationStore.case {
+                        case let .detail(detailStore):
+                            CommunityDetailView(store: detailStore)
+                        }
                     }
                 }
                 tabContainer(for: .myPage) {
@@ -63,6 +70,22 @@ public struct AppTabView: View {
             item: $store.scope(state: \.loginCover, action: \.loginCover)
         ) { loginStore in
             LoginView(store: loginStore)
+        }
+        // OPEN_SUBVIEW(modal) — 게시글 상세를 모달로 띄운다. 모달 내부의 중첩 OPEN_SUBVIEW는
+        // 자체 NavigationStack(coverPath)에 push되어 모달 위 모달 중첩을 피한다.
+        .fullScreenCover(
+            item: $store.scope(state: \.home.detailCover, action: \.home.detailCover)
+        ) { coverStore in
+            NavigationStack(
+                path: $store.scope(state: \.home.coverPath, action: \.home.coverPath)
+            ) {
+                CommunityDetailView(store: coverStore)
+            } destination: { destinationStore in
+                switch destinationStore.case {
+                case let .detail(detailStore):
+                    CommunityDetailView(store: detailStore)
+                }
+            }
         }
         .appAlert(
             isPresented: Binding(
@@ -100,7 +123,8 @@ public struct AppTabView: View {
     private var isSubViewPushed: Bool {
         switch store.selectedTab {
         case .home:
-            return false
+            // 게시글 상세 서브뷰가 push되어 있으면 탭바를 숨긴다(상세는 chromeless 풀스크린).
+            return !store.home.path.isEmpty
         case .myPage:
             return store.myPage.destination != nil
         case .settings:

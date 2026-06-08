@@ -48,6 +48,13 @@ public struct CommunityFeature: Sendable {
         var isDebugURLAlertPresented = false
         var debugURLInput = ""
 
+        // OPEN_SUBVIEW(push)로 쌓이는 게시글 상세 서브뷰 스택. 중첩 OPEN_SUBVIEW도 여기에 push된다.
+        var path = StackState<Path.State>()
+        // OPEN_SUBVIEW(modal)로 띄우는 상세 서브뷰(모달 루트).
+        @Presents var detailCover: CommunityDetailFeature.State?
+        // 모달 내부에서의 중첩 OPEN_SUBVIEW가 쌓이는 별도 스택(모달 위 NavigationStack 전용).
+        var coverPath = StackState<Path.State>()
+
         public init(accessToken: String? = nil) {
             self.accessToken = accessToken
             let url = CommunityFeature.makeCommunityURL()
@@ -67,6 +74,11 @@ public struct CommunityFeature: Sendable {
         case delegate(DelegateAction)
         // 부모(AppTabFeature)가 세션 변화를 주입해 웹뷰에 전파시키는 통로.
         case session(SessionAction)
+
+        // 게시글 상세 서브뷰 네비게이션.
+        case path(StackAction<Path.State, Path.Action>)
+        case coverPath(StackAction<Path.State, Path.Action>)
+        case detailCover(PresentationAction<CommunityDetailFeature.Action>)
 
         public enum ViewAction: Sendable {
             case onAppear
@@ -111,6 +123,17 @@ public struct CommunityFeature: Sendable {
             case loggedOut
             case sessionExpired
         }
+    }
+
+    @Reducer
+    public enum Path: Sendable {
+        case detail(CommunityDetailFeature)
+    }
+
+    /// 중첩 서브뷰가 어느 컨테이너(푸시 스택 / 모달 내부 스택)에서 올라왔는지 구분한다.
+    private enum SubviewContainer {
+        case push
+        case modal
     }
 
     public var body: some ReducerOf<Self> {
@@ -219,6 +242,14 @@ public struct CommunityFeature: Sendable {
                 case .authLogoutRequest:
                     return .send(.delegate(.logoutRequested))
 
+                case let .openSubview(payload):
+                    return Self.openSubview(payload, from: .push, into: &state)
+
+                case .closeSubview:
+                    // 리스트 웹뷰에는 닫을 서브뷰가 없다. 상세 웹뷰의 CLOSE는 각 상세가 처리한다.
+                    Log.trace("리스트 웹뷰 CLOSE_SUBVIEW 수신 — 무시", category: .network, level: .info)
+                    return .none
+
                 case let .unknown(type):
                     // 계약에 없는 타입 — 한쪽만 먼저 배포된 경우를 대비해 무시한다.
                     Log.trace("WebBridge 미지원 메시지 무시: \(type)", category: .network, level: .info)
@@ -250,10 +281,95 @@ public struct CommunityFeature: Sendable {
                 Self.enqueue(.authSessionExpired, into: &state)
                 return .none
 
+            // MARK: - Subview Delegates (상세 서브뷰 → 부모)
+
+            // 푸시 스택의 상세에서 올라온 위임.
+            case let .path(.element(id: _, action: .detail(.delegate(delegate)))):
+                return Self.handleDetailDelegate(delegate, from: .push, into: &state)
+
+            // 모달 내부 스택의 상세에서 올라온 위임.
+            case let .coverPath(.element(id: _, action: .detail(.delegate(delegate)))):
+                return Self.handleDetailDelegate(delegate, from: .modal, into: &state)
+
+            // 모달 루트 상세에서 올라온 위임.
+            case let .detailCover(.presented(.delegate(delegate))):
+                return Self.handleDetailDelegate(delegate, from: .modal, into: &state)
+
+            case .path, .coverPath, .detailCover:
+                return .none
+
             case .delegate:
                 return .none
             }
         }
+        .ifLet(\.$detailCover, action: \.detailCover) {
+            CommunityDetailFeature()
+        }
+        .forEach(\.path, action: \.path)
+        .forEach(\.coverPath, action: \.coverPath)
+    }
+
+    // MARK: - Subview 라우팅 헬퍼
+
+    /// 상세 서브뷰의 위임을 받아 스택/모달을 갱신하거나, 인증류는 부모(AppTab)로 다시 위임한다.
+    private static func handleDetailDelegate(
+        _ delegate: CommunityDetailFeature.Action.DelegateAction,
+        from container: SubviewContainer,
+        into state: inout State
+    ) -> Effect<Action> {
+        switch delegate {
+        case let .openSubviewRequested(payload):
+            // 이미 서브뷰 안이므로 같은 컨테이너에 push로 쌓는다(모달 위 모달 중첩 방지).
+            return openSubview(payload, from: container, into: &state)
+        case let .loginPromptRequested(reason):
+            return .send(.delegate(.loginPromptRequested(reason: reason)))
+        case let .loginModalRequested(reason):
+            return .send(.delegate(.loginModalRequested(reason: reason)))
+        case .logoutRequested:
+            return .send(.delegate(.logoutRequested))
+        }
+    }
+
+    /// OPEN_SUBVIEW를 동일 origin 검증 후 push/modal로 표시한다.
+    /// - 리스트(.push 컨테이너)에서의 modal 요청만 모달로 띄우고,
+    ///   서브뷰 안에서의 중첩 요청은 현재 컨테이너에 push로 강등한다(모달 중첩 방지).
+    private static func openSubview(
+        _ payload: OpenSubviewPayload,
+        from container: SubviewContainer,
+        into state: inout State
+    ) -> Effect<Action> {
+        guard
+            let base = state.url,
+            let target = URL(string: payload.url),
+            WebOrigin.isSameOrigin(target, as: base)
+        else {
+            Log.trace("OPEN_SUBVIEW 무시(잘못된 URL/교차 출처): \(payload.url)", category: .network, level: .error)
+            return .none
+        }
+
+        let detail = CommunityDetailFeature.State(
+            url: target,
+            title: payload.title,
+            accessToken: state.accessToken
+        )
+
+        switch container {
+        case .push:
+            switch payload.presentation {
+            case .push:
+                state.path.append(.detail(detail))
+            case .modal:
+                // 새 모달을 띄우기 전, 이전 모달의 잔여 내부 스택을 비워 신선한 상태로 연다.
+                state.coverPath = .init()
+                state.detailCover = detail
+            }
+        case .modal:
+            if payload.presentation == .modal {
+                Log.trace("중첩 OPEN_SUBVIEW presentation=modal → 모달 내부 push로 강등", category: .network, level: .info)
+            }
+            state.coverPath.append(.detail(detail))
+        }
+        return .none
     }
 
     /// 아웃바운드 메시지를 식별자와 함께 대기열에 추가한다.
@@ -331,3 +447,6 @@ public struct CommunityFeature: Sendable {
     }
 #endif
 }
+
+extension CommunityFeature.Path.State: Sendable, Equatable {}
+extension CommunityFeature.Path.Action: Sendable {}

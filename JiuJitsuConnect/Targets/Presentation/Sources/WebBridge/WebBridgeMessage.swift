@@ -63,6 +63,10 @@ private extension WebBridgeInboundMessage {
             return "AUTH_LOGIN_MODAL  reason=\(reason ?? "-")"
         case .authLogoutRequest:
             return "AUTH_LOGOUT_REQUEST"
+        case let .openSubview(payload):
+            return "OPEN_SUBVIEW  url=\(payload.url) presentation=\(payload.presentation.rawValue)"
+        case .closeSubview:
+            return "CLOSE_SUBVIEW"
         case let .unknown(type):
             return "\(type)  (unsupported)"
         }
@@ -100,6 +104,10 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     case authLoginModal(reason: String?)
     /// 웹 주도 로그아웃 요청(선택).
     case authLogoutRequest
+    /// 게시글 상세 등 동일 origin URL을 풀스크린 웹뷰(서브뷰)로 띄우라는 요청.
+    case openSubview(OpenSubviewPayload)
+    /// 현재 최상단 서브뷰를 닫으라는 요청(웹 헤더의 뒤로가기).
+    case closeSubview
     /// 계약에 없는 타입(상위 버전/오타 등) — 무시 대상.
     case unknown(type: String)
 
@@ -108,6 +116,8 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case authLoginPrompt = "AUTH_LOGIN_PROMPT"
         case authLoginModal = "AUTH_LOGIN_MODAL"
         case authLogoutRequest = "AUTH_LOGOUT_REQUEST"
+        case openSubview = "OPEN_SUBVIEW"
+        case closeSubview = "CLOSE_SUBVIEW"
     }
 
     /// `WKScriptMessage.body`를 파싱한다.
@@ -134,6 +144,23 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             return .authLoginModal(reason: payload?["reason"] as? String)
         case .authLogoutRequest:
             return .authLogoutRequest
+        case .openSubview:
+            // url은 필수. 빈 값/누락이면 띄울 대상이 없으므로 무시한다(동일 origin 검사는 Feature가 수행).
+            guard let urlString = payload?["url"] as? String, !urlString.isEmpty else {
+                Log.trace("OPEN_SUBVIEW payload url 누락/빈값", category: .network, level: .error)
+                return nil
+            }
+            let presentation = (payload?["presentation"] as? String)
+                .flatMap(OpenSubviewPayload.Presentation.init(rawValue:)) ?? .push
+            return .openSubview(
+                OpenSubviewPayload(
+                    url: urlString,
+                    title: payload?["title"] as? String,
+                    presentation: presentation
+                )
+            )
+        case .closeSubview:
+            return .closeSubview
         case .none:
             return .unknown(type: rawType)
         }
@@ -150,6 +177,60 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             return object
         }
         return nil
+    }
+}
+
+// MARK: - OPEN_SUBVIEW Payload
+
+/// `OPEN_SUBVIEW` 페이로드. 게시글 상세 등 동일 origin URL을 풀스크린 웹뷰로 여는 데 필요한 정보.
+/// `CommunityFeature.Action`의 연관값으로 노출되므로 public이다.
+public struct OpenSubviewPayload: Equatable, Sendable {
+    /// 서브뷰 표시 방식. 기본은 push(네비게이션 스택), modal은 fullScreenCover.
+    public enum Presentation: String, Sendable {
+        case push
+        case modal
+    }
+
+    /// 동일 origin 절대경로(예: https://.../community/123).
+    public let url: String
+    /// 웹 헤더 렌더 전 임시 제목(선택).
+    public let title: String?
+    /// push(기본) | modal.
+    public let presentation: Presentation
+
+    public init(url: String, title: String?, presentation: Presentation) {
+        self.url = url
+        self.title = title
+        self.presentation = presentation
+    }
+}
+
+// MARK: - Origin 검사
+
+/// 서브뷰로 열려는 URL이 호스트 웹뷰와 동일 origin(scheme+host+port)인지 검사한다.
+/// 외부 도메인이 네이티브 풀스크린 웹뷰로 열려 세션 쿠키가 새는 것을 막는다.
+enum WebOrigin {
+    static func isSameOrigin(_ lhs: URL, as rhs: URL) -> Bool {
+        guard let lhsKey = originKey(lhs), let rhsKey = originKey(rhs) else { return false }
+        return lhsKey == rhsKey
+    }
+
+    private static func originKey(_ url: URL) -> String? {
+        guard
+            let scheme = url.scheme?.lowercased(),
+            let host = url.host?.lowercased()
+        else { return nil }
+        // 포트 미표기는 스킴 기본 포트로 정규화해 `https://h` == `https://h:443`이 되게 한다.
+        let port = url.port ?? defaultPort(for: scheme)
+        return "\(scheme)://\(host):\(port.map(String.init) ?? "-")"
+    }
+
+    private static func defaultPort(for scheme: String) -> Int? {
+        switch scheme {
+        case "https": return 443
+        case "http": return 80
+        default: return nil
+        }
     }
 }
 
