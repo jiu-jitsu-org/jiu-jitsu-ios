@@ -63,8 +63,8 @@ struct BridgeWebView: UIViewRepresentable {
         webView.allowsBackForwardNavigationGestures = allowsBackForwardNavigationGestures
         webView.scrollView.contentInsetAdjustmentBehavior = .never
 
-        #if DEBUG
-        // Safari > 개발자용 메뉴에서 이 웹뷰를 인스펙트할 수 있게 허용한다. (DEBUG 전용)
+        #if DEBUG || BETA
+        // Safari > 개발자용 메뉴에서 이 웹뷰를 인스펙트할 수 있게 허용한다. (DEBUG/BETA 빌드)
         webView.isInspectable = true
         #endif
 
