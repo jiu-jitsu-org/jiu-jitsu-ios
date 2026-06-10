@@ -21,8 +21,6 @@ public struct CommunityView: View {
         // 알림·검색 아이콘 버튼 2곳에서 공유
         static let trailingIconSize: CGFloat = 24
         static let trailingIconButtonSize: CGFloat = 40
-        // 플로팅 버튼 trailing·bottom padding 2곳에서 공유
-        static let floatingButtonPadding: CGFloat = 12
     }
 
     public var body: some View {
@@ -49,8 +47,6 @@ public struct CommunityView: View {
                 if store.hasError {
                     errorOverlay
                 }
-
-                floatingWriteButton
             }
         }
         .background(Color.component.background.default)
@@ -146,27 +142,6 @@ public struct CommunityView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-
-    private var floatingWriteButton: some View {
-        Button {
-            store.send(.view(.writeTapped))
-        } label: {
-            Assets.Common.Icon.pencilLine.swiftUIImage
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 20, height: 20)
-                .foregroundStyle(Color.semantic.primary.onPrimary)
-                .frame(width: 48, height: 48)
-                .background(
-                    Capsule().fill(Color.semantic.interactive.primary)
-                )
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-        .padding(.trailing, Metrics.floatingButtonPadding)
-        .padding(.bottom, Metrics.floatingButtonPadding)
     }
 
     private var loadingOverlay: some View {

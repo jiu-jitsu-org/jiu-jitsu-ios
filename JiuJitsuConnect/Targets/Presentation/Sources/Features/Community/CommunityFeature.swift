@@ -86,7 +86,6 @@ public struct CommunityFeature: Sendable {
             case tabSelected(Tab)
             case notificationTapped
             case searchTapped
-            case writeTapped
 
             // MARK: 테스트용 웹뷰 도메인 변경
             // IP/도메인을 입력받아 즉시 해당 주소의 웹뷰를 다시 로드한다. (DEBUG/BETA 전용)
@@ -155,10 +154,6 @@ public struct CommunityFeature: Sendable {
 
             // FIXME: 검색 화면 진입 (커뮤니티 검색 기능 도입 시 구현)
             case .view(.searchTapped):
-                return .none
-
-            // FIXME: 글쓰기 화면 진입 (커뮤니티 글쓰기 기능 도입 시 구현)
-            case .view(.writeTapped):
                 return .none
 
             case .view(.retryTapped):
