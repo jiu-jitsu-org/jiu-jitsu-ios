@@ -49,7 +49,10 @@ public struct CommunityDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         // 탭바가 사라진 하단 영역까지 웹뷰가 채우도록 한다.
-        .ignoresSafeArea(.container, edges: .bottom)
+        // .keyboard도 함께 무시해 SwiftUI 자동 키보드 회피를 끄고, 키보드 대응은
+        // BridgeWebView의 keyboardLayoutGuide 한 곳에서만 처리해 이중 보정·애니메이션 충돌을 막는다.
+        // (웹의 sticky 하단 툴바가 키보드 위에 자연스럽게 붙도록 웹뷰 높이만 줄인다.)
+        .ignoresSafeArea([.container, .keyboard], edges: .bottom)
     }
 
     private var loadingOverlay: some View {

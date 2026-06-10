@@ -48,6 +48,10 @@ public struct CommunityView: View {
                     errorOverlay
                 }
             }
+            // SwiftUI 자동 키보드 회피를 끄고, 키보드 대응은 BridgeWebView의 keyboardLayoutGuide
+            // 한 곳에서만 처리한다. 글쓰기 화면이 웹 내부 라우트로 열릴 때도 웹뷰 높이만 줄어
+            // 웹의 sticky 하단 툴바가 키보드 위에 붙는다. (이중 보정·애니메이션 충돌 방지)
+            .ignoresSafeArea(.keyboard, edges: .bottom)
         }
         .background(Color.component.background.default)
         .onAppear { store.send(.view(.onAppear)) }

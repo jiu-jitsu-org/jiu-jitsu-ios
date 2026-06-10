@@ -43,7 +43,10 @@ struct BridgeWebView: UIViewRepresentable {
         )
     }
 
-    func makeUIView(context: Context) -> WKWebView {
+    // 웹뷰를 컨테이너 UIView로 감싼다. 직접 WKWebView를 반환하지 않는 이유는
+    // 하단을 컨테이너의 keyboardLayoutGuide에 고정해 키보드만큼 높이를 줄이기 위해서다.
+    // (아래 makeUIView 주석 참고)
+    func makeUIView(context: Context) -> UIView {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
         // 리스트·상세 웹뷰가 로그인 세션 쿠키(httpOnly 포함)를 공유하도록 영구 default 데이터스토어를 강제한다.
@@ -68,6 +71,8 @@ struct BridgeWebView: UIViewRepresentable {
         webView.isInspectable = true
         #endif
 
+        context.coordinator.attach(webView: webView)
+
         // 풀다운 리프레시: 페이지를 가리는 전면 로딩 오버레이 대신 네이티브 스피너만 노출한다.
         if enablesPullToRefresh {
             let refreshControl = UIRefreshControl()
@@ -78,14 +83,33 @@ struct BridgeWebView: UIViewRepresentable {
                 for: .valueChanged
             )
             webView.scrollView.refreshControl = refreshControl
-            context.coordinator.bind(webView: webView, refreshControl: refreshControl)
+            context.coordinator.bind(refreshControl: refreshControl)
         }
 
-        context.coordinator.load(url: url, token: loadToken, in: webView)
-        return webView
+        // 키보드가 올라오면 웹뷰 하단을 키보드 상단까지 끌어올려 visual viewport를 줄인다.
+        // 그래야 웹의 position:sticky; bottom:0 하단 툴바가 키보드 바로 위에 자동으로 붙는다.
+        // (웹에서 JS로 끌어올리던 방식은 버벅임/스크롤 충돌이 있어 제거했고, 네이티브가
+        //  웹뷰 높이만 줄여주는 방식으로 일원화한다.)
+        // NotificationCenter(keyboardWillShow/Hide) 대신 iOS 표준 keyboardLayoutGuide를 써서
+        // 키보드 프레임·애니메이션 추적을 시스템에 위임한다.
+        let container = UIView()
+        webView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(webView)
+        // usesBottomSafeArea=false → 키보드가 없을 때 가이드가 화면 맨 아래(홈 인디케이터 포함)로
+        // 내려간다. 덕분에 안전영역 이중 보정 없이, 기존처럼 웹뷰가 하단 끝까지 채운다.
+        container.keyboardLayoutGuide.usesBottomSafeArea = false
+        NSLayoutConstraint.activate([
+            webView.topAnchor.constraint(equalTo: container.topAnchor),
+            webView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            webView.bottomAnchor.constraint(equalTo: container.keyboardLayoutGuide.topAnchor)
+        ])
+
+        context.coordinator.load(url: url, token: loadToken)
+        return container
     }
 
-    func updateUIView(_ webView: WKWebView, context: Context) {
+    func updateUIView(_ container: UIView, context: Context) {
         context.coordinator.update(
             onLoadingStarted: onLoadingStarted,
             onLoadingFinished: onLoadingFinished,
@@ -93,13 +117,13 @@ struct BridgeWebView: UIViewRepresentable {
             onBridgeMessage: onBridgeMessage,
             onOutboundDelivered: onOutboundDelivered
         )
-        context.coordinator.load(url: url, token: loadToken, in: webView)
-        context.coordinator.flushOutbox(outbox, in: webView)
+        context.coordinator.load(url: url, token: loadToken)
+        context.coordinator.flushOutbox(outbox)
     }
 
-    static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
+    static func dismantleUIView(_ container: UIView, coordinator: Coordinator) {
         // 핸들러를 정리해 WKUserContentController가 잔존 참조를 들고 있지 않도록 한다.
-        webView.configuration.userContentController
+        coordinator.webView?.configuration.userContentController
             .removeScriptMessageHandler(forName: WebBridge.appBridgeHandlerName)
     }
 
@@ -116,9 +140,9 @@ struct BridgeWebView: UIViewRepresentable {
         // 호출돼도 같은 메시지를 중복 주입하지 않도록 가드한다.
         private var deliveredOutboundIDs: Set<UUID> = []
 
-        // 풀다운 리프레시용 약한 참조. target-action 콜백에는 델리게이트 메서드와 달리
-        // webView가 인자로 오지 않아 직접 보관한다.
-        private weak var webView: WKWebView?
+        // 로드·아웃바운드 주입·리프레시 등에서 공용으로 쓰는 webView 약한 참조.
+        // (컨테이너로 감싸 makeUIView가 webView를 직접 반환하지 않으므로 직접 보관한다.)
+        private(set) weak var webView: WKWebView?
         private weak var refreshControl: UIRefreshControl?
         // 현재 로드가 풀다운 리프레시로 시작됐는지. true면 전면 로딩 오버레이를
         // 띄우지 않고 리프레시 스피너만 유지한다.
@@ -152,7 +176,8 @@ struct BridgeWebView: UIViewRepresentable {
             self.onOutboundDelivered = onOutboundDelivered
         }
 
-        func load(url: URL, token: UUID, in webView: WKWebView) {
+        func load(url: URL, token: UUID) {
+            guard let webView else { return }
             // URL이 바뀌었거나 retry 토큰이 갱신된 경우에만 reload.
             guard lastLoadedURL != url || lastLoadToken != token else { return }
             lastLoadedURL = url
@@ -163,9 +188,13 @@ struct BridgeWebView: UIViewRepresentable {
             webView.load(URLRequest(url: url))
         }
 
-        // 풀다운 리프레시 대상 webView·컨트롤을 보관한다.
-        func bind(webView: WKWebView, refreshControl: UIRefreshControl) {
+        // 로드·아웃바운드·키보드 처리에 쓸 webView를 보관한다.
+        func attach(webView: WKWebView) {
             self.webView = webView
+        }
+
+        // 풀다운 리프레시 컨트롤을 보관한다.
+        func bind(refreshControl: UIRefreshControl) {
             self.refreshControl = refreshControl
         }
 
@@ -185,7 +214,8 @@ struct BridgeWebView: UIViewRepresentable {
         }
 
         // 대기열의 아웃바운드 메시지를 순서대로 웹에 주입한다.
-        func flushOutbox(_ outbox: [WebBridgeOutboundEnvelope], in webView: WKWebView) {
+        func flushOutbox(_ outbox: [WebBridgeOutboundEnvelope]) {
+            guard let webView else { return }
             for envelope in outbox where !deliveredOutboundIDs.contains(envelope.id) {
                 guard let script = envelope.message.makeJavaScript() else {
                     // 직렬화 실패한 메시지는 영구히 막히지 않도록 전달 처리해 대기열에서 제거한다.
