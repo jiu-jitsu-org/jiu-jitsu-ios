@@ -241,6 +241,8 @@ struct BridgeWebView: UIViewRepresentable {
             didReceive message: WKScriptMessage
         ) {
             guard message.name == WebBridge.appBridgeHandlerName else { return }
+            // 해석 결과와 별개로, 웹이 보낸 원본을 먼저 남긴다(파싱 실패·계약 위반도 추적 가능하도록).
+            WebBridge.logInboundRaw(message.body)
             guard let inbound = WebBridgeInboundMessage.decode(from: message.body) else { return }
             WebBridge.logInbound(inbound)
             onBridgeMessage(inbound)

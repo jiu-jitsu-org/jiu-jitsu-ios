@@ -33,9 +33,51 @@ enum WebBridge {
         .custom(label: "Bridge", emoji: "🌉")
     }
 
-    /// 웹 → 네이티브 수신 메시지를 한 줄로 기록한다.
+    /// 웹 → 네이티브 수신 원본(raw)을 파싱 전에 구조 그대로 기록한다.
+    /// `type` 누락·payload 형태 불일치 같은 계약 위반도 로그에 남도록, 해석된 요약(`logInbound`)과 별개로 호출한다.
+    static func logInboundRaw(_ body: Any) {
+        Log.trace("⬇︎ IN  [raw] \(describeBody(body))", category: logCategory(), level: .info)
+    }
+
+    /// 웹 → 네이티브 수신 메시지(해석 결과)를 한 줄로 기록한다.
     static func logInbound(_ message: WebBridgeInboundMessage) {
         Log.trace("⬇︎ IN  \(message.logSummary)", category: logCategory(), level: .info)
+    }
+
+    /// raw body를 사람이 읽기 좋은 형태로 기술한다.
+    /// 웹이 보낸 봉투가 객체(`postMessage(obj)`)인지 JSON 문자열인지, 그리고 그 내용 전체를 노출한다.
+    private static func describeBody(_ body: Any) -> String {
+        if body is [String: Any] {
+            return prettyJSON(from: body).map { "(object)\n\($0)" } ?? "(object) \(body)"
+        }
+        if let string = body as? String {
+            if let json = prettyJSON(from: body) {
+                return "(json-string)\n\(json)"
+            }
+            return "(string) \(string)"
+        }
+        return "(\(Swift.type(of: body))) \(body)"
+    }
+
+    /// 딕셔너리/JSON 문자열을 정렬·들여쓰기된 JSON 문자열로 변환한다(실패 시 nil).
+    private static func prettyJSON(from body: Any) -> String? {
+        let object: Any
+        if let dictionary = body as? [String: Any] {
+            object = dictionary
+        } else if
+            let jsonString = body as? String,
+            let data = jsonString.data(using: .utf8),
+            let parsed = try? JSONSerialization.jsonObject(with: data) {
+            object = parsed
+        } else {
+            return nil
+        }
+        guard
+            JSONSerialization.isValidJSONObject(object),
+            let data = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]),
+            let json = String(data: data, encoding: .utf8)
+        else { return nil }
+        return json
     }
 
     /// 네이티브 → 웹 전송 메시지를 한 줄로 기록한다.
@@ -64,9 +106,9 @@ private extension WebBridgeInboundMessage {
         case .authLogoutRequest:
             return "AUTH_LOGOUT_REQUEST"
         case let .openSubview(payload):
-            return "OPEN_SUBVIEW  url=\(payload.url) presentation=\(payload.presentation.rawValue)"
+            return "OPEN_SUBVIEW  url=\(payload.url) presentation=\(payload.presentation.rawValue) title=\(payload.title ?? "-")"
         case .closeSubview:
-            return "CLOSE_SUBVIEW"
+            return "CLOSE_SUBVIEW  (payload 없음)"
         case let .unknown(type):
             return "\(type)  (unsupported)"
         }
