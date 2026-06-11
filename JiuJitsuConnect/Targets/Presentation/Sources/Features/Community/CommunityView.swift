@@ -118,7 +118,12 @@ public struct CommunityView: View {
             .padding(.trailing, 8)
         }
         .frame(height: 44)
-        .background(Color.component.header.background)
+        // 헤더 흰색을 상단 safe area(상태바)까지 끌어올려 회색(background.default)이
+        // 상태바에 번지지 않게 한다. gnb가 VStack 최상단이라 top safe area 무시가 곧 상태바 채움.
+        .background {
+            Color.component.header.background
+                .ignoresSafeArea(edges: .top)
+        }
     }
 
     private func tabButton(_ tab: CommunityFeature.Tab) -> some View {

@@ -48,11 +48,16 @@ public struct CommunityDetailView: View {
         // chromeless: 네이티브 내비게이션 바를 숨겨 웹 자체 헤더만 보이게 한다.
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
-        // 탭바가 사라진 하단 영역까지 웹뷰가 채우도록 한다.
-        // .keyboard도 함께 무시해 SwiftUI 자동 키보드 회피를 끄고, 키보드 대응은
-        // BridgeWebView의 keyboardLayoutGuide 한 곳에서만 처리해 이중 보정·애니메이션 충돌을 막는다.
-        // (웹의 sticky 하단 툴바가 키보드 위에 자연스럽게 붙도록 웹뷰 높이만 줄인다.)
-        .ignoresSafeArea([.container, .keyboard], edges: .bottom)
+        // chromeless 일관성: 상태바(상단 safe area)까지 웹이 자체 헤더로 직접 그리도록
+        // 웹뷰를 화면 최상단·최하단까지 확장한다. (네이티브가 상태바를 회색으로 칠하던 문제 제거)
+        // ⚠️ 웹 의존성: 웹 HTML <meta viewport>에 `viewport-fit=cover`를, 상단 헤더에
+        //    `padding-top: env(safe-area-inset-top)`를 적용해야 시계/배터리와 헤더가 겹치지 않는다.
+        //    (BridgeWebView는 contentInsetAdjustmentBehavior=.never로 safe area 보정을 웹에 위임한다.)
+        // .keyboard는 하단만 무시 — SwiftUI 자동 키보드 회피를 끄고 키보드 대응은
+        //    BridgeWebView의 keyboardLayoutGuide 한 곳에서만 처리해 이중 보정·애니메이션 충돌을 막는다.
+        //    (웹의 sticky 하단 툴바가 키보드 위에 자연스럽게 붙도록 웹뷰 높이만 줄인다.)
+        .ignoresSafeArea(.container, edges: [.top, .bottom])
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
     private var loadingOverlay: some View {
