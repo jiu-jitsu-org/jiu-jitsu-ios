@@ -71,6 +71,9 @@ let appInfoPlist: [String: Plist.Value] = {
         "TEST_BASE_URL": "$(TEST_BASE_URL)",
         "WEB_URL": "$(WEB_URL)",
         "IMAGEKIT_PUBLIC_KEY": "$(IMAGEKIT_PUBLIC_KEY)",
+        // 시뮬레이터 자동로그인용 디버그 토큰. Beta/Release 타겟 설정에서 빈 값으로 덮어써
+        // 배포 바이너리 Info.plist에는 포함되지 않으며, 코드도 simulator 빌드에서만 읽는다.
+        "SIMULATOR_DEBUG_REFRESH_TOKEN": "$(SIMULATOR_DEBUG_REFRESH_TOKEN)",
         // 테스트용 커뮤니티 웹뷰 도메인 변경(IP/HTTP) 지원을 위한 ATS 예외.
         // - NSAllowsArbitraryLoadsInWebContent: WKWebView가 임의 http(IP 포함)를 로드 가능.
         // - NSAllowsLocalNetworking: LAN/사설망(192.168.x, 172.16~31.x 등) 및 .local 접근 허용.
@@ -164,11 +167,15 @@ let project = Project(
                         "OTHER_LDFLAGS": "$(inherited)",
                         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "\(additionalCondition) BETA",
                         "CODE_SIGN_ENTITLEMENTS": "JiuJitsuConnect.Release.entitlements",
+                        // 디버그 자동로그인 토큰을 배포 바이너리에서 제외 (Debug 빌드 전용)
+                        "SIMULATOR_DEBUG_REFRESH_TOKEN": "",
                     ]),
                     .release(name: "Release", settings: [
                         "OTHER_LDFLAGS": "$(inherited)",
                         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "\(additionalCondition)",
                         "CODE_SIGN_ENTITLEMENTS": "JiuJitsuConnect.Release.entitlements",
+                        // 디버그 자동로그인 토큰을 배포 바이너리에서 제외 (Debug 빌드 전용)
+                        "SIMULATOR_DEBUG_REFRESH_TOKEN": "",
                     ]),
                 ]
             )

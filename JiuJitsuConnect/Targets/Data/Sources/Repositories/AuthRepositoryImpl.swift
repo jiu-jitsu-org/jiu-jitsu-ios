@@ -158,6 +158,14 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     // MARK: - Auto Login
 
     public func autoLogin() async throws -> AuthInfo? {
+        #if targetEnvironment(simulator)
+        // 시뮬레이터에서는 Google/Apple SNS 로그인 SDK가 정상 동작하지 않아 수동 로그인이 불가능하다.
+        // 개발 편의를 위해 저장된 refreshToken이 없을 때만 디버그용 토큰을 시드하고, 이후는
+        // 기존 자동로그인(refresh) 플로우를 그대로 태운다. (첫 refresh 성공 시 회전된 토큰이
+        // Keychain에 저장되므로 시드 토큰은 1회만 사용된다.) 토큰 만료 시 아래 상수만 갱신한다.
+        seedSimulatorDebugTokenIfNeeded()
+        #endif
+
         // 1. 자동 로그인 설정 확인
         guard tokenStorage.isAutoLoginEnabled() else {
             return nil
@@ -251,7 +259,36 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     }
     
     // MARK: - Private Methods
-    
+
+    #if targetEnvironment(simulator)
+    /// 시뮬레이터 자동로그인용 디버그 provider. refreshToken은 `Configs/Secrets.xcconfig`의
+    /// `SIMULATOR_DEBUG_REFRESH_TOKEN`(gitignore) → Info.plist 경로로 주입받는다(`BASE_URL` 동일 패턴).
+    private enum SimulatorDebugAuth {
+        static let provider = "GOOGLE"
+
+        static var refreshToken: String? {
+            let token = Bundle.main.object(forInfoDictionaryKey: "SIMULATOR_DEBUG_REFRESH_TOKEN") as? String
+            // Beta/Release 빌드는 빈 문자열로 주입되므로 nil 취급한다.
+            return (token?.isEmpty == false) ? token : nil
+        }
+    }
+
+    private func seedSimulatorDebugTokenIfNeeded() {
+        guard tokenStorage.getRefreshToken() == nil else { return }
+        guard let refreshToken = SimulatorDebugAuth.refreshToken else {
+            Log.trace("🧪 시뮬레이터 디버그 토큰 미설정 — Secrets.xcconfig의 SIMULATOR_DEBUG_REFRESH_TOKEN 확인", category: .storage, level: .info)
+            return
+        }
+        Log.trace("🧪 시뮬레이터 디버그 토큰 시드 — SNS 로그인 우회 자동로그인 진행", category: .debug, level: .info)
+        // accessToken은 직후 refresh 호출로 즉시 교체되므로 refreshToken을 임시값으로 채운다.
+        tokenStorage.save(
+            accessToken: refreshToken,
+            refreshToken: refreshToken,
+            provider: SimulatorDebugAuth.provider
+        )
+    }
+    #endif
+
     @MainActor
     private func findRootViewController() throws -> UIViewController {
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
