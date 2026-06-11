@@ -88,10 +88,11 @@ let appInfoPlist: [String: Plist.Value] = {
             "remote-notification"
         ],
         "FirebaseAppDelegateProxyEnabled": false,
-        // 프로필 이미지 수정 — 카메라 촬영
-        "NSCameraUsageDescription": "프로필 이미지를 촬영하기 위해 카메라를 사용합니다.",
-        // PHPickerViewController는 사용자가 명시적으로 선택한 사진만 전달하므로
-        // NSPhotoLibraryUsageDescription 없이도 동작한다(추가 필요 없음).
+        // 프로필 이미지 수정 + 커뮤니티 글 작성 웹뷰(<input type=file>) — 카메라 촬영
+        "NSCameraUsageDescription": "사진을 촬영하기 위해 카메라를 사용합니다.",
+        // 기능상 필수는 아님(PHPicker/웹뷰 파일 입력은 권한 프롬프트 없이 동작)이나
+        // 보관함 접근 안내 일관성을 위해 명시.
+        "NSPhotoLibraryUsageDescription": "사진을 첨부하기 위해 사진 보관함에 접근합니다.",
     ]
     return base
 }()
