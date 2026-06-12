@@ -22,9 +22,6 @@ enum WebBridge {
     /// FE/Android와 공유하는 고정 계약이므로 변경 시 양 플랫폼 동시 합의가 필요하다.
     static let appBridgeHandlerName = "AppBridge"
 
-    /// 메시지 봉투(Envelope) 스키마 버전. 계약이 바뀌면 증가시켜 하위호환을 분기한다.
-    static let schemaVersion = 1
-
     // MARK: - Logging
 
     /// 브릿지 트래픽 전용 로그 카테고리. 네트워크 로그처럼 한곳에 모여 보이도록 분리한다.
@@ -109,6 +106,8 @@ private extension WebBridgeInboundMessage {
             return "OPEN_SUBVIEW  url=\(payload.url) presentation=\(payload.presentation.rawValue) title=\(payload.title ?? "-")"
         case .closeSubview:
             return "CLOSE_SUBVIEW  (payload 없음)"
+        case let .backGuard(enabled):
+            return "BACK_GUARD  enabled=\(enabled)"
         case let .unknown(type):
             return "\(type)  (unsupported)"
         }
@@ -152,6 +151,9 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     case openSubview(OpenSubviewPayload)
     /// 현재 최상단 서브뷰를 닫으라는 요청(웹 헤더의 뒤로가기).
     case closeSubview
+    /// 이 화면이 뒤로가기 가드(작성 취소 확인 등)를 갖는지 통지. enabled면 네이티브 back은
+    /// 직접 닫지 않고 BACK_PRESSED를 보내 웹이 가드 후 닫게 한다. disabled면 네이티브가 직접 닫는다.
+    case backGuard(enabled: Bool)
     /// 계약에 없는 타입(상위 버전/오타 등) — 무시 대상.
     case unknown(type: String)
 
@@ -162,6 +164,7 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case authLogoutRequest = "AUTH_LOGOUT_REQUEST"
         case openSubview = "OPEN_SUBVIEW"
         case closeSubview = "CLOSE_SUBVIEW"
+        case backGuard = "BACK_GUARD"
     }
 
     /// `WKScriptMessage.body`를 파싱한다.
@@ -205,6 +208,8 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             )
         case .closeSubview:
             return .closeSubview
+        case .backGuard:
+            return .backGuard(enabled: payload?["enabled"] as? Bool ?? false)
         case .none:
             return .unknown(type: rawType)
         }
@@ -335,10 +340,7 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
     }
 
     private func makeEnvelopeJSON() -> String? {
-        var envelope: [String: Any] = [
-            "type": type,
-            "version": WebBridge.schemaVersion
-        ]
+        var envelope: [String: Any] = ["type": type]
         if let payload { envelope["payload"] = payload }
 
         guard
