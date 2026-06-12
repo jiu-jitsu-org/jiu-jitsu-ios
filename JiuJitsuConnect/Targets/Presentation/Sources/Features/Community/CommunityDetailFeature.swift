@@ -26,6 +26,9 @@ public struct CommunityDetailFeature: Sendable {
         var loadToken: UUID = UUID()
         var isLoading: Bool = true
         var hasError: Bool = false
+        // 웹이 이 화면에 뒤로가기 가드(작성 취소 확인 등)를 등록했는지. true면 네이티브 back은
+        // 직접 닫지 않고 BACK_PRESSED를 보내 웹이 닫기를 결정한다. (BACK_GUARD 인바운드로 토글)
+        var backGuardEnabled: Bool = false
 
         // 서브뷰 생성 시점의 access token. WEBVIEW_READY 핸드셰이크 때 초기 로그인 상태를 동기화한다.
         // (세션 연속성은 공유 쿠키가 보장하고, 토큰 주입은 웹 JS 상태 동기화용 보조 채널이다.)
@@ -48,9 +51,9 @@ public struct CommunityDetailFeature: Sendable {
         public enum ViewAction: Sendable {
             case retryTapped
             // 공통 네이티브 뒤로가기 버튼 탭.
-            // 정상 로드: 웹에 BACK_PRESSED를 보내 웹이 가드(작성 취소 확인·내부 라우트 pop 등)
-            //   후 CLOSE_SUBVIEW로 닫게 한다. ("계속 작성"이면 웹이 안 닫아 화면 유지)
-            // 로딩/에러: 웹이 응답 불가이므로 네이티브가 직접 dismiss해 탈출을 보장한다.
+            // 기본은 네이티브가 직접 닫는다(빠른 경로). 웹이 가드(BACK_GUARD)를 등록한 화면
+            // (작성 등)에서만 BACK_PRESSED를 보내 웹이 가드 후 CLOSE_SUBVIEW로 닫게 한다.
+            // 로딩/에러는 웹이 응답 불가이므로 가드와 무관하게 직접 닫아 탈출을 보장한다.
             case backTapped
         }
 
@@ -87,14 +90,15 @@ public struct CommunityDetailFeature: Sendable {
                 return .none
 
             case .view(.backTapped):
-                // 정상 로드: 웹에 BACK_PRESSED를 보내, 웹이 가드(작성 취소 확인 등) 후
-                //   CLOSE_SUBVIEW를 되돌려줄 때 닫히게 한다. ("계속 작성"이면 웹이 안 닫아 유지)
-                // 로딩/에러: 웹 JS가 미준비/응답 불가 → 네이티브가 직접 닫아 탈출을 보장한다.
-                guard !state.isLoading, !state.hasError else {
-                    return .run { _ in await self.dismiss() }
+                // 기본은 네이티브가 직접 닫는다(빠른 경로). 단, 웹이 이 화면에 가드를 등록했고
+                //   (작성 취소 확인 등) 웹이 응답 가능한 상태면 BACK_PRESSED를 보내 웹이 가드 후
+                //   CLOSE_SUBVIEW로 닫게 한다. ("계속 작성"이면 웹이 안 닫아 화면 유지)
+                // 로딩/에러는 웹 응답 불가이므로 가드와 무관하게 직접 닫아 탈출을 보장한다.
+                if state.backGuardEnabled, !state.isLoading, !state.hasError {
+                    Self.enqueue(.backPressed, into: &state)
+                    return .none
                 }
-                Self.enqueue(.backPressed, into: &state)
-                return .none
+                return .run { _ in await self.dismiss() }
 
             case .internal(.loadingStarted):
                 state.isLoading = true
@@ -136,6 +140,11 @@ public struct CommunityDetailFeature: Sendable {
                 case .closeSubview:
                     // 자기 자신(최상단 서브뷰)을 닫는다. 스택 push면 pop, 모달이면 dismiss된다.
                     return .run { _ in await self.dismiss() }
+
+                case let .backGuard(enabled):
+                    // 웹이 이 화면의 뒤로가기 가드 유무를 통지 → 네이티브 back 분기에 사용한다.
+                    state.backGuardEnabled = enabled
+                    return .none
 
                 case let .authLoginPrompt(reason):
                     return .send(.delegate(.loginPromptRequested(reason: reason)))

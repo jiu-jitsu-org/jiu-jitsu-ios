@@ -245,6 +245,10 @@ public struct CommunityFeature: Sendable {
                     Log.trace("리스트 웹뷰 CLOSE_SUBVIEW 수신 — 무시", category: .network, level: .info)
                     return .none
 
+                case .backGuard:
+                    // 뒤로가기 가드는 서브뷰(상세) 전용 — 리스트에는 네이티브 back이 없어 무시한다.
+                    return .none
+
                 case let .unknown(type):
                     // 계약에 없는 타입 — 한쪽만 먼저 배포된 경우를 대비해 무시한다.
                     Log.trace("WebBridge 미지원 메시지 무시: \(type)", category: .network, level: .info)
