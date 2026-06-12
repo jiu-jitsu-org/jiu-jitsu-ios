@@ -29,6 +29,8 @@ public struct CommunityDetailView: View {
                 allowsBackForwardNavigationGestures: false,
                 // 상세는 스크롤/상태 보존을 위해 풀다운 리프레시를 끈다.
                 enablesPullToRefresh: false,
+                // 키보드가 문서를 밀어올려 고정 헤더가 화면 밖으로 나가는 것을 막는다.
+                locksDocumentScroll: true,
                 onLoadingStarted: { store.send(.internal(.loadingStarted)) },
                 onLoadingFinished: { store.send(.internal(.loadingFinished)) },
                 onLoadingFailed: { store.send(.internal(.loadingFailed)) },
@@ -44,20 +46,22 @@ public struct CommunityDetailView: View {
                 errorOverlay
             }
         }
-        .background(Color.component.background.default)
+        // 키보드 회피로 웹뷰가 줄었다 복귀하는 사이 드러나는 영역까지 흰색을 유지한다.
+        // 웹 콘텐츠가 #ffffff이므로 배경도 동일한 흰색으로 둬야 회색 갭이 보이지 않는다.
+        .background(Color.primitive.bw.trueWhite)
         // chromeless: 네이티브 내비게이션 바를 숨겨 웹 자체 헤더만 보이게 한다.
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
-        // chromeless 일관성: 상태바(상단 safe area)까지 웹이 자체 헤더로 직접 그리도록
-        // 웹뷰를 화면 최상단·최하단까지 확장한다. (네이티브가 상태바를 회색으로 칠하던 문제 제거)
-        // ⚠️ 웹 의존성: 웹 HTML <meta viewport>에 `viewport-fit=cover`를, 상단 헤더에
-        //    `padding-top: env(safe-area-inset-top)`를 적용해야 시계/배터리와 헤더가 겹치지 않는다.
-        //    (BridgeWebView는 contentInsetAdjustmentBehavior=.never로 safe area 보정을 웹에 위임한다.)
-        // .keyboard는 하단만 무시 — SwiftUI 자동 키보드 회피를 끄고 키보드 대응은
-        //    BridgeWebView의 keyboardLayoutGuide 한 곳에서만 처리해 이중 보정·애니메이션 충돌을 막는다.
-        //    (웹의 sticky 하단 툴바가 키보드 위에 자연스럽게 붙도록 웹뷰 높이만 줄인다.)
-        .ignoresSafeArea(.container, edges: [.top, .bottom])
-        .ignoresSafeArea(.keyboard, edges: .bottom)
+        // chromeless 일관성: 상단(상태바)·하단(홈 인디케이터) safe area를 모두 무시해
+        // 웹뷰를 화면 끝까지 확장한다. 웹이 자체 헤더/툴바로 노치 영역까지 직접 그린다.
+        // chained ignoresSafeArea는 합성이 불안정해 .container·.keyboard를 단일 modifier로
+        // 한 번에 무시한다. (분리하면 하단 container 무시가 되돌아가 홈 인디케이터에 배경색이 샌다)
+        // .keyboard 무시로 SwiftUI 자동 키보드 회피를 끄고, 키보드 대응은 BridgeWebView의
+        // keyboardLayoutGuide 한 곳에서만 처리해 이중 보정·애니메이션 충돌을 막는다.
+        // ⚠️ 웹 의존성: 웹 HTML <meta viewport>에 viewport-fit=cover, 헤더/툴바에
+        //    padding(env(safe-area-inset-top/bottom))을 적용해야 시계·홈인디케이터와 안 겹친다.
+        //    (BridgeWebView는 contentInsetAdjustmentBehavior=.never로 safe area 보정을 웹에 위임)
+        .ignoresSafeArea([.container, .keyboard], edges: [.top, .bottom])
     }
 
     private var loadingOverlay: some View {

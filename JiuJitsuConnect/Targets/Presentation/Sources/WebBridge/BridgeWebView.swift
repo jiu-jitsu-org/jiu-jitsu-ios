@@ -25,6 +25,9 @@ struct BridgeWebView: UIViewRepresentable {
     var allowsBackForwardNavigationGestures: Bool = true
     // 풀다운 리프레시 사용 여부. 상세 서브뷰는 스크롤/상태 보존을 위해 끈다.
     var enablesPullToRefresh: Bool = true
+    // 고정 셸(h-dvh + overflow:hidden) 화면에서, 키보드가 메인 문서를 위로 스크롤해 헤더가
+    // 화면 밖으로 밀리는 것을 막기 위해 메인 스크롤뷰 세로 오프셋을 0으로 고정한다.
+    var locksDocumentScroll: Bool = false
     let onLoadingStarted: () -> Void
     let onLoadingFinished: () -> Void
     let onLoadingFailed: () -> Void
@@ -61,10 +64,17 @@ struct BridgeWebView: UIViewRepresentable {
         )
         config.userContentController = contentController
 
-        let webView = WKWebView(frame: .zero, configuration: config)
+        // 시스템 기본 입력 액세서리 바(위/아래/완료 회색 바)를 제거한다. 웹이 자체 하단 툴바
+        // (사진/태그)를 키보드 위에 띄우므로 시스템 바는 불필요하고, 없는 편이 깔끔하다.
+        let webView = ChromelessWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = allowsBackForwardNavigationGestures
         webView.scrollView.contentInsetAdjustmentBehavior = .never
+        // 오버스크롤/바운스 영역에 WKWebView 기본 회색이 비치지 않도록 웹 콘텐츠(#ffffff)와
+        // 동일한 불투명 흰색으로 맞춘다. (CommunityDetailView 배경도 흰색)
+        webView.isOpaque = true
+        webView.backgroundColor = UIColor(Color.primitive.bw.trueWhite)
+        webView.scrollView.backgroundColor = UIColor(Color.primitive.bw.trueWhite)
 
         #if DEBUG || BETA
         // Safari > 개발자용 메뉴에서 이 웹뷰를 인스펙트할 수 있게 허용한다. (DEBUG/BETA 빌드)
@@ -72,6 +82,10 @@ struct BridgeWebView: UIViewRepresentable {
         #endif
 
         context.coordinator.attach(webView: webView)
+        // 고정 셸(상세): 키보드가 문서를 위로 스크롤해 헤더가 화면 밖으로 밀리는 것을 막는다.
+        if locksDocumentScroll {
+            context.coordinator.enableDocumentScrollLock(on: webView.scrollView)
+        }
 
         // 풀다운 리프레시: 페이지를 가리는 전면 로딩 오버레이 대신 네이티브 스피너만 노출한다.
         if enablesPullToRefresh {
@@ -86,24 +100,15 @@ struct BridgeWebView: UIViewRepresentable {
             context.coordinator.bind(refreshControl: refreshControl)
         }
 
-        // 키보드가 올라오면 웹뷰 하단을 키보드 상단까지 끌어올려 visual viewport를 줄인다.
-        // 그래야 웹의 position:sticky; bottom:0 하단 툴바가 키보드 바로 위에 자동으로 붙는다.
-        // (웹에서 JS로 끌어올리던 방식은 버벅임/스크롤 충돌이 있어 제거했고, 네이티브가
-        //  웹뷰 높이만 줄여주는 방식으로 일원화한다.)
-        // NotificationCenter(keyboardWillShow/Hide) 대신 iOS 표준 keyboardLayoutGuide를 써서
-        // 키보드 프레임·애니메이션 추적을 시스템에 위임한다.
-        let container = UIView()
+        // 키보드가 뜨면 웹뷰 프레임 자체를 키보드 높이만큼 줄여(웹뷰를 키보드 위로 리사이즈)
+        // layout/visual viewport를 축소한다. 그래야 웹(고정 셸 + 100dvh)의 입력바가 키보드 위에
+        // 붙고, env(safe-area-inset-bottom)이 0이 되어 하단 여백/회색이 사라지며, 헤더는 고정되고
+        // 본문만 스크롤된다. WKWebView는 viewport `interactive-widget=resizes-content` 지원이
+        // 불안정해 레이아웃 뷰포트가 안 줄어들므로, 네이티브 프레임 리사이즈로 키보드를 처리한다.
+        let container = KeyboardAvoidingWebContainer()
         webView.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(webView)
-        // usesBottomSafeArea=false → 키보드가 없을 때 가이드가 화면 맨 아래(홈 인디케이터 포함)로
-        // 내려간다. 덕분에 안전영역 이중 보정 없이, 기존처럼 웹뷰가 하단 끝까지 채운다.
-        container.keyboardLayoutGuide.usesBottomSafeArea = false
-        NSLayoutConstraint.activate([
-            webView.topAnchor.constraint(equalTo: container.topAnchor),
-            webView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            webView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            webView.bottomAnchor.constraint(equalTo: container.keyboardLayoutGuide.topAnchor)
-        ])
+        container.pinWebView(webView)
 
         context.coordinator.load(url: url, token: loadToken)
         return container
@@ -127,7 +132,7 @@ struct BridgeWebView: UIViewRepresentable {
             .removeScriptMessageHandler(forName: WebBridge.appBridgeHandlerName)
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, UIScrollViewDelegate {
         private var onLoadingStarted: () -> Void
         private var onLoadingFinished: () -> Void
         private var onLoadingFailed: () -> Void
@@ -147,6 +152,9 @@ struct BridgeWebView: UIViewRepresentable {
         // 현재 로드가 풀다운 리프레시로 시작됐는지. true면 전면 로딩 오버레이를
         // 띄우지 않고 리프레시 스피너만 유지한다.
         private var isRefreshing = false
+        // 고정 셸(상세) 웹뷰에서 키보드가 메인 문서를 위로 스크롤해 헤더가 화면 밖으로 밀리는 것을
+        // 막기 위해, 메인 스크롤뷰의 세로 오프셋을 0으로 고정할지 여부.
+        private var locksDocumentScroll = false
 
         init(
             onLoadingStarted: @escaping () -> Void,
@@ -191,6 +199,19 @@ struct BridgeWebView: UIViewRepresentable {
         // 로드·아웃바운드·키보드 처리에 쓸 webView를 보관한다.
         func attach(webView: WKWebView) {
             self.webView = webView
+        }
+
+        // 고정 셸 화면에서 메인 문서 스크롤을 0에 고정한다. 키보드가 포커스된 입력칸을 보이려
+        // 문서를 위로 스크롤(contentOffset.y>0)해 헤더가 화면 밖으로 밀리는 것을 되돌려 막는다.
+        // (웹은 overflow:hidden이라 메인 문서는 스크롤될 일이 없고, 본문은 별도 스크롤러로 스크롤된다.)
+        func enableDocumentScrollLock(on scrollView: UIScrollView) {
+            locksDocumentScroll = true
+            scrollView.delegate = self
+        }
+
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            guard locksDocumentScroll, scrollView.contentOffset.y != 0 else { return }
+            scrollView.contentOffset.y = 0
         }
 
         // 풀다운 리프레시 컨트롤을 보관한다.
@@ -292,4 +313,51 @@ struct BridgeWebView: UIViewRepresentable {
             decisionHandler(.allow)
         }
     }
+}
+
+/// 키보드가 뜨면 웹뷰 프레임을 키보드 상단까지 줄이고, 내리면 화면 바닥까지 복귀시키는 컨테이너.
+///
+/// 웹뷰 프레임을 키보드만큼 줄이면 웹의 100dvh/고정 셸이 키보드 위 영역으로 맞춰져 입력바가
+/// 키보드 위에 붙고 헤더는 고정된다. `keyboardLayoutGuide.topAnchor`에만 묶으면 키보드 해제 후
+/// 가이드가 하단 safe area만큼 위에 머물러 흰 여백이 남으므로, 가이드 제약은 항상 살려두되
+/// (키보드 추적 + 위로 띄움) required보다 한 단계 낮추고, 키보드가 없을 때만 바닥 고정 제약
+/// (required)을 켜서 강제 복귀시킨다.
+private final class KeyboardAvoidingWebContainer: UIView {
+    private var bottomToBottomEdge: NSLayoutConstraint?
+
+    func pinWebView(_ webView: UIView) {
+        // 키보드가 떠 있는 동안 가이드가 키보드만 추적하도록(하단 safe area 미포함) 한다.
+        keyboardLayoutGuide.usesBottomSafeArea = false
+        // 항상 활성 → ① 가이드가 키보드를 추적하도록 engage ② 키보드 위로 웹뷰를 띄움.
+        //   required보다 낮춰, 키보드 없을 때 아래 바닥 제약이 우선하게 한다.
+        let toKeyboard = webView.bottomAnchor.constraint(equalTo: keyboardLayoutGuide.topAnchor)
+        toKeyboard.priority = UILayoutPriority(999)
+        // 키보드가 없을 때만 켜서 웹뷰를 화면 바닥까지 강제 복귀(잔류 여백 제거).
+        let toBottomEdge = webView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        bottomToBottomEdge = toBottomEdge
+        NSLayoutConstraint.activate([
+            webView.topAnchor.constraint(equalTo: topAnchor),
+            webView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            toKeyboard
+        ])
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // 가이드 상단이 하단 safe area보다 충분히 위에 있으면 키보드가 실제로 떠 있는 것으로 본다.
+        // 키보드 ↑이면 바닥 고정을 풀어 웹뷰가 키보드 위로 따라 올라가게 하고,
+        // 키보드 ↓이면 바닥 고정을 켜서 잔류 여백 없이 복귀시킨다.
+        let distanceFromBottom = bounds.maxY - keyboardLayoutGuide.layoutFrame.minY
+        let keyboardVisible = distanceFromBottom > safeAreaInsets.bottom + 8
+        let shouldPinBottom = !keyboardVisible
+        guard bottomToBottomEdge?.isActive != shouldPinBottom else { return }
+        bottomToBottomEdge?.isActive = shouldPinBottom
+    }
+}
+
+/// 시스템 기본 입력 액세서리 바(키보드 위 위/아래/완료 회색 폼 어시스턴트)를 제거한 WKWebView.
+/// 웹이 자체 하단 툴바(사진/태그)를 키보드 위에 띄우므로 시스템 바는 불필요하고, 없는 편이 깔끔하다.
+private final class ChromelessWebView: WKWebView {
+    override var inputAccessoryView: UIView? { nil }
 }
