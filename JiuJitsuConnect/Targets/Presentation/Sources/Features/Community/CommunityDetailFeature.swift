@@ -47,6 +47,11 @@ public struct CommunityDetailFeature: Sendable {
 
         public enum ViewAction: Sendable {
             case retryTapped
+            // 공통 네이티브 뒤로가기 버튼 탭.
+            // 정상 로드: 웹에 BACK_PRESSED를 보내 웹이 가드(작성 취소 확인·내부 라우트 pop 등)
+            //   후 CLOSE_SUBVIEW로 닫게 한다. ("계속 작성"이면 웹이 안 닫아 화면 유지)
+            // 로딩/에러: 웹이 응답 불가이므로 네이티브가 직접 dismiss해 탈출을 보장한다.
+            case backTapped
         }
 
         public enum InternalAction: Sendable {
@@ -79,6 +84,16 @@ public struct CommunityDetailFeature: Sendable {
                 state.hasError = false
                 state.isLoading = true
                 state.loadToken = UUID()
+                return .none
+
+            case .view(.backTapped):
+                // 정상 로드: 웹에 BACK_PRESSED를 보내, 웹이 가드(작성 취소 확인 등) 후
+                //   CLOSE_SUBVIEW를 되돌려줄 때 닫히게 한다. ("계속 작성"이면 웹이 안 닫아 유지)
+                // 로딩/에러: 웹 JS가 미준비/응답 불가 → 네이티브가 직접 닫아 탈출을 보장한다.
+                guard !state.isLoading, !state.hasError else {
+                    return .run { _ in await self.dismiss() }
+                }
+                Self.enqueue(.backPressed, into: &state)
                 return .none
 
             case .internal(.loadingStarted):

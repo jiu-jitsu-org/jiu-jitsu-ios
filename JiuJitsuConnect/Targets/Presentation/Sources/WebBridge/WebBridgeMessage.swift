@@ -126,6 +126,8 @@ private extension WebBridgeOutboundMessage {
             return "AUTH_SESSION_EXPIRED"
         case .authLogout:
             return "AUTH_LOGOUT"
+        case .backPressed:
+            return "BACK_PRESSED"
         }
     }
 }
@@ -288,6 +290,8 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
     case authSessionExpired
     /// 네이티브 주도 로그아웃 → 웹 세션 정리.
     case authLogout
+    /// 네이티브 공통 뒤로가기 탭 통지 → 웹이 가드(작성 취소 확인 등) 후 CLOSE_SUBVIEW로 닫는다.
+    case backPressed
 
     private var type: String {
         switch self {
@@ -295,6 +299,7 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         case .authLoginCancelled: return "AUTH_LOGIN_CANCELLED"
         case .authSessionExpired: return "AUTH_SESSION_EXPIRED"
         case .authLogout: return "AUTH_LOGOUT"
+        case .backPressed: return "BACK_PRESSED"
         }
     }
 
@@ -305,7 +310,7 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
             // expiresAt은 선택 필드 — 값이 있을 때만 실어 계약 잡음을 줄인다.
             if let expiresAt { payload["expiresAt"] = expiresAt }
             return payload
-        case .authLoginCancelled, .authSessionExpired, .authLogout:
+        case .authLoginCancelled, .authSessionExpired, .authLogout, .backPressed:
             return nil
         }
     }

@@ -20,6 +20,21 @@ public struct CommunityDetailView: View {
     }
 
     public var body: some View {
+        // 외부 ZStack은 safe area를 존중 → 네이티브 뒤로가기를 상태바 아래에 둘 수 있다.
+        // (안쪽 웹뷰 레이어만 ignoresSafeArea로 edge-to-edge 확장)
+        ZStack(alignment: .topLeading) {
+            webViewLayer
+            backButton
+                .padding(.leading, 8)
+                // 웹 헤더(높이 44) 바 안에서 40pt 버튼을 세로 중앙 정렬: (44-40)/2
+                .padding(.top, 2)
+        }
+        // chromeless: 네이티브 내비게이션 바를 숨겨 웹 자체 헤더만 보이게 한다.
+        .toolbar(.hidden, for: .navigationBar)
+        .navigationBarBackButtonHidden(true)
+    }
+
+    private var webViewLayer: some View {
         ZStack {
             BridgeWebView(
                 url: store.url,
@@ -49,9 +64,6 @@ public struct CommunityDetailView: View {
         // 키보드 회피로 웹뷰가 줄었다 복귀하는 사이 드러나는 영역까지 흰색을 유지한다.
         // 웹 콘텐츠가 #ffffff이므로 배경도 동일한 흰색으로 둬야 회색 갭이 보이지 않는다.
         .background(Color.primitive.bw.trueWhite)
-        // chromeless: 네이티브 내비게이션 바를 숨겨 웹 자체 헤더만 보이게 한다.
-        .toolbar(.hidden, for: .navigationBar)
-        .navigationBarBackButtonHidden(true)
         // chromeless 일관성: 상단(상태바)·하단(홈 인디케이터) safe area를 모두 무시해
         // 웹뷰를 화면 끝까지 확장한다. 웹이 자체 헤더/툴바로 노치 영역까지 직접 그린다.
         // chained ignoresSafeArea는 합성이 불안정해 .container·.keyboard를 단일 modifier로
@@ -62,6 +74,23 @@ public struct CommunityDetailView: View {
         //    padding(env(safe-area-inset-top/bottom))을 적용해야 시계·홈인디케이터와 안 겹친다.
         //    (BridgeWebView는 contentInsetAdjustmentBehavior=.never로 safe area 보정을 웹에 위임)
         .ignoresSafeArea([.container, .keyboard], edges: [.top, .bottom])
+    }
+
+    // 공통 네이티브 뒤로가기 — 웹이 헤더에서 뺀 좌측 자리에 항상 노출되어, 웹 헤더가 못 떠도
+    // (로딩/에러) 빠져나갈 수 있게 한다. 아이콘 24x24 / 터치영역 40x40 / 좌측 여백 8.
+    private var backButton: some View {
+        Button {
+            store.send(.view(.backTapped))
+        } label: {
+            Assets.Common.Icon.chevronLeft.swiftUIImage
+                .resizable()
+                .scaledToFit()
+                .frame(width: 24, height: 24)
+                .foregroundStyle(Color.component.header.iconButton)
+                .frame(width: 40, height: 40)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var loadingOverlay: some View {
