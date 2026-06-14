@@ -100,15 +100,15 @@ public struct AppTabView: View {
     // 특정 화면에 종속되지 않도록 문구를 일반화해 여러 진입점에서 그대로 재사용한다.
     private var loginPromptAlertConfiguration: AppAlertConfiguration {
         AppAlertConfiguration(
-            title: "로그인이 필요해요",
-            message: "로그인하면 더 많은 기능을 이용할 수 있어요.",
+            title: "로그인하고 더 많은\n기능을 이용해보세요",
+            message: "커뮤니티 참여와 프로필 설정이 가능해요.",
             primaryButton: .init(
                 title: "로그인",
                 style: .primary,
                 action: { store.send(.view(.loginPromptLoginTapped)) }
             ),
             secondaryButton: .init(
-                title: "취소",
+                title: "닫기",
                 style: .neutral,
                 action: { store.send(.view(.loginPromptCancelTapped)) }
             )
