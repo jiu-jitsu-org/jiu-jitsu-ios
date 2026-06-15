@@ -87,17 +87,10 @@ struct BridgeWebView: UIViewRepresentable {
             context.coordinator.enableDocumentScrollLock(on: webView.scrollView)
         }
 
-        // 풀다운 리프레시: 페이지를 가리는 전면 로딩 오버레이 대신 네이티브 스피너만 노출한다.
+        // 풀다운 리프레시: 페이지를 가리는 전면 로딩 오버레이 대신, 디자인 밴드(연파랑 + 새로고침
+        // 안내 → 완료 안내)를 오버스크롤 영역에 노출한다. (커스텀 컨트롤러가 contentInset으로 제어)
         if enablesPullToRefresh {
-            let refreshControl = UIRefreshControl()
-            refreshControl.tintColor = UIColor(Color.semantic.interactive.primary)
-            refreshControl.addTarget(
-                context.coordinator,
-                action: #selector(Coordinator.handleRefresh),
-                for: .valueChanged
-            )
-            webView.scrollView.refreshControl = refreshControl
-            context.coordinator.bind(refreshControl: refreshControl)
+            context.coordinator.setupPullToRefresh(on: webView.scrollView)
         }
 
         // 키보드가 뜨면 웹뷰 프레임 자체를 키보드 높이만큼 줄여(웹뷰를 키보드 위로 리사이즈)
@@ -148,9 +141,10 @@ struct BridgeWebView: UIViewRepresentable {
         // 로드·아웃바운드 주입·리프레시 등에서 공용으로 쓰는 webView 약한 참조.
         // (컨테이너로 감싸 makeUIView가 webView를 직접 반환하지 않으므로 직접 보관한다.)
         private(set) weak var webView: WKWebView?
-        private weak var refreshControl: UIRefreshControl?
+        // 커스텀 풀다운 리프레시 컨트롤러. 리스트 웹뷰에서만 생성된다.
+        private var pullToRefresh: WebPullToRefreshController?
         // 현재 로드가 풀다운 리프레시로 시작됐는지. true면 전면 로딩 오버레이를
-        // 띄우지 않고 리프레시 스피너만 유지한다.
+        // 띄우지 않고 리프레시 밴드만 유지한다.
         private var isRefreshing = false
         // 고정 셸(상세) 웹뷰에서 키보드가 메인 문서를 위로 스크롤해 헤더가 화면 밖으로 밀리는 것을
         // 막기 위해, 메인 스크롤뷰의 세로 오프셋을 0으로 고정할지 여부.
@@ -210,16 +204,26 @@ struct BridgeWebView: UIViewRepresentable {
         }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
-            guard locksDocumentScroll, scrollView.contentOffset.y != 0 else { return }
-            scrollView.contentOffset.y = 0
+            if locksDocumentScroll, scrollView.contentOffset.y != 0 {
+                scrollView.contentOffset.y = 0
+                return
+            }
+            pullToRefresh?.scrollViewDidScroll(scrollView)
         }
 
-        // 풀다운 리프레시 컨트롤을 보관한다.
-        func bind(refreshControl: UIRefreshControl) {
-            self.refreshControl = refreshControl
+        func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+            pullToRefresh?.scrollViewDidEndDragging(scrollView)
         }
 
-        @objc func handleRefresh() {
+        // 커스텀 풀다운 리프레시를 스크롤뷰에 부착한다. (리스트 웹뷰 전용)
+        func setupPullToRefresh(on scrollView: UIScrollView) {
+            scrollView.delegate = self
+            pullToRefresh = WebPullToRefreshController(scrollView: scrollView) { [weak self] in
+                self?.beginRefresh()
+            }
+        }
+
+        private func beginRefresh() {
             guard let webView else { return }
             isRefreshing = true
             // 리프레시로 웹 컨텍스트가 재초기화되므로 전달 기록을 비워
@@ -228,10 +232,10 @@ struct BridgeWebView: UIViewRepresentable {
             webView.reload()
         }
 
-        private func endRefreshing() {
+        private func endRefreshing(success: Bool) {
             guard isRefreshing else { return }
             isRefreshing = false
-            refreshControl?.endRefreshing()
+            pullToRefresh?.finishRefreshing(success: success)
         }
 
         // 대기열의 아웃바운드 메시지를 순서대로 웹에 주입한다.
@@ -276,19 +280,47 @@ struct BridgeWebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            endRefreshing()
+            endRefreshing(success: true)
             onLoadingFinished()
+            #if DEBUG || BETA
+            logScrollDiagnostics(webView)
+            #endif
         }
+
+        #if DEBUG || BETA
+        // [임시 진단] 네이티브 스크롤뷰가 세로 오버플로(스크롤/바운스 가능)인지 확인한다.
+        // CSR 웹은 didFinish 직후 contentSize가 빈 셸일 수 있어 약간 지연 후 한 번 더 찍는다.
+        private func logScrollDiagnostics(_ webView: WKWebView) {
+            func dump(_ tag: String) {
+                let sv = webView.scrollView
+                let isSelfDelegate = (sv.delegate === self)
+                Log.trace(
+                    "[PTR진단 \(tag)] contentSize=\(sv.contentSize) bounds=\(sv.bounds.size) "
+                    + "bounces=\(sv.bounces) alwaysBounceV=\(sv.alwaysBounceVertical) "
+                    + "scrollEnabled=\(sv.isScrollEnabled) contentInset=\(sv.contentInset) "
+                    + "adjInset=\(sv.adjustedContentInset) delegate=self?\(isSelfDelegate) "
+                    + "verticalOverflow=\(sv.contentSize.height - sv.bounds.height)",
+                    category: .view, level: .info
+                )
+            }
+            dump("didFinish")
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(2))
+                guard self != nil else { return }
+                dump("+2s")
+            }
+        }
+        #endif
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
             Log.trace("Bridge webview didFail: \(error)", category: .network, level: .error)
-            endRefreshing()
+            endRefreshing(success: false)
             onLoadingFailed()
         }
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
             Log.trace("Bridge webview didFailProvisionalNavigation: \(error)", category: .network, level: .error)
-            endRefreshing()
+            endRefreshing(success: false)
             onLoadingFailed()
         }
 
@@ -306,7 +338,7 @@ struct BridgeWebView: UIViewRepresentable {
             {
                 Log.trace("Bridge webview HTTP error: \(http.statusCode)", category: .network, level: .error)
                 decisionHandler(.cancel)
-                endRefreshing()
+                endRefreshing(success: false)
                 onLoadingFailed()
                 return
             }
