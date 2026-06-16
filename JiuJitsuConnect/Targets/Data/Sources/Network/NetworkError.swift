@@ -16,8 +16,10 @@ public enum NetworkError: Error, LocalizedError, Sendable {
     case statusCodeError(statusCode: Int, response: APIErrorResponseDTO?)
     case timeout
     case noConnection
+    /// 401 후 토큰 갱신까지 실패(refresh 토큰 만료 등) — 재로그인이 필요한 세션 만료.
+    case sessionExpired
     case unknown(Error)
-    
+
     public var errorDescription: String? {
         switch self {
         case .invalidURL:
@@ -32,6 +34,8 @@ public enum NetworkError: Error, LocalizedError, Sendable {
             return "요청 시간이 초과되었습니다."
         case .noConnection:
             return "네트워크 연결을 확인해 주세요."
+        case .sessionExpired:
+            return "세션이 만료되었습니다. 다시 로그인해 주세요."
         case .unknown:
             return "알 수 없는 오류가 발생했습니다."
         }
@@ -56,7 +60,12 @@ public enum NetworkError: Error, LocalizedError, Sendable {
             
         case .decodingError:
             return .dataParsingFailed
-            
+
+        case .sessionExpired:
+            // 세션 만료는 전역 로그아웃(AuthSessionEvent.sessionExpired)으로 별도 처리되며,
+            // 호출부 에러 매핑에서는 refresh 토큰 무효와 동일하게 취급한다.
+            return .apiError(code: .invalidRefreshToken, message: nil)
+
         case .statusCodeError(_, let response):
             // 기존 AuthRepositoryImpl에 있던 로직을 그대로 가져옵니다.
             if let response, !response.code.isEmpty {

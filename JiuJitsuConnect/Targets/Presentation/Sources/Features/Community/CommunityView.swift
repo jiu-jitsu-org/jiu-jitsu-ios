@@ -31,6 +31,7 @@ public struct CommunityView: View {
                     BridgeWebView(
                         url: url,
                         loadToken: store.loadToken,
+                        accessToken: store.accessToken,
                         outbox: store.outbox,
                         onLoadingStarted: { store.send(.internal(.loadingStarted)) },
                         onLoadingFinished: { store.send(.internal(.loadingFinished)) },

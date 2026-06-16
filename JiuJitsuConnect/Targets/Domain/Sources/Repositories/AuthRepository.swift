@@ -18,4 +18,8 @@ public protocol AuthRepository: Sendable {
     
     func autoLogin() async throws -> AuthInfo?
     func hasValidToken() -> Bool
+
+    /// 저장된 refresh 토큰으로 세션을 갱신하고 새 accessToken을 반환한다(single-flight).
+    /// 웹뷰가 자기 토큰 만료 시 네이티브에 갱신을 위임할 때 사용한다.
+    func refreshSession() async throws -> String
 }

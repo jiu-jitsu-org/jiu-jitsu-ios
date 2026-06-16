@@ -39,6 +39,7 @@ public struct CommunityDetailView: View {
             BridgeWebView(
                 url: store.url,
                 loadToken: store.loadToken,
+                accessToken: store.accessToken,
                 outbox: store.outbox,
                 // 웹 헤더의 뒤로가기(CLOSE_SUBVIEW)로 닫으므로 좌우 스와이프 제스처는 끈다.
                 allowsBackForwardNavigationGestures: false,

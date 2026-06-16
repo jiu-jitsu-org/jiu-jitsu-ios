@@ -15,6 +15,10 @@ public protocol Endpoint: Sendable {
     var queryParameters: [String: String]? { get } // GET 파라미터용
     var body: Data? { get }
     var timeout: TimeInterval { get } // 타임아웃 설정
+    /// 401 수신 시 토큰 자동 갱신 후 재시도를 허용할지 여부.
+    /// 토큰 생명주기를 직접 다루는 인증 엔드포인트(login/refresh/logout)는 false로 둬
+    /// 인터셉터 재귀·로그인 도중 잘못된 세션 만료 통지를 막는다.
+    var allowsAuthRetry: Bool { get }
 }
 
 public enum HTTPMethod: String {
@@ -38,8 +42,10 @@ public extension Endpoint {
     var timeout: TimeInterval {
         return 30.0
     }
-    
-    var body: Data? { nil } 
+
+    var allowsAuthRetry: Bool { true }
+
+    var body: Data? { nil }
     
     func asURLRequest() -> URLRequest? {
         guard var urlComponents = URLComponents(string: baseURL) else { return nil }

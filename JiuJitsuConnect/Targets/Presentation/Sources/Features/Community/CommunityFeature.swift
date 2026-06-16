@@ -113,6 +113,8 @@ public struct CommunityFeature: Sendable {
             case loginModalRequested(reason: String?)
             // 웹 주도 로그아웃 요청(선택) → 부모가 네이티브 로그아웃을 수행한다.
             case logoutRequested
+            // 웹뷰 토큰 만료 → 부모가 네이티브 refresh로 갱신 후 결과를 웹에 주입한다.
+            case tokenRefreshRequested
         }
 
         /// 부모가 세션 상태 변화를 알려주면 그에 맞는 아웃바운드 메시지를 웹에 주입한다.
@@ -224,7 +226,7 @@ public struct CommunityFeature: Sendable {
                     // 초기 로그인 상태 동기화: 이미 로그인 상태면 즉시 토큰을 주입하고,
                     // 게스트면 아무것도 보내지 않는다(웹은 비로그인 상태로 시작).
                     if let accessToken = state.accessToken {
-                        Self.enqueue(.authLoginSuccess(accessToken: accessToken, expiresAt: nil), into: &state)
+                        Self.enqueueLoginSuccess(accessToken: accessToken, into: &state)
                     }
                     return .none
 
@@ -236,6 +238,10 @@ public struct CommunityFeature: Sendable {
 
                 case .authLogoutRequest:
                     return .send(.delegate(.logoutRequested))
+
+                case .authTokenRefresh:
+                    // 웹뷰 토큰 만료 → 네이티브가 refresh를 소유하므로 부모에 갱신을 위임한다.
+                    return .send(.delegate(.tokenRefreshRequested))
 
                 case let .openSubview(payload):
                     return Self.openSubview(payload, from: .push, into: &state)
@@ -262,8 +268,11 @@ public struct CommunityFeature: Sendable {
             // MARK: - Session (부모 주입 → 아웃바운드)
 
             case let .session(.loggedIn(accessToken, expiresAt)):
+                // 토큰 자동 갱신으로 같은 값이 반복 주입될 수 있어(동시 401 등), 변동 없으면 건너뛴다.
+                guard state.accessToken != accessToken else { return .none }
                 state.accessToken = accessToken
-                Self.enqueue(.authLoginSuccess(accessToken: accessToken, expiresAt: expiresAt), into: &state)
+                Self.enqueueLoginSuccess(accessToken: accessToken, providedExpiresAt: expiresAt, into: &state)
+                Self.broadcastToDetails(.loggedIn(accessToken: accessToken, expiresAt: expiresAt), into: &state)
                 return .none
 
             case .session(.loginCancelled):
@@ -273,11 +282,13 @@ public struct CommunityFeature: Sendable {
             case .session(.loggedOut):
                 state.accessToken = nil
                 Self.enqueue(.authLogout, into: &state)
+                Self.broadcastToDetails(.loggedOut, into: &state)
                 return .none
 
             case .session(.sessionExpired):
                 state.accessToken = nil
                 Self.enqueue(.authSessionExpired, into: &state)
+                Self.broadcastToDetails(.sessionExpired, into: &state)
                 return .none
 
             // MARK: - Subview Delegates (상세 서브뷰 → 부모)
@@ -326,6 +337,31 @@ public struct CommunityFeature: Sendable {
             return .send(.delegate(.loginModalRequested(reason: reason)))
         case .logoutRequested:
             return .send(.delegate(.logoutRequested))
+        case .tokenRefreshRequested:
+            return .send(.delegate(.tokenRefreshRequested))
+        }
+    }
+
+    /// 세션 변화(토큰 갱신/로그아웃/만료)를 열려 있는 모든 상세 서브뷰(푸시 스택·모달 스택·모달 루트)에
+    /// 전파한다. 상세는 리스트와 별개 WKWebView라 각자 토큰을 동기화해야 한다.
+    private static func broadcastToDetails(_ update: CommunityDetailFeature.SessionUpdate, into state: inout State) {
+        for id in state.path.ids {
+            if case .detail(let existing) = state.path[id: id] {
+                var detail = existing
+                CommunityDetailFeature.apply(update, into: &detail)
+                state.path[id: id] = .detail(detail)
+            }
+        }
+        for id in state.coverPath.ids {
+            if case .detail(let existing) = state.coverPath[id: id] {
+                var detail = existing
+                CommunityDetailFeature.apply(update, into: &detail)
+                state.coverPath[id: id] = .detail(detail)
+            }
+        }
+        if var cover = state.detailCover {
+            CommunityDetailFeature.apply(update, into: &cover)
+            state.detailCover = cover
         }
     }
 
@@ -374,6 +410,17 @@ public struct CommunityFeature: Sendable {
     /// 아웃바운드 메시지를 식별자와 함께 대기열에 추가한다.
     private static func enqueue(_ message: WebBridgeOutboundMessage, into state: inout State) {
         state.outbox.append(WebBridgeOutboundEnvelope(id: UUID(), message: message))
+    }
+
+    /// AUTH_LOGIN_SUCCESS를 큐에 넣는다. expiresAt은 호출부 값이 없으면 access token(JWT)의
+    /// exp 클레임에서 추출해, 웹이 선제 갱신 타이밍을 잡을 수 있도록 항상 함께 실어 보낸다.
+    private static func enqueueLoginSuccess(
+        accessToken: String,
+        providedExpiresAt: Int? = nil,
+        into state: inout State
+    ) {
+        let expiresAt = providedExpiresAt ?? JWTDecoder.expiry(of: accessToken)
+        enqueue(.authLoginSuccess(accessToken: accessToken, expiresAt: expiresAt), into: &state)
     }
 
     private static func makeCommunityURL() -> URL? {

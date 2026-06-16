@@ -11,7 +11,9 @@ public struct AuthClient {
     public var signOut: @Sendable () async -> Void
     public var autoLogin: @Sendable () async throws -> Domain.AuthInfo?
     public var hasValidToken: @Sendable () -> Bool
-    
+    /// 웹뷰 토큰 만료 위임용 — 저장된 refresh 토큰으로 갱신 후 새 accessToken 반환.
+    public var refreshSession: @Sendable () async throws -> String
+
     public init(
         loginWithGoogle: @Sendable @escaping () async throws -> Domain.SNSUser,
         loginWithApple: @Sendable @escaping () async throws -> Domain.SNSUser,
@@ -20,7 +22,8 @@ public struct AuthClient {
         serverLogout: @Sendable @escaping () async throws -> Bool,
         signOut: @Sendable @escaping () async -> Void,
         autoLogin: @Sendable @escaping () async throws -> Domain.AuthInfo?,
-        hasValidToken: @Sendable @escaping () -> Bool
+        hasValidToken: @Sendable @escaping () -> Bool,
+        refreshSession: @Sendable @escaping () async throws -> String
     ) {
         self.loginWithGoogle = loginWithGoogle
         self.loginWithApple = loginWithApple
@@ -30,6 +33,7 @@ public struct AuthClient {
         self.signOut = signOut
         self.autoLogin = autoLogin
         self.hasValidToken = hasValidToken
+        self.refreshSession = refreshSession
     }
 }
 
@@ -70,6 +74,9 @@ extension AuthClient: DependencyKey {
         },
         hasValidToken: {
             false
+        },
+        refreshSession: {
+            "test-access-token"
         }
     )
 }
@@ -107,6 +114,9 @@ extension AuthClient {
         },
         hasValidToken: {
             fatalError("unimplemented.hasValidToken is not implemented")
+        },
+        refreshSession: {
+            fatalError("unimplemented.refreshSession is not implemented")
         }
     )
 }

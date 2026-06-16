@@ -18,6 +18,9 @@ struct BridgeWebView: UIViewRepresentable {
     let url: URL
     // 같은 URL로 강제 reload를 트리거하기 위한 토큰.
     let loadToken: UUID
+    // 현재 백엔드 access token. 웹뷰 로드 전에 FE 세션 쿠키(oss_session)로 주입해
+    // SSR이 첫 요청부터 인증되게 한다(특히 서브뷰). 게스트면 nil → 주입하지 않는다.
+    var accessToken: String?
     // 네이티브 → 웹으로 전달 대기 중인 브릿지 메시지.
     let outbox: [WebBridgeOutboundEnvelope]
     // 좌우 스와이프 백/포워드 제스처 허용 여부. 상세 서브뷰는 웹 자체 헤더로 뒤로가기를
@@ -103,7 +106,14 @@ struct BridgeWebView: UIViewRepresentable {
         container.addSubview(webView)
         container.pinWebView(webView)
 
-        context.coordinator.load(url: url, token: loadToken)
+        // FE 세션 쿠키를 먼저 심고 나서 로드해, SSR 첫 네비게이션부터 인증되게 한다.
+        let cookieStore = config.websiteDataStore.httpCookieStore
+        let coordinator = context.coordinator
+        let token = accessToken
+        Task { @MainActor in
+            await WebSessionCookie.sync(accessToken: token, for: url, into: cookieStore)
+            coordinator.load(url: url, token: loadToken)
+        }
         return container
     }
 
@@ -115,8 +125,16 @@ struct BridgeWebView: UIViewRepresentable {
             onBridgeMessage: onBridgeMessage,
             onOutboundDelivered: onOutboundDelivered
         )
-        context.coordinator.load(url: url, token: loadToken)
-        context.coordinator.flushOutbox(outbox)
+        // 토큰 변동(갱신) 시에도 세션 쿠키를 최신으로 유지한 뒤 (재)로드/플러시한다.
+        let cookieStore = context.coordinator.webView?.configuration.websiteDataStore.httpCookieStore
+            ?? WKWebsiteDataStore.default().httpCookieStore
+        let coordinator = context.coordinator
+        let token = accessToken
+        Task { @MainActor in
+            await WebSessionCookie.sync(accessToken: token, for: url, into: cookieStore)
+            coordinator.load(url: url, token: loadToken)
+            coordinator.flushOutbox(outbox)
+        }
     }
 
     static func dismantleUIView(_ container: UIView, coordinator: Coordinator) {
@@ -282,35 +300,9 @@ struct BridgeWebView: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             endRefreshing(success: true)
             onLoadingFinished()
-            #if DEBUG || BETA
-            logScrollDiagnostics(webView)
-            #endif
+            // 웹이 로드되며 overscroll-behavior로 바운스를 끌 수 있어 풀다운 여지를 재확보한다.
+            pullToRefresh?.enforceVerticalBounce()
         }
-
-        #if DEBUG || BETA
-        // [임시 진단] 네이티브 스크롤뷰가 세로 오버플로(스크롤/바운스 가능)인지 확인한다.
-        // CSR 웹은 didFinish 직후 contentSize가 빈 셸일 수 있어 약간 지연 후 한 번 더 찍는다.
-        private func logScrollDiagnostics(_ webView: WKWebView) {
-            func dump(_ tag: String) {
-                let sv = webView.scrollView
-                let isSelfDelegate = (sv.delegate === self)
-                Log.trace(
-                    "[PTR진단 \(tag)] contentSize=\(sv.contentSize) bounds=\(sv.bounds.size) "
-                    + "bounces=\(sv.bounces) alwaysBounceV=\(sv.alwaysBounceVertical) "
-                    + "scrollEnabled=\(sv.isScrollEnabled) contentInset=\(sv.contentInset) "
-                    + "adjInset=\(sv.adjustedContentInset) delegate=self?\(isSelfDelegate) "
-                    + "verticalOverflow=\(sv.contentSize.height - sv.bounds.height)",
-                    category: .view, level: .info
-                )
-            }
-            dump("didFinish")
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .seconds(2))
-                guard self != nil else { return }
-                dump("+2s")
-            }
-        }
-        #endif
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
             Log.trace("Bridge webview didFail: \(error)", category: .network, level: .error)

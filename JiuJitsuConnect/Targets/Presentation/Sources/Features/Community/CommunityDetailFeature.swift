@@ -75,7 +75,17 @@ public struct CommunityDetailFeature: Sendable {
             case loginModalRequested(reason: String?)
             // 웹 주도 로그아웃 요청 → 부모가 네이티브 로그아웃을 수행한다.
             case logoutRequested
+            // 웹뷰 토큰 만료 → 부모가 네이티브 refresh로 갱신 후 결과를 웹에 전파한다.
+            case tokenRefreshRequested
         }
+    }
+
+    /// 부모(CommunityFeature)가 세션 변화를 상세 웹뷰에도 전파하기 위한 명령.
+    /// 상세 웹뷰는 리스트와 다른 WKWebView라, 토큰 갱신/만료 시 별도로 동기화해야 한다.
+    public enum SessionUpdate: Sendable, Equatable {
+        case loggedIn(accessToken: String, expiresAt: Int?)
+        case loggedOut
+        case sessionExpired
     }
 
     @Dependency(\.dismiss) var dismiss
@@ -122,7 +132,7 @@ public struct CommunityDetailFeature: Sendable {
                 case .webViewReady:
                     // 초기 로그인 상태 동기화: 이미 로그인 상태면 즉시 토큰을 주입한다.
                     if let accessToken = state.accessToken {
-                        Self.enqueue(.authLoginSuccess(accessToken: accessToken, expiresAt: nil), into: &state)
+                        Self.enqueueLoginSuccess(accessToken: accessToken, into: &state)
                     }
                     return .none
 
@@ -155,6 +165,10 @@ public struct CommunityDetailFeature: Sendable {
                 case .authLogoutRequest:
                     return .send(.delegate(.logoutRequested))
 
+                case .authTokenRefresh:
+                    // 상세 웹뷰 토큰 만료 → 네이티브 갱신 위임. 결과는 부모가 SessionUpdate로 다시 내려준다.
+                    return .send(.delegate(.tokenRefreshRequested))
+
                 case let .unknown(type):
                     Log.trace("WebBridge 미지원 메시지 무시: \(type)", category: .network, level: .info)
                     return .none
@@ -170,8 +184,35 @@ public struct CommunityDetailFeature: Sendable {
         }
     }
 
+    /// 부모가 전파한 세션 변화를 상세 웹뷰 상태에 반영한다.
+    static func apply(_ update: SessionUpdate, into state: inout State) {
+        switch update {
+        case let .loggedIn(accessToken, expiresAt):
+            guard state.accessToken != accessToken else { return }
+            state.accessToken = accessToken
+            enqueueLoginSuccess(accessToken: accessToken, providedExpiresAt: expiresAt, into: &state)
+        case .loggedOut:
+            state.accessToken = nil
+            enqueue(.authLogout, into: &state)
+        case .sessionExpired:
+            state.accessToken = nil
+            enqueue(.authSessionExpired, into: &state)
+        }
+    }
+
     /// 아웃바운드 메시지를 식별자와 함께 대기열에 추가한다.
     private static func enqueue(_ message: WebBridgeOutboundMessage, into state: inout State) {
         state.outbox.append(WebBridgeOutboundEnvelope(id: UUID(), message: message))
+    }
+
+    /// AUTH_LOGIN_SUCCESS를 큐에 넣는다. expiresAt은 호출부 값이 없으면 access token(JWT)의
+    /// exp 클레임에서 추출해 웹의 선제 갱신 타이밍을 돕는다.
+    private static func enqueueLoginSuccess(
+        accessToken: String,
+        providedExpiresAt: Int? = nil,
+        into state: inout State
+    ) {
+        let expiresAt = providedExpiresAt ?? JWTDecoder.expiry(of: accessToken)
+        enqueue(.authLoginSuccess(accessToken: accessToken, expiresAt: expiresAt), into: &state)
     }
 }

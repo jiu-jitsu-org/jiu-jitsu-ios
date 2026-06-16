@@ -94,6 +94,7 @@ public struct AppTabView: View {
             ),
             configuration: loginPromptAlertConfiguration
         )
+        .onAppear { store.send(.view(.onAppear)) }
     }
 
     // 게스트가 인증 필요 동작(MY 탭 진입·커뮤니티 행위 등)을 시도할 때 노출되는 공통 로그인 유도 알럿.

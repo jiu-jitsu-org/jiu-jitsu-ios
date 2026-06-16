@@ -13,7 +13,12 @@ import CoreKit
 @Reducer
 public struct AppTabFeature: Sendable {
     public init() {}
-    
+
+    private enum CancelID: Hashable, Sendable {
+        // 401 인터셉터가 방송하는 세션 이벤트 구독. AppTab 생명주기 동안만 유지한다.
+        case sessionObserver
+    }
+
     public enum Tab: String, CaseIterable, Equatable, Sendable {
         case home = "홈"
         case myPage = "MY"
@@ -37,6 +42,8 @@ public struct AppTabFeature: Sendable {
         // true면 로그인 성공 시 탭 전환 없이 커뮤니티에 머물러 행위를 복귀시키고,
         // 취소 시 웹에 AUTH_LOGIN_CANCELLED를 보내 대기 중 행위를 폐기시킨다.
         var pendingCommunityLogin: Bool = false
+        // 세션 이벤트 구독을 onAppear 중복 호출에도 한 번만 시작하기 위한 가드.
+        var didStartSessionObserver: Bool = false
 
         var authInfo: AuthInfo
 
@@ -62,6 +69,7 @@ public struct AppTabFeature: Sendable {
 
         @CasePathable
         public enum ViewAction: Sendable {
+            case onAppear
             case tabSelected(Tab)
             case loginPromptLoginTapped
             case loginPromptDismissed
@@ -76,6 +84,12 @@ public struct AppTabFeature: Sendable {
             // 웹 주도 로그아웃 요청(AUTH_LOGOUT_REQUEST) 처리.
             case performWebLogout
             case webLogoutCompleted
+            // 401 인터셉터가 방송한 세션 이벤트 수신.
+            case sessionEvent(AuthSessionEvent)
+            // 웹뷰 위임 토큰 갱신 성공 → 새 토큰을 웹에 주입.
+            case tokenRefreshSucceeded(accessToken: String)
+            // 토큰 갱신 불가(세션 만료) → 게스트로 전환 + 웹 세션 정리.
+            case handleSessionExpired
         }
     }
 
@@ -83,6 +97,7 @@ public struct AppTabFeature: Sendable {
     @Dependency(\.firebaseClient) var firebaseClient
     @Dependency(\.userClient) var userClient
     @Dependency(\.authClient) var authClient
+    @Dependency(\.authSessionEventClient) var authSessionEventClient
 
     public var body: some ReducerOf<Self> {
         Scope(state: \.home, action: \.home) {
@@ -97,6 +112,17 @@ public struct AppTabFeature: Sendable {
 
         Reduce { state, action in
             switch action {
+            case .view(.onAppear):
+                // 401 인터셉터의 세션 이벤트(토큰 자동 갱신/세션 만료)를 구독한다.
+                guard !state.didStartSessionObserver else { return .none }
+                state.didStartSessionObserver = true
+                return .run { send in
+                    for await event in authSessionEventClient.events() {
+                        await send(.internal(.sessionEvent(event)))
+                    }
+                }
+                .cancellable(id: CancelID.sessionObserver, cancelInFlight: false)
+
             case let .view(.tabSelected(tab)):
                 if state.authInfo.isGuest {
                     switch tab {
@@ -147,6 +173,18 @@ public struct AppTabFeature: Sendable {
             case .home(.delegate(.logoutRequested)):
                 return .send(.internal(.performWebLogout))
 
+            case .home(.delegate(.tokenRefreshRequested)):
+                // 하이브리드 토큰 소유권은 네이티브 — 웹뷰 만료 시 네이티브 refresh로 갱신해 웹에 돌려준다.
+                return .run { send in
+                    do {
+                        let accessToken = try await authClient.refreshSession()
+                        await send(.internal(.tokenRefreshSucceeded(accessToken: accessToken)))
+                    } catch {
+                        Log.trace("웹뷰 위임 토큰 갱신 실패 → 세션 만료 처리: \(error)", category: .network, level: .error)
+                        await send(.internal(.handleSessionExpired))
+                    }
+                }
+
             case .home, .myPage, .settings:
                 return .none
                 
@@ -173,6 +211,32 @@ public struct AppTabFeature: Sendable {
                 state.settings = SettingsFeature.State(authInfo: .guest)
                 state.selectedTab = .home
                 return .send(.home(.session(.loggedOut)))
+
+            case let .internal(.sessionEvent(event)):
+                // 게스트 상태에서 들어온 잔여 이벤트는 무시한다(로그아웃 직후 등).
+                guard !state.authInfo.isGuest else { return .none }
+                switch event {
+                case let .tokenRefreshed(accessToken, expiresAt):
+                    // 네이티브 API가 갱신한 토큰을 웹뷰에도 동기화.
+                    return .send(.home(.session(.loggedIn(accessToken: accessToken, expiresAt: expiresAt))))
+                case .sessionExpired:
+                    return .send(.internal(.handleSessionExpired))
+                }
+
+            case let .internal(.tokenRefreshSucceeded(accessToken)):
+                // expiresAt은 CommunityFeature가 access token(JWT)에서 계산하므로 nil로 위임한다.
+                return .send(.home(.session(.loggedIn(accessToken: accessToken, expiresAt: nil))))
+
+            case .internal(.handleSessionExpired):
+                // refresh 토큰까지 만료 — 로컬 토큰만 정리하고 게스트로 전환한다(서버 세션은 이미 죽음).
+                state.authInfo = .guest
+                state.myPage = MyProfileFeature.State(authInfo: .guest)
+                state.settings = SettingsFeature.State(authInfo: .guest)
+                state.selectedTab = .home
+                return .merge(
+                    .run { _ in await authClient.signOut() },
+                    .send(.home(.session(.sessionExpired)))
+                )
 
             case .view(.loginPromptLoginTapped):
                 state.isLoginPromptPresented = false

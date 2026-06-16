@@ -47,4 +47,7 @@ extension ImageKitUploadEndpoint: Endpoint {
         // 업로드는 기본 30s로 부족할 수 있어 60s로 늘림
         60.0
     }
+
+    // 외부 CDN(ImageKit)이라 우리 BE 토큰과 무관하다. 401이 와도 우리 토큰을 갱신/회전하지 않는다.
+    var allowsAuthRetry: Bool { false }
 }

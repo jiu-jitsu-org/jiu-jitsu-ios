@@ -102,6 +102,8 @@ private extension WebBridgeInboundMessage {
             return "AUTH_LOGIN_MODAL  reason=\(reason ?? "-")"
         case .authLogoutRequest:
             return "AUTH_LOGOUT_REQUEST"
+        case .authTokenRefresh:
+            return "AUTH_TOKEN_REFRESH_REQUEST"
         case let .openSubview(payload):
             return "OPEN_SUBVIEW  url=\(payload.url) presentation=\(payload.presentation.rawValue) title=\(payload.title ?? "-")"
         case .closeSubview:
@@ -147,6 +149,9 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     case authLoginModal(reason: String?)
     /// 웹 주도 로그아웃 요청(선택).
     case authLogoutRequest
+    /// 웹뷰가 자기 access token 만료를 감지 → 네이티브에 토큰 갱신을 위임한다(하이브리드 토큰 소유권은 네이티브).
+    /// 네이티브는 저장된 refresh 토큰으로 갱신 후 AUTH_LOGIN_SUCCESS(새 토큰) 또는 AUTH_SESSION_EXPIRED로 응답한다.
+    case authTokenRefresh
     /// 게시글 상세 등 동일 origin URL을 풀스크린 웹뷰(서브뷰)로 띄우라는 요청.
     case openSubview(OpenSubviewPayload)
     /// 현재 최상단 서브뷰를 닫으라는 요청(웹 헤더의 뒤로가기).
@@ -162,6 +167,7 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case authLoginPrompt = "AUTH_LOGIN_PROMPT"
         case authLoginModal = "AUTH_LOGIN_MODAL"
         case authLogoutRequest = "AUTH_LOGOUT_REQUEST"
+        case authTokenRefresh = "AUTH_TOKEN_REFRESH_REQUEST"
         case openSubview = "OPEN_SUBVIEW"
         case closeSubview = "CLOSE_SUBVIEW"
         case backGuard = "BACK_GUARD"
@@ -191,6 +197,8 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             return .authLoginModal(reason: payload?["reason"] as? String)
         case .authLogoutRequest:
             return .authLogoutRequest
+        case .authTokenRefresh:
+            return .authTokenRefresh
         case .openSubview:
             // url은 필수. 빈 값/누락이면 띄울 대상이 없으므로 무시한다(동일 origin 검사는 Feature가 수행).
             guard let urlString = payload?["url"] as? String, !urlString.isEmpty else {

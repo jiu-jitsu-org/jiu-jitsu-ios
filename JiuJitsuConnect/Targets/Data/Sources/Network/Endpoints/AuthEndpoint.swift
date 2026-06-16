@@ -40,6 +40,9 @@ extension AuthEndpoint: Endpoint {
             return .post
         }
     }
+
+    // 인증 엔드포인트는 스스로 토큰을 발급/갱신하므로 401 인터셉터의 재시도 대상에서 제외한다.
+    var allowsAuthRetry: Bool { false }
     
     var body: Data? {
         switch self {

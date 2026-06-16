@@ -160,9 +160,10 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     public func autoLogin() async throws -> AuthInfo? {
         #if targetEnvironment(simulator)
         // 시뮬레이터에서는 Google/Apple SNS 로그인 SDK가 정상 동작하지 않아 수동 로그인이 불가능하다.
-        // 개발 편의를 위해 저장된 refreshToken이 없을 때만 디버그용 토큰을 시드하고, 이후는
-        // 기존 자동로그인(refresh) 플로우를 그대로 태운다. (첫 refresh 성공 시 회전된 토큰이
-        // Keychain에 저장되므로 시드 토큰은 1회만 사용된다.) 토큰 만료 시 아래 상수만 갱신한다.
+        // 개발 편의를 위해 디버그용 토큰을 시드하고, 이후는 기존 자동로그인(refresh) 플로우를
+        // 그대로 태운다. (첫 refresh 성공 시 회전된 토큰이 Keychain에 저장되므로 시드 토큰은
+        // 1회만 사용된다.) 토큰 만료 시 SIMULATOR_DEBUG_REFRESH_TOKEN만 새 값으로 갱신하면,
+        // 주입값 변경을 감지해 Keychain에 남은 만료 토큰을 덮어쓴다.
         seedSimulatorDebugTokenIfNeeded()
         #endif
 
@@ -206,6 +207,18 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
         return tokenStorage.getAccessToken() != nil &&
                tokenStorage.getRefreshToken() != nil &&
                tokenStorage.isAutoLoginEnabled()
+    }
+
+    public func refreshSession() async throws -> String {
+        // 실제 갱신은 NetworkService의 single-flight 코디네이터가 수행한다(401 인터셉터와 공유).
+        // refresh 토큰이 회전되므로 인터셉터·웹 위임이 같은 코디네이터를 타야 경쟁이 없다.
+        do {
+            return try await networkService.refreshSession()
+        } catch let error as NetworkError {
+            throw error.toDomainError()
+        } catch {
+            throw DomainError.unknown(error.localizedDescription)
+        }
     }
     
     // MARK: - ASAuthorizationControllerDelegate
@@ -266,6 +279,10 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     private enum SimulatorDebugAuth {
         static let provider = "GOOGLE"
 
+        /// 마지막으로 시드한 디버그 refreshToken을 기록하는 키. 주입값이 바뀌었는지(= 만료되어
+        /// 새 토큰으로 갱신했는지) 판별해, 같은 토큰의 불필요한 재시드는 막고 새 토큰만 반영한다.
+        static let lastSeededTokenKey = "simulatorDebugLastSeededRefreshToken"
+
         static var refreshToken: String? {
             let token = Bundle.main.object(forInfoDictionaryKey: "SIMULATOR_DEBUG_REFRESH_TOKEN") as? String
             // Beta/Release 빌드는 빈 문자열로 주입되므로 nil 취급한다.
@@ -274,11 +291,19 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     }
 
     private func seedSimulatorDebugTokenIfNeeded() {
-        guard tokenStorage.getRefreshToken() == nil else { return }
         guard let refreshToken = SimulatorDebugAuth.refreshToken else {
             Log.trace("🧪 시뮬레이터 디버그 토큰 미설정 — Secrets.xcconfig의 SIMULATOR_DEBUG_REFRESH_TOKEN 확인", category: .storage, level: .info)
             return
         }
+
+        // 주입된 디버그 토큰이 직전에 시드한 값과 같고 Keychain에도 토큰이 남아 있으면,
+        // 이미 자동로그인(회전된 토큰)이 진행 중이므로 재시드하지 않는다 → 시드 토큰 1회성 보존.
+        let lastSeeded = UserDefaults.standard.string(forKey: SimulatorDebugAuth.lastSeededTokenKey)
+        if lastSeeded == refreshToken, tokenStorage.getRefreshToken() != nil {
+            return
+        }
+
+        // 새 디버그 토큰이 주입됐다(만료 토큰 교체). Keychain에 남은 꼬인 토큰을 덮어쓴다.
         Log.trace("🧪 시뮬레이터 디버그 토큰 시드 — SNS 로그인 우회 자동로그인 진행", category: .debug, level: .info)
         // accessToken은 직후 refresh 호출로 즉시 교체되므로 refreshToken을 임시값으로 채운다.
         tokenStorage.save(
@@ -286,6 +311,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             refreshToken: refreshToken,
             provider: SimulatorDebugAuth.provider
         )
+        UserDefaults.standard.set(refreshToken, forKey: SimulatorDebugAuth.lastSeededTokenKey)
     }
     #endif
 

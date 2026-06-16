@@ -14,6 +14,7 @@
 
 import Foundation
 import Domain
+import Data
 import Presentation
 import CoreKit
 
@@ -25,12 +26,35 @@ public final class DependencyContainer {
         Log.handler = PulseLogHandler()
     }
 
+    // MARK: - Shared Infra (single instance)
+    // 401 토큰 갱신 single-flight를 위해 모든 Repository가 동일한 NetworkService(=동일 코디네이터)를
+    // 공유한다. TokenStorage도 동일 인스턴스로 묶어 시드/갱신 경로를 일치시킨다.
+    private let sharedTokenStorage: TokenStorage = DefaultTokenStorage()
+    /// 401 인터셉터의 토큰 갱신/세션 만료를 Presentation(웹뷰 동기화·로그아웃)으로 전달하는 채널.
+    private let authSessionEventBroadcaster = AuthSessionEventBroadcaster()
+    private lazy var sharedNetworkService: NetworkService = DefaultNetworkService(
+        tokenStorage: sharedTokenStorage,
+        sessionEventBroadcaster: authSessionEventBroadcaster
+    )
+
     // MARK: - Repositories (lazy single instance)
-    private lazy var authRepository: AuthRepository = RepositoryFactory.makeAuthRepository()
-    private lazy var userRepository: UserRepository = RepositoryFactory.makeUserRepository()
-    private lazy var communityRepository: CommunityRepository = RepositoryFactory.makeCommunityRepository()
-    private lazy var imageUploadRepository: ImageUploadRepository = RepositoryFactory.makeImageUploadRepository()
-    private lazy var imageRepository: ImageRepository = RepositoryFactory.makeImageRepository()
+    private lazy var authRepository: AuthRepository = RepositoryFactory.makeAuthRepository(
+        networkService: sharedNetworkService,
+        tokenStorage: sharedTokenStorage
+    )
+    private lazy var userRepository: UserRepository = RepositoryFactory.makeUserRepository(
+        networkService: sharedNetworkService,
+        tokenStorage: sharedTokenStorage
+    )
+    private lazy var communityRepository: CommunityRepository = RepositoryFactory.makeCommunityRepository(
+        networkService: sharedNetworkService
+    )
+    private lazy var imageUploadRepository: ImageUploadRepository = RepositoryFactory.makeImageUploadRepository(
+        networkService: sharedNetworkService
+    )
+    private lazy var imageRepository: ImageRepository = RepositoryFactory.makeImageRepository(
+        networkService: sharedNetworkService
+    )
 
     // MARK: - Firebase Client (shared instance)
     private lazy var sharedFirebaseClient: FirebaseClient = FirebaseClientFactory.make()
@@ -62,8 +86,18 @@ public final class DependencyContainer {
             },
             hasValidToken: {
                 self.authRepository.hasValidToken()
+            },
+            refreshSession: {
+                try await self.authRepository.refreshSession()
             }
         )
+    }
+
+    /// 401 인터셉터가 방송하는 세션 이벤트를 TCA가 구독하기 위한 클라이언트.
+    public func configureAuthSessionEventClient() -> AuthSessionEventClient {
+        AuthSessionEventClient(events: { [authSessionEventBroadcaster] in
+            authSessionEventBroadcaster.events()
+        })
     }
 
     public func configureUserClient() -> UserClient {
