@@ -36,6 +36,10 @@ public struct LoginFeature: Sendable {
             case appleButtonTapped
             case aroundButtonTapped
             case toastButtonTapped(ToastState.Action)
+            #if BETA
+            // Beta 스킴 전용: SNS SDK 없이 테스트 계정(kakao / kakaoTest)으로 즉시 서버 로그인.
+            case testLoginTapped
+            #endif
         }
         
         public enum InternalAction: Sendable {
@@ -93,7 +97,18 @@ public struct LoginFeature: Sendable {
                         await TaskResult { try await authClient.loginWithKakao() }
                     )))
                 }
-                
+
+            #if BETA
+            // MARK: - Beta 전용 테스트 로그인
+            // SNS SDK를 우회하고 서버 sns-login에 kakao/kakaoTest로 바로 로그인한다.
+            // 이후 흐름(신규→약관/닉네임, 기존→didLogin)은 기존 serverLogin 경로를 그대로 탄다.
+            case .view(.testLoginTapped):
+                state.isLoading = true
+                return .send(.internal(.socialLoginResponse(.success(
+                    SNSUser(accessToken: "kakaoTest", snsProvider: .kakao)
+                ))))
+            #endif
+
                 // MARK: - 로그인 결과 처리
             case let .internal(.socialLoginResponse(.success(user))):
                 return .run { send in

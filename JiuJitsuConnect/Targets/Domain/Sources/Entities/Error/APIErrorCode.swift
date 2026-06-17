@@ -11,6 +11,7 @@ public enum APIErrorCode: String, Equatable {
     // MARK: - Auth (A0000)
     case authenticationFailed = "A0010" // 인증 실패
     case notMatchCategory = "A0002" // 잘못된 유형의 토큰
+    case expiredToken = "A0003" // 만료된 토큰
     case invalidRefreshToken = "A0009" // 유효하지 않은 refresh token
     
     // MARK: - Request (R0000)

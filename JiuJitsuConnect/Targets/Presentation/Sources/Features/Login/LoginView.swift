@@ -71,6 +71,11 @@ public struct LoginView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            #if BETA
+            // Beta 스킴 전용 테스트 로그인. 기존 로그인 레이아웃을 건드리지 않도록
+            // 본문 위에 떠 있는 오버레이로만 올린다.
+            .overlay(alignment: .topTrailing) { testLoginButton }
+            #endif
         } destination: { store in
             switch store.case {
             case let .nicknameSetting(nicknameStore):
@@ -109,6 +114,23 @@ public struct LoginView: View {
         //        }
     }
     
+    #if BETA
+    // MARK: - Beta 전용 테스트 로그인 버튼
+    private var testLoginButton: some View {
+        Button(action: { store.send(.view(.testLoginTapped)) }) {
+            Text("테스트 로그인")
+                .font(Font.pretendard.custom(weight: .medium, size: 13))
+                .foregroundStyle(Color.primitive.bw.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.primitive.coolGray.cg700.opacity(0.85), in: Capsule())
+                .overlay(Capsule().stroke(Color.primitive.bw.white.opacity(0.4), lineWidth: 1))
+        }
+        .padding(.top, 8)
+        .padding(.trailing, 16)
+    }
+    #endif
+
     // MARK: - 브랜드 영역
 
     private var brandSection: some View {

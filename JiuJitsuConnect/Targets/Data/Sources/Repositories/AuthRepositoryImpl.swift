@@ -197,7 +197,13 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             return responseDTO.toDomain()
             
         } catch let error as NetworkError {
-            throw error.toDomainError()
+            let domainError = error.toDomainError()
+            // refresh 토큰 만료 = 세션 완전 종료, 재시도 불가이므로 저장된 토큰을 즉시 정리한다.
+            if case .apiError(let code, _) = domainError,
+               code == .expiredToken || code == .invalidRefreshToken {
+                tokenStorage.clear()
+            }
+            throw domainError
         } catch {
             throw DomainError.unknown(error.localizedDescription)
         }
