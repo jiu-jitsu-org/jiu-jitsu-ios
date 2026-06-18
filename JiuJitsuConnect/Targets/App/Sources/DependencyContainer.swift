@@ -175,4 +175,16 @@ public final class DependencyContainer {
     public func configureFirebaseClient() -> FirebaseClient {
         return sharedFirebaseClient
     }
+
+    public func configureNoticeClient() -> NoticeClient {
+        let noticeService = NoticeService(networkService: sharedNetworkService)
+        return NoticeClient(
+            fetchSetting: {
+                try await noticeService.fetchSetting()
+            },
+            updateSetting: { setting in
+                try await noticeService.updateSetting(setting)
+            }
+        )
+    }
 }

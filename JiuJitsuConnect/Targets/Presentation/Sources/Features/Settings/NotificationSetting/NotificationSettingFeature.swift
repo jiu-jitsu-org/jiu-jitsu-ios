@@ -2,79 +2,145 @@
 //  NotificationSettingFeature.swift
 //  Presentation
 //
-//  설정 → 알림 (카테고리별 수신 여부 토글) 2-step 화면.
+//  설정 → 알림 (카테고리별 수신 여부 토글) 화면.
 //
 
 import ComposableArchitecture
-import Foundation
+import Domain
+import DesignSystem
+import CoreKit
 
 @Reducer
 public struct NotificationSettingFeature: Sendable {
     public init() {}
 
+    // 연속 토글 시 마지막 상태만 서버에 반영하기 위한 debounce
+    private enum CancelID { case updateSetting, toast }
+
     @ObservableState
     public struct State: Equatable, Sendable {
-        // 알림 수신 여부 (카테고리별). 마케팅은 정통망법상 옵트인 → 기본 false.
-        // TODO: 서버 동기화 전까지 임시 로컬 상태. API 연동 후 초기값/저장은 Repository 경유.
-        var isAccountSecurityNotificationEnabled: Bool
-        var isServiceNoticeNotificationEnabled: Bool
-        var isCommunityNotificationEnabled: Bool
-        var isMarketingNotificationEnabled: Bool
+        var isAccountSecurityNotificationEnabled: Bool = true
+        var isServiceNoticeNotificationEnabled: Bool = true
+        var isCommunityNotificationEnabled: Bool = true
+        // 정통망법상 마케팅 알림은 옵트인 → 기본 false
+        var isMarketingNotificationEnabled: Bool = false
 
-        public init(
-            isAccountSecurityNotificationEnabled: Bool = true,
-            isServiceNoticeNotificationEnabled: Bool = true,
-            isCommunityNotificationEnabled: Bool = true,
-            isMarketingNotificationEnabled: Bool = false
-        ) {
-            self.isAccountSecurityNotificationEnabled = isAccountSecurityNotificationEnabled
-            self.isServiceNoticeNotificationEnabled = isServiceNoticeNotificationEnabled
-            self.isCommunityNotificationEnabled = isCommunityNotificationEnabled
-            self.isMarketingNotificationEnabled = isMarketingNotificationEnabled
-        }
+        var toast: ToastState?
+
+        public init() {}
     }
 
     public enum Action: Sendable {
         case view(ViewAction)
+        case `internal`(InternalAction)
 
         public enum ViewAction: Sendable {
+            case onAppear
             case backButtonTapped
             case accountSecurityNotificationToggled(Bool)
             case serviceNoticeNotificationToggled(Bool)
             case communityNotificationToggled(Bool)
             case marketingNotificationToggled(Bool)
+            case toastButtonTapped(ToastState.Action)
+        }
+
+        public enum InternalAction: Sendable {
+            // TODO: GET /notice/setting 백엔드 미구현 — 완료 후 fetchSettingResponse 처리 복구
+            case updateSettingResponse(TaskResult<NoticeSetting>)
+            case triggerUpdateSetting
+            case showToast(ToastState)
+            case toastDismissed
         }
     }
 
+    @Dependency(\.noticeClient) var noticeClient
     @Dependency(\.dismiss) var dismiss
+    @Dependency(\.continuousClock) var clock
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
+
+            // MARK: - View Actions
+
+            case .view(.onAppear):
+                // TODO: GET /notice/setting 백엔드 미구현 — 완료 후 서버에서 초기값 로드로 전환
+                return .none
+
             case .view(.backButtonTapped):
                 return .run { _ in await self.dismiss() }
 
             case let .view(.accountSecurityNotificationToggled(isOn)):
                 state.isAccountSecurityNotificationEnabled = isOn
-                // TODO: 알림 설정 API 연동 - 계정·보안 알림 수신 여부 서버 반영
-                return .none
+                return .send(.internal(.triggerUpdateSetting))
 
             case let .view(.serviceNoticeNotificationToggled(isOn)):
                 state.isServiceNoticeNotificationEnabled = isOn
-                // TODO: 알림 설정 API 연동 - 서비스 공지 알림 수신 여부 서버 반영
-                return .none
+                return .send(.internal(.triggerUpdateSetting))
 
             case let .view(.communityNotificationToggled(isOn)):
                 state.isCommunityNotificationEnabled = isOn
-                // TODO: 알림 설정 API 연동 - 커뮤니티 활동 알림 수신 동의 여부 서버 반영
-                return .none
+                return .send(.internal(.triggerUpdateSetting))
 
             case let .view(.marketingNotificationToggled(isOn)):
                 state.isMarketingNotificationEnabled = isOn
-                // TODO: 알림 설정 API 연동 - 마케팅 정보 수신 동의 여부 서버 반영
-                //       정통망법상 광고성 정보는 별도 동의 필요 — 회원가입/약관 흐름과 연동 검토
+                return .send(.internal(.triggerUpdateSetting))
+
+            // MARK: - Internal Actions
+
+            case .internal(.triggerUpdateSetting):
+                // 연속 토글 시 마지막 상태만 반영 (300ms debounce)
+                let setting = NoticeSetting(
+                    securityEnabled: state.isAccountSecurityNotificationEnabled,
+                    serviceEnabled: state.isServiceNoticeNotificationEnabled,
+                    communityEnabled: state.isCommunityNotificationEnabled,
+                    marketingEnabled: state.isMarketingNotificationEnabled
+                )
+                return .run { send in
+                    try await self.clock.sleep(for: .milliseconds(300))
+                    await send(.internal(.updateSettingResponse(
+                        await TaskResult { try await noticeClient.updateSetting(setting) }
+                    )))
+                }
+                .cancellable(id: CancelID.updateSetting, cancelInFlight: true)
+
+            case .internal(.updateSettingResponse(.success)):
                 return .none
+
+            case let .internal(.updateSettingResponse(.failure(error))):
+                Log.trace("알림 설정 저장 실패: \(error)", category: .network, level: .error)
+                return handleError(error)
+
+            // MARK: - Toast Actions
+
+            case let .internal(.showToast(toastState)):
+                state.toast = toastState
+                return .run { send in
+                    try await self.clock.sleep(for: toastState.duration)
+                    await send(.internal(.toastDismissed))
+                }
+                .cancellable(id: CancelID.toast)
+
+            case .internal(.toastDismissed):
+                state.toast = nil
+                return .cancel(id: CancelID.toast)
+
+            case .view(.toastButtonTapped):
+                return .send(.internal(.toastDismissed))
             }
+        }
+    }
+
+    private func handleError(_ error: Error) -> Effect<Action> {
+        guard let domainError = error as? DomainError else {
+            return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info))))
+        }
+        let displayError = DomainErrorMapper.toDisplayError(from: domainError)
+        switch displayError {
+        case .toast(let message), .info(let message), .alert(let message):
+            return .send(.internal(.showToast(.init(message: message, style: .info))))
+        case .none:
+            return .none
         }
     }
 }
