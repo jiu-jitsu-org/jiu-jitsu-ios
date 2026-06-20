@@ -216,16 +216,15 @@ public struct AppTabFeature: Sendable {
                 // 게스트 상태에서 들어온 잔여 이벤트는 무시한다(로그아웃 직후 등).
                 guard !state.authInfo.isGuest else { return .none }
                 switch event {
-                case let .tokenRefreshed(accessToken, expiresAt):
+                case let .tokenRefreshed(accessToken, _):
                     // 네이티브 API가 갱신한 토큰을 웹뷰에도 동기화.
-                    return .send(.home(.session(.loggedIn(accessToken: accessToken, expiresAt: expiresAt))))
+                    return .send(.home(.session(.loggedIn(accessToken: accessToken))))
                 case .sessionExpired:
                     return .send(.internal(.handleSessionExpired))
                 }
 
             case let .internal(.tokenRefreshSucceeded(accessToken)):
-                // expiresAt은 CommunityFeature가 access token(JWT)에서 계산하므로 nil로 위임한다.
-                return .send(.home(.session(.loggedIn(accessToken: accessToken, expiresAt: nil))))
+                return .send(.home(.session(.loggedIn(accessToken: accessToken))))
 
             case .internal(.handleSessionExpired):
                 // refresh 토큰까지 만료 — 로컬 토큰만 정리하고 게스트로 전환한다(서버 세션은 이미 죽음).
@@ -269,7 +268,7 @@ public struct AppTabFeature: Sendable {
                     }
                     // 웹 세션 동기화: 새 access token을 커뮤니티 웹뷰에 주입(있을 때만).
                     let syncWeb: Effect<Action> = newAuthInfo.accessToken.map {
-                        .send(.home(.session(.loggedIn(accessToken: $0, expiresAt: nil))))
+                        .send(.home(.session(.loggedIn(accessToken: $0))))
                     } ?? .none
                     return .merge(
                         .send(.myPage(.internal(.loadProfile))),

@@ -119,8 +119,8 @@ private extension WebBridgeInboundMessage {
 private extension WebBridgeOutboundMessage {
     var logSummary: String {
         switch self {
-        case let .authLoginSuccess(accessToken, expiresAt):
-            return "AUTH_LOGIN_SUCCESS  accessToken=\(WebBridge.maskToken(accessToken)) expiresAt=\(expiresAt.map(String.init) ?? "nil")"
+        case let .authLoginSuccess(accessToken):
+            return "AUTH_LOGIN_SUCCESS  accessToken=\(WebBridge.maskToken(accessToken))"
         case .authLoginCancelled:
             return "AUTH_LOGIN_CANCELLED"
         case .authSessionExpired:
@@ -296,7 +296,7 @@ enum WebOrigin {
 /// 네이티브가 `window.WebBridge.receive(...)`로 주입하는 메시지.
 enum WebBridgeOutboundMessage: Equatable, Sendable {
     /// 로그인 성공, 토큰 전달. (정책: accessToken만 전달, refreshToken은 네이티브 보관)
-    case authLoginSuccess(accessToken: String, expiresAt: Int?)
+    case authLoginSuccess(accessToken: String)
     /// 사용자가 로그인 취소 → 대기 중 행위 폐기.
     case authLoginCancelled
     /// 토큰 만료 통지 → 웹 세션 정리.
@@ -318,11 +318,8 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
 
     private var payload: [String: Any]? {
         switch self {
-        case let .authLoginSuccess(accessToken, expiresAt):
-            var payload: [String: Any] = ["accessToken": accessToken]
-            // expiresAt은 선택 필드 — 값이 있을 때만 실어 계약 잡음을 줄인다.
-            if let expiresAt { payload["expiresAt"] = expiresAt }
-            return payload
+        case let .authLoginSuccess(accessToken):
+            return ["accessToken": accessToken]
         case .authLoginCancelled, .authSessionExpired, .authLogout, .backPressed:
             return nil
         }

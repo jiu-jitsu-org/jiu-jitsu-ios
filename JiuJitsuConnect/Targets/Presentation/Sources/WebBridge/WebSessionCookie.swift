@@ -29,22 +29,25 @@ enum WebSessionCookie {
     static func sync(accessToken: String?, for url: URL, into store: WKHTTPCookieStore) async {
         guard
             let accessToken,
-            let host = url.host,
-            let cookie = make(accessToken: accessToken, host: host, secure: url.scheme == "https")
+            let cookie = make(accessToken: accessToken, url: url)
         else { return }
         await store.setCookie(cookie)
     }
 
-    private static func make(accessToken: String, host: String, secure: Bool) -> HTTPCookie? {
+    private static func make(accessToken: String, url: URL) -> HTTPCookie? {
+        // WHY: .domain을 쓰면 "localhost"/IP 같은 단일 라벨 호스트에서 WebKit이 도메인 매칭에
+        // 실패해 쿠키를 origin에 부착하지 않는다(저장소엔 있지만 SSR 요청에 Cookie 헤더 누락).
+        // .originURL로 host-only 쿠키를 만들어 정확히 해당 호스트에만 부착되게 한다. 운영 FQDN에도
+        // 안전하며 FE의 host-only `oss_session`(Next `cookies()`) 스펙과도 일치한다.
         var properties: [HTTPCookiePropertyKey: Any] = [
             .name: name,
             .value: accessToken,
-            .domain: host,
+            .originURL: url,
             .path: "/",
             .sameSitePolicy: HTTPCookieStringPolicy.sameSiteLax,
         ]
         // https일 때만 Secure. (IP/http 도메인 변경 테스트에서는 Secure 쿠키가 저장 안 되므로 제외)
-        if secure {
+        if url.scheme == "https" {
             properties[.secure] = "TRUE"
         }
         // 토큰 exp를 쿠키 만료로 맞춰, 서버가 환산한 수명과 정합을 유지한다.

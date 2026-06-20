@@ -83,7 +83,7 @@ public struct CommunityDetailFeature: Sendable {
     /// 부모(CommunityFeature)가 세션 변화를 상세 웹뷰에도 전파하기 위한 명령.
     /// 상세 웹뷰는 리스트와 다른 WKWebView라, 토큰 갱신/만료 시 별도로 동기화해야 한다.
     public enum SessionUpdate: Sendable, Equatable {
-        case loggedIn(accessToken: String, expiresAt: Int?)
+        case loggedIn(accessToken: String)
         case loggedOut
         case sessionExpired
     }
@@ -187,10 +187,10 @@ public struct CommunityDetailFeature: Sendable {
     /// 부모가 전파한 세션 변화를 상세 웹뷰 상태에 반영한다.
     static func apply(_ update: SessionUpdate, into state: inout State) {
         switch update {
-        case let .loggedIn(accessToken, expiresAt):
+        case let .loggedIn(accessToken):
             guard state.accessToken != accessToken else { return }
             state.accessToken = accessToken
-            enqueueLoginSuccess(accessToken: accessToken, providedExpiresAt: expiresAt, into: &state)
+            enqueueLoginSuccess(accessToken: accessToken, into: &state)
         case .loggedOut:
             state.accessToken = nil
             enqueue(.authLogout, into: &state)
@@ -205,14 +205,8 @@ public struct CommunityDetailFeature: Sendable {
         state.outbox.append(WebBridgeOutboundEnvelope(id: UUID(), message: message))
     }
 
-    /// AUTH_LOGIN_SUCCESS를 큐에 넣는다. expiresAt은 호출부 값이 없으면 access token(JWT)의
-    /// exp 클레임에서 추출해 웹의 선제 갱신 타이밍을 돕는다.
-    private static func enqueueLoginSuccess(
-        accessToken: String,
-        providedExpiresAt: Int? = nil,
-        into state: inout State
-    ) {
-        let expiresAt = providedExpiresAt ?? JWTDecoder.expiry(of: accessToken)
-        enqueue(.authLoginSuccess(accessToken: accessToken, expiresAt: expiresAt), into: &state)
+    /// AUTH_LOGIN_SUCCESS를 큐에 넣는다.
+    private static func enqueueLoginSuccess(accessToken: String, into state: inout State) {
+        enqueue(.authLoginSuccess(accessToken: accessToken), into: &state)
     }
 }

@@ -119,7 +119,7 @@ public struct CommunityFeature: Sendable {
 
         /// 부모가 세션 상태 변화를 알려주면 그에 맞는 아웃바운드 메시지를 웹에 주입한다.
         public enum SessionAction: Sendable {
-            case loggedIn(accessToken: String, expiresAt: Int?)
+            case loggedIn(accessToken: String)
             case loginCancelled
             case loggedOut
             case sessionExpired
@@ -267,12 +267,12 @@ public struct CommunityFeature: Sendable {
 
             // MARK: - Session (부모 주입 → 아웃바운드)
 
-            case let .session(.loggedIn(accessToken, expiresAt)):
+            case let .session(.loggedIn(accessToken)):
                 // 토큰 자동 갱신으로 같은 값이 반복 주입될 수 있어(동시 401 등), 변동 없으면 건너뛴다.
                 guard state.accessToken != accessToken else { return .none }
                 state.accessToken = accessToken
-                Self.enqueueLoginSuccess(accessToken: accessToken, providedExpiresAt: expiresAt, into: &state)
-                Self.broadcastToDetails(.loggedIn(accessToken: accessToken, expiresAt: expiresAt), into: &state)
+                Self.enqueueLoginSuccess(accessToken: accessToken, into: &state)
+                Self.broadcastToDetails(.loggedIn(accessToken: accessToken), into: &state)
                 return .none
 
             case .session(.loginCancelled):
@@ -412,15 +412,9 @@ public struct CommunityFeature: Sendable {
         state.outbox.append(WebBridgeOutboundEnvelope(id: UUID(), message: message))
     }
 
-    /// AUTH_LOGIN_SUCCESS를 큐에 넣는다. expiresAt은 호출부 값이 없으면 access token(JWT)의
-    /// exp 클레임에서 추출해, 웹이 선제 갱신 타이밍을 잡을 수 있도록 항상 함께 실어 보낸다.
-    private static func enqueueLoginSuccess(
-        accessToken: String,
-        providedExpiresAt: Int? = nil,
-        into state: inout State
-    ) {
-        let expiresAt = providedExpiresAt ?? JWTDecoder.expiry(of: accessToken)
-        enqueue(.authLoginSuccess(accessToken: accessToken, expiresAt: expiresAt), into: &state)
+    /// AUTH_LOGIN_SUCCESS를 큐에 넣는다.
+    private static func enqueueLoginSuccess(accessToken: String, into state: inout State) {
+        enqueue(.authLoginSuccess(accessToken: accessToken), into: &state)
     }
 
     private static func makeCommunityURL() -> URL? {
