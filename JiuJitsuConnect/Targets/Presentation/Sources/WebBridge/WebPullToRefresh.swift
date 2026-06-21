@@ -53,10 +53,8 @@ final class WebPullToRefreshBand: UIView {
         isUserInteractionEnabled = false
 
         let tint = UIColor(Color.semantic.primary.primary)
-        iconView.image = UIImage(
-            systemName: "arrow.clockwise",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
-        )
+        // 디자인: 상단이 열린 원형 스피너 링(template) — tintColor로 Blue/500 적용, 회전으로 로딩 표현.
+        iconView.image = Assets.Common.Icon.refresh.image
         iconView.tintColor = tint
         iconView.contentMode = .scaleAspectFit
         iconView.translatesAutoresizingMaskIntoConstraints = false
