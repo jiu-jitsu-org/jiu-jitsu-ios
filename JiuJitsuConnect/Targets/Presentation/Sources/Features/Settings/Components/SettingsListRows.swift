@@ -86,7 +86,12 @@ struct SettingsToggleRow: View {
     let asset: ImageAsset
     let text: String
     let subtitle: String?
+    // 서버 초기값 로드 전에는 스켈레톤으로 표시해 잘못된 토글 상태가 잠깐 노출되는 것을 막는다.
+    var isLoading: Bool = false
     @Binding var isOn: Bool
+
+    // 표준 UISwitch 크기 — 로딩 중 캡슐 플레이스홀더가 실제 토글과 동일한 자리를 차지하게 한다.
+    private static let toggleSize = CGSize(width: 51, height: 31)
 
     var body: some View {
         HStack(spacing: 8) {
@@ -109,12 +114,22 @@ struct SettingsToggleRow: View {
 
             Spacer()
 
-            Toggle("", isOn: $isOn)
-                .labelsHidden()
-                .tint(Color.component.switch.on.bg)
+            // 네이티브 Toggle은 .redacted로 on/off 노브가 가려지지 않으므로,
+            // 로딩 중에는 Toggle 대신 캡슐 플레이스홀더로 치환한다.
+            if isLoading {
+                Capsule()
+                    .fill(Color.semantic.surface.disabled)
+                    .frame(width: Self.toggleSize.width, height: Self.toggleSize.height)
+            } else {
+                Toggle("", isOn: $isOn)
+                    .labelsHidden()
+                    .tint(Color.component.switch.on.bg)
+            }
         }
         .frame(minHeight: SettingsListMetrics.rowHeight)
         .padding(.horizontal, 16)
         .padding(.vertical, subtitle == nil ? 0 : 6)
+        .redacted(reason: isLoading ? .placeholder : [])
+        .disabled(isLoading)
     }
 }

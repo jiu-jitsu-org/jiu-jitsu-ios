@@ -15,10 +15,13 @@ public struct NotificationSettingFeature: Sendable {
     public init() {}
 
     // 연속 토글 시 마지막 상태만 서버에 반영하기 위한 debounce
-    private enum CancelID { case updateSetting, toast }
+    private enum CancelID { case fetchSetting, updateSetting, toast }
 
     @ObservableState
     public struct State: Equatable, Sendable {
+        // 첫 GET 완료 전에는 토글을 스켈레톤으로 표시 (잘못된 초기값 노출 방지)
+        var isLoaded: Bool = false
+
         var isAccountSecurityNotificationEnabled: Bool = true
         var isServiceNoticeNotificationEnabled: Bool = true
         var isCommunityNotificationEnabled: Bool = true
@@ -45,7 +48,7 @@ public struct NotificationSettingFeature: Sendable {
         }
 
         public enum InternalAction: Sendable {
-            // TODO: GET /notice/setting 백엔드 미구현 — 완료 후 fetchSettingResponse 처리 복구
+            case fetchSettingResponse(TaskResult<NoticeSetting>)
             case updateSettingResponse(TaskResult<NoticeSetting>)
             case triggerUpdateSetting
             case showToast(ToastState)
@@ -64,8 +67,13 @@ public struct NotificationSettingFeature: Sendable {
             // MARK: - View Actions
 
             case .view(.onAppear):
-                // TODO: GET /notice/setting 백엔드 미구현 — 완료 후 서버에서 초기값 로드로 전환
-                return .none
+                // 서버에서 카테고리별 수신 여부 초기값 로드
+                return .run { send in
+                    await send(.internal(.fetchSettingResponse(
+                        await TaskResult { try await noticeClient.fetchSetting() }
+                    )))
+                }
+                .cancellable(id: CancelID.fetchSetting, cancelInFlight: true)
 
             case .view(.backButtonTapped):
                 return .run { _ in await self.dismiss() }
@@ -103,6 +111,20 @@ public struct NotificationSettingFeature: Sendable {
                     )))
                 }
                 .cancellable(id: CancelID.updateSetting, cancelInFlight: true)
+
+            case let .internal(.fetchSettingResponse(.success(setting))):
+                state.isAccountSecurityNotificationEnabled = setting.securityEnabled
+                state.isServiceNoticeNotificationEnabled = setting.serviceEnabled
+                state.isCommunityNotificationEnabled = setting.communityEnabled
+                state.isMarketingNotificationEnabled = setting.marketingEnabled
+                state.isLoaded = true
+                return .none
+
+            case let .internal(.fetchSettingResponse(.failure(error))):
+                Log.trace("알림 설정 조회 실패: \(error)", category: .network, level: .error)
+                // 조회 실패 시에도 화면은 사용 가능하도록 공개 (기본값 노출 + 토스트 안내)
+                state.isLoaded = true
+                return handleError(error)
 
             case .internal(.updateSettingResponse(.success)):
                 return .none

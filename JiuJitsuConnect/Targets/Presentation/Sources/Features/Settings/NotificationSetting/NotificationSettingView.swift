@@ -37,6 +37,7 @@ public struct NotificationSettingView: View {
                                 asset: Assets.Common.Icon.bell,
                                 text: "계정·보안 알림",
                                 subtitle: "로그인, 신고 처리 결과 등",
+                                isLoading: !store.isLoaded,
                                 isOn: Binding(
                                     get: { store.isAccountSecurityNotificationEnabled },
                                     set: { store.send(.view(.accountSecurityNotificationToggled($0))) }
@@ -46,6 +47,7 @@ public struct NotificationSettingView: View {
                                 asset: Assets.Common.Icon.bell,
                                 text: "서비스 공지 알림",
                                 subtitle: "정책 변경, 공지사항",
+                                isLoading: !store.isLoaded,
                                 isOn: Binding(
                                     get: { store.isServiceNoticeNotificationEnabled },
                                     set: { store.send(.view(.serviceNoticeNotificationToggled($0))) }
@@ -55,6 +57,7 @@ public struct NotificationSettingView: View {
                                 asset: Assets.Common.Icon.bell,
                                 text: "커뮤니티 활동 알림",
                                 subtitle: "댓글, 답글, 언급 등",
+                                isLoading: !store.isLoaded,
                                 isOn: Binding(
                                     get: { store.isCommunityNotificationEnabled },
                                     set: { store.send(.view(.communityNotificationToggled($0))) }
@@ -64,6 +67,7 @@ public struct NotificationSettingView: View {
                                 asset: Assets.Common.Icon.bell,
                                 text: "마케팅 정보 알림",
                                 subtitle: "이벤트, 혜택 안내",
+                                isLoading: !store.isLoaded,
                                 isOn: Binding(
                                     get: { store.isMarketingNotificationEnabled },
                                     set: { store.send(.view(.marketingNotificationToggled($0))) }
