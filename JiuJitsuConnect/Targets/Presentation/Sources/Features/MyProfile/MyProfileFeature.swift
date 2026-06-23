@@ -335,7 +335,11 @@ public struct MyProfileFeature: Sendable {
             case let .destination(.presented(.academySetting(.delegate(.saveAcademyName(academyName))))):
                 // 도장 이름 저장 요청 받음 → API 호출
                 return .send(.internal(.updateProfileSection(.academy, academyName)))
-                
+
+            case .destination(.presented(.academySetting(.delegate(.deleteAcademy)))):
+                // 도장 정보 삭제 요청 받음 → 빈 문자열로 저장하여 도장 정보 제거
+                return .send(.internal(.updateProfileSection(.academy, "")))
+
             case .destination(.presented(.academySetting(.delegate(.cancel)))):
                 // 취소 - 아무것도 하지 않음
                 return .none

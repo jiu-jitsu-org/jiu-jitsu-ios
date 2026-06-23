@@ -61,6 +61,7 @@ public struct MyAcademySettingFeature: Sendable {
             case onAppear
             case viewTapped
             case doneButtonTapped
+            case deleteButtonTapped
             case backButtonTapped
         }
 
@@ -69,6 +70,7 @@ public struct MyAcademySettingFeature: Sendable {
 
         public enum DelegateAction: Sendable {
             case saveAcademyName(String)  // 저장 요청만 위임
+            case deleteAcademy            // 도장 정보 삭제 요청 위임 (수정 모드 전용)
             case cancel
         }
     }
@@ -123,7 +125,12 @@ public struct MyAcademySettingFeature: Sendable {
                 // 유효성 검사 통과 - 부모 Feature에게 저장 요청 위임
                 state.validationState = .valid
                 return .send(.delegate(.saveAcademyName(state.academyName)))
-                
+
+            case .view(.deleteButtonTapped):
+                // 수정 모드에서만 노출되는 삭제 — 부모에 삭제 요청 위임(도장 정보 "" 처리)
+                guard state.mode.isEdit else { return .none }
+                return .send(.delegate(.deleteAcademy))
+
             case .view(.backButtonTapped):
                 return .concatenate(
                     .send(.delegate(.cancel)),
@@ -161,6 +168,10 @@ public extension MyAcademySettingFeature {
         case add
         case edit
         
+        var isEdit: Bool {
+            self == .edit
+        }
+
         var headerTitle: String {
             switch self {
             case .add:
