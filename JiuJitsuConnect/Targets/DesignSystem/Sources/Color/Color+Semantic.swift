@@ -130,4 +130,11 @@ public struct SemanticColors {
     public struct Transparent {
         public let transparent = Color.clear
     }
+    
+    public let destructive = Destructive()
+
+    public struct Destructive {
+        public let destructive = Color.primitive.red.r500
+    }
+
 }

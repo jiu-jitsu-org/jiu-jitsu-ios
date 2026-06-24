@@ -289,6 +289,7 @@ public struct ComponentColors {
         public let text = Color.semantic.text.primary
         public let background = Color.semantic.surface.container
         public let iconButton = Color.semantic.icon.primary
+        public let destructiveText = Color.semantic.destructive.destructive
     }
 
     // MARK: - Bottom Sheet

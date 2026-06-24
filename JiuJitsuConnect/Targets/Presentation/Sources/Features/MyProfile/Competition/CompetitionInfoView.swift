@@ -72,9 +72,9 @@ struct CompetitionInfoView: View {
                     store.send(.view(.deleteButtonTapped))
                 } label: {
                     Text("삭제")
-                        .font(Font.pretendard.bodyM)
-                        .foregroundStyle(Color.semantic.error.error)
-                        .frame(height: 36)
+                        .font(Font.pretendard.buttonS)
+                        .foregroundColor(Color.component.header.destructiveText)
+                        .frame(width: 48, height: 32)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -108,3 +108,4 @@ struct CompetitionInfoView: View {
         )
     }
 }
+

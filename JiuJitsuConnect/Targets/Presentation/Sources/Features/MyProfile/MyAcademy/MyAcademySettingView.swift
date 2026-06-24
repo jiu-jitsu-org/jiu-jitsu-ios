@@ -80,9 +80,9 @@ private extension MyAcademySettingView {
                     store.send(.view(.deleteButtonTapped))
                 } label: {
                     Text("삭제")
-                        .font(Font.pretendard.bodyM)
-                        .foregroundStyle(Color.semantic.error.error)
-                        .frame(height: 36)
+                        .font(Font.pretendard.buttonS)
+                        .foregroundStyle(Color.component.button.text.defaultText)
+                        .frame(width: 53, height: 32)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
