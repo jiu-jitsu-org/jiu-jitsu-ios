@@ -94,6 +94,16 @@ public struct AppTabView: View {
             ),
             configuration: loginPromptAlertConfiguration
         )
+        // 리스트 웹뷰가 요청한 확인 알럿·선택 시트를 최상위에서 그려 GNB·하단 탭바까지 덮는다.
+        // (웹뷰는 자기 프레임 밖을 딤 처리할 수 없어 이 표면은 네이티브가 소유한다.)
+        .webBridgeDialogs(
+            confirmDialog: store.home.pendingConfirmDialog,
+            selectSheet: store.home.pendingSelectSheet,
+            onConfirmButton: { store.send(.home(.view(.confirmDialogButtonTapped($0)))) },
+            onConfirmDismiss: { store.send(.home(.view(.confirmDialogDismissed))) },
+            onSelectSubmit: { store.send(.home(.view(.selectSheetSubmitted(value: $0, customText: $1)))) },
+            onSelectDismiss: { store.send(.home(.view(.selectSheetDismissed))) }
+        )
         .onAppear { store.send(.view(.onAppear)) }
     }
 

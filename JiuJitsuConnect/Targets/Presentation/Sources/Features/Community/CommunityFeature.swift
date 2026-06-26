@@ -44,6 +44,12 @@ public struct CommunityFeature: Sendable {
         // 전달한 뒤 outboundDelivered로 제거한다.
         var outbox: [WebBridgeOutboundEnvelope] = []
 
+        // 웹이 요청한 확인 알럿/선택 시트(표시 중이면 non-nil). 리스트 웹뷰의 다이얼로그는
+        // GNB·하단 탭바까지 덮어야 해 AppTabView(최상위)가 이 상태를 읽어 그린다.
+        // 한 번에 하나만 표시한다(동시 요청은 즉시 dismiss로 회신).
+        var pendingConfirmDialog: ConfirmDialogPayload?
+        var pendingSelectSheet: SelectSheetPayload?
+
         // 테스트용 웹뷰 도메인 변경 입력 다이얼로그 상태. (DEBUG/BETA 빌드에서만 노출)
         var isDebugURLAlertPresented = false
         var debugURLInput = ""
@@ -86,6 +92,16 @@ public struct CommunityFeature: Sendable {
             case tabSelected(Tab)
             case notificationTapped
             case searchTapped
+
+            // MARK: 브릿지 다이얼로그 결과 (AppTabView가 그린 알럿/시트 → Feature로 회신)
+            // 확인 알럿의 [확인]/[취소] 버튼 탭.
+            case confirmDialogButtonTapped(ConfirmDialogOutcome)
+            // 확인 알럿이 버튼 외로 닫힘(바깥 탭 등). 버튼으로 이미 처리됐으면 무시된다.
+            case confirmDialogDismissed
+            // 선택 시트 제출(선택 value + 자유 입력).
+            case selectSheetSubmitted(value: String, customText: String?)
+            // 선택 시트 제출 없이 닫힘(드래그·딤 탭).
+            case selectSheetDismissed
 
             // MARK: 테스트용 웹뷰 도메인 변경
             // IP/도메인을 입력받아 즉시 해당 주소의 웹뷰를 다시 로드한다. (DEBUG/BETA 전용)
@@ -203,6 +219,36 @@ public struct CommunityFeature: Sendable {
                 state.isDebugURLAlertPresented = false
                 return .none
 
+            // MARK: - 브릿지 다이얼로그 결과 (→ 웹 회신)
+
+            case let .view(.confirmDialogButtonTapped(outcome)):
+                guard let pending = state.pendingConfirmDialog else { return .none }
+                state.pendingConfirmDialog = nil
+                Self.enqueue(.confirmDialogResult(requestId: pending.requestId, outcome: outcome), into: &state)
+                return .none
+
+            case .view(.confirmDialogDismissed):
+                // 버튼 탭이면 위에서 이미 pending을 비워 여기선 무시된다(중복 회신 방지).
+                guard let pending = state.pendingConfirmDialog else { return .none }
+                state.pendingConfirmDialog = nil
+                Self.enqueue(.confirmDialogResult(requestId: pending.requestId, outcome: .dismiss), into: &state)
+                return .none
+
+            case let .view(.selectSheetSubmitted(value, customText)):
+                guard let pending = state.pendingSelectSheet else { return .none }
+                state.pendingSelectSheet = nil
+                Self.enqueue(
+                    .selectSheetResult(requestId: pending.requestId, outcome: .submit(value: value, customText: customText)),
+                    into: &state
+                )
+                return .none
+
+            case .view(.selectSheetDismissed):
+                guard let pending = state.pendingSelectSheet else { return .none }
+                state.pendingSelectSheet = nil
+                Self.enqueue(.selectSheetResult(requestId: pending.requestId, outcome: .dismiss), into: &state)
+                return .none
+
             case .internal(.loadingStarted):
                 state.isLoading = true
                 state.hasError = false
@@ -254,6 +300,12 @@ public struct CommunityFeature: Sendable {
                 case .backGuard:
                     // 뒤로가기 가드는 서브뷰(상세) 전용 — 리스트에는 네이티브 back이 없어 무시한다.
                     return .none
+
+                case let .showConfirmDialog(payload):
+                    return Self.presentConfirmDialog(payload, into: &state)
+
+                case let .showSelectSheet(payload):
+                    return Self.presentSelectSheet(payload, into: &state)
 
                 case let .unknown(type):
                     // 계약에 없는 타입 — 한쪽만 먼저 배포된 경우를 대비해 무시한다.
@@ -404,6 +456,27 @@ public struct CommunityFeature: Sendable {
             }
             state.coverPath.append(.detail(detail))
         }
+        return .none
+    }
+
+    /// 확인 알럿 표시 요청 처리. 이미 다이얼로그가 떠 있으면 새 요청은 즉시 dismiss로 회신한다
+    /// (동시 표시 없이 하나만 — 계약: 큐잉하지 않음).
+    private static func presentConfirmDialog(_ payload: ConfirmDialogPayload, into state: inout State) -> Effect<Action> {
+        guard state.pendingConfirmDialog == nil, state.pendingSelectSheet == nil else {
+            enqueue(.confirmDialogResult(requestId: payload.requestId, outcome: .dismiss), into: &state)
+            return .none
+        }
+        state.pendingConfirmDialog = payload
+        return .none
+    }
+
+    /// 선택 시트 표시 요청 처리(동시 표시 방지는 presentConfirmDialog와 동일).
+    private static func presentSelectSheet(_ payload: SelectSheetPayload, into state: inout State) -> Effect<Action> {
+        guard state.pendingConfirmDialog == nil, state.pendingSelectSheet == nil else {
+            enqueue(.selectSheetResult(requestId: payload.requestId, outcome: .dismiss), into: &state)
+            return .none
+        }
+        state.pendingSelectSheet = payload
         return .none
     }
 

@@ -110,6 +110,10 @@ private extension WebBridgeInboundMessage {
             return "CLOSE_SUBVIEW  (payload 없음)"
         case let .backGuard(enabled):
             return "BACK_GUARD  enabled=\(enabled)"
+        case let .showConfirmDialog(payload):
+            return "SHOW_CONFIRM_DIALOG  reqId=\(payload.requestId) destructive=\(payload.destructive)"
+        case let .showSelectSheet(payload):
+            return "SHOW_SELECT_SHEET  reqId=\(payload.requestId) options=\(payload.options.count)"
         case let .unknown(type):
             return "\(type)  (unsupported)"
         }
@@ -129,6 +133,15 @@ private extension WebBridgeOutboundMessage {
             return "AUTH_LOGOUT"
         case .backPressed:
             return "BACK_PRESSED"
+        case let .confirmDialogResult(requestId, outcome):
+            return "CONFIRM_DIALOG_RESULT  reqId=\(requestId) result=\(outcome.rawValue)"
+        case let .selectSheetResult(requestId, outcome):
+            switch outcome {
+            case let .submit(value, customText):
+                return "SELECT_SHEET_RESULT  reqId=\(requestId) result=submit value=\(value) custom=\(customText != nil)"
+            case .dismiss:
+                return "SELECT_SHEET_RESULT  reqId=\(requestId) result=dismiss"
+            }
         }
     }
 }
@@ -159,6 +172,13 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 이 화면이 뒤로가기 가드(작성 취소 확인 등)를 갖는지 통지. enabled면 네이티브 back은
     /// 직접 닫지 않고 BACK_PRESSED를 보내 웹이 가드 후 닫게 한다. disabled면 네이티브가 직접 닫는다.
     case backGuard(enabled: Bool)
+    /// 확인 알럿 표시 요청. 웹뷰는 자기 프레임 밖(GNB·하단 탭바)을 딤 처리할 수 없어, 풀스크린 딤이
+    /// 필요한 표면은 네이티브가 소유한다. 문구는 웹이 payload로 넘기고, 결과(confirm/cancel/dismiss)는
+    /// requestId로 짝지어 CONFIRM_DIALOG_RESULT로 회신한다.
+    case showConfirmDialog(ConfirmDialogPayload)
+    /// 선택 바텀시트 표시 요청(신고 사유 등). 항목을 웹이 넘기므로 사유가 늘어도 앱을 건드리지 않는다.
+    /// 결과(submit+선택값 / dismiss)는 requestId로 짝지어 SELECT_SHEET_RESULT로 회신한다.
+    case showSelectSheet(SelectSheetPayload)
     /// 계약에 없는 타입(상위 버전/오타 등) — 무시 대상.
     case unknown(type: String)
 
@@ -171,6 +191,8 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case openSubview = "OPEN_SUBVIEW"
         case closeSubview = "CLOSE_SUBVIEW"
         case backGuard = "BACK_GUARD"
+        case showConfirmDialog = "SHOW_CONFIRM_DIALOG"
+        case showSelectSheet = "SHOW_SELECT_SHEET"
     }
 
     /// `WKScriptMessage.body`를 파싱한다.
@@ -218,6 +240,60 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             return .closeSubview
         case .backGuard:
             return .backGuard(enabled: payload?["enabled"] as? Bool ?? false)
+        case .showConfirmDialog:
+            // requestId·title·confirmText는 필수. 하나라도 없으면 회신할 대상/문구가 없어 무시한다
+            // (웹은 무응답을 타임아웃 후 cancel로 간주하므로 화면이 멈추지 않는다).
+            guard
+                let requestId = payload?["requestId"] as? String, !requestId.isEmpty,
+                let title = payload?["title"] as? String,
+                let confirmText = payload?["confirmText"] as? String
+            else {
+                Log.trace("SHOW_CONFIRM_DIALOG payload 필수 필드 누락", category: .network, level: .error)
+                return nil
+            }
+            return .showConfirmDialog(
+                ConfirmDialogPayload(
+                    requestId: requestId,
+                    title: title,
+                    message: payload?["message"] as? String,
+                    confirmText: confirmText,
+                    cancelText: payload?["cancelText"] as? String,
+                    destructive: payload?["destructive"] as? Bool ?? false,
+                    dismissOnOutsideTap: payload?["dismissOnOutsideTap"] as? Bool ?? true
+                )
+            )
+        case .showSelectSheet:
+            guard
+                let requestId = payload?["requestId"] as? String, !requestId.isEmpty,
+                let title = payload?["title"] as? String,
+                let submitText = payload?["submitText"] as? String
+            else {
+                Log.trace("SHOW_SELECT_SHEET payload 필수 필드 누락", category: .network, level: .error)
+                return nil
+            }
+            // value/label이 없는 항목은 선택·전송이 불가능하므로 건너뛴다.
+            let options: [SelectSheetPayload.Option] = (payload?["options"] as? [[String: Any]] ?? [])
+                .compactMap { raw in
+                    guard
+                        let value = raw["value"] as? String,
+                        let label = raw["label"] as? String
+                    else { return nil }
+                    return SelectSheetPayload.Option(
+                        value: value,
+                        label: label,
+                        allowsCustomText: raw["allowsCustomText"] as? Bool ?? false
+                    )
+                }
+            return .showSelectSheet(
+                SelectSheetPayload(
+                    requestId: requestId,
+                    title: title,
+                    message: payload?["message"] as? String,
+                    options: options,
+                    customTextPlaceholder: payload?["customTextPlaceholder"] as? String,
+                    submitText: submitText
+                )
+            )
         case .none:
             return .unknown(type: rawType)
         }
@@ -260,6 +336,99 @@ public struct OpenSubviewPayload: Equatable, Sendable {
         self.title = title
         self.presentation = presentation
     }
+}
+
+// MARK: - Dialog Payloads (SHOW_CONFIRM_DIALOG / SHOW_SELECT_SHEET)
+
+/// `SHOW_CONFIRM_DIALOG` 페이로드 — 네이티브가 그릴 확인 알럿. 문구·라벨은 전부 웹이 채운다.
+/// `WebBridgeInboundMessage`(public)의 연관값으로 노출되므로 public이다.
+public struct ConfirmDialogPayload: Equatable, Sendable {
+    /// 웹이 발급하는 요청 식별자 — 결과 회신을 이 값으로 매칭한다.
+    public let requestId: String
+    public let title: String
+    public let message: String?
+    public let confirmText: String
+    /// 미지정 시 네이티브가 "취소"를 쓴다.
+    public let cancelText: String?
+    /// true면 확인 버튼을 위험색(destructive)으로 그린다.
+    public let destructive: Bool
+    /// 딤 바깥 탭으로 닫을 수 있는지(미지정 시 true). 바깥 탭 닫힘은 dismiss로 회신한다.
+    public let dismissOnOutsideTap: Bool
+
+    public init(
+        requestId: String,
+        title: String,
+        message: String?,
+        confirmText: String,
+        cancelText: String?,
+        destructive: Bool,
+        dismissOnOutsideTap: Bool
+    ) {
+        self.requestId = requestId
+        self.title = title
+        self.message = message
+        self.confirmText = confirmText
+        self.cancelText = cancelText
+        self.destructive = destructive
+        self.dismissOnOutsideTap = dismissOnOutsideTap
+    }
+}
+
+/// `SHOW_SELECT_SHEET` 페이로드 — 네이티브가 그릴 선택 바텀시트(신고 사유 등).
+public struct SelectSheetPayload: Equatable, Sendable {
+    /// 선택 항목. value는 API로 보낼 코드, label은 사용자에게 보일 문구.
+    public struct Option: Equatable, Sendable {
+        public let value: String
+        public let label: String
+        /// 고르면 자유 입력 필드를 함께 노출한다(신고 사유의 "기타" 등).
+        public let allowsCustomText: Bool
+
+        public init(value: String, label: String, allowsCustomText: Bool) {
+            self.value = value
+            self.label = label
+            self.allowsCustomText = allowsCustomText
+        }
+    }
+
+    public let requestId: String
+    public let title: String
+    /// 제목 아래 보조 설명(선택).
+    public let message: String?
+    public let options: [Option]
+    /// 자유 입력 필드의 placeholder(선택).
+    public let customTextPlaceholder: String?
+    public let submitText: String
+
+    public init(
+        requestId: String,
+        title: String,
+        message: String?,
+        options: [Option],
+        customTextPlaceholder: String?,
+        submitText: String
+    ) {
+        self.requestId = requestId
+        self.title = title
+        self.message = message
+        self.options = options
+        self.customTextPlaceholder = customTextPlaceholder
+        self.submitText = submitText
+    }
+}
+
+// MARK: - Dialog Result Outcomes (네이티브 → 웹 회신 값)
+
+/// 확인 알럿 종료 사유. dismiss = 바깥 탭·시스템 닫힘 등 명시적 버튼이 아닌 닫힘.
+public enum ConfirmDialogOutcome: String, Sendable {
+    case confirm
+    case cancel
+    case dismiss
+}
+
+/// 선택 시트 종료 결과. submit이면 선택된 항목의 value(+자유 입력)를 함께 싣는다.
+public enum SelectSheetOutcome: Equatable, Sendable {
+    case submit(value: String, customText: String?)
+    case dismiss
 }
 
 // MARK: - Origin 검사
@@ -305,6 +474,10 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
     case authLogout
     /// 네이티브 공통 뒤로가기 탭 통지 → 웹이 가드(작성 취소 확인 등) 후 CLOSE_SUBVIEW로 닫는다.
     case backPressed
+    /// SHOW_CONFIRM_DIALOG의 결과. requestId로 어느 요청의 답인지 웹이 식별한다.
+    case confirmDialogResult(requestId: String, outcome: ConfirmDialogOutcome)
+    /// SHOW_SELECT_SHEET의 결과. submit이면 선택값(+자유 입력)을 함께 싣는다.
+    case selectSheetResult(requestId: String, outcome: SelectSheetOutcome)
 
     private var type: String {
         switch self {
@@ -313,6 +486,8 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         case .authSessionExpired: return "AUTH_SESSION_EXPIRED"
         case .authLogout: return "AUTH_LOGOUT"
         case .backPressed: return "BACK_PRESSED"
+        case .confirmDialogResult: return "CONFIRM_DIALOG_RESULT"
+        case .selectSheetResult: return "SELECT_SHEET_RESULT"
         }
     }
 
@@ -322,6 +497,18 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
             return ["accessToken": accessToken]
         case .authLoginCancelled, .authSessionExpired, .authLogout, .backPressed:
             return nil
+        case let .confirmDialogResult(requestId, outcome):
+            return ["requestId": requestId, "result": outcome.rawValue]
+        case let .selectSheetResult(requestId, outcome):
+            switch outcome {
+            case let .submit(value, customText):
+                var payload: [String: Any] = ["requestId": requestId, "result": "submit", "value": value]
+                // 자유 입력은 입력했을 때만 싣는다(계약: customText는 선택 필드).
+                if let customText { payload["customText"] = customText }
+                return payload
+            case .dismiss:
+                return ["requestId": requestId, "result": "dismiss"]
+            }
         }
     }
 
