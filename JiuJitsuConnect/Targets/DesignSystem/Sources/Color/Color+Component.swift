@@ -173,6 +173,37 @@ public struct ComponentColors {
         }
     }
 
+    // MARK: - TextField Multiline
+    public let textfieldMultiline = TextFieldMultiline()
+
+    public struct TextFieldMultiline {
+        public let `default` = Default()
+        public let focused = Focused()
+        public let filled = Filled()
+        public let disabled = Disabled()
+
+        public struct Default {
+            public let bg = Color.semantic.surface.field
+            public let text = Color.semantic.text.tertiary
+        }
+
+        public struct Focused {
+            public let bg = Color.semantic.surface.field
+            public let border = Color.semantic.border.focus
+            public let text = Color.semantic.text.primary
+        }
+
+        public struct Filled {
+            public let bg = Color.semantic.surface.field
+            public let text = Color.semantic.text.primary
+        }
+
+        public struct Disabled {
+            public let bg = Color.semantic.surface.field
+            public let text = Color.semantic.text.disabled
+        }
+    }
+
     // MARK: - TextField Display
     public let textfieldDisplay = TextFieldDisplay()
     

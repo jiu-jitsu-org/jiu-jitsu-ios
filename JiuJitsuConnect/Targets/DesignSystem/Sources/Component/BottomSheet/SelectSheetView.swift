@@ -87,17 +87,17 @@ public struct SelectSheetView: View {
         VStack(alignment: .leading, spacing: 0) {
             handle
                 .frame(maxWidth: .infinity)
-                .padding(.top, 8)
+                .padding(.vertical, 10)
 
             Text(configuration.title)
                 .font(.pretendard.title2)
-                .foregroundStyle(Color.component.bottomSheet.selected.container.title)
-                .padding(.top, 16)
+                .foregroundStyle(Color.component.sectionHeader.title)
+                .padding(.top, 24)
 
             if let message = configuration.message {
                 Text(message)
-                    .font(.pretendard.bodyS)
-                    .foregroundStyle(Color.semantic.text.secondary)
+                    .font(.pretendard.labelM)
+                    .foregroundStyle(Color.component.sectionHeader.subTitle)
                     .padding(.top, 4)
             }
 
@@ -110,12 +110,11 @@ public struct SelectSheetView: View {
 
             if needsCustomText {
                 customTextField
-                    .padding(.top, 8)
+                    .padding(.top, 4)
             }
 
             submitButton
-                .padding(.top, 16)
-                .padding(.bottom, 8)
+                .padding(.top, 24)
         }
         .padding(.horizontal, 20)
     }
@@ -174,19 +173,34 @@ public struct SelectSheetView: View {
     }
 
     private var customTextField: some View {
-        TextField(
-            configuration.customTextPlaceholder ?? "",
-            text: $customText,
-            axis: .vertical
-        )
-        .focused($isCustomTextFocused)
-        .font(.pretendard.bodyS)
-        .foregroundStyle(Color.semantic.text.primary)
-        .lineLimit(3, reservesSpace: true)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color.semantic.surface.field)
-        .clipShape(RoundedRectangle(cornerRadius: 15))
+        // SwiftUI 기본 TextField는 placeholder 색을 못 바꿔, placeholder를 커스텀 오버레이로 그린다.
+        // 입력 텍스트는 focused 색, placeholder는 default 색으로 분리한다.
+        TextField("", text: $customText, axis: .vertical)
+            .focused($isCustomTextFocused)
+            .font(.pretendard.bodyS)
+            .foregroundStyle(Color.component.textfieldMultiline.focused.text)
+            .lineLimit(5, reservesSpace: true)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.component.textfieldMultiline.filled.bg)
+            .overlay(alignment: .topLeading) {
+                if customText.isEmpty {
+                    Text(configuration.customTextPlaceholder ?? "")
+                        .font(.pretendard.bodyS)
+                        .foregroundStyle(Color.component.textfieldMultiline.default.text)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .allowsHitTesting(false)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 15))
+            // 포커스 중에만 안쪽 1pt 보더를 얹고, 해제되면 원상복귀한다.
+            .overlay {
+                RoundedRectangle(cornerRadius: 15)
+                    .strokeBorder(Color.component.textfieldMultiline.focused.border, lineWidth: 1)
+                    .opacity(isCustomTextFocused ? 1 : 0)
+                    .allowsHitTesting(false)
+            }
     }
 
     private var submitButton: some View {
