@@ -77,10 +77,9 @@ public struct SelectSheetView: View {
         selectedOption?.allowsCustomText == true
     }
 
-    // 자유 입력 항목은 내용이 있어야 제출할 수 있다(빈 사유 전송 방지).
+    // 정책: 사유만 선택하면 제출 가능. "기타"도 상세 입력 없이 제출을 허용한다.
     private var canSubmit: Bool {
-        guard selectedOption != nil else { return false }
-        return !needsCustomText || !customText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        selectedOption != nil
     }
 
     public var body: some View {
@@ -206,8 +205,10 @@ public struct SelectSheetView: View {
     private var submitButton: some View {
         Button {
             guard let option = selectedOption else { return }
+            // "기타"에 실제 입력이 있을 때만 상세를 싣는다(빈 값은 nil로 생략).
             let trimmed = customText.trimmingCharacters(in: .whitespacesAndNewlines)
-            onSubmit(option.value, needsCustomText ? trimmed : nil)
+            let detail = needsCustomText && !trimmed.isEmpty ? trimmed : nil
+            onSubmit(option.value, detail)
         } label: {
             AppButtonConfiguration(title: configuration.submitText, size: .large)
                 .frame(maxWidth: .infinity)
