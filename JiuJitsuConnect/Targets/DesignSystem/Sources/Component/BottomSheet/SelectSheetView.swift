@@ -100,12 +100,14 @@ public struct SelectSheetView: View {
                     .padding(.top, 4)
             }
 
-            VStack(spacing: 0) {
+            VStack(spacing: 4) {
                 ForEach(configuration.options) { option in
                     optionRow(option)
                 }
             }
             .padding(.top, 16)
+            // 각 행의 좌우 8 탭 여백을 콘텐츠(20) 바깥으로 빼, 라디오/텍스트는 20 정렬을 유지한다.
+            .padding(.horizontal, -8)
 
             if needsCustomText {
                 customTextField
@@ -134,41 +136,41 @@ public struct SelectSheetView: View {
                 isCustomTextFocused = false
             }
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: 9) {
                 radio(isSelected: isSelected)
                 Text(option.label)
-                    .font(.pretendard.bodyM)
-                    .foregroundStyle(
-                        isSelected
-                        ? Color.semantic.text.primary
-                        : Color.semantic.text.secondary
-                    )
+                    .font(.pretendard.bodyS)
+                    // 선택 여부와 무관하게 동일 폰트·색상.
+                    .foregroundStyle(Color.component.bottomSheet.unselected.listItem.label)
                 Spacer(minLength: 0)
             }
-            .frame(height: 51)
+            // 탭 영역: [8 마진][라디오 24][9][텍스트][8 마진]. 좌우 8은 탭 여백에 포함된다.
+            .padding(.horizontal, 8)
+            .frame(height: 40)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
     private func radio(isSelected: Bool) -> some View {
+        // 원 16×16을 24×24 라디오 영역 중앙에 둔다.
         ZStack {
             if isSelected {
                 // 선택: 파란 원 채움 + 중앙 흰 점.
                 Circle()
                     .fill(Color.semantic.interactive.primary)
-                    .frame(width: 20, height: 20)
+                    .frame(width: 16, height: 16)
                 Circle()
                     .fill(Color.semantic.surface.container)
-                    .frame(width: 7, height: 7)
+                    .frame(width: 6, height: 6)
             } else {
                 // 미선택: 회색 테두리 원.
                 Circle()
                     .strokeBorder(Color.semantic.border.default, lineWidth: 1.5)
-                    .frame(width: 20, height: 20)
+                    .frame(width: 16, height: 16)
             }
         }
-        .frame(width: 20, height: 20)
+        .frame(width: 24, height: 24)
     }
 
     private var customTextField: some View {
