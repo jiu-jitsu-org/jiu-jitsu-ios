@@ -37,7 +37,7 @@ public struct TermsAgreementView: View {
             
             // 동의 항목 리스트
             VStack(spacing: 4) {
-                ForEachStore(
+                ForEach(
                     self.store.scope(state: \.rows, action: \.rows)
                 ) { rowStore in
                     TermsAgreementRowView(store: rowStore)

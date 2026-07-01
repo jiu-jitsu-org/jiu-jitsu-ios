@@ -104,6 +104,10 @@ let project = Project(
         base: [
             "GCC_TREAT_WARNINGS_AS_ERRORS": "YES",
             "SWIFT_TREAT_WARNINGS_AS_ERRORS": "YES",
+            // TCA `@Reducer enum`이 생성하는 public CaseScope는 Sendable이 추론되지 않아
+            // AnyCasePath(embed:)에서 non-Sendable 변환 경고가 난다(TCA #3897/#3958).
+            // Warnings as Errors와 겹쳐 빌드가 깨지므로 SE-0418 추론을 켠다.
+            "SWIFT_APPROACHABLE_CONCURRENCY": "YES",
             "IPHONEOS_DEPLOYMENT_TARGET": SettingValue(stringLiteral: deploymentTargetString),
             "ENABLE_BITCODE": "NO",
             "CODE_SIGN_IDENTITY": "",
