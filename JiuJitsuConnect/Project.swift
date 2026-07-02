@@ -67,8 +67,8 @@ let appInfoPlist: [String: Plist.Value] = {
         ],
         "KAKAO_NATIVE_APP_KEY": "$(KAKAO_NATIVE_APP_KEY)",
         "GoogleSignIn": "$(GOOGLE_SIGN_IN)",
+        // 실제 값은 구성별로 BASE_URL_DEV / BASE_URL_PROD 중 하나가 주입된다(아래 configurations 참고).
         "BASE_URL": "$(BASE_URL)",
-        "TEST_BASE_URL": "$(TEST_BASE_URL)",
         "WEB_URL": "$(WEB_URL)",
         "IMAGEKIT_PUBLIC_KEY": "$(IMAGEKIT_PUBLIC_KEY)",
         // 테스트용 커뮤니티 웹뷰 도메인 변경(IP/HTTP) 지원을 위한 ATS 예외.
@@ -114,12 +114,23 @@ let project = Project(
             "CODE_SIGNING_REQUIRED": "NO",
             "DEVELOPMENT_LANGUAGE": "ko"
         ],
+        // 서버는 dev(develop 브랜치) / prod(main 브랜치) 2벌로 운영된다.
+        // Beta는 사내 QA용이므로 Debug와 함께 dev를 바라보고, Release만 prod를 쓴다.
+        // 값 자체는 Secrets.xcconfig의 *_DEV / *_PROD에 있고 여기서 BASE_URL·WEB_URL로 확정한다.
         configurations: [
-            .debug(name: "Debug", xcconfig: .relativeToRoot("Configs/Secrets.xcconfig")),
-            .release(name: "Beta", settings: [
-                "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "BETA"
+            .debug(name: "Debug", settings: [
+                "BASE_URL": "$(BASE_URL_DEV)",
+                "WEB_URL": "$(WEB_URL_DEV)"
             ], xcconfig: .relativeToRoot("Configs/Secrets.xcconfig")),
-            .release(name: "Release", xcconfig: .relativeToRoot("Configs/Secrets.xcconfig"))
+            .release(name: "Beta", settings: [
+                "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "BETA",
+                "BASE_URL": "$(BASE_URL_DEV)",
+                "WEB_URL": "$(WEB_URL_DEV)"
+            ], xcconfig: .relativeToRoot("Configs/Secrets.xcconfig")),
+            .release(name: "Release", settings: [
+                "BASE_URL": "$(BASE_URL_PROD)",
+                "WEB_URL": "$(WEB_URL_PROD)"
+            ], xcconfig: .relativeToRoot("Configs/Secrets.xcconfig"))
         ]
     ),
     targets: [
