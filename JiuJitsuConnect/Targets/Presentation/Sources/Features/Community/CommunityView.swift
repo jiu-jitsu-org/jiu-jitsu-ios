@@ -33,6 +33,8 @@ public struct CommunityView: View {
                         loadToken: store.loadToken,
                         accessToken: store.accessToken,
                         outbox: store.outbox,
+                        // 리스트 피드 웹 배경과 맞춰, 바운스 때 다른 색이 드러나지 않게 한다.
+                        overscrollBackground: Color.primitive.bw.white,
                         onLoadingStarted: { store.send(.internal(.loadingStarted)) },
                         onLoadingFinished: { store.send(.internal(.loadingFinished)) },
                         onLoadingFailed: { store.send(.internal(.loadingFailed)) },

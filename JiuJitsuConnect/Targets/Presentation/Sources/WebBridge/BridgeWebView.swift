@@ -31,6 +31,9 @@ struct BridgeWebView: UIViewRepresentable {
     // 고정 셸(h-dvh + overflow:hidden) 화면에서, 키보드가 메인 문서를 위로 스크롤해 헤더가
     // 화면 밖으로 밀리는 것을 막기 위해 메인 스크롤뷰 세로 오프셋을 0으로 고정한다.
     var locksDocumentScroll: Bool = false
+    // 오버스크롤(바운스) 영역에 드러나는 색. 웹 콘텐츠 배경과 어긋나면 바운스할 때 이음새가
+    // 보이므로 화면별로 주입한다. 리스트 피드는 B&W/White, 상세 서브뷰는 True-White.
+    var overscrollBackground: Color = Color.primitive.bw.trueWhite
     let onLoadingStarted: () -> Void
     let onLoadingFinished: () -> Void
     let onLoadingFailed: () -> Void
@@ -73,11 +76,11 @@ struct BridgeWebView: UIViewRepresentable {
         webView.navigationDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = allowsBackForwardNavigationGestures
         webView.scrollView.contentInsetAdjustmentBehavior = .never
-        // 오버스크롤/바운스 영역에 WKWebView 기본 회색이 비치지 않도록 웹 콘텐츠(#ffffff)와
-        // 동일한 불투명 흰색으로 맞춘다. (CommunityDetailView 배경도 흰색)
+        // 오버스크롤/바운스 영역에 WKWebView 기본 회색이 비치지 않도록 웹 콘텐츠 배경과
+        // 동일한 불투명 색으로 맞춘다.
         webView.isOpaque = true
-        webView.backgroundColor = UIColor(Color.primitive.bw.trueWhite)
-        webView.scrollView.backgroundColor = UIColor(Color.primitive.bw.trueWhite)
+        webView.backgroundColor = UIColor(overscrollBackground)
+        webView.scrollView.backgroundColor = UIColor(overscrollBackground)
 
         #if DEBUG || BETA
         // Safari > 개발자용 메뉴에서 이 웹뷰를 인스펙트할 수 있게 허용한다. (DEBUG/BETA 빌드)
