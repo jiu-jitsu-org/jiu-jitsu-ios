@@ -153,24 +153,12 @@ public struct SelectSheetView: View {
     }
 
     private func radio(isSelected: Bool) -> some View {
-        // 원 16×16을 24×24 라디오 영역 중앙에 둔다.
-        ZStack {
-            if isSelected {
-                // 선택: 파란 원 채움 + 중앙 흰 점.
-                Circle()
-                    .fill(Color.semantic.interactive.primary)
-                    .frame(width: 16, height: 16)
-                Circle()
-                    .fill(Color.semantic.surface.container)
-                    .frame(width: 6, height: 6)
-            } else {
-                // 미선택: 회색 테두리 원.
-                Circle()
-                    .strokeBorder(Color.semantic.border.default, lineWidth: 1.5)
-                    .frame(width: 16, height: 16)
-            }
-        }
-        .frame(width: 24, height: 24)
+        // 선택/미선택 아이콘은 디자인 에셋(16×16)을 24×24 라디오 영역 중앙에 둔다.
+        (isSelected ? Assets.Common.Icon.radioOn : Assets.Common.Icon.radioOff)
+            .swiftUIImage
+            .resizable()
+            .frame(width: 16, height: 16)
+            .frame(width: 24, height: 24)
     }
 
     private var customTextField: some View {

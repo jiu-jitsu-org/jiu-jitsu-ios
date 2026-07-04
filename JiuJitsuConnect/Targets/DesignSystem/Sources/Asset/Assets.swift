@@ -42,6 +42,8 @@ public enum Assets {
       public static let pencil = ImageAsset(name: "Common/Icon/pencil")
       public static let plus = ImageAsset(name: "Common/Icon/plus")
       public static let profile = ImageAsset(name: "Common/Icon/profile")
+      public static let radioOff = ImageAsset(name: "Common/Icon/radio-off")
+      public static let radioOn = ImageAsset(name: "Common/Icon/radio-on")
       public static let refresh = ImageAsset(name: "Common/Icon/refresh")
       public static let search = ImageAsset(name: "Common/Icon/search")
       public static let secession = ImageAsset(name: "Common/Icon/secession")
