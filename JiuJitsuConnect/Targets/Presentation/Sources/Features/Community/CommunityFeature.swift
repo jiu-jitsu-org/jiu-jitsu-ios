@@ -27,6 +27,31 @@ public struct CommunityFeature: Sendable {
         }
     }
 
+    /// 테스트용 도메인 변경 다이얼로그에서 한 번에 전환할 수 있는 서버 후보.
+    /// 값은 Info.plist에 구성별로 주입되며, Release 구성에서는 비어 있다(버튼도 노출되지 않음).
+    public enum DebugServer: String, CaseIterable, Sendable, Equatable {
+        case prod
+        case dev
+
+        var title: String {
+            switch self {
+            case .prod: return "운영 서버"
+            case .dev: return "개발 서버"
+            }
+        }
+
+        private var infoPlistKey: String {
+            switch self {
+            case .prod: return "DEBUG_WEB_URL_PROD"
+            case .dev: return "DEBUG_WEB_URL_DEV"
+            }
+        }
+
+        var urlString: String {
+            Bundle.main.object(forInfoDictionaryKey: infoPlistKey) as? String ?? ""
+        }
+    }
+
     @ObservableState
     public struct State: Equatable {
         var selectedTab: Tab = .feed
@@ -108,7 +133,7 @@ public struct CommunityFeature: Sendable {
             case debugChangeDomainTapped
             case debugURLInputChanged(String)
             case debugURLApplyTapped
-            case debugURLResetTapped
+            case debugServerTapped(DebugServer)
             case debugURLAlertDismissed
         }
 
@@ -208,10 +233,13 @@ public struct CommunityFeature: Sendable {
                 Self.reloadCommunity(&state)
                 return .none
 
-            case .view(.debugURLResetTapped):
-                // 오버라이드를 지우면 다시 Info.plist의 WEB_URL로 로드된다.
+            case let .view(.debugServerTapped(server)):
                 state.isDebugURLAlertPresented = false
-                Self.setDebugOverrideURLString(nil)
+                // 고른 서버가 이 빌드 구성의 기본값과 같으면 오버라이드를 지운다.
+                // 그래야 이후 구성의 WEB_URL이 바뀌어도 옛 주소에 고정되지 않는다.
+                let selected = server.urlString
+                let isDefault = !selected.isEmpty && selected == Self.defaultWebURLString
+                Self.setDebugOverrideURLString(isDefault ? nil : Self.normalizedURLString(selected))
                 Self.reloadCommunity(&state)
                 return .none
 
@@ -490,6 +518,12 @@ public struct CommunityFeature: Sendable {
         enqueue(.authLoginSuccess(accessToken: accessToken), into: &state)
     }
 
+    /// Info.plist WEB_URL — 오버라이드가 없을 때 로드되는 기본 도메인.
+    /// 테스트용 도메인 변경 다이얼로그가 "기본값"을 그대로 보여주기 위해 View에도 노출한다.
+    static var defaultWebURLString: String {
+        Bundle.main.object(forInfoDictionaryKey: "WEB_URL") as? String ?? ""
+    }
+
     private static func makeCommunityURL() -> URL? {
 #if DEBUG || BETA
         // 테스트용 도메인 오버라이드가 설정돼 있으면 WEB_URL보다 우선 사용한다.
@@ -498,8 +532,8 @@ public struct CommunityFeature: Sendable {
             return override
         }
 #endif
+        let urlString = defaultWebURLString
         guard
-            let urlString = Bundle.main.object(forInfoDictionaryKey: "WEB_URL") as? String,
             !urlString.isEmpty,
             let url = URL(string: urlString)
         else {

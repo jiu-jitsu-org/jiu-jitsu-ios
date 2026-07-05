@@ -70,6 +70,10 @@ let appInfoPlist: [String: Plist.Value] = {
         // 실제 값은 구성별로 BASE_URL_DEV / BASE_URL_PROD 중 하나가 주입된다(아래 configurations 참고).
         "BASE_URL": "$(BASE_URL)",
         "WEB_URL": "$(WEB_URL)",
+        // 테스트용 서버 전환(운영/개발) 다이얼로그가 읽는 후보 도메인.
+        // Debug/Beta 구성에만 값이 정의돼 있고, Release에서는 빈 문자열로 치환된다.
+        "DEBUG_WEB_URL_DEV": "$(DEBUG_WEB_URL_DEV)",
+        "DEBUG_WEB_URL_PROD": "$(DEBUG_WEB_URL_PROD)",
         "IMAGEKIT_PUBLIC_KEY": "$(IMAGEKIT_PUBLIC_KEY)",
         // 테스트용 커뮤니티 웹뷰 도메인 변경(IP/HTTP) 지원을 위한 ATS 예외.
         // - NSAllowsArbitraryLoadsInWebContent: WKWebView가 임의 http(IP 포함)를 로드 가능.
@@ -120,12 +124,16 @@ let project = Project(
         configurations: [
             .debug(name: "Debug", settings: [
                 "BASE_URL": "$(BASE_URL_DEV)",
-                "WEB_URL": "$(WEB_URL_DEV)"
+                "WEB_URL": "$(WEB_URL_DEV)",
+                "DEBUG_WEB_URL_DEV": "$(WEB_URL_DEV)",
+                "DEBUG_WEB_URL_PROD": "$(WEB_URL_PROD)"
             ], xcconfig: .relativeToRoot("Configs/Secrets.xcconfig")),
             .release(name: "Beta", settings: [
                 "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "BETA",
                 "BASE_URL": "$(BASE_URL_DEV)",
-                "WEB_URL": "$(WEB_URL_DEV)"
+                "WEB_URL": "$(WEB_URL_DEV)",
+                "DEBUG_WEB_URL_DEV": "$(WEB_URL_DEV)",
+                "DEBUG_WEB_URL_PROD": "$(WEB_URL_PROD)"
             ], xcconfig: .relativeToRoot("Configs/Secrets.xcconfig")),
             .release(name: "Release", settings: [
                 "BASE_URL": "$(BASE_URL_PROD)",

@@ -198,8 +198,10 @@ private struct DebugDomainAlert: ViewModifier {
                 set: { if !$0 { store.send(.view(.debugURLAlertDismissed)) } }
             )
         ) {
+            // 플레이스홀더는 실제 기본값(Info.plist WEB_URL)과 일치시킨다.
+            // 입력 필드를 지웠을 때 "비워두면 어디로 가는지"가 그대로 보여야 오해가 없다.
             TextField(
-                "http://192.168.0.10:3000",
+                CommunityFeature.defaultWebURLString,
                 text: Binding(
                     get: { store.debugURLInput },
                     set: { store.send(.view(.debugURLInputChanged($0))) }
@@ -210,10 +212,20 @@ private struct DebugDomainAlert: ViewModifier {
             .keyboardType(.URL)
 
             Button("적용") { store.send(.view(.debugURLApplyTapped)) }
-            Button("기본값 복원", role: .destructive) { store.send(.view(.debugURLResetTapped)) }
+
+            // 운영/개발은 입력 없이 한 번에 전환한다. 값이 주입되지 않은 구성(Release)에서는
+            // 버튼 자체를 만들지 않아 빈 주소로 로드되는 일이 없게 한다.
+            ForEach(CommunityFeature.DebugServer.allCases, id: \.self) { server in
+                if !server.urlString.isEmpty {
+                    Button(server.title, role: server == .prod ? .destructive : nil) {
+                        store.send(.view(.debugServerTapped(server)))
+                    }
+                }
+            }
+
             Button("취소", role: .cancel) {}
         } message: {
-            Text("불러올 웹뷰 주소를 입력하세요.\n스킴(http/https)을 생략하면 http로 처리됩니다.")
+            Text("불러올 웹뷰 주소를 입력하세요. 예) 192.168.0.10:3000\n스킴(http/https)을 생략하면 http로 처리되고, 비워두고 적용하면 기본값으로 복원됩니다.\n운영·개발 서버는 아래 버튼으로 바로 전환됩니다.")
         }
     }
 }
