@@ -213,6 +213,10 @@ private struct DebugDomainAlert: ViewModifier {
 
             Button("적용") { store.send(.view(.debugURLApplyTapped)) }
 
+            // AASA 배포 전에도 딥링크 파싱·라우팅을 확인하기 위한 통로.
+            // 입력한 주소를 실제 유니버설 링크와 같은 경로로 태워 게시글 상세를 연다.
+            Button("딥링크로 열기") { store.send(.view(.debugDeepLinkOpenTapped)) }
+
             // 운영/개발은 입력 없이 한 번에 전환한다. 값이 주입되지 않은 구성(Release)에서는
             // 버튼 자체를 만들지 않아 빈 주소로 로드되는 일이 없게 한다.
             ForEach(CommunityFeature.DebugServer.allCases, id: \.self) { server in
@@ -225,7 +229,7 @@ private struct DebugDomainAlert: ViewModifier {
 
             Button("취소", role: .cancel) {}
         } message: {
-            Text("불러올 웹뷰 주소를 입력하세요. 예) 192.168.0.10:3000\n스킴(http/https)을 생략하면 http로 처리되고, 비워두고 적용하면 기본값으로 복원됩니다.\n운영·개발 서버는 아래 버튼으로 바로 전환됩니다.")
+            Text("불러올 웹뷰 주소를 입력하세요. 예) 192.168.0.10:3000\n스킴(http/https)을 생략하면 http로 처리되고, 비워두고 적용하면 기본값으로 복원됩니다.\n운영·개발 서버는 아래 버튼으로 바로 전환됩니다.\n[딥링크로 열기]는 입력한 전체 주소(https://…/community/123)를 유니버설 링크처럼 열어봅니다.")
         }
     }
 }

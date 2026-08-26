@@ -186,7 +186,9 @@ let project = Project(
                     .release(name: "Beta", settings: [
                         "OTHER_LDFLAGS": "$(inherited)",
                         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "\(additionalCondition) BETA",
-                        "CODE_SIGN_ENTITLEMENTS": "JiuJitsuConnect.Release.entitlements",
+                        // Release와 별도 파일 — APNs는 production이지만 유니버설 링크는
+                        // 이 구성이 로드하는 WEB_URL_DEV(dev 도메인)를 등록해야 한다.
+                        "CODE_SIGN_ENTITLEMENTS": "JiuJitsuConnect.Beta.entitlements",
                     ]),
                     .release(name: "Release", settings: [
                         "OTHER_LDFLAGS": "$(inherited)",

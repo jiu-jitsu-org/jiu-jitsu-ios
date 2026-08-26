@@ -2,16 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Beta는 TestFlight 배포용이라 APNs는 production, 웹은 dev를 바라본다(Project.swift 구성 참고). -->
 	<key>aps-environment</key>
 	<string>production</string>
 	<key>com.apple.developer.applesignin</key>
 	<array>
 		<string>Default</string>
 	</array>
-	<!-- 유니버설 링크. Release는 WEB_URL_PROD를 로드하므로 운영 도메인만 등록한다. -->
+	<!-- 유니버설 링크. Beta는 WEB_URL_DEV를 로드하므로 dev 도메인만 등록한다. -->
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:oss-front.bjj-oss.kr</string>
+		<string>applinks:dev-oss-front.bjj-oss.kr</string>
 	</array>
 </dict>
 </plist>

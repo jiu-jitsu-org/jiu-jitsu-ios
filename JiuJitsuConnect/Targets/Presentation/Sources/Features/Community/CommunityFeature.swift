@@ -48,7 +48,7 @@ public struct CommunityFeature: Sendable {
         }
 
         var urlString: String {
-            Bundle.main.object(forInfoDictionaryKey: infoPlistKey) as? String ?? ""
+            WebEnvironment.string(forKey: infoPlistKey)
         }
     }
 
@@ -105,6 +105,8 @@ public struct CommunityFeature: Sendable {
         case delegate(DelegateAction)
         // 부모(AppTabFeature)가 세션 변화를 주입해 웹뷰에 전파시키는 통로.
         case session(SessionAction)
+        // 부모(AppTabFeature)가 유니버설 링크를 주입해 게시글 상세로 보내는 통로.
+        case deepLink(DeepLink)
 
         // 게시글 상세 서브뷰 네비게이션.
         case path(StackAction<Path.State, Path.Action>)
@@ -135,6 +137,8 @@ public struct CommunityFeature: Sendable {
             case debugURLApplyTapped
             case debugServerTapped(DebugServer)
             case debugURLAlertDismissed
+            // 입력한 주소를 실제 유니버설 링크와 같은 파서·라우팅에 태워 본다.
+            case debugDeepLinkOpenTapped
         }
 
         public enum InternalAction: Sendable {
@@ -246,6 +250,20 @@ public struct CommunityFeature: Sendable {
             case .view(.debugURLAlertDismissed):
                 state.isDebugURLAlertPresented = false
                 return .none
+
+            case .view(.debugDeepLinkOpenTapped):
+                // AASA 배포 전에도 파싱·라우팅을 확인하기 위한 통로. 콜드 스타트 경로는
+                // 재현하지 못하므로 실기기 링크 탭 검증은 별도로 필요하다.
+                state.isDebugURLAlertPresented = false
+                let raw = state.debugURLInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard
+                    let url = URL(string: raw),
+                    let link = DeepLinkParser.parse(url)
+                else {
+                    Log.trace("테스트 딥링크 파싱 실패: \(raw)", category: .system, level: .error)
+                    return .none
+                }
+                return .send(.deepLink(link))
 
             // MARK: - 브릿지 다이얼로그 결과 (→ 웹 회신)
 
@@ -371,6 +389,11 @@ public struct CommunityFeature: Sendable {
                 Self.broadcastToDetails(.sessionExpired, into: &state)
                 return .none
 
+            // MARK: - DeepLink (부모 주입 → 게시글 상세 진입)
+
+            case let .deepLink(link):
+                return Self.openDeepLink(link, into: &state)
+
             // MARK: - Subview Delegates (상세 서브뷰 → 부모)
 
             // 푸시 스택의 상세에서 올라온 위임.
@@ -487,6 +510,42 @@ public struct CommunityFeature: Sendable {
         return .none
     }
 
+    /// 유니버설 링크로 들어온 게시글 상세를 현재 최상단 컨테이너에 연다.
+    ///
+    /// 모달이 떠 있으면 모달을 닫지 않고 그 내부 스택에 쌓는다. dismiss와 push가 같은 틱에
+    /// 겹치면 전환이 튀기 때문으로, 중첩 OPEN_SUBVIEW를 push로 강등하는 것과 같은 이유다.
+    private static func openDeepLink(_ link: DeepLink, into state: inout State) -> Effect<Action> {
+        let container: SubviewContainer = state.detailCover != nil ? .modal : .push
+        // 같은 글이 이미 최상단이면 무시한다. 링크 재탭이나 중복 전달로 상세가 겹쳐 쌓이는 것을 막는다.
+        guard !isTopDetail(url: link.url, in: state, container: container) else {
+            Log.trace("딥링크 무시(이미 최상단): \(link.url.absoluteString)", category: .view, level: .info)
+            return .none
+        }
+
+        let detail = CommunityDetailFeature.State(url: link.url, accessToken: state.accessToken)
+        switch container {
+        case .push:
+            state.path.append(.detail(detail))
+        case .modal:
+            state.coverPath.append(.detail(detail))
+        }
+        return .none
+    }
+
+    /// 해당 컨테이너의 최상단에 같은 URL의 상세가 이미 떠 있는지 검사한다.
+    private static func isTopDetail(url: URL, in state: State, container: SubviewContainer) -> Bool {
+        switch container {
+        case .push:
+            guard case let .detail(top)? = state.path.last else { return false }
+            return top.url == url
+        case .modal:
+            if case let .detail(top)? = state.coverPath.last {
+                return top.url == url
+            }
+            return state.detailCover?.url == url
+        }
+    }
+
     /// 확인 알럿 표시 요청 처리. 이미 다이얼로그가 떠 있으면 새 요청은 즉시 dismiss로 회신한다
     /// (동시 표시 없이 하나만 — 계약: 큐잉하지 않음).
     private static func presentConfirmDialog(_ payload: ConfirmDialogPayload, into state: inout State) -> Effect<Action> {
@@ -521,7 +580,7 @@ public struct CommunityFeature: Sendable {
     /// Info.plist WEB_URL — 오버라이드가 없을 때 로드되는 기본 도메인.
     /// 테스트용 도메인 변경 다이얼로그가 "기본값"을 그대로 보여주기 위해 View에도 노출한다.
     static var defaultWebURLString: String {
-        Bundle.main.object(forInfoDictionaryKey: "WEB_URL") as? String ?? ""
+        WebEnvironment.webURLString
     }
 
     private static func makeCommunityURL() -> URL? {

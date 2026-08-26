@@ -67,6 +67,9 @@ public struct AppTabFeature: Sendable {
 
         case loginCover(PresentationAction<LoginFeature.Action>)
 
+        // 부모(AppFeature)가 파싱해 넘긴 유니버설 링크.
+        case deepLink(DeepLink)
+
         @CasePathable
         public enum ViewAction: Sendable {
             case onAppear
@@ -184,6 +187,13 @@ public struct AppTabFeature: Sendable {
                         await send(.internal(.handleSessionExpired))
                     }
                 }
+
+            // MARK: - DeepLink
+
+            case let .deepLink(link):
+                // 현재 딥링크 대상은 모두 커뮤니티 영역이라, 다른 탭에 있었다면 홈으로 되돌린 뒤 넘긴다.
+                state.selectedTab = .home
+                return .send(.home(.deepLink(link)))
 
             case .home, .myPage, .settings:
                 return .none

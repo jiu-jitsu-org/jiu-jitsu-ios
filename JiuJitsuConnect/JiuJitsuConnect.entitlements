@@ -8,5 +8,11 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<!-- 유니버설 링크. 이 구성이 바라보는 웹(Secrets.xcconfig WEB_URL_DEV)과 같은 도메인만 등록한다.
+	     빌드가 보지 않는 도메인까지 가로채면 "앱은 열렸는데 글은 안 열리는" 상태가 되기 때문. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:dev-oss-front.bjj-oss.kr</string>
+	</array>
 </dict>
 </plist>
