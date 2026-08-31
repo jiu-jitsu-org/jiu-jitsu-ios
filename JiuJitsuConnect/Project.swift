@@ -63,6 +63,14 @@ let appInfoPlist: [String: Plist.Value] = {
             ],
             [
                 "CFBundleURLSchemes": ["kakao$(KAKAO_NATIVE_APP_KEY)"]
+            ],
+            // 웹 페이지 안의 '앱 열기' 버튼 진입용.
+            // iOS는 같은 도메인 페이지에서 탭한 링크로 유니버설 링크를 발동시키지 않아
+            // 그 버튼은 이 경로로만 앱을 열 수 있다(FE#72 실측).
+            // 구성별로 나누지 않는다 — 번들 id가 Debug·Beta·Release 모두 같아 한 기기에 공존할 수 없다.
+            [
+                "CFBundleURLName": "com.jiujitsulab.connect.deeplink",
+                "CFBundleURLSchemes": ["bjjossapp"]
             ]
         ],
         "KAKAO_NATIVE_APP_KEY": "$(KAKAO_NATIVE_APP_KEY)",
