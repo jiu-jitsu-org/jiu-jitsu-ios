@@ -20,7 +20,7 @@
 | Swift / Xcode | **6.0** / upToNextMajor("26.0") |
 | 기술 스택 | SwiftUI + TCA(ComposableArchitecture) 1.22.2+ |
 | 패키지 관리 | SPM (Tuist `Tuist/Package.swift`) |
-| 빌드 시스템 | **Tuist 4.46.1** (mise로 핀) |
+| 빌드 시스템 | **Tuist** — `mise.toml` 핀은 4.46.1이나 실제 빌드는 homebrew 최신(4.203.3) 필요 (§10.5) |
 | 경고 정책 | Warnings as Errors (Swift / GCC 모두 ON) |
 
 **주요 외부 의존성:** `swift-composable-architecture` 1.22.2+, `firebase-ios-sdk` 12.12.1+,
@@ -505,7 +505,7 @@ private enum Metrics {
 |---|---|---|
 | Xcode | 26.x | Mac App Store / Apple Developer |
 | mise | 최신 | `brew install mise` |
-| Tuist | 4.46.1 | `mise install` (자동) |
+| Tuist | 4.46.1 (핀) / 4.203.3 (실빌드) | `mise install` + `brew install tuist` — **§10.5 참고** |
 | SwiftLint | 최신 | `brew install swiftlint` |
 
 ### 10.2 최초 세팅 순서
@@ -520,6 +520,7 @@ cp <받은 파일> JiuJitsuConnect/Configs/Secrets.xcconfig
 cp <받은 파일> JiuJitsuConnect/Secrets/GoogleService-Info.plist
 
 # 3) 의존성 + 프로젝트 생성
+#    ⚠️ 핀 버전(mise 4.46.1)이 아니라 homebrew tuist로 실행한다 — §10.5
 cd JiuJitsuConnect
 tuist install
 tuist generate
@@ -542,6 +543,31 @@ open JiuJitsuConnect.xcworkspace
 | Asset이 코드에서 인식되지 않음 | `swiftgen` 실행 후 `tuist generate` |
 | Firebase / Kakao / Google 관련 빌드 에러 | `Configs/Secrets.xcconfig` 및 `Secrets/GoogleService-Info.plist` 배치 확인 |
 | Pulse 콘솔이 뜨지 않음 | Debug 빌드인지 확인, 시뮬레이터 흔들기 제스처 |
+| `module map file ... not found` 로 빌드 실패 | homebrew `tuist`로 `tuist install && tuist generate` 재실행 — §10.5 |
+
+### 10.5 Tuist 핀 버전과 빌드 실패 (2026-08-31 확인)
+
+`mise.toml`은 tuist를 **4.46.1로 핀**하고 있지만, **이 버전으로 generate한 프로젝트는 빌드되지 않는다.**
+
+```
+error: module map file '.../Tuist/.build/checkouts/GoogleUtilities/../../tuist-derived/
+GoogleUtilities_Environment/GoogleUtilities_Environment.modulemap' not found
+```
+
+원인은 `Tuist/.build/checkouts/<pkg>`가 `~/.cache/swifterpm/sources/...`로 가는 **심볼릭 링크**라는 점이다.
+생성된 모듈맵 경로의 `../..`가 물리적으로는 프로젝트가 아닌 **SPM 공유 캐시 폴더 안**을 가리켜 파일을 찾지 못한다.
+
+**조치 — homebrew의 최신 `tuist`(4.203.3 이상)로 generate한다.**
+
+```sh
+brew install tuist
+cd JiuJitsuConnect
+tuist install && tuist generate     # mise exec 아님
+```
+
+- `Tuist.swift`가 구형 `Config(...)` API를 쓰고 있지만 4.203.3에서도 정상 파싱된다.
+- 이 조합으로 Debug 시뮬레이터 빌드 성공을 확인했다(이슈 #25).
+- `mise.toml`의 핀을 올릴지는 다른 팀원 환경에서도 재현되는지 확인한 뒤 결정한다. 재현되면 핀을 올리고 이 절을 지운다.
 
 ---
 
