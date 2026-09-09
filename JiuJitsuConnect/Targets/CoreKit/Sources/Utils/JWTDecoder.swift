@@ -26,6 +26,18 @@ public enum JWTDecoder {
         return nil
     }
 
+    /// 토큰이 이미 만료됐는지 판정한다.
+    ///
+    /// WHY: 웹뷰에 만료된 accessToken을 주입하면 웹은 "갱신됐다"고 판단해 같은 토큰으로 재조회하다
+    /// 복구에 실패한다(#26). 주입 전에 만료 여부를 먼저 확인해 갱신을 태우기 위한 판정이다.
+    /// exp를 읽을 수 없으면 `false`를 반환한다 — 모르는 것을 만료로 단정해 멀쩡한 세션을 끊지 않기 위해서다.
+    ///
+    /// - Parameter leeway: 기기·서버 시계 오차와 전달 지연을 감안한 여유. 이 시간 안에 만료될 토큰도 만료로 본다.
+    public static func isExpired(_ token: String, leeway: TimeInterval = 30, now: Date = Date()) -> Bool {
+        guard let exp = expiry(of: token) else { return false }
+        return Date(timeIntervalSince1970: TimeInterval(exp)) <= now.addingTimeInterval(leeway)
+    }
+
     /// JWT는 padding 없는 base64url을 쓰므로, 표준 base64로 정규화한 뒤 디코드한다.
     private static func base64URLDecode(_ value: String) -> Data? {
         var base64 = value

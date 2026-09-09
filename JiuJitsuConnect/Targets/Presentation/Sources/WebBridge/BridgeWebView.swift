@@ -15,6 +15,8 @@ import DesignSystem
 import CoreKit
 
 struct BridgeWebView: UIViewRepresentable {
+    // 이 웹뷰가 리스트인지 상세 서브뷰인지. 브릿지 로그에 찍혀 "어느 웹뷰의 트래픽인지"를 구분한다.
+    let source: WebBridgeSource
     let url: URL
     // 같은 URL로 강제 reload를 트리거하기 위한 토큰.
     let loadToken: UUID
@@ -44,6 +46,7 @@ struct BridgeWebView: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
+            source: source,
             onLoadingStarted: onLoadingStarted,
             onLoadingFinished: onLoadingFinished,
             onLoadingFailed: onLoadingFailed,
@@ -147,6 +150,7 @@ struct BridgeWebView: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, UIScrollViewDelegate {
+        private let source: WebBridgeSource
         private var onLoadingStarted: () -> Void
         private var onLoadingFinished: () -> Void
         private var onLoadingFailed: () -> Void
@@ -172,12 +176,14 @@ struct BridgeWebView: UIViewRepresentable {
         private var locksDocumentScroll = false
 
         init(
+            source: WebBridgeSource,
             onLoadingStarted: @escaping () -> Void,
             onLoadingFinished: @escaping () -> Void,
             onLoadingFailed: @escaping () -> Void,
             onBridgeMessage: @escaping (WebBridgeInboundMessage) -> Void,
             onOutboundDelivered: @escaping (UUID) -> Void
         ) {
+            self.source = source
             self.onLoadingStarted = onLoadingStarted
             self.onLoadingFinished = onLoadingFinished
             self.onLoadingFailed = onLoadingFailed
@@ -270,7 +276,7 @@ struct BridgeWebView: UIViewRepresentable {
                     continue
                 }
                 deliveredOutboundIDs.insert(envelope.id)
-                WebBridge.logOutbound(envelope.message)
+                WebBridge.logOutbound(envelope.message, source: source)
                 webView.evaluateJavaScript(script) { [weak self] _, error in
                     guard let self else { return }
                     if let error {
@@ -288,9 +294,9 @@ struct BridgeWebView: UIViewRepresentable {
         ) {
             guard message.name == WebBridge.appBridgeHandlerName else { return }
             // 해석 결과와 별개로, 웹이 보낸 원본을 먼저 남긴다(파싱 실패·계약 위반도 추적 가능하도록).
-            WebBridge.logInboundRaw(message.body)
+            WebBridge.logInboundRaw(message.body, source: source)
             guard let inbound = WebBridgeInboundMessage.decode(from: message.body) else { return }
-            WebBridge.logInbound(inbound)
+            WebBridge.logInbound(inbound, source: source)
             onBridgeMessage(inbound)
         }
 

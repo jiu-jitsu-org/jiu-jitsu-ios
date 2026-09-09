@@ -165,6 +165,9 @@ public struct CommunityFeature: Sendable {
         /// 부모가 세션 상태 변화를 알려주면 그에 맞는 아웃바운드 메시지를 웹에 주입한다.
         public enum SessionAction: Sendable {
             case loggedIn(accessToken: String)
+            /// AUTH_TOKEN_REFRESH_REQUEST에 대한 갱신 성공 응답. `loggedIn`(수동 동기화)과 달리
+            /// 토큰 값이 같아도 반드시 웹에 회신한다 — 요청한 웹뷰가 응답을 기다리고 있기 때문이다.
+            case tokenRefreshed(accessToken: String)
             case loginCancelled
             case loggedOut
             case sessionExpired
@@ -315,12 +318,7 @@ public struct CommunityFeature: Sendable {
             case let .internal(.bridgeMessageReceived(message)):
                 switch message {
                 case .webViewReady:
-                    // 초기 로그인 상태 동기화: 이미 로그인 상태면 즉시 토큰을 주입하고,
-                    // 게스트면 아무것도 보내지 않는다(웹은 비로그인 상태로 시작).
-                    if let accessToken = state.accessToken {
-                        Self.enqueueLoginSuccess(accessToken: accessToken, into: &state)
-                    }
-                    return .none
+                    return Self.syncSessionOnReady(into: &state)
 
                 case let .authLoginPrompt(reason):
                     return .send(.delegate(.loginPromptRequested(reason: reason)))
@@ -333,6 +331,7 @@ public struct CommunityFeature: Sendable {
 
                 case .authTokenRefresh:
                     // 웹뷰 토큰 만료 → 네이티브가 refresh를 소유하므로 부모에 갱신을 위임한다.
+                    // 응답은 부모가 `.session(.tokenRefreshed)` 또는 `.session(.sessionExpired)`로 되돌려준다.
                     return .send(.delegate(.tokenRefreshRequested))
 
                 case let .openSubview(payload):
@@ -371,6 +370,15 @@ public struct CommunityFeature: Sendable {
                 state.accessToken = accessToken
                 Self.enqueueLoginSuccess(accessToken: accessToken, into: &state)
                 Self.broadcastToDetails(.loggedIn(accessToken: accessToken), into: &state)
+                return .none
+
+            case let .session(.tokenRefreshed(accessToken)):
+                // 갱신 응답은 요청한 웹뷰가 기다리고 있으므로 값이 같아도 반드시 회신한다.
+                // (`loggedIn`의 중복 제거를 타면 응답이 사라져 웹이 타임아웃까지 복구 화면에 머문다)
+                state.accessToken = accessToken
+                WebBridge.logEvent("토큰 갱신 완료 → AUTH_LOGIN_SUCCESS(갱신 후 토큰) 회신", source: .list)
+                Self.enqueueLoginSuccess(accessToken: accessToken, into: &state)
+                Self.broadcastToDetails(.tokenRefreshed(accessToken: accessToken), into: &state)
                 return .none
 
             case .session(.loginCancelled):
@@ -575,6 +583,23 @@ public struct CommunityFeature: Sendable {
     /// AUTH_LOGIN_SUCCESS를 큐에 넣는다.
     private static func enqueueLoginSuccess(accessToken: String, into state: inout State) {
         enqueue(.authLoginSuccess(accessToken: accessToken), into: &state)
+    }
+
+    /// WEBVIEW_READY 핸드셰이크에서 초기 로그인 상태를 동기화한다.
+    ///
+    /// 만료된 토큰은 절대 주입하지 않는다. 웹은 이 재주입과 AUTH_TOKEN_REFRESH_REQUEST의 응답을
+    /// 같은 메시지(AUTH_LOGIN_SUCCESS)로 받아 구분할 수 없어, 만료 토큰을 주입하면 "갱신됐다"고
+    /// 판단하고 같은 토큰으로 재조회하다 403(A0003)으로 복구에 실패한다. (#26)
+    /// 만료 상태면 주입 대신 네이티브 갱신을 먼저 태우고, 그 결과를 AUTH_LOGIN_SUCCESS(새 토큰)
+    /// 또는 AUTH_SESSION_EXPIRED로 회신한다. 게스트면 아무것도 보내지 않는다(웹은 비로그인으로 시작).
+    private static func syncSessionOnReady(into state: inout State) -> Effect<Action> {
+        guard let accessToken = state.accessToken else { return .none }
+        guard !JWTDecoder.isExpired(accessToken) else {
+            WebBridge.logEvent("WEBVIEW_READY: accessToken 만료 → 재주입 보류, 네이티브 갱신 요청", source: .list)
+            return .send(.delegate(.tokenRefreshRequested))
+        }
+        enqueueLoginSuccess(accessToken: accessToken, into: &state)
+        return .none
     }
 
     /// Info.plist WEB_URL — 오버라이드가 없을 때 로드되는 기본 도메인.

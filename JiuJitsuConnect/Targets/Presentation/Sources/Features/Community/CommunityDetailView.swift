@@ -46,6 +46,7 @@ public struct CommunityDetailView: View {
     private var webViewLayer: some View {
         ZStack {
             BridgeWebView(
+                source: .detail(store.url),
                 url: store.url,
                 loadToken: store.loadToken,
                 accessToken: store.accessToken,

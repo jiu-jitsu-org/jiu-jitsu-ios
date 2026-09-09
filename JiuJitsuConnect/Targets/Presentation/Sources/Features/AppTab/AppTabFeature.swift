@@ -44,6 +44,9 @@ public struct AppTabFeature: Sendable {
         var pendingCommunityLogin: Bool = false
         // 세션 이벤트 구독을 onAppear 중복 호출에도 한 번만 시작하기 위한 가드.
         var didStartSessionObserver: Bool = false
+        // 웹뷰 위임 토큰 갱신이 진행 중인지. 리스트·상세 여러 웹뷰가 동시에 만료를 감지해도
+        // 갱신은 한 번만 태우고 결과를 모두에게 전파한다. (refreshToken은 서버에서 1회용으로 회전)
+        var isRefreshingWebToken: Bool = false
 
         var authInfo: AuthInfo
 
@@ -178,6 +181,9 @@ public struct AppTabFeature: Sendable {
 
             case .home(.delegate(.tokenRefreshRequested)):
                 // 하이브리드 토큰 소유권은 네이티브 — 웹뷰 만료 시 네이티브 refresh로 갱신해 웹에 돌려준다.
+                // 갱신 결과는 열려 있는 모든 웹뷰에 전파되므로, 진행 중이면 그 응답을 함께 기다리면 된다.
+                guard !state.isRefreshingWebToken else { return .none }
+                state.isRefreshingWebToken = true
                 return .run { send in
                     do {
                         let accessToken = try await authClient.refreshSession()
@@ -234,9 +240,13 @@ public struct AppTabFeature: Sendable {
                 }
 
             case let .internal(.tokenRefreshSucceeded(accessToken)):
-                return .send(.home(.session(.loggedIn(accessToken: accessToken))))
+                state.isRefreshingWebToken = false
+                // 갱신 "응답"이므로 `.loggedIn`(중복 제거되는 수동 동기화)이 아니라 `.tokenRefreshed`로 내린다.
+                // 다른 요청이 이미 갱신을 마쳐 토큰 값이 그대로여도, 요청한 웹뷰는 응답을 받아야 한다.
+                return .send(.home(.session(.tokenRefreshed(accessToken: accessToken))))
 
             case .internal(.handleSessionExpired):
+                state.isRefreshingWebToken = false
                 // refresh 토큰까지 만료 — 로컬 토큰만 정리하고 게스트로 전환한다(서버 세션은 이미 죽음).
                 state.authInfo = .guest
                 state.myPage = MyProfileFeature.State(authInfo: .guest)

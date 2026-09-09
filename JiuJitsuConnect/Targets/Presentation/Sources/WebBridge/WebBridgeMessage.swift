@@ -15,6 +15,26 @@
 import Foundation
 import CoreKit
 
+// MARK: - Bridge Source (로그 식별)
+
+/// 브릿지 트래픽이 어느 웹뷰의 것인지 구분하는 출처 라벨.
+/// 리스트·상세(서브뷰)가 각자 WKWebView를 갖고 같은 메시지를 주고받아, 로그만 보면
+/// "어느 웹뷰가 갱신을 요청했고 어느 웹뷰로 응답이 갔는지"를 알 수 없었다(#26). 그 추적용이다.
+enum WebBridgeSource: Equatable, Sendable {
+    case list
+    case detail(URL)
+
+    var label: String {
+        switch self {
+        case .list:
+            return "list"
+        case let .detail(url):
+            // 토큰·쿼리가 섞이지 않도록 경로만 남긴다.
+            return "detail\(url.path)"
+        }
+    }
+}
+
 // MARK: - Bridge Naming / Schema
 
 enum WebBridge {
@@ -32,13 +52,18 @@ enum WebBridge {
 
     /// 웹 → 네이티브 수신 원본(raw)을 파싱 전에 구조 그대로 기록한다.
     /// `type` 누락·payload 형태 불일치 같은 계약 위반도 로그에 남도록, 해석된 요약(`logInbound`)과 별개로 호출한다.
-    static func logInboundRaw(_ body: Any) {
-        Log.trace("⬇︎ IN  [raw] \(describeBody(body))", category: logCategory(), level: .info)
+    static func logInboundRaw(_ body: Any, source: WebBridgeSource) {
+        Log.trace("⬇︎ IN  [\(source.label)] [raw] \(describeBody(body))", category: logCategory(), level: .info)
     }
 
     /// 웹 → 네이티브 수신 메시지(해석 결과)를 한 줄로 기록한다.
-    static func logInbound(_ message: WebBridgeInboundMessage) {
-        Log.trace("⬇︎ IN  \(message.logSummary)", category: logCategory(), level: .info)
+    static func logInbound(_ message: WebBridgeInboundMessage, source: WebBridgeSource) {
+        Log.trace("⬇︎ IN  [\(source.label)] \(message.logSummary)", category: logCategory(), level: .info)
+    }
+
+    /// 메시지 송수신이 아닌 브릿지 처리 판단(만료 토큰 주입 보류 등)을 같은 카테고리에 남긴다.
+    static func logEvent(_ message: String, source: WebBridgeSource) {
+        Log.trace("··  [\(source.label)] \(message)", category: logCategory(), level: .info)
     }
 
     /// raw body를 사람이 읽기 좋은 형태로 기술한다.
@@ -78,8 +103,8 @@ enum WebBridge {
     }
 
     /// 네이티브 → 웹 전송 메시지를 한 줄로 기록한다.
-    static func logOutbound(_ message: WebBridgeOutboundMessage) {
-        Log.trace("⬆︎ OUT \(message.logSummary)", category: logCategory(), level: .info)
+    static func logOutbound(_ message: WebBridgeOutboundMessage, source: WebBridgeSource) {
+        Log.trace("⬆︎ OUT [\(source.label)] \(message.logSummary)", category: logCategory(), level: .info)
     }
 
     /// 로그에 토큰 원문을 남기지 않도록 마스킹한다(앞 8자 + 길이만 노출).

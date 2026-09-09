@@ -29,6 +29,7 @@ public struct CommunityView: View {
             ZStack {
                 if let url = store.url {
                     BridgeWebView(
+                        source: .list,
                         url: url,
                         loadToken: store.loadToken,
                         accessToken: store.accessToken,
