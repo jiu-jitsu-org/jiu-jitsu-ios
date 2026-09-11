@@ -60,6 +60,8 @@ public struct SelectSheetView: View {
     @State private var selectedValue: String?
     @State private var customText: String = ""
     @FocusState private var isCustomTextFocused: Bool
+    /// 콘텐츠 실제 높이. 시트가 이 값보다 커지지 않게 막아, 공간이 충분하면 스크롤 없이 콘텐츠 크기로 붙는다.
+    @State private var contentHeight: CGFloat?
 
     public init(
         configuration: SelectSheetConfiguration,
@@ -83,6 +85,19 @@ public struct SelectSheetView: View {
     }
 
     public var body: some View {
+        // 키보드가 올라오면 시트에 남는 세로 공간이 콘텐츠(목록 + 5줄 입력창 + CTA)보다 작아진다.
+        // 그대로 두면 VStack이 유일하게 가변인 입력창을 눌러 확장이 멈추므로, 부족할 때만 내부 스크롤로 넘긴다.
+        ScrollView {
+            sheetBody
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+        }
+        .frame(maxHeight: contentHeight ?? .infinity)
+        .scrollBounceBehavior(.basedOnSize)
+        // 넘칠 때는 입력창·CTA가 있는 아래쪽을 붙잡고 위(핸들·제목)가 밀려 올라가게 한다.
+        .defaultScrollAnchor(.bottom)
+    }
+
+    private var sheetBody: some View {
         VStack(alignment: .leading, spacing: 0) {
             handle
                 .frame(maxWidth: .infinity)
@@ -168,7 +183,9 @@ public struct SelectSheetView: View {
             .focused($isCustomTextFocused)
             .font(.pretendard.bodyS)
             .foregroundStyle(Color.component.textfieldMultiline.focused.text)
-            .lineLimit(5, reservesSpace: true)
+            // 정책: 2줄 높이로 시작해 입력에 따라 5줄까지 늘어나고, 그 이상은 높이를 고정한 채 내부 스크롤.
+            // `reservesSpace: true`는 빈 상태에서도 5줄을 예약해 시트가 열리자마자 최대 높이가 되므로 쓰지 않는다.
+            .lineLimit(2...5)
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(Color.component.textfieldMultiline.filled.bg)

@@ -61,6 +61,9 @@ private struct WebBridgeDialogModifier: ViewModifier {
                     }
                     .background(Color.component.bottomSheet.selected.container.background)
                     .clipShape(.rect(topLeadingRadius: 24, topTrailingRadius: 24))
+                    // 키보드로 시트가 길어져도 상단 safe area(상태바) 아래에서 멈추게 한다.
+                    // 없으면 시트가 화면 끝까지 올라가 제목이 시계·다이내믹 아일랜드와 겹친다.
+                    .padding(.top, geometry.safeAreaInsets.top)
                     .transition(.move(edge: .bottom))
                 }
             }
