@@ -163,6 +163,13 @@ public struct SelectSheetView: View {
             .padding(.horizontal, 8)
             .frame(height: 40)
             .contentShape(Rectangle())
+            // PlainButtonStyle은 눌림 해제를 자기 animation transaction으로 커밋하는데, 그 transaction이
+            // label subtree까지 흐른다. "기타" 선택으로 입력창이 끼어들어 시트 레이아웃이 바뀌면 다른 행은
+            // 즉시 점프하지만 방금 탭한 행의 라디오·글자만 옛 위치에서 새 위치로 흘러가 "글자가 움직이는"
+            // 잔상이 생긴다(#19). label 안에서 animation을 끊어 눌림 페이드만 남기고 위치는 즉시 확정한다.
+            .transaction { transaction in
+                transaction.animation = nil
+            }
         }
         .buttonStyle(.plain)
     }
