@@ -22,6 +22,8 @@ public struct AppView: View {
         EmptyView()
       }
     }
+    // 푸시 탭 릴레이 구독 시작. 유니버설 링크 수신과 같은 이유로 분기 바깥(Group)에 붙인다.
+    .onAppear { store.send(.view(.onAppear)) }
     // 유니버설 링크(공유 링크) 수신 창구. 화면 전환과 무관하게 항상 살아 있어야 해
     // 분기 바깥(Group)에 붙인다.
     .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in

@@ -32,6 +32,8 @@ public final class DependencyContainer {
     private let sharedTokenStorage: TokenStorage = DefaultTokenStorage()
     /// 401 인터셉터의 토큰 갱신/세션 만료를 Presentation(웹뷰 동기화·로그아웃)으로 전달하는 채널.
     private let authSessionEventBroadcaster = AuthSessionEventBroadcaster()
+    /// AppDelegate가 받은 푸시 탭을 Presentation(딥링크 라우팅)으로 전달하는 채널.
+    private let pushNotificationTapRelay = PushNotificationTapRelay()
     private lazy var sharedNetworkService: NetworkService = DefaultNetworkService(
         tokenStorage: sharedTokenStorage,
         sessionEventBroadcaster: authSessionEventBroadcaster
@@ -98,6 +100,18 @@ public final class DependencyContainer {
         AuthSessionEventClient(events: { [authSessionEventBroadcaster] in
             authSessionEventBroadcaster.events()
         })
+    }
+
+    /// 푸시 탭 payload를 TCA가 구독하기 위한 클라이언트.
+    public func configurePushNotificationClient() -> PushNotificationClient {
+        PushNotificationClient(taps: { [pushNotificationTapRelay] in
+            pushNotificationTapRelay.taps()
+        })
+    }
+
+    /// AppDelegate가 푸시 탭 payload를 흘려보내는 발신 창구.
+    public func deliverPushNotificationTap(_ payload: PushActionPayload) {
+        pushNotificationTapRelay.send(payload)
     }
 
     public func configureUserClient() -> UserClient {
