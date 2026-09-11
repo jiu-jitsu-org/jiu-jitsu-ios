@@ -59,7 +59,8 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         completionHandler([.banner, .sound, .badge])
     }
 
-    /// 알림을 탭했을 때 payload를 기반으로 처리합니다.
+    /// 알림을 탭했을 때 payload(`type`·`data`)를 릴레이에 넘긴다. 해석·화면 이동은 AppFeature가 한다.
+    /// 콜드 스타트에서는 스토어 구독보다 먼저 호출될 수 있는데, 릴레이가 보관했다가 전달한다.
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
@@ -67,6 +68,7 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     ) {
         let userInfo = response.notification.request.content.userInfo
         Log.trace("[Push] 알림 탭 수신: \(userInfo)", category: .system, level: .info)
+        DependencyContainer.shared.deliverPushNotificationTap(PushActionPayload(userInfo: userInfo))
         completionHandler()
     }
 }

@@ -105,7 +105,7 @@ public struct CommunityFeature: Sendable {
         case delegate(DelegateAction)
         // 부모(AppTabFeature)가 세션 변화를 주입해 웹뷰에 전파시키는 통로.
         case session(SessionAction)
-        // 부모(AppTabFeature)가 유니버설 링크를 주입해 게시글 상세로 보내는 통로.
+        // 부모(AppTabFeature)가 딥링크(공유 링크·푸시 탭)를 주입해 상세로 보내는 통로.
         case deepLink(DeepLink)
 
         // 게시글 상세 서브뷰 네비게이션.
@@ -198,7 +198,8 @@ public struct CommunityFeature: Sendable {
                 state.selectedTab = tab
                 return .none
 
-            // FIXME: 알림 화면 진입 (네이티브 알림 센터 도입 시 구현)
+            // FIXME: 알림 화면 진입 (네이티브 알림함 도입 시 구현 — 항목 탭은 `NoticeListResponse.actionType`·`data`를
+            // `PushActionRouter.makeURL`로 바꿔 AppFeature `.deepLinkReceived`에 넣는다. #28)
             case .view(.notificationTapped):
                 return .none
 
@@ -518,7 +519,8 @@ public struct CommunityFeature: Sendable {
         return .none
     }
 
-    /// 유니버설 링크로 들어온 게시글 상세를 현재 최상단 컨테이너에 연다.
+    /// 딥링크로 들어온 상세(게시글·밸런스 게임)를 현재 최상단 컨테이너에 연다.
+    /// 어느 상세든 URL을 그대로 로드하는 같은 웹뷰라 `DeepLink` 케이스를 구분하지 않는다.
     ///
     /// 모달이 떠 있으면 모달을 닫지 않고 그 내부 스택에 쌓는다. dismiss와 push가 같은 틱에
     /// 겹치면 전환이 튀기 때문으로, 중첩 OPEN_SUBVIEW를 push로 강등하는 것과 같은 이유다.

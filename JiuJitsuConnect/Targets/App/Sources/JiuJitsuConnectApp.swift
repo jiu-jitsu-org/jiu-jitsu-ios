@@ -56,6 +56,7 @@ struct JiuJitsuConnectApp: App {
                     $0.imageClient = DependencyContainer.shared.configureImageClient()
                     $0.authSessionEventClient = DependencyContainer.shared.configureAuthSessionEventClient()
                     $0.noticeClient = DependencyContainer.shared.configureNoticeClient()
+                    $0.pushNotificationClient = DependencyContainer.shared.configurePushNotificationClient()
                 }
             )
         } else {

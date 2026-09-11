@@ -10,6 +10,7 @@
 //  발동시키지 않아, 웹 페이지 안의 '앱 열기' 버튼(FE#72)은 그 경로로 앱을 열 수 없다(#25 실측).
 //  그래서 커스텀 스킴을 보조 전송 수단으로 둔다. 목적지는 여전히 같은 https URL이므로
 //  검증도 그 URL에 그대로 적용해 두 경로가 한 벌의 규칙만 공유하게 한다.
+//  푸시·알림함 탭(#28)도 payload를 같은 https URL로 바꿔 이 관문을 통과시킨다(PushActionRouter).
 //
 
 import CoreKit
@@ -20,10 +21,12 @@ public enum DeepLink: Equatable, Sendable {
     /// 게시글 상세(`/community/{id}`).
     /// `url`은 쿼리까지 포함한 원본 링크 그대로 — 상세 웹뷰가 그대로 로드해 웹이 해석한다.
     case communityPost(url: URL, postId: String)
+    /// 밸런스 게임 상세(`/community/balance/{contentId}`). `url` 취급은 `communityPost`와 같다.
+    case balanceGame(url: URL, contentId: String)
 
     public var url: URL {
         switch self {
-        case let .communityPost(url, _):
+        case let .communityPost(url, _), let .balanceGame(url, _):
             return url
         }
     }
@@ -31,7 +34,10 @@ public enum DeepLink: Equatable, Sendable {
 
 enum DeepLinkParser {
     /// 게시글 상세 경로의 첫 세그먼트. 웹 라우트 `src/app/community/[id]`와 1:1로 대응한다.
-    private static let communitySegment = "community"
+    static let communitySegment = "community"
+
+    /// 밸런스 게임 상세 경로의 둘째 세그먼트. 웹 라우트 `src/app/community/balance/[contentId]`와 대응한다.
+    static let balanceSegment = "balance"
 
     /// 웹 페이지 안의 '앱 열기' 버튼용 커스텀 스킴.
     /// Info.plist `CFBundleURLTypes`(Project.swift)·웹(FE#72)에 등록된 값과 반드시 같아야 한다.
@@ -99,21 +105,34 @@ enum DeepLinkParser {
 
         // pathComponents는 선행 "/"를 원소로 포함하므로 걸러낸 뒤 세그먼트 수를 본다.
         let segments = url.pathComponents.filter { $0 != "/" }
-        guard
-            segments.count == 2,
-            segments[0] == communitySegment
-        else {
+        guard segments.first == communitySegment else {
             Log.trace("딥링크 무시(지원하지 않는 경로): \(url.absoluteString)", category: .system, level: .info)
             return nil
         }
 
-        // 글쓰기(`/community/write`) 같은 비-상세 라우트를 걸러내기 위해 id는 숫자만 허용한다.
-        let postId = segments[1]
-        guard !postId.isEmpty, postId.allSatisfy(\.isNumber) else {
-            Log.trace("딥링크 무시(게시글 id 형식 아님): \(url.absoluteString)", category: .system, level: .info)
+        switch segments.count {
+        case 2:
+            // `/community/{id}`
+            guard let postId = contentId(from: segments[1], url: url) else { return nil }
+            return .communityPost(url: url, postId: postId)
+
+        case 3 where segments[1] == balanceSegment:
+            // `/community/balance/{contentId}`
+            guard let contentId = contentId(from: segments[2], url: url) else { return nil }
+            return .balanceGame(url: url, contentId: contentId)
+
+        default:
+            Log.trace("딥링크 무시(지원하지 않는 경로): \(url.absoluteString)", category: .system, level: .info)
             return nil
         }
+    }
 
-        return .communityPost(url: url, postId: postId)
+    /// 글쓰기(`/community/write`) 같은 비-상세 라우트를 걸러내기 위해 id는 숫자만 허용한다.
+    private static func contentId(from segment: String, url: URL) -> String? {
+        guard !segment.isEmpty, segment.allSatisfy(\.isNumber) else {
+            Log.trace("딥링크 무시(콘텐츠 id 형식 아님): \(url.absoluteString)", category: .system, level: .info)
+            return nil
+        }
+        return segment
     }
 }
