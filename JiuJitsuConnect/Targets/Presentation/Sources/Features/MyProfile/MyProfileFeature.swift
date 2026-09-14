@@ -338,6 +338,8 @@ public struct MyProfileFeature: Sendable {
 
             case .destination(.presented(.academySetting(.delegate(.deleteAcademy)))):
                 // 도장 정보 삭제 요청 받음 → 빈 문자열로 저장하여 도장 정보 제거
+                // (nil 이면 요청 JSON 에서 키가 빠져 BE 가 기존 값을 유지하므로 "" 를 보낸다.
+                //  응답의 "" 는 DTO.toDomain() 에서 nil 로 정규화됨)
                 return .send(.internal(.updateProfileSection(.academy, "")))
 
             case .destination(.presented(.academySetting(.delegate(.cancel)))):
@@ -686,6 +688,9 @@ public struct MyProfileFeature: Sendable {
                 } else if previousProfile?.academyName == nil && updatedProfile.academyName != nil {
                     // 도장 정보 추가
                     message = "도장 정보 입력을 완료했어요"
+                } else if previousProfile?.academyName != nil && updatedProfile.academyName == nil {
+                    // 도장 정보 삭제
+                    message = "도장 정보를 삭제했어요"
                 } else if previousProfile?.beltRank != updatedProfile.beltRank ||
                          previousProfile?.beltStripe != updatedProfile.beltStripe {
                     // 벨트 정보 수정
