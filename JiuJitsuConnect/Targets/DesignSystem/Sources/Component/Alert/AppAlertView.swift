@@ -23,10 +23,9 @@ public struct AppAlertView: View {
                 }
             
             VStack(alignment: .leading, spacing: 8) {
-                Text(configuration.title)
+                titleView
                     .font(.pretendard.title2)
                     .foregroundColor(Color.component.dialog.titleText)
-                    .lineLimit(2)
                 
                 Text(configuration.message)
                     .font(.pretendard.bodyM)
@@ -72,12 +71,32 @@ public struct AppAlertView: View {
             }
         }
     }
+
+    @ViewBuilder
+    private var titleView: some View {
+        switch configuration.title {
+        case let .plain(title):
+            Text(title)
+                .lineLimit(2)
+        case let .truncatable(truncatable, suffix):
+            // 접미사를 fixedSize로 먼저 확보하고 남는 폭에서 앞부분만 tail 말줄임한다.
+            // 한 Text로 합치면 말줄임이 접미사까지 먹어 "긴닉네임…" 처럼 접미사가 사라진다.
+            HStack(spacing: 0) {
+                Text(truncatable)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text(suffix)
+                    .fixedSize()
+            }
+        }
+    }
 }
 
 // MARK: - Preview
 struct AppAlertPreview: View {
     @State private var showAlertWithOneButton = false
     @State private var showAlertWithTwoButtons = false
+    @State private var showAlertWithTruncatableTitle = false
     
     var body: some View {
         VStack(spacing: 20) {
@@ -87,6 +106,10 @@ struct AppAlertPreview: View {
             
             Button("Show Alert (2 Buttons)") {
                 showAlertWithTwoButtons = true
+            }
+            
+            Button("Show Alert (Truncatable Title)") {
+                showAlertWithTruncatableTitle = true
             }
         }
         .appAlert(
@@ -102,6 +125,15 @@ struct AppAlertPreview: View {
                 title: "회원 탈퇴",
                 message: "정말 탈퇴 하시겠어요?\n모든 정보가 삭제되며 복구할 수 없습니다.",
                 primaryButton: .init(title: "탈퇴", action: { }),
+                secondaryButton: .init(title: "취소", action: { })
+            )
+        )
+        .appAlert(
+            isPresented: $showAlertWithTruncatableTitle,
+            configuration: .init(
+                title: .truncatable("아주아주아주아주아주아주아주긴닉네임입니다", suffix: "님 차단"),
+                message: "차단하면 이 사용자의 게시글과 댓글이 보이지 않아요.",
+                primaryButton: .init(title: "차단", style: .destructive, action: { }),
                 secondaryButton: .init(title: "취소", action: { })
             )
         )

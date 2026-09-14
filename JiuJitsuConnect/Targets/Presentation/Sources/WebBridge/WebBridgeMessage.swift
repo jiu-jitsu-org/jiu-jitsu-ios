@@ -276,10 +276,20 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
                 Log.trace("SHOW_CONFIRM_DIALOG payload 필수 필드 누락", category: .network, level: .error)
                 return nil
             }
+            // titleParts는 두 조각이 모두 있어야 의미가 있다. 하나라도 빠지면 title 폴백으로 그린다.
+            let titleParts: ConfirmDialogPayload.TitleParts? = {
+                guard
+                    let parts = payload?["titleParts"] as? [String: Any],
+                    let truncatable = parts["truncatable"] as? String,
+                    let suffix = parts["suffix"] as? String
+                else { return nil }
+                return .init(truncatable: truncatable, suffix: suffix)
+            }()
             return .showConfirmDialog(
                 ConfirmDialogPayload(
                     requestId: requestId,
                     title: title,
+                    titleParts: titleParts,
                     message: payload?["message"] as? String,
                     confirmText: confirmText,
                     cancelText: payload?["cancelText"] as? String,
@@ -368,9 +378,24 @@ public struct OpenSubviewPayload: Equatable, Sendable {
 /// `SHOW_CONFIRM_DIALOG` 페이로드 — 네이티브가 그릴 확인 알럿. 문구·라벨은 전부 웹이 채운다.
 /// `WebBridgeInboundMessage`(public)의 연관값으로 노출되므로 public이다.
 public struct ConfirmDialogPayload: Equatable, Sendable {
+    /// 제목을 "말줄임 가능한 앞부분 + 항상 온전히 보여야 하는 접미사"로 나눈 것.
+    /// (예: 닉네임 + "님 차단") 말줄임 폭은 렌더링 시점에만 알 수 있어 알럿을 소유한 네이티브가 처리한다.
+    public struct TitleParts: Equatable, Sendable {
+        public let truncatable: String
+        public let suffix: String
+
+        public init(truncatable: String, suffix: String) {
+            self.truncatable = truncatable
+            self.suffix = suffix
+        }
+    }
+
     /// 웹이 발급하는 요청 식별자 — 결과 회신을 이 값으로 매칭한다.
     public let requestId: String
+    /// 완성 제목. `titleParts`가 있으면 그쪽이 우선이고, 이 값은 구버전 웹 호환용 폴백이다.
     public let title: String
+    /// 있으면 제목을 1줄 고정으로 그리고 `truncatable`만 말줄임한다. 없으면 `title`을 그대로 쓴다.
+    public let titleParts: TitleParts?
     public let message: String?
     public let confirmText: String
     /// 미지정 시 네이티브가 "취소"를 쓴다.
@@ -383,6 +408,7 @@ public struct ConfirmDialogPayload: Equatable, Sendable {
     public init(
         requestId: String,
         title: String,
+        titleParts: TitleParts? = nil,
         message: String?,
         confirmText: String,
         cancelText: String?,
@@ -391,6 +417,7 @@ public struct ConfirmDialogPayload: Equatable, Sendable {
     ) {
         self.requestId = requestId
         self.title = title
+        self.titleParts = titleParts
         self.message = message
         self.confirmText = confirmText
         self.cancelText = cancelText
