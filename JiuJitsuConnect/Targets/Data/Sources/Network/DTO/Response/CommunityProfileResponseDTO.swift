@@ -40,7 +40,8 @@ struct CommunityProfileResponseDTO: Codable {
             beltStripe: beltStripe.flatMap { BeltStripe(rawValue: $0) },
             gender: gender.flatMap { Gender(rawValue: $0) },
             weightKg: weightKg,
-            academyName: academyName,
+            // 도장 삭제 시 BE가 "" 로 회신 → nil 정규화 (UI는 nil 여부로 "입력하기" 버튼 분기)
+            academyName: academyName.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 },
             competitions: competitions?.map { $0.toDomain() } ?? [],
             bestSubmission: bestSubmission.flatMap { SubmissionType(rawValue: $0) },
             favoriteSubmission: favoriteSubmission.flatMap { SubmissionType(rawValue: $0) },
