@@ -10,7 +10,6 @@ private enum Style {
 public struct NicknameSettingView: View {
 
     @Bindable var store: StoreOf<NicknameSettingFeature>
-    @FocusState private var isKeyboardVisible: Bool
 
     public init(store: StoreOf<NicknameSettingFeature>) {
         self.store = store
@@ -33,7 +32,6 @@ public struct NicknameSettingView: View {
         .onTapGesture {
             store.send(.view(.viewTapped))
         }
-        .bind($store.isKeyboardVisible, to: $isKeyboardVisible)
         .alert($store.scope(state: \.alert, action: \.alert))
         .navigationBarBackButtonHidden(true)
         .navigationBarHidden(true)
@@ -107,20 +105,20 @@ private extension NicknameSettingView {
                     .allowsHitTesting(false)
             }
             
-            // 표시와 입력을 하나의 세로 축 TextField가 담당합니다.
+            // 표시와 입력을 하나의 줄바꿈 필드가 담당합니다.
             // 표시용 Text(줄바꿈)와 입력용 단일 라인 TextField(가로 스크롤)를 겹치면
             // 2줄 이상일 때 caret이 실제 텍스트 끝이 아닌 오른쪽 가운데에 고정되므로 분리하지 않습니다.
-            TextField("", text: $store.nickname, axis: .vertical)
-                .font(Font.pretendard.display1)
-                .focused($isKeyboardVisible)
-                .multilineTextAlignment(.center)
-                // 세로 축 TextField는 Return 키가 줄바꿈을 삽입하므로 onSubmit으로 가로채
-                // 닉네임에 개행이 들어가지 않게 합니다. (기존 단일 라인과 동일하게 Return은 동작 없음)
-                .onSubmit {}
-                .foregroundStyle(store.validationState.textColor)
+            // Return은 개행 없이 확인 버튼과 동일하게 처리합니다.
+            MultilineTextField(
+                text: $store.nickname,
+                isFocused: $store.isKeyboardVisible,
+                font: UIFont.pretendard.display1,
+                textColor: store.validationState.textColor,
                 // 정책 1: 초기 상태에서는 네이티브 커서를 숨깁니다.
                 // 정책 2: 입력 시작 후에는 네이티브 커서를 보여줍니다.
-                .tint(store.isTextFieldActive ? Color.component.textfieldDisplay.focus.text : .clear)
+                tintColor: store.isTextFieldActive ? Color.component.textfieldDisplay.focus.text : .clear,
+                onSubmit: { store.send(.view(.doneButtonTapped)) }
+            )
         }
         .padding(.horizontal, 30)
     }
