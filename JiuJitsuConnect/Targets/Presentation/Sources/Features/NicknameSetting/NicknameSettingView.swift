@@ -94,41 +94,33 @@ private extension NicknameSettingView {
     
     var textFieldSection: some View {
         ZStack {
-            // MARK: - 보여주기용 뷰 (Display View)
-            
             // 정책 1: 초기 상태에서 플레이스홀더를 보여줍니다.
             if !store.isTextFieldActive {
                 Text("닉네임을 입력해주세요")
                     .font(Font.pretendard.display1)
                     .foregroundStyle(Color.gray.opacity(0.5))
                     .allowsHitTesting(false)
-            } else {
-                // 정책 2 & 3: 사용자가 입력을 시작한 후
-                // 실제 텍스트를 보여주거나,
-                // 텍스트가 비어있으면 커스텀 커서를 보여줍니다.
-                Text(store.nickname)
-                    .font(Font.pretendard.display1)
-                    .foregroundStyle(store.validationState.textColor)
-                
-                // 정책 3: 입력 필드가 비어있고, 사용자가 입력을 시작한 상태라면
-                // 키보드 상태와 관계없이 커스텀 커서를 보여줍니다.
-                if store.nickname.isEmpty {
-                    BlinkingCursorView()
-                        .allowsHitTesting(false)
-                }
+            } else if store.nickname.isEmpty {
+                // 정책 3: 입력을 시작했지만 비어있으면 키보드 상태와 관계없이 커스텀 커서를 보여줍니다.
+                // (가운데 정렬 TextField는 빈 상태에서 네이티브 커서가 보이지 않음)
+                BlinkingCursorView()
+                    .allowsHitTesting(false)
             }
             
-            // MARK: - 입력용 뷰 (Input View)
-            // 실제 키보드 입력을 처리하는 보이지 않는 TextField입니다.
-            TextField("", text: $store.nickname)
+            // 표시와 입력을 하나의 세로 축 TextField가 담당합니다.
+            // 표시용 Text(줄바꿈)와 입력용 단일 라인 TextField(가로 스크롤)를 겹치면
+            // 2줄 이상일 때 caret이 실제 텍스트 끝이 아닌 오른쪽 가운데에 고정되므로 분리하지 않습니다.
+            TextField("", text: $store.nickname, axis: .vertical)
                 .font(Font.pretendard.display1)
                 .focused($isKeyboardVisible)
                 .multilineTextAlignment(.center)
+                // 세로 축 TextField는 Return 키가 줄바꿈을 삽입하므로 onSubmit으로 가로채
+                // 닉네임에 개행이 들어가지 않게 합니다. (기존 단일 라인과 동일하게 Return은 동작 없음)
+                .onSubmit {}
+                .foregroundStyle(store.validationState.textColor)
                 // 정책 1: 초기 상태에서는 네이티브 커서를 숨깁니다.
                 // 정책 2: 입력 시작 후에는 네이티브 커서를 보여줍니다.
                 .tint(store.isTextFieldActive ? Color.component.textfieldDisplay.focus.text : .clear)
-                // 입력 처리를 위해 항상 투명하게 유지합니다.
-                .foregroundStyle(.clear)
         }
         .padding(.horizontal, 30)
     }
