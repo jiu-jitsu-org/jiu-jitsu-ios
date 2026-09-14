@@ -4,7 +4,8 @@ import DesignSystem
 
 struct CompetitionNameView: View {
     @Bindable var store: StoreOf<CompetitionInfoFeature>
-    @FocusState private var isKeyboardVisible: Bool
+    // 포커스는 이 화면에서만 쓰므로 Feature 상태로 올리지 않고 View에 둔다.
+    @State private var isKeyboardVisible = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,19 +36,22 @@ struct CompetitionNameView: View {
     private var textFieldSection: some View {
         ZStack {
             // 입력 값이 비어있을 때 깜빡이는 커스텀 커서 표시
-            // (TextField는 multilineTextAlignment(.center)이라 빈 상태에서 커서가 보이지 않음)
+            // (가운데 정렬 필드는 빈 상태에서 네이티브 커서가 보이지 않음)
             if store.name.isEmpty {
                 BlinkingCursorView()
                     .allowsHitTesting(false)
             }
 
-            TextField("", text: $store.name)
-                .font(Font.pretendard.display1)
-                .focused($isKeyboardVisible)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(Color.component.textfieldDisplay.focus.text)
+            // 긴 대회명은 줄바꿈해서 보여주고, Return은 개행 없이 다음 버튼과 동일하게 처리한다.
+            MultilineTextField(
+                text: $store.name,
+                isFocused: $isKeyboardVisible,
+                font: UIFont.pretendard.display1,
+                textColor: Color.component.textfieldDisplay.focus.text,
                 // 빈 상태에서는 네이티브 커서 숨기고 커스텀 커서 사용
-                .tint(store.name.isEmpty ? .clear : Color.component.textfieldDisplay.focus.text)
+                tintColor: store.name.isEmpty ? .clear : Color.component.textfieldDisplay.focus.text,
+                onSubmit: { store.send(.view(.nextButtonTapped)) }
+            )
         }
         .padding(.horizontal, 30)
     }
