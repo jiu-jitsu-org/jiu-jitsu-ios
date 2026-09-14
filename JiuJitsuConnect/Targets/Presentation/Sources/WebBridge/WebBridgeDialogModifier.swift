@@ -74,7 +74,7 @@ private struct WebBridgeDialogModifier: ViewModifier {
 
     private func alertConfiguration(_ payload: ConfirmDialogPayload) -> AppAlertConfiguration {
         AppAlertConfiguration(
-            title: payload.title,
+            title: payload.titleParts.map { .truncatable($0.truncatable, suffix: $0.suffix) } ?? .plain(payload.title),
             message: payload.message ?? "",
             primaryButton: .init(
                 title: payload.confirmText,
