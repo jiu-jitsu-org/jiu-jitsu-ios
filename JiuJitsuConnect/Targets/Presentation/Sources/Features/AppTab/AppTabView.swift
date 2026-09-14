@@ -18,53 +18,45 @@ public struct AppTabView: View {
     }
 
     private enum Metrics {
-        // tabBarReservedSpace(safeAreaInset)와 bottomTabBar 2곳에서 공유
         static let tabBarHeight: CGFloat = 58
     }
 
     public var body: some View {
-        ZStack(alignment: .bottom) {
-            ZStack {
-                // 탭별 NavigationStack을 모두 유지하여 탭 전환 시 상태가 보존되도록 한다.
-                // safeAreaInset은 NavigationStack 내부의 root view에만 적용하여
-                // push된 destination은 탭바 영역까지 풀스크린으로 차지하도록 한다.
-                tabContainer(for: .home) {
-                    NavigationStack(
-                        path: $store.scope(state: \.home.path, action: \.home.path)
-                    ) {
-                        CommunityView(store: store.scope(state: \.home, action: \.home))
-                            .safeAreaInset(edge: .bottom, spacing: 0) { tabBarReservedSpace }
-                    } destination: { destinationStore in
-                        switch destinationStore.case {
-                        case let .detail(detailStore):
-                            CommunityDetailView(store: detailStore)
-                        }
-                    }
-                }
-                tabContainer(for: .myPage) {
-                    NavigationStack {
-                        MyProfileView(store: store.scope(state: \.myPage, action: \.myPage))
-                            .safeAreaInset(edge: .bottom, spacing: 0) { tabBarReservedSpace }
-                    }
-                }
-                tabContainer(for: .settings) {
-                    NavigationStack {
-                        SettingsView(store: store.scope(state: \.settings, action: \.settings))
-                            .safeAreaInset(edge: .bottom, spacing: 0) { tabBarReservedSpace }
+        ZStack {
+            // 탭별 NavigationStack을 모두 유지하여 탭 전환 시 상태가 보존되도록 한다.
+            // 탭바는 오버레이가 아니라 각 NavigationStack root view의 safeAreaInset으로 붙인다.
+            // → UIKit hidesBottomBarWhenPushed처럼 push/pop 트랜지션 하나로 root 콘텐츠와
+            //   탭바가 같은 커브로 함께 밀려나가고 돌아온다. (별도 탭바 애니메이션이 있으면
+            //   NavigationStack 트랜지션과 커브·타이밍이 어긋나고, pop 중 탭바 자리에
+            //   root 배경색이 잠깐 비쳤다.) push된 destination은 root의 safeAreaInset 영향을
+            //   받지 않아 탭바 영역까지 풀스크린으로 차지한다.
+            tabContainer(for: .home) {
+                NavigationStack(
+                    path: $store.scope(state: \.home.path, action: \.home.path)
+                ) {
+                    CommunityView(store: store.scope(state: \.home, action: \.home))
+                        .safeAreaInset(edge: .bottom, spacing: 0) { bottomTabBar }
+                } destination: { destinationStore in
+                    switch destinationStore.case {
+                    case let .detail(detailStore):
+                        CommunityDetailView(store: detailStore)
                     }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            // 서브뷰 push 시 탭바를 아래로 슬라이드해서 화면 밖으로 내보낸다.
-            // NavigationStack의 push 애니메이션과 동시에 진행되어
-            // 새 화면이 탭바 위로 덮이는 듯한 인상을 준다.
-            if !isSubViewPushed {
-                bottomTabBar
-                    .transition(.move(edge: .bottom))
+            tabContainer(for: .myPage) {
+                NavigationStack {
+                    MyProfileView(store: store.scope(state: \.myPage, action: \.myPage))
+                        .safeAreaInset(edge: .bottom, spacing: 0) { bottomTabBar }
+                }
+            }
+            tabContainer(for: .settings) {
+                NavigationStack {
+                    SettingsView(store: store.scope(state: \.settings, action: \.settings))
+                        .safeAreaInset(edge: .bottom, spacing: 0) { bottomTabBar }
+                }
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: isSubViewPushed)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.component.navibar.container.background)
         .fullScreenCover(
             item: $store.scope(state: \.loginCover, action: \.loginCover)
@@ -124,23 +116,6 @@ public struct AppTabView: View {
                 action: { store.send(.view(.loginPromptCancelTapped)) }
             )
         )
-    }
-
-    private var tabBarReservedSpace: some View {
-        Color.clear.frame(height: Metrics.tabBarHeight)
-    }
-
-    // 현재 선택된 탭의 NavigationStack에 서브뷰가 push되어 있는지 여부
-    private var isSubViewPushed: Bool {
-        switch store.selectedTab {
-        case .home:
-            // 게시글 상세 서브뷰가 push되어 있으면 탭바를 숨긴다(상세는 chromeless 풀스크린).
-            return !store.home.path.isEmpty
-        case .myPage:
-            return store.myPage.destination != nil
-        case .settings:
-            return store.settings.destination != nil
-        }
     }
 
     @ViewBuilder

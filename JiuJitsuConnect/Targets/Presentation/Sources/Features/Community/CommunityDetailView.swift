@@ -4,7 +4,7 @@
 //
 //  OPEN_SUBVIEW로 열리는 게시글 상세 풀스크린 웹뷰.
 //  웹이 자체 헤더를 그리므로 네이티브 내비게이션 바를 숨겨 chromeless로 렌더한다.
-//  (탭바는 부모 AppTabView가 서브뷰 push 시 숨긴다.)
+//  (탭바는 root view의 safeAreaInset에만 붙어 있어 push된 이 화면은 하단까지 풀스크린이다.)
 //
 
 import SwiftUI
