@@ -3,7 +3,8 @@
 //  Presentation
 //
 //  OPEN_SUBVIEW로 열리는 게시글 상세 풀스크린 웹뷰.
-//  웹이 자체 헤더를 그리므로 네이티브 내비게이션 바를 숨겨 chromeless로 렌더한다.
+//  웹이 자체 헤더(뒤로가기 포함)를 그리므로 네이티브 내비게이션 바를 숨겨 chromeless로 렌더한다.
+//  네이티브는 웹이 응답할 수 없는 로딩/에러 상태에서만 탈출용 뒤로가기를 띄운다(#37).
 //  (탭바는 root view의 safeAreaInset에만 붙어 있어 push된 이 화면은 하단까지 풀스크린이다.)
 //
 
@@ -20,14 +21,19 @@ public struct CommunityDetailView: View {
     }
 
     public var body: some View {
-        // 외부 ZStack은 safe area를 존중 → 네이티브 뒤로가기를 상태바 아래에 둘 수 있다.
+        // 외부 ZStack은 safe area를 존중 → 오버레이 뒤로가기를 상태바 아래에 둘 수 있다.
         // (안쪽 웹뷰 레이어만 ignoresSafeArea로 edge-to-edge 확장)
         ZStack(alignment: .topLeading) {
             webViewLayer
-            backButton
-                .padding(.leading, 8)
-                // 웹 헤더(높이 44) 바 안에서 40pt 버튼을 세로 중앙 정렬: (44-40)/2
-                .padding(.top, 2)
+            // 로딩/에러 오버레이 위에만 얹는다. 정상 화면의 뒤로가기는 웹 헤더가 그리므로
+            // 여기서 겹쳐 그리면 버튼이 두 개가 된다.
+            if store.isLoading || store.hasError {
+                backButton
+                    .padding(.leading, 8)
+                    // 웹 앱바(높이 44)의 뒤로가기와 같은 자리에 둬 로딩 → 렌더 전환 시 버튼이
+                    // 튀지 않게 한다. 계약이 아니라 시각적 연속성용이라 어긋나도 동작엔 영향 없다.
+                    .padding(.top, 2)
+            }
         }
         // chromeless: 네이티브 내비게이션 바를 숨겨 웹 자체 헤더만 보이게 한다.
         .toolbar(.hidden, for: .navigationBar)
@@ -87,8 +93,8 @@ public struct CommunityDetailView: View {
         .ignoresSafeArea([.container, .keyboard], edges: [.top, .bottom])
     }
 
-    // 공통 네이티브 뒤로가기 — 웹이 헤더에서 뺀 좌측 자리에 항상 노출되어, 웹 헤더가 못 떠도
-    // (로딩/에러) 빠져나갈 수 있게 한다. 아이콘 24x24 / 터치영역 40x40 / 좌측 여백 8.
+    // 탈출용 뒤로가기 — 웹 헤더가 못 뜬 상태(로딩/에러)에서도 빠져나갈 수 있게 한다.
+    // 스펙은 웹 앱바 뒤로가기와 동일: 아이콘 24x24 / 터치영역 40x40 / 좌측 여백 8.
     private var backButton: some View {
         Button {
             store.send(.view(.backTapped))

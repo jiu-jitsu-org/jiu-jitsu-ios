@@ -133,8 +133,6 @@ private extension WebBridgeInboundMessage {
             return "OPEN_SUBVIEW  url=\(payload.url) presentation=\(payload.presentation.rawValue) title=\(payload.title ?? "-")"
         case .closeSubview:
             return "CLOSE_SUBVIEW  (payload 없음)"
-        case let .backGuard(enabled):
-            return "BACK_GUARD  enabled=\(enabled)"
         case let .showConfirmDialog(payload):
             return "SHOW_CONFIRM_DIALOG  reqId=\(payload.requestId) destructive=\(payload.destructive)"
         case let .showSelectSheet(payload):
@@ -156,8 +154,6 @@ private extension WebBridgeOutboundMessage {
             return "AUTH_SESSION_EXPIRED"
         case .authLogout:
             return "AUTH_LOGOUT"
-        case .backPressed:
-            return "BACK_PRESSED"
         case let .confirmDialogResult(requestId, outcome):
             return "CONFIRM_DIALOG_RESULT  reqId=\(requestId) result=\(outcome.rawValue)"
         case let .selectSheetResult(requestId, outcome):
@@ -192,11 +188,9 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     case authTokenRefresh
     /// 게시글 상세 등 동일 origin URL을 풀스크린 웹뷰(서브뷰)로 띄우라는 요청.
     case openSubview(OpenSubviewPayload)
-    /// 현재 최상단 서브뷰를 닫으라는 요청(웹 헤더의 뒤로가기).
+    /// 현재 최상단 서브뷰를 닫으라는 요청(웹 헤더의 뒤로가기). 이탈 가드(작성 취소 확인 등)는
+    /// 뒤로가기 버튼을 소유한 웹이 끝내고 오므로, 네이티브는 묻지 않고 닫는다.
     case closeSubview
-    /// 이 화면이 뒤로가기 가드(작성 취소 확인 등)를 갖는지 통지. enabled면 네이티브 back은
-    /// 직접 닫지 않고 BACK_PRESSED를 보내 웹이 가드 후 닫게 한다. disabled면 네이티브가 직접 닫는다.
-    case backGuard(enabled: Bool)
     /// 확인 알럿 표시 요청. 웹뷰는 자기 프레임 밖(GNB·하단 탭바)을 딤 처리할 수 없어, 풀스크린 딤이
     /// 필요한 표면은 네이티브가 소유한다. 문구는 웹이 payload로 넘기고, 결과(confirm/cancel/dismiss)는
     /// requestId로 짝지어 CONFIRM_DIALOG_RESULT로 회신한다.
@@ -215,7 +209,6 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case authTokenRefresh = "AUTH_TOKEN_REFRESH_REQUEST"
         case openSubview = "OPEN_SUBVIEW"
         case closeSubview = "CLOSE_SUBVIEW"
-        case backGuard = "BACK_GUARD"
         case showConfirmDialog = "SHOW_CONFIRM_DIALOG"
         case showSelectSheet = "SHOW_SELECT_SHEET"
     }
@@ -263,8 +256,6 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             )
         case .closeSubview:
             return .closeSubview
-        case .backGuard:
-            return .backGuard(enabled: payload?["enabled"] as? Bool ?? false)
         case .showConfirmDialog:
             // requestId·title·confirmText는 필수. 하나라도 없으면 회신할 대상/문구가 없어 무시한다
             // (웹은 무응답을 타임아웃 후 cancel로 간주하므로 화면이 멈추지 않는다).
@@ -524,8 +515,6 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
     case authSessionExpired
     /// 네이티브 주도 로그아웃 → 웹 세션 정리.
     case authLogout
-    /// 네이티브 공통 뒤로가기 탭 통지 → 웹이 가드(작성 취소 확인 등) 후 CLOSE_SUBVIEW로 닫는다.
-    case backPressed
     /// SHOW_CONFIRM_DIALOG의 결과. requestId로 어느 요청의 답인지 웹이 식별한다.
     case confirmDialogResult(requestId: String, outcome: ConfirmDialogOutcome)
     /// SHOW_SELECT_SHEET의 결과. submit이면 선택값(+자유 입력)을 함께 싣는다.
@@ -537,7 +526,6 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         case .authLoginCancelled: return "AUTH_LOGIN_CANCELLED"
         case .authSessionExpired: return "AUTH_SESSION_EXPIRED"
         case .authLogout: return "AUTH_LOGOUT"
-        case .backPressed: return "BACK_PRESSED"
         case .confirmDialogResult: return "CONFIRM_DIALOG_RESULT"
         case .selectSheetResult: return "SELECT_SHEET_RESULT"
         }
@@ -547,7 +535,7 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         switch self {
         case let .authLoginSuccess(accessToken):
             return ["accessToken": accessToken]
-        case .authLoginCancelled, .authSessionExpired, .authLogout, .backPressed:
+        case .authLoginCancelled, .authSessionExpired, .authLogout:
             return nil
         case let .confirmDialogResult(requestId, outcome):
             return ["requestId": requestId, "result": outcome.rawValue]

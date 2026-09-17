@@ -343,10 +343,6 @@ public struct CommunityFeature: Sendable {
                     Log.trace("리스트 웹뷰 CLOSE_SUBVIEW 수신 — 무시", category: .network, level: .info)
                     return .none
 
-                case .backGuard:
-                    // 뒤로가기 가드는 서브뷰(상세) 전용 — 리스트에는 네이티브 back이 없어 무시한다.
-                    return .none
-
                 case let .showConfirmDialog(payload):
                     return Self.presentConfirmDialog(payload, into: &state)
 
