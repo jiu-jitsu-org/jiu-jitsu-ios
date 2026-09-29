@@ -42,6 +42,16 @@ private struct WebBridgeDialogModifier: ViewModifier {
 
     @ViewBuilder
     private var selectSheetOverlay: some View {
+        // 바깥 GeometryReader는 키보드 영역을 존중해 하단 inset으로 키보드 높이를 읽는 용도로만 쓴다.
+        // 시트 컨테이너가 키보드 safe area를 따라가면 키보드가 뜰 때 컨테이너 자체가 위로 밀려
+        // 시트가 상태바를 침범한다(#38 "키보드 등장 시 콘텐츠 점프"). 그래서 안쪽은 키보드를 무시한
+        // 고정 전체 화면에 두고, 키보드 부착은 시트가 bottomInset으로 직접 계산한다.
+        GeometryReader { keyboardProbe in
+            sheetContainer(bottomInset: keyboardProbe.safeAreaInsets.bottom)
+        }
+    }
+
+    private func sheetContainer(bottomInset: CGFloat) -> some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottom) {
                 if let selectSheet {
@@ -50,26 +60,28 @@ private struct WebBridgeDialogModifier: ViewModifier {
                         .onTapGesture { onSelectDismiss() }
                         .transition(.opacity)
 
-                    VStack(spacing: 0) {
-                        SelectSheetView(
-                            configuration: Self.sheetConfiguration(selectSheet),
-                            onSubmit: { value, customText in onSelectSubmit(value, customText) }
-                        )
-                        // 홈 인디케이터 영역까지 시트 배경을 연장한다(회색 갭 방지).
-                        Color.component.bottomSheet.selected.container.background
-                            .frame(height: geometry.safeAreaInsets.bottom)
-                    }
-                    .background(Color.component.bottomSheet.selected.container.background)
-                    .clipShape(.rect(topLeadingRadius: 24, topTrailingRadius: 24))
-                    // 키보드로 시트가 길어져도 상단 safe area(상태바) 아래에서 멈추게 한다.
-                    // 없으면 시트가 화면 끝까지 올라가 제목이 시계·다이내믹 아일랜드와 겹친다.
-                    .padding(.top, geometry.safeAreaInsets.top)
+                    // 높이 단계(중간·확장)·드래그·키보드 부착은 시트가 소유하고, 여기서는 화면 치수만 넘긴다.
+                    SelectSheetView(
+                        configuration: Self.sheetConfiguration(selectSheet),
+                        screen: SelectSheetScreenMetrics(
+                            height: geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom,
+                            topInset: geometry.safeAreaInsets.top,
+                            bottomInset: bottomInset
+                        ),
+                        onSubmit: { value, customText in onSelectSubmit(value, customText) },
+                        onDismiss: onSelectDismiss
+                    )
                     .transition(.move(edge: .bottom))
                 }
             }
+            // 키보드가 떠 있으면 홈 인디케이터 영역이 키보드에 덮여 ignoresSafeArea가 하단을 넓히지 못한다
+            // (컨테이너가 화면 하단보다 34pt 위에서 끝나 시트 전체가 그만큼 떠오름). 화면 전체 높이를 명시해 고정한다.
+            .frame(height: geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom)
+            .frame(maxHeight: .infinity, alignment: .top)
             .ignoresSafeArea()
             .animation(.spring(response: 0.4, dampingFraction: 0.9), value: selectSheet != nil)
         }
+        .ignoresSafeArea(.keyboard)
     }
 
     private func alertConfiguration(_ payload: ConfirmDialogPayload) -> AppAlertConfiguration {
