@@ -109,7 +109,8 @@ public final class DefaultNetworkService: NetworkService {
 
         // 이 요청에 실제로 실린 accessToken. 401 후 갱신 시 "이미 다른 요청이 갱신했는지" 판별에 쓴다.
         var sentAccessToken: String?
-        if urlRequest.value(forHTTPHeaderField: "Authorization") == nil,
+        if endpoint.requiresAuth,
+           urlRequest.value(forHTTPHeaderField: "Authorization") == nil,
            let accessToken = tokenStorage.getAccessToken() {
             urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
             sentAccessToken = accessToken

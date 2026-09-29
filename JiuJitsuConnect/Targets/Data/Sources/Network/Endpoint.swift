@@ -19,6 +19,10 @@ public protocol Endpoint: Sendable {
     /// 토큰 생명주기를 직접 다루는 인증 엔드포인트(login/refresh/logout)는 false로 둬
     /// 인터셉터 재귀·로그인 도중 잘못된 세션 만료 통지를 막는다.
     var allowsAuthRetry: Bool { get }
+    /// 저장된 accessToken을 `Authorization: Bearer`로 자동 주입할지 여부.
+    /// 로그인·refresh처럼 토큰을 새로 발급받는 요청에 만료 토큰이 실리면 서버 JWT 필터가
+    /// 본문을 보기 전에 A0003(만료된 토큰)으로 거부하므로, 이런 엔드포인트는 false로 둔다.
+    var requiresAuth: Bool { get }
 }
 
 public enum HTTPMethod: String {
@@ -44,6 +48,8 @@ public extension Endpoint {
     }
 
     var allowsAuthRetry: Bool { true }
+
+    var requiresAuth: Bool { true }
 
     var body: Data? { nil }
     

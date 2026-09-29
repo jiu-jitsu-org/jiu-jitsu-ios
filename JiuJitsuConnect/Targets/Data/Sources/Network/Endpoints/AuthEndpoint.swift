@@ -42,6 +42,17 @@ extension AuthEndpoint: Endpoint {
 
     // 인증 엔드포인트는 스스로 토큰을 발급/갱신하므로 401 인터셉터의 재시도 대상에서 제외한다.
     var allowsAuthRetry: Bool { false }
+
+    // 로그인/refresh는 토큰을 새로 받는 요청이라 기존(만료 가능) 토큰을 실으면 A0003으로 거부된다.
+    // logout은 기존 동작(헤더 주입)을 유지한다.
+    var requiresAuth: Bool {
+        switch self {
+        case .serverLogin, .refresh:
+            return false
+        case .serverLogout:
+            return true
+        }
+    }
     
     var body: Data? {
         switch self {

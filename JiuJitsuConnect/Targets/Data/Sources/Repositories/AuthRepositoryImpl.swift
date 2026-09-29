@@ -158,14 +158,17 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     // MARK: - Auto Login
 
     public func autoLogin() async throws -> AuthInfo? {
+        // 자동 로그인 불가 경로에서는 남은 토큰을 모두 지운다. accessToken만 남으면
+        // 게스트 상태의 이후 요청(로그인 포함)에 만료 토큰이 실려 A0003으로 계속 거부된다.
         // 1. 자동 로그인 설정 확인
         guard tokenStorage.isAutoLoginEnabled() else {
+            tokenStorage.clear()
             return nil
         }
         
         // 2. 저장된 토큰 확인
         guard let refreshToken = tokenStorage.getRefreshToken() else {
-            tokenStorage.setAutoLoginEnabled(false)
+            tokenStorage.clear()
             return nil
         }
         
@@ -255,6 +258,10 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     }
     
     public func signOut() async {
+        // 서버 로그아웃 실패·세션 만료 경로도 이 메서드로 로컬 로그아웃하므로, 서버 결과와 무관하게
+        // 로컬 토큰을 정리해야 게스트 상태에 만료 토큰이 남지 않는다.
+        tokenStorage.clear()
+
         await MainActor.run {
             GIDSignIn.sharedInstance.signOut()
         }

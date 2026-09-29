@@ -10,10 +10,7 @@ import Foundation
 /// ImageKit 업로드 엔드포인트 — `upload.imagekit.io/api/v1/files/upload`.
 ///
 /// **인증**: ImageKit는 multipart 폼의 `publicKey/signature/token/expire`로 인증한다.
-/// 우리 BE의 `Bearer` 토큰이 흘러 들어가서는 안 된다.
-/// `NetworkService.requestData`는 `urlRequest.value(forHTTPHeaderField: "Authorization") == nil`
-/// 일 때만 Bearer를 주입하므로 (`NetworkService.swift:81`), `Authorization`을 빈 문자열로
-/// 미리 세팅해 자동 주입을 차단한다. (`URLRequest.value(_:)`는 빈 문자열을 nil로 normalize하지 않는다.)
+/// 우리 BE의 `Bearer` 토큰이 흘러 들어가서는 안 되므로 `requiresAuth = false`로 자동 주입을 끈다.
 enum ImageKitUploadEndpoint {
     case upload(body: Data, boundary: String)
 }
@@ -28,11 +25,7 @@ extension ImageKitUploadEndpoint: Endpoint {
     var headers: [String: String]? {
         switch self {
         case .upload(_, let boundary):
-            return [
-                "Content-Type": "multipart/form-data; boundary=\(boundary)",
-                // NetworkService의 자동 Bearer 주입 차단 — 트릭이지만 의도된 동작.
-                "Authorization": ""
-            ]
+            return ["Content-Type": "multipart/form-data; boundary=\(boundary)"]
         }
     }
 
@@ -50,4 +43,6 @@ extension ImageKitUploadEndpoint: Endpoint {
 
     // 외부 CDN(ImageKit)이라 우리 BE 토큰과 무관하다. 401이 와도 우리 토큰을 갱신/회전하지 않는다.
     var allowsAuthRetry: Bool { false }
+
+    var requiresAuth: Bool { false }
 }
