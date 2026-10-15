@@ -7,6 +7,8 @@ import PackageDescription
     let packageSettings = PackageSettings(
         productTypes: [:],
         baseSettings: .settings(
+            // Xcode 27부터 macOS 최소 배포 타깃이 12.0 — 매크로 패키지(swift-syntax 등)의 11.0 설정을 덮어씀
+            base: ["MACOSX_DEPLOYMENT_TARGET": "12.0"],
             configurations: [
                 .debug(name: "Debug"),
                 .release(name: "Beta"),

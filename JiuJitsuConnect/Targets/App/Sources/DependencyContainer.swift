@@ -193,6 +193,9 @@ public final class DependencyContainer {
     public func configureNoticeClient() -> NoticeClient {
         let noticeService = NoticeService(networkService: sharedNetworkService)
         return NoticeClient(
+            hasUnread: {
+                try await noticeService.hasUnread()
+            },
             fetchSetting: {
                 try await noticeService.fetchSetting()
             },

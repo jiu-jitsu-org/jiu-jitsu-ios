@@ -15,6 +15,11 @@ import Foundation
 public struct CommunityFeature: Sendable {
     public init() {}
 
+    private enum CancelID: Hashable, Sendable {
+        // 새 알림 여부 조회. 진입·복귀·포그라운드가 겹쳐 들어와도 마지막 요청만 반영한다.
+        case unreadNotification
+    }
+
     public enum Tab: String, CaseIterable, Sendable, Equatable {
         case feed
         case category
@@ -75,6 +80,9 @@ public struct CommunityFeature: Sendable {
         var pendingConfirmDialog: ConfirmDialogPayload?
         var pendingSelectSheet: SelectSheetPayload?
 
+        // GNB 종 아이콘의 새 알림 점. 안 읽은 알림이 하나라도 있으면 true.
+        var hasUnreadNotification = false
+
         // 테스트용 웹뷰 도메인 변경 입력 다이얼로그 상태. (DEBUG/BETA 빌드에서만 노출)
         var isDebugURLAlertPresented = false
         var debugURLInput = ""
@@ -85,6 +93,9 @@ public struct CommunityFeature: Sendable {
         @Presents var detailCover: CommunityDetailFeature.State?
         // 모달 내부에서의 중첩 OPEN_SUBVIEW가 쌓이는 별도 스택(모달 위 NavigationStack 전용).
         var coverPath = StackState<Path.State>()
+
+        // 알림함은 로그인 사용자 전용이라 비로그인이면 종 아이콘 자체를 숨긴다(알림함 정책).
+        var isNotificationButtonVisible: Bool { accessToken != nil }
 
         public init(accessToken: String? = nil) {
             self.accessToken = accessToken
@@ -115,6 +126,10 @@ public struct CommunityFeature: Sendable {
 
         public enum ViewAction: Sendable {
             case onAppear
+            // 다른 탭에서 커뮤니티 탭으로 돌아옴. 탭 컨테이너가 뷰를 유지해 onAppear가 다시 오지 않으므로 부모가 보낸다.
+            case tabEntered
+            // 앱이 포그라운드로 복귀.
+            case sceneBecameActive
             case retryTapped
             case tabSelected(Tab)
             case notificationTapped
@@ -149,6 +164,7 @@ public struct CommunityFeature: Sendable {
             case bridgeMessageReceived(WebBridgeInboundMessage)
             // View가 outbox의 메시지를 evaluateJavaScript로 전달 완료했음을 통지.
             case outboundDelivered(id: UUID)
+            case unreadNotificationResponse(TaskResult<Bool>)
         }
 
         public enum DelegateAction: Sendable {
@@ -185,6 +201,8 @@ public struct CommunityFeature: Sendable {
         case modal
     }
 
+    @Dependency(\.noticeClient) var noticeClient
+
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
@@ -192,15 +210,25 @@ public struct CommunityFeature: Sendable {
                 if state.url == nil {
                     state.url = Self.makeCommunityURL()
                 }
-                return .none
+                return refreshUnreadNotification(state)
+
+            case .view(.tabEntered), .view(.sceneBecameActive):
+                return refreshUnreadNotification(state)
 
             case let .view(.tabSelected(tab)):
                 state.selectedTab = tab
                 return .none
 
-            // FIXME: 알림 화면 진입 (네이티브 알림함 도입 시 구현 — 항목 탭은 `NoticeListResponse.actionType`·`data`를
-            // `PushActionRouter.makeURL`로 바꿔 AppFeature `.deepLinkReceived`에 넣는다. #28)
+            // 알림함은 iOS/Android 공용 웹 화면이다. 상세와 같은 chromeless 서브뷰로 열어
+            // 알림 항목 탭(OPEN_SUBVIEW)·뒤로가기(CLOSE_SUBVIEW)를 기존 브릿지 흐름 그대로 쓴다.
+            // `PushActionRouter`는 푸시 탭 전용으로 남는다. (#45)
             case .view(.notificationTapped):
+                guard
+                    state.isNotificationButtonVisible,
+                    let base = state.url,
+                    let url = Self.notificationsURL(base: base)
+                else { return .none }
+                state.path.append(.detail(.init(url: url, accessToken: state.accessToken)))
                 return .none
 
             // FIXME: 검색 화면 진입 (커뮤니티 검색 기능 도입 시 구현)
@@ -359,15 +387,28 @@ public struct CommunityFeature: Sendable {
                 state.outbox.removeAll { $0.id == id }
                 return .none
 
+            case let .internal(.unreadNotificationResponse(.success(hasUnread))):
+                // 응답 전에 로그아웃됐다면 이전 계정의 결과를 버린다.
+                guard state.isNotificationButtonVisible else { return .none }
+                state.hasUnreadNotification = hasUnread
+                return .none
+
+            case let .internal(.unreadNotificationResponse(.failure(error))):
+                // 점은 보조 표시라 실패를 알리지 않고 직전 값을 유지한다. 다음 진입·복귀 때 다시 조회된다.
+                Log.trace("새 알림 여부 조회 실패: \(error)", category: .network, level: .error)
+                return .none
+
             // MARK: - Session (부모 주입 → 아웃바운드)
 
             case let .session(.loggedIn(accessToken)):
                 // 토큰 자동 갱신으로 같은 값이 반복 주입될 수 있어(동시 401 등), 변동 없으면 건너뛴다.
                 guard state.accessToken != accessToken else { return .none }
+                let wasGuest = state.accessToken == nil
                 state.accessToken = accessToken
                 Self.enqueueLoginSuccess(accessToken: accessToken, into: &state)
                 Self.broadcastToDetails(.loggedIn(accessToken: accessToken), into: &state)
-                return .none
+                // 토큰 자동 갱신으로 들어온 경우는 같은 계정이라 다시 조회하지 않는다.
+                return wasGuest ? refreshUnreadNotification(state) : .none
 
             case let .session(.tokenRefreshed(accessToken)):
                 // 갱신 응답은 요청한 웹뷰가 기다리고 있으므로 값이 같아도 반드시 회신한다.
@@ -384,15 +425,17 @@ public struct CommunityFeature: Sendable {
 
             case .session(.loggedOut):
                 state.accessToken = nil
+                state.hasUnreadNotification = false
                 Self.enqueue(.authLogout, into: &state)
                 Self.broadcastToDetails(.loggedOut, into: &state)
-                return .none
+                return .cancel(id: CancelID.unreadNotification)
 
             case .session(.sessionExpired):
                 state.accessToken = nil
+                state.hasUnreadNotification = false
                 Self.enqueue(.authSessionExpired, into: &state)
                 Self.broadcastToDetails(.sessionExpired, into: &state)
-                return .none
+                return .cancel(id: CancelID.unreadNotification)
 
             // MARK: - DeepLink (부모 주입 → 게시글 상세 진입)
 
@@ -413,6 +456,15 @@ public struct CommunityFeature: Sendable {
             case let .detailCover(.presented(.delegate(delegate))):
                 return Self.handleDetailDelegate(delegate, from: .modal, into: &state)
 
+            // 알림함에서 읽은 알림을 점에 반영한다. forEach보다 먼저 실행돼 pop 대상이 아직 스택에 남아 있다.
+            // 알림함 위에 쌓인 상세까지 한 번에 닫히는 경우도 있어 pop 범위 전체를 본다.
+            case let .path(.popFrom(id)):
+                guard
+                    let index = state.path.ids.firstIndex(of: id),
+                    state.path.ids[index...].contains(where: { Self.isNotificationsDetail(state.path[id: $0]) })
+                else { return .none }
+                return refreshUnreadNotification(state)
+
             case .path, .coverPath, .detailCover:
                 return .none
 
@@ -425,6 +477,34 @@ public struct CommunityFeature: Sendable {
         }
         .forEach(\.path, action: \.path)
         .forEach(\.coverPath, action: \.coverPath)
+    }
+
+    // MARK: - 새 알림 점
+
+    /// 안 읽은 알림 여부를 다시 조회한다. 비로그인이면 알림함이 없으므로 조회하지 않는다.
+    private func refreshUnreadNotification(_ state: State) -> Effect<Action> {
+        guard state.isNotificationButtonVisible else { return .none }
+        return .run { [noticeClient] send in
+            await send(.internal(.unreadNotificationResponse(
+                await TaskResult { try await noticeClient.hasUnread() }
+            )))
+        }
+        .cancellable(id: CancelID.unreadNotification, cancelInFlight: true)
+    }
+
+    /// 알림함 웹 라우트(`/community/notifications`). 숫자 id가 아니라 `DeepLinkParser`의
+    /// 게시글 상세 경로로 오인되지 않는다.
+    private static let notificationsPath = "/\(DeepLinkParser.communitySegment)/notifications"
+
+    /// 리스트 웹뷰와 같은 origin(테스트용 도메인 오버라이드 포함)에 알림함 경로를 붙인다.
+    /// OPEN_SUBVIEW와 마찬가지로 세션 쿠키를 가진 웹뷰에 다른 origin이 실리지 않게 하기 위함이다.
+    private static func notificationsURL(base: URL) -> URL? {
+        URL(string: notificationsPath, relativeTo: base)?.absoluteURL
+    }
+
+    private static func isNotificationsDetail(_ element: Path.State?) -> Bool {
+        guard case let .detail(detail)? = element else { return false }
+        return detail.url.path() == notificationsPath
     }
 
     // MARK: - Subview 라우팅 헬퍼
