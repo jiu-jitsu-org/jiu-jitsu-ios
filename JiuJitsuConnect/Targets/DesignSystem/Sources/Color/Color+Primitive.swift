@@ -53,6 +53,8 @@ public struct PrimitiveColors {
 
     public struct Red {
         public let r500 = Color("Red/Red-500", bundle: .module)
+        // 알림 새 소식 점(FF3B40). 스케일에 대응하는 값이 없어 용도 이름으로 둔다.
+        public let notification = Color("Red/Notification", bundle: .module)
     }
 
     public struct BW {
