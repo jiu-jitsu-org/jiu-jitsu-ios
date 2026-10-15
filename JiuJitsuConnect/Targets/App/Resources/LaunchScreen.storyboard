@@ -19,13 +19,13 @@
                             <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="stg-Fr-001" userLabel="Splash Frame">
                                 <rect key="frame" x="0.0" y="1" width="393" height="850"/>
                                 <subviews>
-                                    <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="SplashPattern" translatesAutoresizingMaskIntoConstraints="NO" id="pat-Im-001" userLabel="Pattern">
+                                    <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="Splash/pattern" translatesAutoresizingMaskIntoConstraints="NO" id="pat-Im-001" userLabel="Pattern">
                                         <rect key="frame" x="0.0" y="151" width="393" height="558"/>
                                     </imageView>
-                                    <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="SplashTagline" translatesAutoresizingMaskIntoConstraints="NO" id="tag-Im-001" userLabel="Tagline">
+                                    <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="Splash/tagline" translatesAutoresizingMaskIntoConstraints="NO" id="tag-Im-001" userLabel="Tagline">
                                         <rect key="frame" x="102" y="365" width="188" height="17"/>
                                     </imageView>
-                                    <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="SplashLogo" translatesAutoresizingMaskIntoConstraints="NO" id="logo-Im-01" userLabel="Logo">
+                                    <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="Splash/logo" translatesAutoresizingMaskIntoConstraints="NO" id="logo-Im-01" userLabel="Logo">
                                         <rect key="frame" x="100" y="395" width="192" height="69"/>
                                     </imageView>
                                 </subviews>
@@ -48,7 +48,7 @@
                             </view>
                         </subviews>
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
-                        <color key="backgroundColor" red="0.0" green="0.56470588235294117" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <color key="backgroundColor" name="Blue/Blue-500-Primary"/>
                         <constraints>
                             <constraint firstItem="stg-Fr-001" firstAttribute="leading" secondItem="Ze5-6b-2t3" secondAttribute="leading" id="stg-Cn-ld1"/>
                             <constraint firstAttribute="trailing" secondItem="stg-Fr-001" secondAttribute="trailing" id="stg-Cn-tr1"/>
@@ -62,8 +62,11 @@
         </scene>
     </scenes>
     <resources>
-        <image name="SplashLogo" width="271" height="98"/>
-        <image name="SplashPattern" width="555" height="788"/>
-        <image name="SplashTagline" width="265" height="24"/>
+        <image name="Splash/logo" width="271" height="98"/>
+        <image name="Splash/pattern" width="555" height="788"/>
+        <image name="Splash/tagline" width="265" height="24"/>
+        <namedColor name="Blue/Blue-500-Primary">
+            <color red="0.0" green="0.56862745098039214" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
     </resources>
 </document>
