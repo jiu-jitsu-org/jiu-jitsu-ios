@@ -34,15 +34,15 @@
                                     <constraint firstAttribute="width" secondItem="stg-Fr-001" secondAttribute="height" multiplier="555:1200" id="stg-Cn-ar1"/>
                                     <constraint firstItem="pat-Im-001" firstAttribute="leading" secondItem="stg-Fr-001" secondAttribute="leading" id="pat-Cn-ld1"/>
                                     <constraint firstItem="pat-Im-001" firstAttribute="trailing" secondItem="stg-Fr-001" secondAttribute="trailing" id="pat-Cn-tr1"/>
-                                    <constraint firstAttribute="width" secondItem="pat-Im-001" secondAttribute="height" multiplier="555:788" id="pat-Cn-ar1"/>
+                                    <constraint firstItem="pat-Im-001" firstAttribute="width" secondItem="pat-Im-001" secondAttribute="height" multiplier="555:788" id="pat-Cn-ar1"/>
                                     <constraint firstItem="pat-Im-001" firstAttribute="top" secondItem="stg-Fr-001" secondAttribute="bottom" multiplier="0.1775" id="pat-Cn-tp1"/>
                                     <constraint firstItem="tag-Im-001" firstAttribute="centerX" secondItem="stg-Fr-001" secondAttribute="centerX" id="tag-Cn-cx1"/>
                                     <constraint firstItem="tag-Im-001" firstAttribute="width" secondItem="stg-Fr-001" secondAttribute="width" multiplier="0.477477" id="tag-Cn-wd1"/>
-                                    <constraint firstAttribute="width" secondItem="tag-Im-001" secondAttribute="height" multiplier="265:24" id="tag-Cn-ar1"/>
+                                    <constraint firstItem="tag-Im-001" firstAttribute="width" secondItem="tag-Im-001" secondAttribute="height" multiplier="265:24" id="tag-Cn-ar1"/>
                                     <constraint firstItem="tag-Im-001" firstAttribute="top" secondItem="stg-Fr-001" secondAttribute="bottom" multiplier="0.429167" id="tag-Cn-tp1"/>
                                     <constraint firstItem="logo-Im-01" firstAttribute="centerX" secondItem="stg-Fr-001" secondAttribute="centerX" id="logo-Cn-cx"/>
                                     <constraint firstItem="logo-Im-01" firstAttribute="width" secondItem="stg-Fr-001" secondAttribute="width" multiplier="0.488288" id="logo-Cn-wd"/>
-                                    <constraint firstAttribute="width" secondItem="logo-Im-01" secondAttribute="height" multiplier="271:98" id="logo-Cn-ar"/>
+                                    <constraint firstItem="logo-Im-01" firstAttribute="width" secondItem="logo-Im-01" secondAttribute="height" multiplier="271:98" id="logo-Cn-ar"/>
                                     <constraint firstItem="logo-Im-01" firstAttribute="top" secondItem="stg-Fr-001" secondAttribute="bottom" multiplier="0.465" id="logo-Cn-tp"/>
                                 </constraints>
                             </view>
