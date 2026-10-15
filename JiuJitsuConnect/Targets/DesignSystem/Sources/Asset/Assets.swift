@@ -106,6 +106,11 @@ public enum Assets {
       public static let signupComplete = ImageAsset(name: "Signup/Icon/signup-complete")
     }
   }
+  public enum Splash {
+    public static let logo = ImageAsset(name: "Splash/logo")
+    public static let pattern = ImageAsset(name: "Splash/pattern")
+    public static let tagline = ImageAsset(name: "Splash/tagline")
+  }
 }
 // swiftlint:enable identifier_name line_length nesting type_body_length type_name
 
