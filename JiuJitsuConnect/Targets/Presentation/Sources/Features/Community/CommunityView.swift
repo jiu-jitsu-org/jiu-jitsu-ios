@@ -12,6 +12,7 @@ import CoreKit
 
 public struct CommunityView: View {
     let store: StoreOf<CommunityFeature>
+    @Environment(\.scenePhase) private var scenePhase
 
     public init(store: StoreOf<CommunityFeature>) {
         self.store = store
@@ -21,6 +22,10 @@ public struct CommunityView: View {
         // 알림·검색 아이콘 버튼 2곳에서 공유
         static let trailingIconSize: CGFloat = 24
         static let trailingIconButtonSize: CGFloat = 40
+        // 새 알림 점: 6pt 원 + 바깥 1pt 테두리. 빨간 원이 종 아이콘(24pt) 상단에 딱 붙고 오른쪽에서 1pt 안쪽에 겹친다.
+        static let notificationDotSize: CGFloat = 6
+        static let notificationDotStrokeWidth: CGFloat = 1
+        static let notificationDotTrailingInset: CGFloat = 1
     }
 
     public var body: some View {
@@ -59,6 +64,9 @@ public struct CommunityView: View {
         }
         .background(Color.component.background.default)
         .onAppear { store.send(.view(.onAppear)) }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { store.send(.view(.sceneBecameActive)) }
+        }
         .modifier(DebugDomainAlert(store: store))
     }
 
@@ -91,18 +99,25 @@ public struct CommunityView: View {
                     .buttonStyle(.plain)
                     #endif
 
-                    Button {
-                        store.send(.view(.notificationTapped))
-                    } label: {
-                        Assets.Common.Icon.bell.swiftUIImage
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: Metrics.trailingIconSize, height: Metrics.trailingIconSize)
-                            .foregroundStyle(Color.component.header.iconButton)
-                            .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
-                            .contentShape(Rectangle())
+                    if store.isNotificationButtonVisible {
+                        Button {
+                            store.send(.view(.notificationTapped))
+                        } label: {
+                            Assets.Common.Icon.bell.swiftUIImage
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: Metrics.trailingIconSize, height: Metrics.trailingIconSize)
+                                .foregroundStyle(Color.component.header.iconButton)
+                                .overlay(alignment: .topTrailing) {
+                                    if store.hasUnreadNotification {
+                                        notificationDot
+                                    }
+                                }
+                                .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
 
                     Button {
                         store.send(.view(.searchTapped))
@@ -128,6 +143,20 @@ public struct CommunityView: View {
             Color.component.header.background
                 .ignoresSafeArea(edges: .top)
         }
+    }
+
+    // 테두리는 바깥(outside) 정렬이라 6pt 원 뒤에 테두리 두께만큼 큰 원을 깔아 표현한다.
+    // 위치는 빨간 원 기준이라 테두리는 아이콘 위·오른쪽 바깥으로 1pt씩 걸칠 수 있다.
+    private var notificationDot: some View {
+        Circle()
+            .fill(Color.primitive.red.notification)
+            .frame(width: Metrics.notificationDotSize, height: Metrics.notificationDotSize)
+            .background {
+                Circle()
+                    .fill(Color.primitive.bw.white)
+                    .padding(-Metrics.notificationDotStrokeWidth)
+            }
+            .padding(.trailing, Metrics.notificationDotTrailingInset)
     }
 
     private func tabButton(_ tab: CommunityFeature.Tab) -> some View {
