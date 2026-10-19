@@ -321,6 +321,9 @@ public struct ComponentColors {
         public let background = Color.semantic.surface.container
         public let iconButton = Color.semantic.icon.primary
         public let destructiveText = Color.semantic.destructive.destructive
+        // 커뮤니티 헤더 내 사진 버튼 — 사진이 없을 때의 원 배경(E5E7EB, 스케일에 대응 값 없음)과 기본 사람 아이콘
+        public let avatarPlaceholder = Color(hex: "#E5E7EB")
+        public let avatarDefaultIcon = Color.semantic.icon.primary
     }
 
     // MARK: - Bottom Sheet

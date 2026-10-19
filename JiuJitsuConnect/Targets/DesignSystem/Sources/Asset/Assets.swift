@@ -32,6 +32,7 @@ public enum Assets {
   public enum Common {
     public enum Icon {
       public static let arrowLeft = ImageAsset(name: "Common/Icon/arrow-left")
+      public static let avatarDefault = ImageAsset(name: "Common/Icon/avatar-default")
       public static let bell = ImageAsset(name: "Common/Icon/bell")
       public static let check = ImageAsset(name: "Common/Icon/check")
       public static let chevronLeft = ImageAsset(name: "Common/Icon/chevron-left")
