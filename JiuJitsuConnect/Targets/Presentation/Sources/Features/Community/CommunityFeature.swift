@@ -9,6 +9,7 @@
 
 import ComposableArchitecture
 import CoreKit
+import Domain
 import Foundation
 
 @Reducer
@@ -18,6 +19,8 @@ public struct CommunityFeature: Sendable {
     private enum CancelID: Hashable, Sendable {
         // 새 알림 여부 조회. 진입·복귀·포그라운드가 겹쳐 들어와도 마지막 요청만 반영한다.
         case unreadNotification
+        // 헤더 내 사진 조회. 새 알림 점과 같은 시점에 다시 조회하며 마지막 요청만 반영한다.
+        case myProfileImage
     }
 
     public enum Tab: String, CaseIterable, Sendable, Equatable {
@@ -83,6 +86,9 @@ public struct CommunityFeature: Sendable {
         // GNB 종 아이콘의 새 알림 점. 안 읽은 알림이 하나라도 있으면 true.
         var hasUnreadNotification = false
 
+        // GNB 내 사진 버튼에 그릴 프로필 이미지. 없거나(기본 이미지) 아직 조회 전이면 nil → 기본 사람 아이콘.
+        var myProfileImageURL: URL?
+
         // 테스트용 웹뷰 도메인 변경 입력 다이얼로그 상태. (DEBUG/BETA 빌드에서만 노출)
         var isDebugURLAlertPresented = false
         var debugURLInput = ""
@@ -96,6 +102,8 @@ public struct CommunityFeature: Sendable {
 
         // 알림함은 로그인 사용자 전용이라 비로그인이면 종 아이콘 자체를 숨긴다(알림함 정책).
         var isNotificationButtonVisible: Bool { accessToken != nil }
+        // '커뮤니티 활동'(내 글·저장한 글)도 내 것 입구라 비로그인이면 내 사진 버튼을 숨긴다. (#43)
+        var isMyActivityButtonVisible: Bool { accessToken != nil }
 
         public init(accessToken: String? = nil) {
             self.accessToken = accessToken
@@ -134,6 +142,8 @@ public struct CommunityFeature: Sendable {
             case tabSelected(Tab)
             case notificationTapped
             case searchTapped
+            // GNB 맨 오른쪽 내 사진 버튼 → '커뮤니티 활동' 서브뷰. (#43)
+            case myActivityTapped
 
             // MARK: 브릿지 다이얼로그 결과 (AppTabView가 그린 알럿/시트 → Feature로 회신)
             // 확인 알럿의 [확인]/[취소] 버튼 탭.
@@ -165,6 +175,7 @@ public struct CommunityFeature: Sendable {
             // View가 outbox의 메시지를 evaluateJavaScript로 전달 완료했음을 통지.
             case outboundDelivered(id: UUID)
             case unreadNotificationResponse(TaskResult<Bool>)
+            case myProfileImageResponse(TaskResult<URL?>)
         }
 
         public enum DelegateAction: Sendable {
@@ -202,6 +213,7 @@ public struct CommunityFeature: Sendable {
     }
 
     @Dependency(\.noticeClient) var noticeClient
+    @Dependency(\.userClient) var userClient
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -210,10 +222,10 @@ public struct CommunityFeature: Sendable {
                 if state.url == nil {
                     state.url = Self.makeCommunityURL()
                 }
-                return refreshUnreadNotification(state)
+                return refreshHeaderState(state)
 
             case .view(.tabEntered), .view(.sceneBecameActive):
-                return refreshUnreadNotification(state)
+                return refreshHeaderState(state)
 
             case let .view(.tabSelected(tab)):
                 state.selectedTab = tab
@@ -227,6 +239,17 @@ public struct CommunityFeature: Sendable {
                     state.isNotificationButtonVisible,
                     let base = state.url,
                     let url = Self.notificationsURL(base: base)
+                else { return .none }
+                state.path.append(.detail(.init(url: url, accessToken: state.accessToken)))
+                return .none
+
+            // 커뮤니티 활동도 알림함처럼 iOS/Android 공용 웹 화면이라 같은 chromeless 서브뷰로 연다.
+            // 웹 안에서 내 이름을 눌러 OPEN_SUBVIEW(push)로 열 때와 같은 경로다. (#43)
+            case .view(.myActivityTapped):
+                guard
+                    state.isMyActivityButtonVisible,
+                    let base = state.url,
+                    let url = Self.myActivityURL(base: base)
                 else { return .none }
                 state.path.append(.detail(.init(url: url, accessToken: state.accessToken)))
                 return .none
@@ -398,6 +421,17 @@ public struct CommunityFeature: Sendable {
                 Log.trace("새 알림 여부 조회 실패: \(error)", category: .network, level: .error)
                 return .none
 
+            case let .internal(.myProfileImageResponse(.success(url))):
+                // 응답 전에 로그아웃됐다면 이전 계정의 사진을 버린다.
+                guard state.isMyActivityButtonVisible else { return .none }
+                state.myProfileImageURL = url
+                return .none
+
+            case let .internal(.myProfileImageResponse(.failure(error))):
+                // 사진은 보조 표시라 실패를 알리지 않고 직전 값을 유지한다. 다음 진입·복귀 때 다시 조회된다.
+                Log.trace("내 프로필 사진 조회 실패: \(error)", category: .network, level: .error)
+                return .none
+
             // MARK: - Session (부모 주입 → 아웃바운드)
 
             case let .session(.loggedIn(accessToken)):
@@ -408,7 +442,7 @@ public struct CommunityFeature: Sendable {
                 Self.enqueueLoginSuccess(accessToken: accessToken, into: &state)
                 Self.broadcastToDetails(.loggedIn(accessToken: accessToken), into: &state)
                 // 토큰 자동 갱신으로 들어온 경우는 같은 계정이라 다시 조회하지 않는다.
-                return wasGuest ? refreshUnreadNotification(state) : .none
+                return wasGuest ? refreshHeaderState(state) : .none
 
             case let .session(.tokenRefreshed(accessToken)):
                 // 갱신 응답은 요청한 웹뷰가 기다리고 있으므로 값이 같아도 반드시 회신한다.
@@ -426,16 +460,18 @@ public struct CommunityFeature: Sendable {
             case .session(.loggedOut):
                 state.accessToken = nil
                 state.hasUnreadNotification = false
+                state.myProfileImageURL = nil
                 Self.enqueue(.authLogout, into: &state)
                 Self.broadcastToDetails(.loggedOut, into: &state)
-                return .cancel(id: CancelID.unreadNotification)
+                return .merge(.cancel(id: CancelID.unreadNotification), .cancel(id: CancelID.myProfileImage))
 
             case .session(.sessionExpired):
                 state.accessToken = nil
                 state.hasUnreadNotification = false
+                state.myProfileImageURL = nil
                 Self.enqueue(.authSessionExpired, into: &state)
                 Self.broadcastToDetails(.sessionExpired, into: &state)
-                return .cancel(id: CancelID.unreadNotification)
+                return .merge(.cancel(id: CancelID.unreadNotification), .cancel(id: CancelID.myProfileImage))
 
             // MARK: - DeepLink (부모 주입 → 게시글 상세 진입)
 
@@ -479,7 +515,26 @@ public struct CommunityFeature: Sendable {
         .forEach(\.coverPath, action: \.coverPath)
     }
 
-    // MARK: - 새 알림 점
+    // MARK: - 헤더 표시(새 알림 점·내 사진)
+
+    /// 진입·탭 복귀·포그라운드·로그인 때 헤더의 새 알림 점과 내 사진을 함께 다시 조회한다.
+    /// MY에서 사진을 바꾼 뒤 커뮤니티로 돌아오면 이 시점에 반영된다.
+    private func refreshHeaderState(_ state: State) -> Effect<Action> {
+        .merge(refreshUnreadNotification(state), refreshMyProfileImage(state))
+    }
+
+    /// 내 프로필 사진을 다시 조회한다(GET /api/user/profile). 비로그인이면 버튼이 없으므로 조회하지 않는다.
+    private func refreshMyProfileImage(_ state: State) -> Effect<Action> {
+        guard state.isMyActivityButtonVisible else { return .none }
+        return .run { [userClient] send in
+            await send(.internal(.myProfileImageResponse(
+                await TaskResult {
+                    try await userClient.fetchUserProfile().profileImageUrl.flatMap(URL.init(string:))
+                }
+            )))
+        }
+        .cancellable(id: CancelID.myProfileImage, cancelInFlight: true)
+    }
 
     /// 안 읽은 알림 여부를 다시 조회한다. 비로그인이면 알림함이 없으므로 조회하지 않는다.
     private func refreshUnreadNotification(_ state: State) -> Effect<Action> {
@@ -500,6 +555,14 @@ public struct CommunityFeature: Sendable {
     /// OPEN_SUBVIEW와 마찬가지로 세션 쿠키를 가진 웹뷰에 다른 origin이 실리지 않게 하기 위함이다.
     private static func notificationsURL(base: URL) -> URL? {
         URL(string: notificationsPath, relativeTo: base)?.absoluteURL
+    }
+
+    /// 커뮤니티 활동 웹 라우트(`/community/me`). 알림함과 같이 숫자 id가 아니라 게시글 상세로 오인되지 않는다.
+    private static let myActivityPath = "/\(DeepLinkParser.communitySegment)/me"
+
+    /// 알림함과 같은 이유로 리스트 웹뷰와 같은 origin에 커뮤니티 활동 경로를 붙인다.
+    private static func myActivityURL(base: URL) -> URL? {
+        URL(string: myActivityPath, relativeTo: base)?.absoluteURL
     }
 
     private static func isNotificationsDetail(_ element: Path.State?) -> Bool {

@@ -19,13 +19,16 @@ public struct CommunityView: View {
     }
 
     private enum Metrics {
-        // 알림·검색 아이콘 버튼 2곳에서 공유
+        // 알림·검색·내 사진 버튼에서 공유
         static let trailingIconSize: CGFloat = 24
         static let trailingIconButtonSize: CGFloat = 40
         // 새 알림 점: 6pt 원 + 바깥 1pt 테두리. 빨간 원이 종 아이콘(24pt) 상단에 딱 붙고 오른쪽에서 1pt 안쪽에 겹친다.
         static let notificationDotSize: CGFloat = 6
         static let notificationDotStrokeWidth: CGFloat = 1
         static let notificationDotTrailingInset: CGFloat = 1
+        // 내 사진: 28pt 원을 다른 아이콘과 같은 터치 영역 가운데에 둔다. 사진이 없으면 기본 사람 아이콘.
+        static let avatarSize: CGFloat = 28
+        static let avatarDefaultIconSize: CGFloat = 20
     }
 
     public var body: some View {
@@ -131,6 +134,18 @@ public struct CommunityView: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+
+                    if store.isMyActivityButtonVisible {
+                        Button {
+                            store.send(.view(.myActivityTapped))
+                        } label: {
+                            myAvatar
+                                .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("커뮤니티 활동")
+                    }
                 }
             }
             .padding(.leading, 16)
@@ -143,6 +158,28 @@ public struct CommunityView: View {
             Color.component.header.background
                 .ignoresSafeArea(edges: .top)
         }
+    }
+
+    // 사진이 없거나 불러오는 중·실패면 회색 원 위 기본 사람 아이콘을 그린다(웹 아바타와 같은 처리).
+    private var myAvatar: some View {
+        AsyncImage(url: store.myProfileImageURL) { phase in
+            if case let .success(image) = phase {
+                image
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ZStack {
+                    Color.component.header.avatarPlaceholder
+                    Assets.Common.Icon.avatarDefault.swiftUIImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: Metrics.avatarDefaultIconSize, height: Metrics.avatarDefaultIconSize)
+                        .foregroundStyle(Color.component.header.avatarDefaultIcon)
+                }
+            }
+        }
+        .frame(width: Metrics.avatarSize, height: Metrics.avatarSize)
+        .clipShape(Circle())
     }
 
     // 테두리는 바깥(outside) 정렬이라 6pt 원 뒤에 테두리 두께만큼 큰 원을 깔아 표현한다.
