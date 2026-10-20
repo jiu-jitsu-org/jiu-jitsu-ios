@@ -93,13 +93,11 @@ public struct TermsAgreementFeature: Sendable {
 
                 } else {
                     Log.trace("모두 동의하기 실행", category: .view, level: .debug)
+                    // 정책: 전체 동의는 모든 항목 체크만 하고, 선택 항목을 해제할 수 있도록 화면에 머무름
                     state.rows.ids.forEach { id in
                         state.rows[id: id]?.isChecked = true
                     }
-
-                    // [정책 확인 필요] '모두 동의' 버튼 클릭 시 바로 다음 화면으로 넘어가는 것이 기획 의도라면 아래 코드 유지.
-                    // 만약 체크만 하고 유저가 다시 '다음'을 눌러야 한다면 return .none으로 변경해야 함.
-                    return .send(.delegate(.didFinishAgreement(isMarketingAgreed: true)))
+                    return .none
                 }
 
             case .rows(.element(id: let id, action: .seeDetailsTapped)):
