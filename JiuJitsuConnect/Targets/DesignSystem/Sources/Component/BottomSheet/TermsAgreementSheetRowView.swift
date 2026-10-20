@@ -15,11 +15,12 @@ public struct TermsAgreementRow: View {
     let labelColor: Color
     let typeTextColor: Color
     let followingIconColor: Color
+    let showsSeeDetails: Bool
     
     let onCheckTapped: () -> Void
     let onSeeDetailsTapped: () -> Void
 
-    public init(title: String, typeText: String, isChecked: Bool, leadingIconColor: Color, labelColor: Color, typeTextColor: Color, followingIconColor: Color, onCheckTapped: @escaping () -> Void, onSeeDetailsTapped: @escaping () -> Void) {
+    public init(title: String, typeText: String, isChecked: Bool, leadingIconColor: Color, labelColor: Color, typeTextColor: Color, followingIconColor: Color, showsSeeDetails: Bool = true, onCheckTapped: @escaping () -> Void, onSeeDetailsTapped: @escaping () -> Void) {
         self.title = title
         self.typeText = typeText
         self.isChecked = isChecked
@@ -27,6 +28,7 @@ public struct TermsAgreementRow: View {
         self.labelColor = labelColor
         self.typeTextColor = typeTextColor
         self.followingIconColor = followingIconColor
+        self.showsSeeDetails = showsSeeDetails
         self.onCheckTapped = onCheckTapped
         self.onSeeDetailsTapped = onSeeDetailsTapped
     }
@@ -58,17 +60,19 @@ public struct TermsAgreementRow: View {
             
             Spacer()
             
-            // 상세보기 버튼
-            Button(action: {
-                onSeeDetailsTapped()
-            }) {
-                Assets.Common.Icon.chevronRight.swiftUIImage
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 24, height: 24)
-                    .foregroundStyle(isChecked ? Color.component.bottomSheet.selected.listItem.followingIcon : Color.component.bottomSheet.unselected.listItem.followingIcon)
+            // 상세보기 버튼 (전문이 있는 항목만)
+            if showsSeeDetails {
+                Button(action: {
+                    onSeeDetailsTapped()
+                }) {
+                    Assets.Common.Icon.chevronRight.swiftUIImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
+                        .foregroundStyle(isChecked ? Color.component.bottomSheet.selected.listItem.followingIcon : Color.component.bottomSheet.unselected.listItem.followingIcon)
+                }
+                .frame(width: 40, height: 40)
             }
-            .frame(width: 40, height: 40)
         }
     }
 }
