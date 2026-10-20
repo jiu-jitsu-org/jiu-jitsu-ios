@@ -135,7 +135,8 @@ public struct MyProfileView: View {
         MyProfileHeaderView(
             nickname: store.communityProfile?.nickname ?? store.authInfo.userInfo?.nickname ?? "",
             academyName: store.communityProfile?.academyName,
-            profileImageUrl: store.communityProfile?.profileImageUrl,
+            // 프로필 이미지는 user-level 데이터(GET /api/user/profile) — 커뮤니티 헤더 버튼과 같은 출처
+            profileImageUrl: store.userProfile?.profileImageUrl,
             beltRank: store.communityProfile?.beltRank,
             safeAreaTop: safeAreaTop,
             isOwner: store.userProfile?.userRole == .owner,

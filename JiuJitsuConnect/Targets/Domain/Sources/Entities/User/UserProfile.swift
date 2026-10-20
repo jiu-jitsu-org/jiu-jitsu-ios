@@ -66,4 +66,33 @@ public struct UserProfile: Equatable, Sendable {
         self.role = role
         self.status = status
     }
+
+    /// 실제로 렌더링 가능한 프로필 이미지 URL이 설정되어 있는지 여부.
+    ///
+    /// 헤더의 이미지 표시 조건과 동일한 기준(빈 문자열 제외 + http/https URL 유효성)을 적용해,
+    /// "이미지가 보이는 상태"와 "삭제 옵션 노출" 같이 UI 결정이 어긋나지 않도록 단일 소스로 사용한다.
+    public var hasProfileImage: Bool {
+        guard let urlString = profileImageUrl,
+              !urlString.isEmpty,
+              let url = URL(string: urlString),
+              url.scheme == "https" || url.scheme == "http"
+        else { return false }
+        return true
+    }
+
+    /// 프로필 이미지 URL·파일 id 업데이트 (둘 다 `nil` 전달 시 삭제 의미)
+    public func updatingProfileImage(url: String?, fileId: Int64?) -> UserProfile {
+        UserProfile(
+            userId: userId,
+            email: email,
+            nickname: nickname,
+            profileImageUrl: url,
+            profileImageFileId: fileId,
+            snsProvider: snsProvider,
+            ownerRequested: ownerRequested,
+            ownerRequestImageUrl: ownerRequestImageUrl,
+            role: role,
+            status: status
+        )
+    }
 }

@@ -57,7 +57,7 @@ public struct MyProfileFeature: Sendable {
         // MARK: - 프로필 이미지 Optimistic Update 상태
         //
         // ImageKit 업로드 + BE 반영까지 2~5초 걸리는 동안 사용자가 변화를 즉시 인지하도록
-        // 크롭 직후 로컬 데이터를 헤더에 미리 표시한다. 응답 성공 시 communityProfile.profileImageUrl로
+        // 크롭 직후 로컬 데이터를 헤더에 미리 표시한다. 응답 성공 시 userProfile.profileImageUrl로
         // 자연스럽게 전환되고, 실패 시 두 필드를 비워 이전 이미지로 롤백한다.
 
         /// 업로드 진행 중 헤더에 미리 노출할 로컬 이미지 데이터
@@ -183,7 +183,7 @@ public struct MyProfileFeature: Sendable {
 
             // 프로필 이미지 업로드/반영 응답
             case profileImageUploadResponse(TaskResult<RegisteredImage>)   // CDN 업로드 + 서버 등록 결과(id 포함)
-            case profileImageUpdateResponse(TaskResult<CommunityProfile>)  // PUT /api/user/profile 반영 결과
+            case profileImageUpdateResponse(TaskResult<UserProfile>)  // PUT /api/user/profile 반영 결과
 
             // 관장 사범 인증 사진 업로드 응답 (ImageKit 호스팅 URL)
             // 성공 시 확보한 URL로 BE 인증 요청(PUT /api/user/owner)을 체이닝한다.
@@ -912,7 +912,7 @@ public struct MyProfileFeature: Sendable {
             case .view(.profileImageEditButtonTapped):
                 // 프로필 이미지 수정 옵션 바텀시트 노출
                 // 실제로 이미지가 렌더링되는 상태일 때만 '삭제' 옵션 노출
-                let canDelete = state.communityProfile?.hasProfileImage ?? false
+                let canDelete = state.userProfile?.hasProfileImage ?? false
                 state.sheet = .profileImageEdit(
                     ProfileImageEditFeature.State(canDelete: canDelete)
                 )
@@ -934,20 +934,20 @@ public struct MyProfileFeature: Sendable {
 
             case .sheet(.presented(.profileImageEdit(.delegate(.didSelectDelete)))):
                 state.sheet = nil
-                guard let profile = state.communityProfile else {
+                guard let profile = state.userProfile else {
                     return .send(.internal(.showToast(.init(
                         message: "프로필 정보를 불러올 수 없어요", style: .info
                     ))))
                 }
                 // 삭제는 DELETE /api/image/{id} 사용 — 현재 이미지의 서버 파일 id가 필요하다.
                 // id는 프로필 조회 응답(GET /api/user/profile)의 profileImage.id에서 온다.
-                guard let imageFileId = state.userProfile?.profileImageFileId else {
+                guard let imageFileId = profile.profileImageFileId else {
                     Log.trace("프로필 이미지 - 삭제 불가(파일 id 없음)", category: .network, level: .error)
                     return .send(.internal(.showToast(.init(
                         message: "이미지 정보를 불러올 수 없어 삭제하지 못했어요", style: .info
                     ))))
                 }
-                let updatedProfile = profile.updatingProfileImageUrl(nil)
+                let updatedProfile = profile.updatingProfileImage(url: nil, fileId: nil)
                 state.isLoadingProfile = true
                 // Optimistic UX — 헤더를 즉시 기본 아이콘으로 전환
                 state.isProfileImageDeleting = true
@@ -1034,7 +1034,7 @@ public struct MyProfileFeature: Sendable {
                 // 분기 없이 프로필 업로드 경로만 처리한다.
                 state.imageCropCover = nil
                 state.pendingImagePurpose = nil
-                guard state.communityProfile != nil else {
+                guard state.userProfile != nil else {
                     return .send(.internal(.showToast(.init(
                         message: "프로필 정보를 불러올 수 없어요", style: .info
                     ))))
@@ -1063,15 +1063,16 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case let .internal(.profileImageUploadResponse(.success(registeredImage))):
-                guard let profile = state.communityProfile else {
+                guard let profile = state.userProfile else {
                     state.isLoadingProfile = false
+                    state.pendingProfileImageData = nil
                     return .send(.internal(.showToast(.init(
                         message: "프로필 정보를 불러올 수 없어요", style: .info
                     ))))
                 }
-                // 헤더 표시는 등록된 이미지 URL을, BE 반영은 발급된 id를 사용한다.
-                let updatedProfile = profile.updatingProfileImageUrl(registeredImage.imageUrl)
+                // 헤더 표시는 등록된 이미지 URL을, BE 반영·이후 삭제는 발급된 id를 사용한다.
                 let imageFileId = registeredImage.id
+                let updatedProfile = profile.updatingProfileImage(url: registeredImage.imageUrl, fileId: imageFileId)
                 return .run { send in
                     await send(.internal(.profileImageUpdateResponse(
                         await TaskResult {
@@ -1150,7 +1151,7 @@ public struct MyProfileFeature: Sendable {
 
             case let .internal(.profileImageUpdateResponse(.success(updatedProfile))):
                 state.isLoadingProfile = false
-                state.communityProfile = updatedProfile
+                state.userProfile = updatedProfile
                 state.isProfileImageDeleting = false
                 // 업로드 성공 시에는 pendingProfileImageData를 유지한다.
                 // AsyncImage가 새 URL을 가져오는 동안 `.empty` 단계에서 기본 아이콘이
