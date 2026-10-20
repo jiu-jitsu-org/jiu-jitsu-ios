@@ -107,19 +107,6 @@ public struct CommunityProfile: Codable, Equatable, Sendable {
         self.teachingStartDate = teachingStartDate
         self.teachingDetail = teachingDetail
     }
-
-    /// 실제로 렌더링 가능한 프로필 이미지 URL이 설정되어 있는지 여부.
-    ///
-    /// 헤더의 이미지 표시 조건과 동일한 기준(빈 문자열 제외 + http/https URL 유효성)을 적용해,
-    /// "이미지가 보이는 상태"와 "삭제 옵션 노출" 같이 UI 결정이 어긋나지 않도록 단일 소스로 사용한다.
-    public var hasProfileImage: Bool {
-        guard let urlString = profileImageUrl,
-              !urlString.isEmpty,
-              let url = URL(string: urlString),
-              url.scheme == "https" || url.scheme == "http"
-        else { return false }
-        return true
-    }
 }
 
 // MARK: - Convenience Update Methods
@@ -204,31 +191,6 @@ extension CommunityProfile {
         CommunityProfile(
             nickname: newNickname,
             profileImageUrl: profileImageUrl,
-            beltRank: beltRank,
-            beltStripe: beltStripe,
-            gender: gender,
-            weightKg: weightKg,
-            academyName: academyName,
-            competitions: competitions,
-            bestSubmission: bestSubmission,
-            favoriteSubmission: favoriteSubmission,
-            bestTechnique: bestTechnique,
-            favoriteTechnique: favoriteTechnique,
-            bestPosition: bestPosition,
-            favoritePosition: favoritePosition,
-            isWeightHidden: isWeightHidden,
-            isOwner: isOwner,
-            teachingPhilosophy: teachingPhilosophy,
-            teachingStartDate: teachingStartDate,
-            teachingDetail: teachingDetail
-        )
-    }
-
-    /// 프로필 이미지 URL 업데이트 (`nil` 전달 시 삭제 의미)
-    public func updatingProfileImageUrl(_ url: String?) -> CommunityProfile {
-        CommunityProfile(
-            nickname: nickname,
-            profileImageUrl: url,
             beltRank: beltRank,
             beltStripe: beltStripe,
             gender: gender,

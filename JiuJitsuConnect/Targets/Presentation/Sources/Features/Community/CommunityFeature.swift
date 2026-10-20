@@ -126,6 +126,8 @@ public struct CommunityFeature: Sendable {
         case session(SessionAction)
         // 부모(AppTabFeature)가 딥링크(공유 링크·푸시 탭)를 주입해 상세로 보내는 통로.
         case deepLink(DeepLink)
+        // 부모(AppTabFeature)가 MY에서 바뀐 내 사진(삭제 시 nil)을 주입하는 통로.
+        case myProfileImageChanged(URL?)
 
         // 게시글 상세 서브뷰 네비게이션.
         case path(StackAction<Path.State, Path.Action>)
@@ -472,6 +474,15 @@ public struct CommunityFeature: Sendable {
                 Self.enqueue(.authSessionExpired, into: &state)
                 Self.broadcastToDetails(.sessionExpired, into: &state)
                 return .merge(.cancel(id: CancelID.unreadNotification), .cancel(id: CancelID.myProfileImage))
+
+            // MARK: - 내 사진 변경 (부모 주입)
+
+            case let .myProfileImageChanged(url):
+                guard state.isMyActivityButtonVisible else { return .none }
+                state.myProfileImageURL = url
+                // MY의 업로드·삭제가 끝나기 전에 홈으로 넘어오면 탭 진입 조회가 변경 전 사진을 들고 늦게 도착해
+                // 방금 반영한 값을 덮는다. 진행 중인 조회는 이미 낡은 값이므로 버린다.
+                return .cancel(id: CancelID.myProfileImage)
 
             // MARK: - DeepLink (부모 주입 → 게시글 상세 진입)
 

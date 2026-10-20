@@ -162,24 +162,36 @@ public struct CommunityView: View {
 
     // 사진이 없거나 불러오는 중·실패면 회색 원 위 기본 사람 아이콘을 그린다(웹 아바타와 같은 처리).
     private var myAvatar: some View {
-        AsyncImage(url: store.myProfileImageURL) { phase in
-            if case let .success(image) = phase {
-                image
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                ZStack {
-                    Color.component.header.avatarPlaceholder
-                    Assets.Common.Icon.avatarDefault.swiftUIImage
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: Metrics.avatarDefaultIconSize, height: Metrics.avatarDefaultIconSize)
-                        .foregroundStyle(Color.component.header.avatarDefaultIcon)
+        Group {
+            // URL이 nil로 바뀌어도 같은 AsyncImage는 직전에 받은 사진을 계속 그린다(사진 삭제 후 이전 사진이 남던 원인).
+            // 그래서 사진이 없으면 AsyncImage를 아예 빼고 기본 아이콘을 직접 그린다.
+            if let url = store.myProfileImageURL {
+                AsyncImage(url: url) { phase in
+                    if case let .success(image) = phase {
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        myAvatarPlaceholder
+                    }
                 }
+            } else {
+                myAvatarPlaceholder
             }
         }
         .frame(width: Metrics.avatarSize, height: Metrics.avatarSize)
         .clipShape(Circle())
+    }
+
+    private var myAvatarPlaceholder: some View {
+        ZStack {
+            Color.component.header.avatarPlaceholder
+            Assets.Common.Icon.avatarDefault.swiftUIImage
+                .resizable()
+                .scaledToFit()
+                .frame(width: Metrics.avatarDefaultIconSize, height: Metrics.avatarDefaultIconSize)
+                .foregroundStyle(Color.component.header.avatarDefaultIcon)
+        }
     }
 
     // 테두리는 바깥(outside) 정렬이라 6pt 원 뒤에 테두리 두께만큼 큰 원을 깔아 표현한다.
