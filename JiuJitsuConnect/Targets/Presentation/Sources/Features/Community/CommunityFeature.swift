@@ -561,7 +561,8 @@ public struct CommunityFeature: Sendable {
     private static let myActivityPath = "/\(DeepLinkParser.communitySegment)/me"
 
     /// 알림함과 같은 이유로 리스트 웹뷰와 같은 origin에 커뮤니티 활동 경로를 붙인다.
-    private static func myActivityURL(base: URL) -> URL? {
+    /// MY 탭의 '커뮤니티 활동' 줄(#44)도 같은 origin으로 열도록 AppTabFeature가 함께 쓴다.
+    static func myActivityURL(base: URL) -> URL? {
         URL(string: myActivityPath, relativeTo: base)?.absoluteURL
     }
 

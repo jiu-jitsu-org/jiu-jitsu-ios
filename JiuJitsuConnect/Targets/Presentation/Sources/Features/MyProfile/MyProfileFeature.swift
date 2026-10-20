@@ -21,6 +21,8 @@ public struct MyProfileFeature: Sendable {
     public struct State: Equatable, Sendable {
         @Presents var destination: Destination.State?
         @Presents var sheet: Sheet.State?
+        // '커뮤니티 활동' 등 프로필 탭 스택에 push되는 웹 서브뷰. 서브뷰 안의 중첩 OPEN_SUBVIEW도 여기에 쌓인다. (#44)
+        var path = StackState<Path.State>()
         
         var authInfo: AuthInfo
         
@@ -89,6 +91,11 @@ public struct MyProfileFeature: Sendable {
     }
     
     @Reducer
+    public enum Path {
+        case communityDetail(CommunityDetailFeature)
+    }
+
+    @Reducer
     public enum Sheet {
         case beltSetting(BeltSettingFeature)
         case weightClassSetting(WeightClassSettingFeature)
@@ -107,8 +114,17 @@ public struct MyProfileFeature: Sendable {
         case sheet(PresentationAction<Sheet.Action>)
         // 1:1 크롭 풀스크린 커버 액션
         case imageCropCover(PresentationAction<ProfileImageCropFeature.Action>)
-        
-        public enum DelegateAction: Sendable {}
+        // 웹 서브뷰 스택 액션
+        case path(StackAction<Path.State, Path.Action>)
+        // 부모(AppTabFeature)가 세션 변화(토큰 갱신 등)를 웹 서브뷰에 전파하는 통로.
+        case session(CommunityDetailFeature.SessionUpdate)
+
+        public enum DelegateAction: Sendable {
+            // '커뮤니티 활동' 줄 탭 → 부모가 커뮤니티 웹과 같은 origin·토큰으로 서브뷰를 이 스택에 push한다.
+            case communityActivityRequested
+            // 웹 서브뷰의 인증류 위임(로그인 유도·로그아웃·토큰 갱신) → 부모가 커뮤니티와 같은 흐름으로 처리한다.
+            case webSubview(CommunityDetailFeature.Action.DelegateAction)
+        }
 
         public enum ViewAction: Sendable {
             case onAppear
@@ -128,6 +144,7 @@ public struct MyProfileFeature: Sendable {
             case imagePicked(Data)                  // 카메라/앨범 픽커에서 이미지 선택됨
             case imagePickerCancelled               // 픽커 취소 (시스템 dismiss 포함)
             case profileImageEditButtonTapped       // 프로필 이미지 우측 하단 카메라 버튼 탭
+            case communityActivityTapped            // 벨트 카드 아래 '커뮤니티 활동' 줄 탭 (#44)
         }
         
         public enum InternalAction: Sendable {
@@ -731,6 +748,37 @@ public struct MyProfileFeature: Sendable {
             case .view(.toastButtonTapped):
                 return .send(.internal(.toastDismissed))
                 
+            case .view(.communityActivityTapped):
+                return .send(.delegate(.communityActivityRequested))
+
+            // MARK: - 웹 서브뷰 (커뮤니티 활동 등)
+
+            // 서브뷰 안의 중첩 OPEN_SUBVIEW. 커뮤니티 탭과 같이 이미 서브뷰 안이므로 modal 요청도 push로 쌓는다.
+            // (동일 origin 검증은 상세가 위임 전에 끝냈다)
+            case let .path(.element(id: id, action: .communityDetail(.delegate(.openSubviewRequested(payload))))):
+                guard
+                    case let .communityDetail(source)? = state.path[id: id],
+                    let url = URL(string: payload.url)
+                else { return .none }
+                state.path.append(.communityDetail(.init(
+                    url: url,
+                    title: payload.title,
+                    accessToken: source.accessToken
+                )))
+                return .none
+
+            case let .path(.element(id: _, action: .communityDetail(.delegate(delegate)))):
+                return .send(.delegate(.webSubview(delegate)))
+
+            case let .session(update):
+                for id in state.path.ids {
+                    if case var .communityDetail(detail)? = state.path[id: id] {
+                        CommunityDetailFeature.apply(update, into: &detail)
+                        state.path[id: id] = .communityDetail(detail)
+                    }
+                }
+                return .none
+
             case .view(.addCompetitionButtonTapped):
                 state.destination = .competitionInfo(CompetitionInfoFeature.State())
                 return .none
@@ -1141,7 +1189,7 @@ public struct MyProfileFeature: Sendable {
                     message: "닉네임 저장에 실패했어요. 다시 시도해주세요", style: .info
                 ))))
 
-            case .destination, .sheet, .imageCropCover, .view, .internal, .delegate:
+            case .destination, .sheet, .imageCropCover, .path, .view, .internal, .delegate:
                 return .none
 
             }
@@ -1155,10 +1203,13 @@ public struct MyProfileFeature: Sendable {
         .ifLet(\.$imageCropCover, action: \.imageCropCover) {
             ProfileImageCropFeature()
         }
+        .forEach(\.path, action: \.path)
     }
 }
 // MARK: - Sendable Conformances
 extension MyProfileFeature.Destination.State: Sendable, Equatable {}
 extension MyProfileFeature.Destination.Action: Sendable {}
+extension MyProfileFeature.Path.State: Sendable, Equatable {}
+extension MyProfileFeature.Path.Action: Sendable {}
 extension MyProfileFeature.Sheet.State: Sendable, Equatable {}
 extension MyProfileFeature.Sheet.Action: Sendable {}

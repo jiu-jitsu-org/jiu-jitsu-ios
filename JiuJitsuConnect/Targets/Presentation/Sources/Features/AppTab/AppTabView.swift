@@ -44,9 +44,16 @@ public struct AppTabView: View {
                 }
             }
             tabContainer(for: .myPage) {
-                NavigationStack {
+                NavigationStack(
+                    path: $store.scope(state: \.myPage.path, action: \.myPage.path)
+                ) {
                     MyProfileView(store: store.scope(state: \.myPage, action: \.myPage))
                         .safeAreaInset(edge: .bottom, spacing: 0) { bottomTabBar }
+                } destination: { destinationStore in
+                    switch destinationStore.case {
+                    case let .communityDetail(detailStore):
+                        CommunityDetailView(store: detailStore)
+                    }
                 }
             }
             tabContainer(for: .settings) {
