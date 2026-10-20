@@ -213,6 +213,11 @@ public struct AppTabFeature: Sendable {
                 state.myPage.path.append(.communityDetail(.init(url: url, accessToken: state.home.accessToken)))
                 return .none
 
+            // MY에서 바꾼 사진을 커뮤니티 헤더에 바로 반영한다. 탭 진입 재조회에만 맡기면
+            // 삭제·업로드가 끝나기 전에 홈으로 넘어온 경우 변경 전 사진이 남는다.
+            case let .myPage(.delegate(.profileImageChanged(url))):
+                return .send(.home(.myProfileImageChanged(url.flatMap(URL.init(string:)))))
+
             // MY 탭은 로그인 전용이라 웹의 대기 중 행위를 되살릴 일이 없어 커뮤니티발 로그인(pendingCommunityLogin)으로 표시하지 않는다.
             case .myPage(.delegate(.webSubview(.loginPromptRequested))):
                 return .send(.internal(.showLoginPromptAlert))

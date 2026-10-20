@@ -124,6 +124,8 @@ public struct MyProfileFeature: Sendable {
             case communityActivityRequested
             // 웹 서브뷰의 인증류 위임(로그인 유도·로그아웃·토큰 갱신) → 부모가 커뮤니티와 같은 흐름으로 처리한다.
             case webSubview(CommunityDetailFeature.Action.DelegateAction)
+            // 프로필 이미지 업로드·삭제가 서버에 반영됨(삭제 시 nil) → 부모가 커뮤니티 헤더의 내 사진에 바로 반영한다.
+            case profileImageChanged(String?)
         }
 
         public enum ViewAction: Sendable {
@@ -1164,7 +1166,10 @@ public struct MyProfileFeature: Sendable {
                 let message = updatedProfile.profileImageUrl == nil
                     ? "프로필 이미지를 삭제했어요"
                     : "프로필 이미지를 변경했어요"
-                return .send(.internal(.showToast(.init(message: message, style: .info))))
+                return .merge(
+                    .send(.delegate(.profileImageChanged(updatedProfile.profileImageUrl))),
+                    .send(.internal(.showToast(.init(message: message, style: .info))))
+                )
 
             case let .internal(.profileImageUpdateResponse(.failure(error))):
                 state.isLoadingProfile = false
