@@ -21,6 +21,7 @@ struct TermsAgreementRowView: View {
             labelColor: labelColor,
             typeTextColor: typeTextColor,
             followingIconColor: followingIconColor,
+            showsSeeDetails: store.term.contentURL != nil,
             onCheckTapped: { store.send(.checkTapped) },
             onSeeDetailsTapped: { store.send(.seeDetailsTapped) }
         )
