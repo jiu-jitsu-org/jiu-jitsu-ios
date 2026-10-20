@@ -91,7 +91,14 @@ public struct MyProfileView: View {
                             .padding(.bottom, -cardOverlapHeight)
                             .zIndex(1)
 
-                        // 3. 콘텐츠 영역
+                        // 3. 커뮤니티 활동 진입 줄 — 벨트 미등록(빈 카드)일 때도 같은 자리 (#44)
+                        MyProfileCommunityActivityRow(
+                            onTapped: { store.send(.view(.communityActivityTapped)) }
+                        )
+                        .padding(.top, 12)
+                        .padding(.horizontal, 20)
+
+                        // 4. 콘텐츠 영역
                         contentView
                             .padding(.top, 36)
                             .padding(.horizontal, 20)

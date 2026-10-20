@@ -181,10 +181,12 @@ public struct AppTabFeature: Sendable {
                 Log.trace("커뮤니티 로그인 모달 요청: reason=\(reason ?? "-")", category: .view, level: .info)
                 return .send(.internal(.showLoginModal))
 
-            case .home(.delegate(.logoutRequested)):
+            case .home(.delegate(.logoutRequested)),
+                 .myPage(.delegate(.webSubview(.logoutRequested))):
                 return .send(.internal(.performWebLogout))
 
-            case .home(.delegate(.tokenRefreshRequested)):
+            case .home(.delegate(.tokenRefreshRequested)),
+                 .myPage(.delegate(.webSubview(.tokenRefreshRequested))):
                 // 하이브리드 토큰 소유권은 네이티브 — 웹뷰 만료 시 네이티브 refresh로 갱신해 웹에 돌려준다.
                 // 갱신 결과는 열려 있는 모든 웹뷰에 전파되므로, 진행 중이면 그 응답을 함께 기다리면 된다.
                 guard !state.isRefreshingWebToken else { return .none }
@@ -198,6 +200,25 @@ public struct AppTabFeature: Sendable {
                         await send(.internal(.handleSessionExpired))
                     }
                 }
+
+            // MARK: - MY 탭 웹 서브뷰 (#44)
+
+            // '커뮤니티 활동'을 MY 탭 스택에 push한다. 커뮤니티 웹뷰와 같은 origin(테스트용 도메인 오버라이드 포함)과
+            // 최신 토큰을 써서, 세션 쿠키를 가진 웹뷰에 다른 origin이 실리거나 옛 토큰이 주입되지 않게 한다.
+            case .myPage(.delegate(.communityActivityRequested)):
+                guard
+                    let base = state.home.url,
+                    let url = CommunityFeature.myActivityURL(base: base)
+                else { return .none }
+                state.myPage.path.append(.communityDetail(.init(url: url, accessToken: state.home.accessToken)))
+                return .none
+
+            // MY 탭은 로그인 전용이라 웹의 대기 중 행위를 되살릴 일이 없어 커뮤니티발 로그인(pendingCommunityLogin)으로 표시하지 않는다.
+            case .myPage(.delegate(.webSubview(.loginPromptRequested))):
+                return .send(.internal(.showLoginPromptAlert))
+
+            case .myPage(.delegate(.webSubview(.loginModalRequested))):
+                return .send(.internal(.showLoginModal))
 
             // MARK: - DeepLink
 
@@ -239,7 +260,10 @@ public struct AppTabFeature: Sendable {
                 switch event {
                 case let .tokenRefreshed(accessToken, _):
                     // 네이티브 API가 갱신한 토큰을 웹뷰에도 동기화.
-                    return .send(.home(.session(.loggedIn(accessToken: accessToken))))
+                    return .merge(
+                        .send(.home(.session(.loggedIn(accessToken: accessToken)))),
+                        .send(.myPage(.session(.loggedIn(accessToken: accessToken))))
+                    )
                 case .sessionExpired:
                     return .send(.internal(.handleSessionExpired))
                 }
@@ -248,7 +272,10 @@ public struct AppTabFeature: Sendable {
                 state.isRefreshingWebToken = false
                 // 갱신 "응답"이므로 `.loggedIn`(중복 제거되는 수동 동기화)이 아니라 `.tokenRefreshed`로 내린다.
                 // 다른 요청이 이미 갱신을 마쳐 토큰 값이 그대로여도, 요청한 웹뷰는 응답을 받아야 한다.
-                return .send(.home(.session(.tokenRefreshed(accessToken: accessToken))))
+                return .merge(
+                    .send(.home(.session(.tokenRefreshed(accessToken: accessToken)))),
+                    .send(.myPage(.session(.tokenRefreshed(accessToken: accessToken))))
+                )
 
             case .internal(.handleSessionExpired):
                 state.isRefreshingWebToken = false
