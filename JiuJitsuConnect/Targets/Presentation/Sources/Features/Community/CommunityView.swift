@@ -106,7 +106,7 @@ public struct CommunityView: View {
                         Button {
                             store.send(.view(.notificationTapped))
                         } label: {
-                            Assets.Common.Icon.bell.swiftUIImage
+                            Assets.Common.Icon.inbox.swiftUIImage
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: Metrics.trailingIconSize, height: Metrics.trailingIconSize)
