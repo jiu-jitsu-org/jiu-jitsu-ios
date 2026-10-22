@@ -159,7 +159,6 @@ public struct SettingsFeature: Sendable {
                 }
 
             case .view(.confirmWithdrawal):
-                // TODO: 실제 회원 탈퇴 API 호출
                 return .run { send in
                     await send(.internal(.withdrawalResponse(
                         await TaskResult { try await

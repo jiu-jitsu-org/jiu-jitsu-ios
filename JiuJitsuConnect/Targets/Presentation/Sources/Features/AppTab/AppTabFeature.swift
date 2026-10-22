@@ -165,7 +165,20 @@ public struct AppTabFeature: Sendable {
                 state.selectedTab = .home
                 return .merge(
                     .send(.home(.session(.loggedOut))),
-                    .send(.internal(.showLoginModal))
+                    // 로컬 세션 정리를 끝낸 뒤 로그인 모달을 띄운다. 먼저 띄우면 새로 로그인한 토큰을
+                    // 뒤늦은 signOut이 지우거나, 새 로그인이 폐기 직전의 FCM 토큰을 등록할 수 있다.
+                    .run { send in
+                        await authClient.signOut()
+                        // 탈퇴 기기로 푸시가 가지 않게 FCM 토큰을 폐기한다. 캐시를 남기면 다음 로그인
+                        // (syncAfterLoginSuccess)이 폐기된 토큰을 서버에 다시 등록하므로 함께 지운다.
+                        firebaseClient.clearCachedToken()
+                        do {
+                            try await firebaseClient.deleteFCMToken()
+                        } catch {
+                            Log.trace("FCM token deletion after withdrawal failed: \(error)", category: .system, level: .error)
+                        }
+                        await send(.internal(.showLoginModal))
+                    }
                 )
 
             // MARK: - Community Web Bridge Delegate
