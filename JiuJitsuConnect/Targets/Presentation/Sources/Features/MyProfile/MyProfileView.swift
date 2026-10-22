@@ -119,6 +119,7 @@ public struct MyProfileView: View {
             .animation(.easeInOut(duration: 0.15), value: store.isMoreMenuPresented)
             .ignoresSafeArea(edges: .top)
             .navigationDestinations(store: $store)
+            .uploadingOverlay(isPresented: store.isUploadingInstructorVerification)
             .toastOverlay(store: store)
             // picker 프레젠테이션은 시트 content 안쪽에서 적용된다
             // (iOS는 한 presenter에서 sheet + fullScreenCover 동시 제시를 막으므로
@@ -269,6 +270,25 @@ private extension View {
             }
     }
     
+    /// 관장 사범 인증 업로드 중 화면 딤 + 인디케이터. 터치를 받아 하위 조작(메뉴 재진입 등)을 막는다.
+    func uploadingOverlay(isPresented: Bool) -> some View {
+        self.overlay {
+            if isPresented {
+                ZStack {
+                    Color.black.opacity(0.4)
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .controlSize(.large)
+                        .tint(.white)
+                }
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.15), value: isPresented)
+    }
+
     /// 토스트 오버레이
     func toastOverlay(store: StoreOf<MyProfileFeature>) -> some View {
         self.overlay(alignment: .bottom) {
