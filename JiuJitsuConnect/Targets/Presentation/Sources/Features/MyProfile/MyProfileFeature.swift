@@ -43,6 +43,10 @@ public struct MyProfileFeature: Sendable {
         // 우측 상단 "..." 메뉴 노출 여부 (관장 사범 인증 메뉴)
         var isMoreMenuPresented: Bool = false
 
+        // 관장 사범 인증 업로드(토큰 발급 → ImageKit 업로드 → PUT /api/user/owner) 진행 중.
+        // 동안 로딩 오버레이로 화면 터치를 막아 중복 제출을 차단한다(#62).
+        var isUploadingInstructorVerification: Bool = false
+
         // 프로필 이미지 캡처 픽커 (카메라/앨범 풀스크린)
         var imageCaptureSource: ImageCaptureSource?
 
@@ -888,6 +892,7 @@ public struct MyProfileFeature: Sendable {
 
             case .view(.instructorVerificationMenuTapped):
                 state.isMoreMenuPresented = false
+                guard !state.isUploadingInstructorVerification else { return .none }
                 // 이미 인증 사진을 제출한 상태(ownerRequested=true & 이미지 존재)면 시트에 미리보기로 노출.
                 let existingImageUrl = state.userProfile?.ownerRequested == true
                     ? state.userProfile?.ownerRequestImageUrl
@@ -1002,13 +1007,10 @@ public struct MyProfileFeature: Sendable {
                 case .instructorVerification:
                     // 파이프라인이 여기서 끝나므로 purpose 리셋
                     state.pendingImagePurpose = nil
-                    // FIXME: 업로드 진행 피드백 부재 (구현 보류). 사진 선택 즉시 시트가 닫힌 뒤
-                    //   순차 3-홉(ImageKit 토큰 발급 → ImageKit 업로드 → PUT /api/user/owner)이
-                    //   끝날 때까지 2~5초간 화면에 표시가 없어, 사용자가 실패로 오인하거나 메뉴
-                    //   재진입으로 중복 인증요청을 보낼 수 있다. 인증 사진은 노출되지 않는 검수용이라
-                    //   프로필 이미지의 Optimistic Update는 적용 불가.
-                    //   구현 방향(합의됨): 로딩 오버레이(화면 딤 + 인디케이터)로 업로드 내내 진행을
-                    //   표시하고 터치를 막아 중복 제출을 차단, 완료 시 오버레이 제거 + 결과 토스트.
+                    // 순차 3-홉(ImageKit 토큰 발급 → ImageKit 업로드 → PUT /api/user/owner)이 2~5초 걸린다.
+                    // 인증 사진은 노출되지 않는 검수용이라 Optimistic Update 대신 로딩 오버레이로
+                    // 진행을 표시하고 터치를 막는다. 완료·실패 응답에서 해제 후 결과 토스트(#62).
+                    state.isUploadingInstructorVerification = true
                     Log.trace(
                         "관장 사범 인증 - 크롭 생략, 원본 업로드 시작 (\(data.count) bytes)",
                         category: .network,
@@ -1121,12 +1123,14 @@ public struct MyProfileFeature: Sendable {
                 .cancellable(id: CancelID.instructorVerificationUpload)
 
             case let .internal(.instructorVerificationImageUploadResponse(.failure(error))):
+                state.isUploadingInstructorVerification = false
                 Log.trace("Failed to upload instructor verification image: \(error)", category: .network, level: .error)
                 return .send(.internal(.showToast(.init(
                     message: "사진 업로드에 실패했어요. 다시 시도해주세요", style: .info
                 ))))
 
             case let .internal(.instructorVerificationRequestResponse(.success(uploadedImageUrl))):
+                state.isUploadingInstructorVerification = false
                 // 인증 요청 접수 완료. 검수는 비동기이므로 "업로드했어요" 안내가 정확하다.
                 Log.trace("관장 사범 인증 - 인증 요청 완료", category: .network, level: .info)
                 // Optimistic — BE 응답을 기다리지 않고 ownerRequested + 방금 업로드한 이미지 URL을
@@ -1151,6 +1155,7 @@ public struct MyProfileFeature: Sendable {
                 ))))
 
             case let .internal(.instructorVerificationRequestResponse(.failure(error))):
+                state.isUploadingInstructorVerification = false
                 Log.trace("Failed to request owner verification: \(error)", category: .network, level: .error)
                 return .send(.internal(.showToast(.init(
                     message: "인증 요청에 실패했어요. 다시 시도해주세요", style: .info
