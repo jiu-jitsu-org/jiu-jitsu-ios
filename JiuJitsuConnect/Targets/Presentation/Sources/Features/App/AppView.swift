@@ -17,7 +17,17 @@ public struct AppView: View {
       } else if let loginStore = store.scope(state: \.destination?.login, action: \.destination.login) {
         LoginView(store: loginStore)
       } else if let appTabStore = store.scope(state: \.destination?.appTab, action: \.destination.appTab) {
-        AppTabView(store: appTabStore)
+        // 홈은 인사 장면이 있든 없든 같은 자리에 두어, 인사가 끝나도 화면이 다시 만들어지지 않게 한다
+        ZStack {
+          if store.greeting != nil {
+            GreetingSceneView(
+              onCover: { store.send(.view(.greetingCoverStarted), animation: Self.coverAnimation) },
+              onFinish: { store.send(.view(.greetingFinished)) }
+            )
+          }
+          AppTabView(store: appTabStore)
+            .modifier(GreetingCover(isHidden: store.greeting == .playing, isActive: store.greeting != nil))
+        }
       } else {
         EmptyView()
       }
@@ -36,5 +46,50 @@ public struct AppView: View {
     .onOpenURL { url in
       store.send(.view(.deepLinkReceived(url)))
     }
+  }
+
+  /// 홈이 아래에서 올라와 덮는 움직임 (시안 cubic-bezier(.6, 0, .2, 1), 0.52초)
+  private static let coverAnimation = Animation.timingCurve(0.6, 0, 0.2, 1, duration: 0.52)
+}
+
+/// 인사 장면 위로 홈을 덮어 올린다. 숨어 있을 때는 화면 아래로 내려 두고, 위쪽 모서리를 둥글게 깎는다.
+/// 인사가 끝나면(`isActive == false`) 깎지 않아 홈이 안전 영역까지 그대로 그려진다.
+private struct GreetingCover: ViewModifier {
+  let isHidden: Bool
+  let isActive: Bool
+
+  @State private var travel: CGFloat = 0
+  @State private var topInset: CGFloat = 0
+
+  func body(content: Content) -> some View {
+    content
+      .clipShape(TopRoundedCover(radius: isHidden ? 28 : 0, topInset: topInset, isActive: isActive))
+      .offset(y: isHidden ? travel : 0)
+      .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { insets in
+        topInset = insets.top
+      }
+      .onGeometryChange(for: CGFloat.self) { $0.size.height + $0.safeAreaInsets.top + $0.safeAreaInsets.bottom } action: { height in
+        travel = height
+      }
+  }
+}
+
+/// 위쪽 두 모서리만 둥근 덮개 모양. 홈이 안전 영역(상태 막대 자리)까지 그리므로 그만큼 위로 넓힌다.
+private struct TopRoundedCover: Shape {
+  var radius: CGFloat
+  let topInset: CGFloat
+  let isActive: Bool
+
+  var animatableData: CGFloat {
+    get { radius }
+    set { radius = newValue }
+  }
+
+  func path(in rect: CGRect) -> Path {
+    // 아래와 양옆은 넉넉히 넓혀 탭 바·홈 바 자리 그림이 잘리지 않게 한다
+    let bounds = CGRect(x: rect.minX - 200, y: rect.minY - topInset, width: rect.width + 400, height: rect.height + topInset + 400)
+    guard isActive else { return Path(bounds.insetBy(dx: -2000, dy: -2000)) }
+    let cover = CGRect(x: rect.minX, y: bounds.minY, width: rect.width, height: bounds.height)
+    return UnevenRoundedRectangle(topLeadingRadius: radius, topTrailingRadius: radius).path(in: cover)
   }
 }

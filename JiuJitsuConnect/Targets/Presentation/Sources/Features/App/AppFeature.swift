@@ -24,8 +24,16 @@ public struct AppFeature: Sendable {
         @Presents public var destination: Destination.State? = .splash(.init())
         // 스플래시·로그인 중에 들어온 딥링크 보관소. AppTab이 만들어지는 즉시 소비한다.
         var pendingDeepLink: DeepLink?
+        /// 자동 로그인으로 들어온 사람에게 홈 위에 덮어 보여주는 인사 장면. nil이면 장면 없이 홈만 보인다.
+        var greeting: Greeting?
 
         public init() {}
+    }
+
+    /// 인사 장면 단계. 홈(AppTab)은 처음부터 만들어 두고 화면 아래에 숨겨 두었다가 `covering`에서 올라와 덮는다.
+    public enum Greeting: Equatable, Sendable {
+        case playing
+        case covering
     }
 
     public enum Action: Sendable {
@@ -37,6 +45,10 @@ public struct AppFeature: Sendable {
             case onAppear
             /// 유니버설 링크 수신(`NSUserActivityTypeBrowsingWeb`).
             case deepLinkReceived(URL)
+            /// 인사가 끝나 홈이 아래에서 올라오기 시작한다.
+            case greetingCoverStarted
+            /// 홈이 화면을 다 덮었다. 인사 장면을 걷어낸다.
+            case greetingFinished
         }
 
         public enum InternalAction: Sendable {
@@ -67,6 +79,15 @@ public struct AppFeature: Sendable {
             case let .view(.deepLinkReceived(url)):
                 return Self.route(url, into: &state)
 
+            case .view(.greetingCoverStarted):
+                guard state.greeting != nil else { return .none }
+                state.greeting = .covering
+                return .none
+
+            case .view(.greetingFinished):
+                state.greeting = nil
+                return .none
+
             case let .internal(.pushNotificationTapped(payload)):
                 // 푸시 payload를 공유 링크와 같은 URL로 바꿔 동일 파이프라인에 태운다.
                 // 미지원 type은 nil → 앱만 열린 채로 둔다(#28 미지원 값 처리).
@@ -78,6 +99,8 @@ public struct AppFeature: Sendable {
             case let .destination(.presented(.splash(.delegate(.finishedLaunch(authInfo))))):
                 if let authInfo = authInfo {
                     state.destination = .appTab(.init(authInfo: authInfo))
+                    // 공유 링크·푸시로 들어왔으면 그 글을 바로 보여줘야 해 인사를 건너뛴다
+                    state.greeting = state.pendingDeepLink == nil ? .playing : nil
                     // 앱 진입 FCM sync: 로그인 상태일 때만 실행 (취소되지 않음)
                     return .merge(
                         Self.consumePendingDeepLink(&state),
@@ -131,6 +154,8 @@ public struct AppFeature: Sendable {
             state.pendingDeepLink = link
             return .none
         }
+        // 인사 중에 링크가 들어오면 인사를 접고 바로 그 화면을 보여준다
+        state.greeting = nil
         return .send(.destination(.presented(.appTab(.deepLink(link)))))
     }
 
