@@ -28,6 +28,10 @@ public struct NotificationSettingFeature: Sendable {
         // 정통망법상 마케팅 알림은 옵트인 → 기본 false
         var isMarketingNotificationEnabled: Bool = false
 
+        // 서버에 반영된 것으로 확인된 마지막 값. 저장 실패 시 토글을 이 값으로 되돌린다.
+        // 조회가 실패해 서버 값을 모르면 nil이고, 이때는 되돌리지 않는다.
+        var lastSavedSetting: NoticeSetting?
+
         var toast: ToastState?
 
         public init() {}
@@ -113,10 +117,8 @@ public struct NotificationSettingFeature: Sendable {
                 .cancellable(id: CancelID.updateSetting, cancelInFlight: true)
 
             case let .internal(.fetchSettingResponse(.success(setting))):
-                state.isAccountSecurityNotificationEnabled = setting.securityEnabled
-                state.isServiceNoticeNotificationEnabled = setting.serviceEnabled
-                state.isCommunityNotificationEnabled = setting.communityEnabled
-                state.isMarketingNotificationEnabled = setting.marketingEnabled
+                state.apply(setting)
+                state.lastSavedSetting = setting
                 state.isLoaded = true
                 return .none
 
@@ -126,11 +128,16 @@ public struct NotificationSettingFeature: Sendable {
                 state.isLoaded = true
                 return handleError(error)
 
-            case .internal(.updateSettingResponse(.success)):
+            case let .internal(.updateSettingResponse(.success(setting))):
+                state.lastSavedSetting = setting
                 return .none
 
             case let .internal(.updateSettingResponse(.failure(error))):
                 Log.trace("알림 설정 저장 실패: \(error)", category: .network, level: .error)
+                // 화면 값과 서버 값이 어긋나지 않도록 마지막으로 저장된 값으로 되돌린다(#61).
+                if let lastSaved = state.lastSavedSetting {
+                    state.apply(lastSaved)
+                }
                 return handleError(error)
 
             // MARK: - Toast Actions
@@ -164,5 +171,14 @@ public struct NotificationSettingFeature: Sendable {
         case .none:
             return .none
         }
+    }
+}
+
+private extension NotificationSettingFeature.State {
+    mutating func apply(_ setting: NoticeSetting) {
+        isAccountSecurityNotificationEnabled = setting.securityEnabled
+        isServiceNoticeNotificationEnabled = setting.serviceEnabled
+        isCommunityNotificationEnabled = setting.communityEnabled
+        isMarketingNotificationEnabled = setting.marketingEnabled
     }
 }
