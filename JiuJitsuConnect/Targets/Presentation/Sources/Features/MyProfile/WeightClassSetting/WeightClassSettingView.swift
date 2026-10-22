@@ -31,10 +31,11 @@ public struct WeightClassSettingView: View {
 
     let store: StoreOf<WeightClassSettingFeature>
     
-    // 성별 아이템 (여성 → 남성)
+    // 성별 아이템 (여성 → 남성 → 기타). '기타'가 없으면 기타 사용자가 여자로 표시·저장된다(#73).
     private let genderItems = [
         GenderItem(gender: .female),
-        GenderItem(gender: .male)
+        GenderItem(gender: .male),
+        GenderItem(gender: .other)
     ]
     
     // 체중 정수 부분 (150~40, 큰 수부터)
