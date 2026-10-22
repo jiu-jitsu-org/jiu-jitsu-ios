@@ -11,66 +11,11 @@ public struct LoginView: View {
     
     public var body: some View {
         NavigationStack(path: $store.scope(state: \.path, action: \.path)) {
-            ZStack {
-                backgroundGradient
-                    .ignoresSafeArea()
-
-                VStack(spacing: 0) {
-                    Spacer()
-
-                    // MARK: - 브랜드 영역
-                    brandSection
-
-                    Spacer()
-
-                    // MARK: - 소셜 로그인 버튼
-                    VStack(spacing: 10) {
-                        // 카카오 로그인 버튼
-                        Button(action: { store.send(.view(.kakaoButtonTapped)) }) {
-                            SocialLoginButton(
-                                asset: Assets.Login.Logo.kakao,
-                                text: "카카오 계속하기",
-                                backgroundColor: Color.primitive.kakao.bg,
-                                foregroundColor: Color.primitive.kakao.text
-                            )
-                        }
-                        .frame(height: 52)
-                        
-                        // 구글 로그인 버튼
-                        Button(action: { store.send(.view(.googleButtonTapped)) }) {
-                            SocialLoginButton(
-                                asset: Assets.Login.Logo.google,
-                                text: "구글로 계속하기",
-                                backgroundColor: Color.primitive.google.bg,
-                                foregroundColor: Color.primitive.google.text
-                            )
-                        }
-                        .frame(height: 52)
-                        
-                        // 애플 로그인 버튼
-                        Button(action: { store.send(.view(.appleButtonTapped)) }) {
-                            SocialLoginButton(
-                                asset: Assets.Login.Logo.apple,
-                                text: "애플로 계속하기",
-                                backgroundColor: Color.primitive.apple.bg,
-                                foregroundColor: Color.primitive.apple.text
-                            )
-                        }
-                        .frame(height: 52)
-                        
-                        // 둘러보기 버튼
-                        Button(action: { store.send(.view(.aroundButtonTapped)) }) {
-                            Text("로그인 없이 둘러보기")
-                                .font(Font.pretendard.custom(weight: .medium, size: 14))
-                                .foregroundStyle(Color.primitive.coolGray.cg200)
-                                .underline(true, color: Color.primitive.coolGray.cg300)
-                        }
-                        .frame(height: 44)
-                    }
-                    .padding(.horizontal, 35)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            LoginSceneView {
+                loginButtons
             }
+            // 빈 내비게이션 바가 안전 영역을 차지하지 않도록 첫 화면에서만 숨긴다
+            .toolbar(.hidden, for: .navigationBar)
             #if BETA
             // Beta 스킴 전용 테스트 로그인. 기존 로그인 레이아웃을 건드리지 않도록
             // 본문 위에 떠 있는 오버레이로만 올린다.
@@ -111,7 +56,8 @@ public struct LoginView: View {
                     )
             }
         }
-        //        }
+        // 파란 화면이 보일 때만 상태 막대를 흰색으로. 닉네임 설정·약관 시트가 뜨면 원래대로 돌아간다
+        .lightStatusBar(store.path.isEmpty && store.sheet == nil)
     }
     
     #if BETA
@@ -131,41 +77,50 @@ public struct LoginView: View {
     }
     #endif
 
-    // MARK: - 브랜드 영역
+    // MARK: - 소셜 로그인 버튼
 
-    private var brandSection: some View {
-        VStack(spacing: 20) {
-            // 워드마크 엠블럼
-            Circle()
-                .fill(Color.primitive.bw.white)
-                .frame(width: 96, height: 96)
-                .overlay {
-                    Text("OSS")
-                        .font(Font.cookieRun.custom(weight: .black, size: 30))
-                        .foregroundStyle(Color.primitive.coolGray.cg900)
-                }
-                .shadow(color: Color.primitive.opacity.black40, radius: 16, y: 8)
-
-            VStack(spacing: 8) {
-                Text("주짓떼로/주짓떼라를 위한 커뮤니티")
-                    .font(Font.pretendard.title2)
-                    .foregroundStyle(Color.primitive.bw.white)
-
-                Text("매트 위의 경험을 나누고 함께 성장해요")
-                    .font(Font.pretendard.bodyS)
-                    .foregroundStyle(Color.primitive.coolGray.cg200)
+    private var loginButtons: some View {
+        VStack(spacing: 10) {
+            Button(action: { store.send(.view(.kakaoButtonTapped)) }) {
+                SocialLoginButton(
+                    asset: Assets.Login.Logo.kakao,
+                    text: "카카오로 계속하기",
+                    backgroundColor: Color.primitive.kakao.bg,
+                    foregroundColor: Color.primitive.kakao.text
+                )
             }
+
+            // 흰 시트 위의 흰 버튼이라 테두리로 경계를 잡는다
+            Button(action: { store.send(.view(.googleButtonTapped)) }) {
+                SocialLoginButton(
+                    asset: Assets.Login.Logo.google,
+                    text: "구글로 계속하기",
+                    backgroundColor: Color.primitive.google.bg,
+                    foregroundColor: Color.primitive.google.text,
+                    borderColor: Color.primitive.coolGray.cg75
+                )
+            }
+
+            Button(action: { store.send(.view(.appleButtonTapped)) }) {
+                SocialLoginButton(
+                    asset: Assets.Login.Logo.apple,
+                    text: "애플로 계속하기",
+                    backgroundColor: Color.primitive.apple.bg,
+                    foregroundColor: Color.primitive.apple.text
+                )
+            }
+
+            Button(action: { store.send(.view(.aroundButtonTapped)) }) {
+                Text("로그인 없이 둘러보기")
+                    .font(Font.pretendard.custom(weight: .medium, size: 14))
+                    .foregroundStyle(Color.primitive.coolGray.cg400)
+                    .underline(true, color: Color.primitive.coolGray.cg100)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .contentShape(Rectangle())
+            }
+            .padding(.top, 2)
         }
-    }
-
-    // MARK: - 배경
-
-    private var backgroundGradient: some View {
-        LinearGradient(
-            colors: [Color.primitive.coolGray.cg700, Color.primitive.coolGray.cg500],
-            startPoint: .top,
-            endPoint: .bottom
-        )
     }
 
     private func calculateSheetHeight(itemCount: Int) -> CGFloat {
@@ -188,27 +143,26 @@ struct SocialLoginButton: View {
     let backgroundColor: Color
     let foregroundColor: Color
     var borderColor: Color = .clear // 테두리 색상 (선택 사항)
-    
+
     var body: some View {
-        HStack(spacing: 21) {
+        HStack(spacing: 12) {
             asset.swiftUIImage
                 .resizable()
-                .aspectRatio(contentMode: .fit)
+                .scaledToFit()
                 .frame(width: 22, height: 22)
-            
+
             Text(text)
                 .font(Font.pretendard.custom(weight: .medium, size: 16))
         }
         .frame(maxWidth: .infinity)
-        .padding()
+        .frame(height: 52)
         .background(backgroundColor)
         .foregroundStyle(foregroundColor)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(borderColor, lineWidth: 1)
+                .strokeBorder(borderColor, lineWidth: 1)
         )
-        .shadow(color: Color.primitive.opacity.black40, radius: 8, y: 4)
     }
 }
 
