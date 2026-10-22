@@ -21,8 +21,9 @@ public struct NicknameSettingFeature: Sendable {
     private enum CancelID { case apiCall }
     
     // 정규식 객체 재사용을 위한 Static 선언
+    // 허용 문자는 한글(완성형)·영문·숫자만 — 공백·`_`·`.` 등 특수문자 불허(정책 2026-10-21, #67).
     private static let nicknameRegex: NSRegularExpression? = {
-        let pattern = "^[a-zA-Z0-9가-힣\\s_.]*$"
+        let pattern = "^[a-zA-Z0-9가-힣]*$"
         return try? NSRegularExpression(pattern: pattern, options: .caseInsensitive)
     }()
     
