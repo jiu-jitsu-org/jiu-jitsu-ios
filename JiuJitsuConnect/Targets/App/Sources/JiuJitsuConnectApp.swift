@@ -5,7 +5,9 @@ import ComposableArchitecture
 import Presentation
 import GoogleSignIn
 import KakaoSDKAuth
+#if DEBUG || BETA
 import PulseUI
+#endif
 
 @main
 struct JiuJitsuConnectApp: App {
@@ -14,9 +16,7 @@ struct JiuJitsuConnectApp: App {
     init() {
         AppConfigurator.configureExternalSDKs()
     }
-    
-    @State private var isPulsePresented = false
-    
+
     var body: some Scene {
         WindowGroup {
             AppView(store: createStore())
@@ -27,14 +27,7 @@ struct JiuJitsuConnectApp: App {
                         GIDSignIn.sharedInstance.handle(url)
                     }
                 }
-                .onShake {
-                    self.isPulsePresented  = true
-                }
-                .sheet(isPresented: $isPulsePresented) {
-                    NavigationView {
-                        ConsoleView()
-                    }
-                }
+                .modifier(PulseConsoleOnShakeModifier())
         }
     }
     
@@ -71,7 +64,33 @@ struct JiuJitsuConnectApp: App {
 }
 
 // TODO: - Clean Architecture에 코드 위치 수정
-// MARK: - DEBUG 전용 HAND SHAKE LOG VIEW (수정된 최종 버전)
+// MARK: - Debug/Beta 전용 HAND SHAKE LOG VIEW
+// 네트워크 요청·응답 로그가 일반 사용자에게 노출되지 않도록 Release에서는 컴파일에서 제외한다.
+
+/// 흔들기로 Pulse 로그 콘솔을 띄운다. Release에서는 아무것도 하지 않는다.
+struct PulseConsoleOnShakeModifier: ViewModifier {
+    #if DEBUG || BETA
+    @State private var isPresented = false
+
+    func body(content: Content) -> some View {
+        content
+            .onShake {
+                isPresented = true
+            }
+            .sheet(isPresented: $isPresented) {
+                NavigationView {
+                    ConsoleView()
+                }
+            }
+    }
+    #else
+    func body(content: Content) -> some View {
+        content
+    }
+    #endif
+}
+
+#if DEBUG || BETA
 // 쉐이크 이벤트를 SwiftUI로 전달하기 위한 Notification 이름 정의
 extension NSNotification.Name {
     static let deviceDidShake = NSNotification.Name("deviceDidShakeNotification")
@@ -147,3 +166,4 @@ extension View {
         .modifier(ShakeObserverModifier())
     }
 }
+#endif

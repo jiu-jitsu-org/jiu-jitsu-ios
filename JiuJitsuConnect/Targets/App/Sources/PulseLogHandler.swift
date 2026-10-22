@@ -5,6 +5,7 @@
 //  Created by suni on 11/10/25.
 //
 
+#if DEBUG || BETA
 import Foundation
 import Pulse
 import CoreKit
@@ -34,3 +35,4 @@ private extension LogLevel {
         }
     }
 }
+#endif
