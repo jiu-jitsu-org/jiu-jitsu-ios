@@ -98,7 +98,8 @@ public struct AppFeature: Sendable {
                     return .none
                 }
 
-            case let .destination(.presented(.login(.delegate(.didLogin(authInfo))))):
+            case let .destination(.presented(.login(.delegate(.didLogin(authInfo))))),
+                 let .destination(.presented(.login(.delegate(.didSignup(authInfo))))):
                 state.destination = .appTab(.init(authInfo: authInfo))
                 // 로그인 성공 FCM sync
                 return .merge(

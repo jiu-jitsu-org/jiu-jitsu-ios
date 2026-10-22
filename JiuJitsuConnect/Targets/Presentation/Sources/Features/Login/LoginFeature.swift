@@ -51,6 +51,8 @@ public struct LoginFeature: Sendable {
         
         public enum DelegateAction: Sendable {
             case didLogin(AuthInfo)
+            /// 신규 가입 완료 후 '홈으로'. 진입 경로와 상관없이 홈 탭으로 보내기 위해 로그인과 구분한다(#72).
+            case didSignup(AuthInfo)
             case skipLogin
         }
     }
@@ -167,7 +169,7 @@ public struct LoginFeature: Sendable {
                     
                     // 회원가입 완료 확인
                 case let .element(id: _, action: .signupComplete(.delegate(.completeSignupFlow(info)))):
-                    return .send(.delegate(.didLogin(info)))
+                    return .send(.delegate(.didSignup(info)))
                     
                     // 닉네임 설정 실패
                 case let .element(id: _, action: .nicknameSetting(.delegate(.signupFailed(message)))):
