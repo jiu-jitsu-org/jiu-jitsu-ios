@@ -53,11 +53,20 @@ public enum Assets {
     }
   }
   public enum Login {
+    public enum Character {
+      public static let bodyBlack = ImageAsset(name: "Login/Character/body-black")
+      public static let bodyBlue = ImageAsset(name: "Login/Character/body-blue")
+      public static let bodyBrown = ImageAsset(name: "Login/Character/body-brown")
+      public static let bodyPurple = ImageAsset(name: "Login/Character/body-purple")
+      public static let bodyWhite = ImageAsset(name: "Login/Character/body-white")
+      public static let eyesMeh = ImageAsset(name: "Login/Character/eyes-meh")
+    }
     public enum Logo {
       public static let apple = ImageAsset(name: "Login/Logo/apple")
       public static let google = ImageAsset(name: "Login/Logo/google")
       public static let kakao = ImageAsset(name: "Login/Logo/kakao")
     }
+    public static let pattern = ImageAsset(name: "Login/pattern")
   }
   public enum MyProfile {
     public enum Background {
