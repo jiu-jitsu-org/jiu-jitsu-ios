@@ -24,6 +24,10 @@ public struct TermsWebViewView: View {
     // didFinish 이후에도 JS 렌더링(Notion 블록 등)이 더 진행되므로,
     // 사용자가 즉시 스크롤해 부분 렌더 상태를 보지 않도록 그레이스 시간을 둔다.
     @State private var isWebViewReady: Bool = false
+    // 로드 실패(오프라인 등) 시 빈 화면 대신 오류 안내 + 재시도를 보여준다(#64).
+    @State private var isLoadFailed: Bool = false
+    // 값이 바뀌면 WKWebView가 같은 url을 다시 로드한다(재시도).
+    @State private var reloadToken: Int = 0
 
     public var body: some View {
         ZStack {
@@ -33,6 +37,7 @@ public struct TermsWebViewView: View {
                 // 컨텐츠가 상단 상태바나 하단 닫기 버튼에 가려지지 않도록 한다.
                 TermsWKWebView(
                     url: store.url,
+                    reloadToken: reloadToken,
                     topContentInset: proxy.safeAreaInsets.top,
                     bottomContentInset: proxy.safeAreaInsets.bottom
                         + Style.expandedHeight
@@ -47,13 +52,18 @@ public struct TermsWebViewView: View {
                                 isWebViewReady = true
                             }
                         }
+                    },
+                    onLoadFail: {
+                        isLoadFailed = true
                     }
                 )
                 .ignoresSafeArea()
             }
-            .opacity(isWebViewReady ? 1 : 0)
+            .opacity(isWebViewReady && !isLoadFailed ? 1 : 0)
 
-            if !isWebViewReady {
+            if isLoadFailed {
+                errorView
+            } else if !isWebViewReady {
                 ProgressView()
                     .tint(Color.component.cta.dark.bg)
                     .scaleEffect(1.2)
@@ -62,12 +72,31 @@ public struct TermsWebViewView: View {
         .overlay(alignment: .bottom) {
             closeButton
                 .padding(.bottom, Style.bottomPadding)
-                .opacity(isWebViewReady ? 1 : 0)
+                .opacity(isWebViewReady || isLoadFailed ? 1 : 0)
         }
         .background(
             Color.primitive.bw.trueWhite
                 .ignoresSafeArea()
         )
+    }
+
+    /// 커뮤니티 웹뷰(`CommunityView.errorOverlay`)와 같은 오류 안내.
+    private var errorView: some View {
+        VStack(spacing: 13) {
+            Text("잠시 문제가 생겼어요")
+                .font(.pretendard.bodyM)
+                .foregroundStyle(Color.component.errorState.default.titleText)
+            Button {
+                isLoadFailed = false
+                isWebViewReady = false
+                reloadToken += 1
+            } label: {
+                AppButtonConfiguration(title: "재시도", size: .medium)
+            }
+            .appButtonStyle(.neutral, size: .medium)
+            .frame(height: 38)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var closeButton: some View {
@@ -177,10 +206,12 @@ public struct TermsWebViewView: View {
 
 private struct TermsWKWebView: UIViewRepresentable {
     let url: URL
+    let reloadToken: Int
     let topContentInset: CGFloat
     let bottomContentInset: CGFloat
     let onScroll: (CGFloat) -> Void
     let onLoadFinish: () -> Void
+    let onLoadFail: () -> Void
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
@@ -204,6 +235,7 @@ private struct TermsWKWebView: UIViewRepresentable {
         context.coordinator.observe(scrollView: webView.scrollView)
         // 최초 1회만 로드. 이후 updateUIView가 호출되어도 같은 url이면 재로드하지 않는다.
         context.coordinator.loadedURL = url
+        context.coordinator.loadedReloadToken = reloadToken
         webView.load(URLRequest(url: url))
         return webView
     }
@@ -218,11 +250,15 @@ private struct TermsWKWebView: UIViewRepresentable {
     func updateUIView(_ uiView: WKWebView, context: Context) {
         context.coordinator.onScroll = onScroll
         context.coordinator.onLoadFinish = onLoadFinish
+        context.coordinator.onLoadFail = onLoadFail
         applyInsets(to: uiView)
         // SwiftUI body re-render마다 호출되므로, 이미 로드한 url이면 절대 재로드 금지.
         // (서버 redirect로 trailing slash가 붙는 등의 차이로 무한 리로드가 발생하던 문제 방어)
-        guard context.coordinator.loadedURL != url else { return }
+        // 단, 재시도(reloadToken 변경)일 때는 같은 url이라도 다시 로드한다.
+        guard context.coordinator.loadedURL != url
+                || context.coordinator.loadedReloadToken != reloadToken else { return }
         context.coordinator.loadedURL = url
+        context.coordinator.loadedReloadToken = reloadToken
         uiView.load(URLRequest(url: url))
     }
 
@@ -240,20 +276,23 @@ private struct TermsWKWebView: UIViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onScroll: onScroll, onLoadFinish: onLoadFinish)
+        Coordinator(onScroll: onScroll, onLoadFinish: onLoadFinish, onLoadFail: onLoadFail)
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate {
         var onScroll: (CGFloat) -> Void
         var onLoadFinish: () -> Void
+        var onLoadFail: () -> Void
         // 이미 load() 호출한 URL — updateUIView에서 중복 로드를 막기 위한 가드.
         var loadedURL: URL?
+        var loadedReloadToken: Int = 0
         private var offsetObservation: NSKeyValueObservation?
         private var didLoad = false
 
-        init(onScroll: @escaping (CGFloat) -> Void, onLoadFinish: @escaping () -> Void) {
+        init(onScroll: @escaping (CGFloat) -> Void, onLoadFinish: @escaping () -> Void, onLoadFail: @escaping () -> Void) {
             self.onScroll = onScroll
             self.onLoadFinish = onLoadFinish
+            self.onLoadFail = onLoadFail
         }
 
         func observe(scrollView: UIScrollView) {
@@ -284,15 +323,22 @@ private struct TermsWKWebView: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
             Log.trace("didFail — error=\(error.localizedDescription)", category: .view, level: .error)
-            enableScrollAtTop(webView)
+            handleFailure(webView, error: error)
         }
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
             Log.trace("didFailProvisionalNavigation — error=\(error.localizedDescription)", category: .view, level: .error)
-            enableScrollAtTop(webView)
+            handleFailure(webView, error: error)
         }
 
-        private func enableScrollAtTop(_ webView: WKWebView) {
+        private func handleFailure(_ webView: WKWebView, error: Error) {
+            // 새 load()가 진행 중인 로드를 끊을 때(redirect·재시도) 오는 취소는 실패로 보지 않는다.
+            if (error as NSError).code == NSURLErrorCancelled { return }
+            enableScrollAtTop(webView, notifyFinish: false)
+            onLoadFail()
+        }
+
+        private func enableScrollAtTop(_ webView: WKWebView, notifyFinish: Bool = true) {
             let scrollView = webView.scrollView
             // 안전망: 혹시 어긋난 offset이 있더라도 최상단에서 시작하도록 보정.
             scrollView.setContentOffset(
@@ -303,7 +349,9 @@ private struct TermsWKWebView: UIViewRepresentable {
             TermsWKWebView.setScrollBlocked(false, on: scrollView)
             Log.trace("enableScrollAtTop — panEnabled=\(scrollView.panGestureRecognizer.isEnabled) isScrollEnabled=\(scrollView.isScrollEnabled) offset=\(scrollView.contentOffset.y) didLoad=\(didLoad)", category: .view, level: .debug)
             // SwiftUI에 로드 완료 통보 — 로딩 인디케이터 해제용
-            onLoadFinish()
+            if notifyFinish {
+                onLoadFinish()
+            }
         }
     }
 }
