@@ -275,6 +275,8 @@ public struct MyProfileFeature: Sendable {
                 let currentStripe = state.communityProfile?.beltStripe ?? .none
                 // 최초 설정인지 확인 (벨트 정보가 없으면 최초 설정)
                 let isInitialSetup = state.communityProfile?.beltRank == nil
+                // 이전 최초 설정을 체급 시트에서 닫아 버렸다면 임시 벨트 값이 남아 있으므로 새 흐름 전에 버린다(#60).
+                state.tempBeltInfo = nil
                 state.sheet = .beltSetting(
                     BeltSettingFeature.State(
                         selectedRank: currentRank,
@@ -288,6 +290,7 @@ public struct MyProfileFeature: Sendable {
                 // 이미 등록된 벨트 영역 탭 → 수정 모드(isInitialSetup: false)로 시트 노출
                 let currentRank = state.communityProfile?.beltRank ?? .white
                 let currentStripe = state.communityProfile?.beltStripe ?? .none
+                state.tempBeltInfo = nil
                 state.sheet = .beltSetting(
                     BeltSettingFeature.State(
                         selectedRank: currentRank,
@@ -302,6 +305,8 @@ public struct MyProfileFeature: Sendable {
                 let currentGender = state.communityProfile?.gender ?? .male
                 let currentWeight = state.communityProfile?.weightKg ?? 60.0
                 let isWeightHidden = state.communityProfile?.isWeightHidden ?? false
+                // 체급만 수정하는 흐름. 남은 임시 벨트 값이 있으면 확인 시 최초 설정으로 오인해 함께 저장하므로 버린다(#60).
+                state.tempBeltInfo = nil
                 
                 state.sheet = .weightClassSetting(
                     WeightClassSettingFeature.State(
