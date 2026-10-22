@@ -400,7 +400,7 @@ Log.trace("닉네임 저장 요청: \(nickname)", category: .debug, level: .info
 ```
 
 - **카테고리:** `.debug`, `.network`, `.storage`, `.view`, `.system`, `.custom(...)`
-- **Pulse**(디버그 콘솔)는 `App` 타겟에서 `Log.handler`로 연결되며, 시뮬레이터/디버그 빌드에서 흔들기 제스처(Simulator 메뉴 `Device > Shake` / `Ctrl+Cmd+Z`)로 호출.
+- **Pulse**(디버그 콘솔)는 `App` 타겟에서 `Log.handler`로 연결되며, Debug/Beta 빌드에서만 흔들기 제스처(Simulator 메뉴 `Device > Shake` / `Ctrl+Cmd+Z`)로 호출. Release에서는 `#if DEBUG || BETA`로 컴파일에서 제외돼 열리지 않는다.
 
 ---
 
@@ -533,7 +533,7 @@ open JiuJitsuConnect.xcworkspace
 
 - **스킴:** `App` (Debug/Release) 또는 `App-Beta` (Beta)
 - **디바이스:** iPhone 시뮬레이터 (iOS 26.0+)
-- **Pulse 디버그 콘솔:** Debug 빌드에서 시뮬레이터 흔들기(`Device > Shake` / `Ctrl+Cmd+Z`)로 호출
+- **Pulse 디버그 콘솔:** Debug/Beta 빌드에서 시뮬레이터 흔들기(`Device > Shake` / `Ctrl+Cmd+Z`)로 호출
 
 ### 10.4 트러블슈팅
 
@@ -542,7 +542,7 @@ open JiuJitsuConnect.xcworkspace
 | `Project.swift` 변경이 Xcode에 반영되지 않음 | `tuist generate` 재실행 |
 | Asset이 코드에서 인식되지 않음 | `swiftgen` 실행 후 `tuist generate` |
 | Firebase / Kakao / Google 관련 빌드 에러 | `Configs/Secrets.xcconfig` 및 `Secrets/GoogleService-Info.plist` 배치 확인 |
-| Pulse 콘솔이 뜨지 않음 | Debug 빌드인지 확인, 시뮬레이터 흔들기 제스처 |
+| Pulse 콘솔이 뜨지 않음 | Debug/Beta 빌드인지 확인(Release는 의도적으로 비활성), 시뮬레이터 흔들기 제스처 |
 | `module map file ... not found` 로 빌드 실패 | homebrew `tuist`로 `tuist install && tuist generate` 재실행 — §10.5 |
 
 ### 10.5 Tuist 핀 버전과 빌드 실패 (2026-08-31 확인)

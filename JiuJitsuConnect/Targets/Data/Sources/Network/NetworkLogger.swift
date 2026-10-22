@@ -71,6 +71,11 @@ final class NetworkLogger {
         Log.trace(message, category: .network, level: level)
     }
     
+    /// 요청 결과를 Pulse 콘솔 Network 탭용으로 기록합니다. 전송 실패(URLError 등)도 error로 남깁니다.
+    static func record(request: URLRequest, response: URLResponse? = nil, data: Data? = nil, error: Error? = nil) {
+        Log.networkTask(request: request, response: response, data: data, error: error)
+    }
+
     /// Data를 예쁘게 포맷팅된 JSON 문자열로 변환합니다.
     private static func prettyPrintedJSON(from data: Data) -> String? {
         do {

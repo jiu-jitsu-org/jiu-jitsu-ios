@@ -23,7 +23,10 @@ public final class DependencyContainer {
 
     private init() {
         // 앱이 시작될 때, CoreKit의 Log 핸들러를 Pulse 핸들러로 설정합니다.
+        // Pulse 콘솔은 Debug/Beta 전용이므로 Release에서는 로그를 Pulse 저장소에 쌓지 않는다.
+        #if DEBUG || BETA
         Log.handler = PulseLogHandler()
+        #endif
     }
 
     // MARK: - Shared Infra (single instance)

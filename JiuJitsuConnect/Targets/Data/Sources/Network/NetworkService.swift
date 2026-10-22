@@ -126,18 +126,26 @@ public final class DefaultNetworkService: NetworkService {
         // --- 1. API 요청 및 데이터 수신 (URLError 처리 포함) ---
         do {
             (data, response) = try await session.data(for: urlRequest)
-        } catch let error as URLError {
-            switch error.code {
+        } catch {
+            #if DEBUG || BETA
+            NetworkLogger.record(request: urlRequest, error: error)
+            #endif
+            guard let urlError = error as? URLError else {
+                throw NetworkError.unknown(error)
+            }
+            switch urlError.code {
             case .notConnectedToInternet:
                 throw NetworkError.noConnection
             case .timedOut:
                 throw NetworkError.timeout
             default:
-                throw NetworkError.unknown(error)
+                throw NetworkError.unknown(urlError)
             }
-        } catch {
-            throw NetworkError.unknown(error)
         }
+
+        #if DEBUG || BETA
+        NetworkLogger.record(request: urlRequest, response: response, data: data)
+        #endif
 
         // --- 2. HTTP 응답 및 상태 코드 확인 ---
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -196,7 +204,20 @@ public final class DefaultNetworkService: NetworkService {
         NetworkLogger.log(request: urlRequest)
         #endif
 
-        let (data, response) = try await session.data(for: urlRequest)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: urlRequest)
+        } catch {
+            #if DEBUG || BETA
+            NetworkLogger.record(request: urlRequest, error: error)
+            #endif
+            throw error
+        }
+
+        #if DEBUG || BETA
+        NetworkLogger.record(request: urlRequest, response: response, data: data)
+        #endif
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
