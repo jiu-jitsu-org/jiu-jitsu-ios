@@ -50,6 +50,12 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     
     @MainActor
     public func signInWithApple() async throws -> Domain.SNSUser {
+        // 인스턴스를 앱 전체가 공유하므로, 진행 중인 요청 위에 새 요청을 겹치면 continuation이 덮어써져
+        // 두 컨트롤러의 콜백이 같은 continuation을 두 번 resume해 크래시한다(#87). 진행 중이면 새 요청은 취소로 끝낸다.
+        guard appleSignInContinuation == nil else {
+            Log.trace("Apple sign-in already in progress — ignoring duplicate request", category: .debug, level: .info)
+            throw DomainError.signInCancelled
+        }
         return try await withCheckedThrowingContinuation { continuation in
             self.appleSignInContinuation = continuation
             
@@ -227,7 +233,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
         if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
             guard let identityToken = appleIDCredential.identityToken,
                   let tokenString = String(data: identityToken, encoding: .utf8) else {
-                appleSignInContinuation?.resume(throwing: DomainError.missingProfileData)
+                resumeAppleSignIn(with: .failure(DomainError.missingProfileData))
                 return
             }
             
@@ -235,15 +241,23 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                 accessToken: tokenString,
                 snsProvider: .apple
             )
-            appleSignInContinuation?.resume(returning: user)
+            resumeAppleSignIn(with: .success(user))
         } else {
-            appleSignInContinuation?.resume(throwing: DomainError.unknown("Apple credential is not AppleIDCredential."))
+            resumeAppleSignIn(with: .failure(DomainError.unknown("Apple credential is not AppleIDCredential.")))
         }
     }
     
     public func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
         let authError = AuthErrorMapper.map(from: error, provider: .apple)
-        appleSignInContinuation?.resume(throwing: authError)
+        resumeAppleSignIn(with: .failure(authError))
+    }
+
+    /// continuation을 비운 뒤 resume한다. 비우지 않으면 다음 요청이 진행 중으로 오인되고,
+    /// 늦게 온 콜백이 이미 끝난 continuation을 다시 resume할 수 있다.
+    private func resumeAppleSignIn(with result: Result<SNSUser, Error>) {
+        guard let continuation = appleSignInContinuation else { return }
+        appleSignInContinuation = nil
+        continuation.resume(with: result)
     }
     
     // MARK: - ASAuthorizationControllerPresentationContextProviding
