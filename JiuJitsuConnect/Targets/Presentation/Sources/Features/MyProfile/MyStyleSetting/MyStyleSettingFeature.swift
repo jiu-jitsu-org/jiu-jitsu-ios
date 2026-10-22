@@ -85,7 +85,7 @@ extension PositionType: StyleSelectable {
     public var cardDescription: String {
         switch self {
         case .top:
-            return "이 매트 위에서 '선다'는 건 없어.\n'아직 넘어지지 않았다'만 있을 뿐.\n그리고 그 시간은, 이제 끝났어."
+            return "이미 끝났어. 넌 내 아래 있고,\n난 네 위에 있어. 여기서 버티는 건 용기가 아닌 그냥 시간 낭비일 뿐."
         case .guard:
             return "이 매트 위에서 '선다'는 건 없어.\n'아직 넘어지지 않았다'만 있을 뿐.\n그리고 그 시간은, 이제 끝났어."
         }
