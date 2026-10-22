@@ -33,9 +33,12 @@ public struct SettingsView: View {
             ScrollView {
                 VStack(spacing: Style.sectionSpacing) {
                     // MARK: - 알림 설정 진입 섹션 (카테고리별 토글은 NotificationSettingView로 분리)
-                    SettingsSection {
-                        SettingsInteractiveRow(asset: Assets.Common.Icon.bell, text: "알림") {
-                            store.send(.view(.notificationButtonTapped))
+                    // 게스트는 푸시 토큰 등록·서버 설정이 없으므로 노출하지 않는다.
+                    if !store.authInfo.isGuest {
+                        SettingsSection {
+                            SettingsInteractiveRow(asset: Assets.Common.Icon.bell, text: "알림") {
+                                store.send(.view(.notificationButtonTapped))
+                            }
                         }
                     }
 

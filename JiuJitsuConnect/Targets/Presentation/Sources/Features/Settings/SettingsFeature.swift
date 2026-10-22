@@ -110,6 +110,7 @@ public struct SettingsFeature: Sendable {
             switch action {
             // MARK: UI Actions
             case .view(.notificationButtonTapped):
+                guard !state.authInfo.isGuest else { return .none }
                 state.destination = .notificationSetting(NotificationSettingFeature.State())
                 return .none
 
