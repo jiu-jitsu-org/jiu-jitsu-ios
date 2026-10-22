@@ -80,6 +80,14 @@ public enum Log {
         )
         #endif
     }
+
+    /// 요청 1건의 결과를 handler에 구조화된 형태로 넘긴다. Pulse 콘솔의 Network 탭은
+    /// 텍스트 로그(`trace`)가 아니라 이 기록으로만 채워진다.
+    public static func networkTask(request: URLRequest, response: URLResponse?, data: Data?, error: Error?) {
+        #if DEBUG || BETA
+        handler?.logNetworkTask(request: request, response: response, data: data, error: error)
+        #endif
+    }
 }
 
 // MARK: - OSLogType to Pulse.Level Conversion
@@ -113,4 +121,9 @@ public enum LogLevel {
 
 public protocol LogHandler {
     func log(level: LogLevel, label: String, message: String, file: String, function: String, line: UInt)
+    func logNetworkTask(request: URLRequest, response: URLResponse?, data: Data?, error: Error?)
+}
+
+public extension LogHandler {
+    func logNetworkTask(request: URLRequest, response: URLResponse?, data: Data?, error: Error?) {}
 }

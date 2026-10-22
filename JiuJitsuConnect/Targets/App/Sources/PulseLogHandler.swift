@@ -19,6 +19,10 @@ struct PulseLogHandler: LogHandler {
             file: file, function: function, line: line
         )
     }
+
+    func logNetworkTask(request: URLRequest, response: URLResponse?, data: Data?, error: Error?) {
+        LoggerStore.shared.storeRequest(request, response: response, error: error, data: data, label: "Network")
+    }
 }
 
 private extension LogLevel {
