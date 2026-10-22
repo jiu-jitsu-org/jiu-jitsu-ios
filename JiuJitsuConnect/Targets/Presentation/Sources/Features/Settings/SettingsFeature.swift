@@ -86,7 +86,6 @@ public struct SettingsFeature: Sendable {
         }
 
         public enum InternalAction: Sendable {
-            case logoutResponse(TaskResult<Bool>)
             case withdrawalResponse(TaskResult<Bool>)
             case showToast(ToastState)
             case toastDismissed
@@ -143,11 +142,19 @@ public struct SettingsFeature: Sendable {
 
             // MARK: Alert Actions
             case .view(.confirmLogout):
-//                    state.isLoading = true
+                // 서버 로그아웃 결과와 상관없이 항상 로그아웃한다(정책 2026-10-21, #65).
+                // 서버 세션은 만료되며 정리되고, 웹 요청 로그아웃(`AppTabFeature.performWebLogout`)과 동작을 맞춘다.
                 return .run { send in
-                    await send(.internal(.logoutResponse(
-                        await TaskResult { try await authClient.serverLogout() }
-                    )))
+                    do {
+                        let isSuccess = try await authClient.serverLogout()
+                        if !isSuccess {
+                            Log.trace("Server logout returned false — proceeding with local logout", category: .network, level: .error)
+                        }
+                    } catch {
+                        Log.trace("Server logout failed — proceeding with local logout: \(error)", category: .network, level: .error)
+                    }
+                    await authClient.signOut()
+                    await send(.delegate(.didLogoutSuccessfully))
                 }
 
             case .view(.confirmWithdrawal):
@@ -159,23 +166,6 @@ public struct SettingsFeature: Sendable {
                         }
                     )))
                 }
-
-            case let .internal(.logoutResponse(.success(isSuccess))):
-//                state.isLoading = false
-                Log.trace("\(isSuccess)")
-
-                if isSuccess {
-                    return .run { send in
-                        await authClient.signOut()
-                        await send(.delegate(.didLogoutSuccessfully))
-                    }
-                } else {
-                    return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info))))
-                }
-
-            case let .internal(.logoutResponse(.failure(error))):
-                Log.trace("\(error)")
-                return handleError(error)
 
             case let .internal(.withdrawalResponse(.success(isSuccess))):
                 Log.trace("\(isSuccess)")
