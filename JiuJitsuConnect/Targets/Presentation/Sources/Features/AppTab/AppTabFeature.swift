@@ -312,8 +312,10 @@ public struct AppTabFeature: Sendable {
 
             case let .loginCover(.presented(.delegate(delegateAction))):
                 switch delegateAction {
-                case let .didLogin(newAuthInfo):
+                case let .didLogin(newAuthInfo), let .didSignup(newAuthInfo):
                     // 커뮤니티발 로그인은 탭 전환 없이 그대로 두어 원래 행위로 복귀시킨다.
+                    // 그 외에는 기존 회원 로그인이면 MY 탭, 신규 가입이면 항상 홈 탭으로 보낸다(#72).
+                    let isSignup = if case .didSignup = delegateAction { true } else { false }
                     let cameFromCommunity = state.pendingCommunityLogin
                     state.pendingCommunityLogin = false
                     state.authInfo = newAuthInfo
@@ -321,7 +323,7 @@ public struct AppTabFeature: Sendable {
                     state.settings.authInfo = newAuthInfo
                     state.loginCover = nil
                     if !cameFromCommunity {
-                        state.selectedTab = .myPage
+                        state.selectedTab = isSignup ? .home : .myPage
                     }
                     // 웹 세션 동기화: 새 access token을 커뮤니티 웹뷰에 주입(있을 때만).
                     let syncWeb: Effect<Action> = newAuthInfo.accessToken.map {
