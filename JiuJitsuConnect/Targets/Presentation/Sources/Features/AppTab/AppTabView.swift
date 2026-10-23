@@ -59,9 +59,16 @@ public struct AppTabView: View {
                 }
             }
             tabContainer(for: .settings) {
-                NavigationStack {
+                NavigationStack(
+                    path: $store.scope(state: \.settings.path, action: \.settings.path)
+                ) {
                     SettingsView(store: store.scope(state: \.settings, action: \.settings))
                         .safeAreaInset(edge: .bottom, spacing: 0) { bottomTabBar }
+                } destination: { destinationStore in
+                    switch destinationStore.case {
+                    case let .communityDetail(detailStore):
+                        CommunityDetailView(store: detailStore)
+                    }
                 }
             }
         }

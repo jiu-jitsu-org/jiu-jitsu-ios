@@ -577,6 +577,13 @@ public struct CommunityFeature: Sendable {
         URL(string: myActivityPath, relativeTo: base)?.absoluteURL
     }
 
+    /// 차단한 회원 웹 라우트(`/community/blocked-users`). 설정의 '차단한 회원' 줄(#56)이 리스트 웹뷰와 같은 origin으로 연다.
+    private static let blockedUsersPath = "/\(DeepLinkParser.communitySegment)/blocked-users"
+
+    static func blockedUsersURL(base: URL) -> URL? {
+        URL(string: blockedUsersPath, relativeTo: base)?.absoluteURL
+    }
+
     private static func isNotificationsDetail(_ element: Path.State?) -> Bool {
         guard case let .detail(detail)? = element else { return false }
         return detail.url.path() == notificationsPath

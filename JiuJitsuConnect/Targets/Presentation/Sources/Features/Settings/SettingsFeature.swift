@@ -42,6 +42,8 @@ public struct SettingsFeature: Sendable {
 
         @Presents var destination: Destination.State?
         @Presents var termsWebCover: TermsWebViewFeature.State?
+        // 설정 스택에 push되는 커뮤니티 웹 서브뷰('차단한 회원' 등, #56)
+        var path = StackState<Path.State>()
 
         public enum Alert: Equatable, Sendable {
             case logout
@@ -66,15 +68,24 @@ public struct SettingsFeature: Sendable {
         case notificationSetting(NotificationSettingFeature)
     }
 
+    @Reducer
+    public enum Path {
+        case communityDetail(CommunityDetailFeature)
+    }
+
     public enum Action: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
         case delegate(DelegateAction)
         case destination(PresentationAction<Destination.Action>)
         case termsWebCover(PresentationAction<TermsWebViewFeature.Action>)
+        case path(StackAction<Path.State, Path.Action>)
+        // 부모(AppTab)가 토큰 갱신·만료를 서브뷰 웹뷰에도 전파한다.
+        case session(CommunityDetailFeature.SessionUpdate)
 
         public enum ViewAction: Sendable {
             case notificationButtonTapped
+            case blockedUsersButtonTapped
             case termsButtonTapped
             case privacyPolicyButtonTapped
             case marketingConsentButtonTapped
@@ -97,6 +108,10 @@ public struct SettingsFeature: Sendable {
             case didLogoutSuccessfully
             case didWithdrawSuccessfully
             case loginRequested
+            // '차단한 회원' 탭 → 부모가 커뮤니티와 같은 origin·최신 토큰으로 서브뷰를 push한다.
+            case blockedUsersRequested
+            // 웹 서브뷰의 인증류 위임(로그인 유도·로그아웃·토큰 갱신) → 부모가 커뮤니티와 같은 흐름으로 처리한다.
+            case webSubview(CommunityDetailFeature.Action.DelegateAction)
         }
     }
 
@@ -136,6 +151,40 @@ public struct SettingsFeature: Sendable {
                 return .none
 
             case .termsWebCover:
+                return .none
+
+            // MARK: - 웹 서브뷰 (차단한 회원)
+
+            case .view(.blockedUsersButtonTapped):
+                guard !state.authInfo.isGuest else { return .none }
+                return .send(.delegate(.blockedUsersRequested))
+
+            // 서브뷰 안의 중첩 OPEN_SUBVIEW는 설정 스택에 push로 쌓는다. (동일 origin 검증은 상세가 위임 전에 끝냈다)
+            case let .path(.element(id: id, action: .communityDetail(.delegate(.openSubviewRequested(payload))))):
+                guard
+                    case let .communityDetail(source)? = state.path[id: id],
+                    let url = URL(string: payload.url)
+                else { return .none }
+                state.path.append(.communityDetail(.init(
+                    url: url,
+                    title: payload.title,
+                    accessToken: source.accessToken
+                )))
+                return .none
+
+            case let .path(.element(id: _, action: .communityDetail(.delegate(delegate)))):
+                return .send(.delegate(.webSubview(delegate)))
+
+            case let .session(update):
+                for id in state.path.ids {
+                    if case var .communityDetail(detail)? = state.path[id: id] {
+                        CommunityDetailFeature.apply(update, into: &detail)
+                        state.path[id: id] = .communityDetail(detail)
+                    }
+                }
+                return .none
+
+            case .path:
                 return .none
 
             case .view(.loginButtonTapped):
@@ -220,6 +269,7 @@ public struct SettingsFeature: Sendable {
         .ifLet(\.$termsWebCover, action: \.termsWebCover) {
             TermsWebViewFeature()
         }
+        .forEach(\.path, action: \.path)
     }
 
     private func handleError(_ error: Error) -> Effect<Action> {
@@ -238,3 +288,5 @@ public struct SettingsFeature: Sendable {
 
 extension SettingsFeature.Destination.State: Equatable, Sendable {}
 extension SettingsFeature.Destination.Action: Sendable {}
+extension SettingsFeature.Path.State: Equatable, Sendable {}
+extension SettingsFeature.Path.Action: Sendable {}
