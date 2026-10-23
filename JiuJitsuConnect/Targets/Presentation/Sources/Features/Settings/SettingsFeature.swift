@@ -20,6 +20,7 @@ public struct SettingsFeature: Sendable {
     private enum TermsURL {
         static let serviceTerms = makeURL(path: "/policies/terms-of-service")
         static let privacyPolicy = makeURL(path: "/policies/privacy-policy")
+        static let marketingConsent = makeURL(path: "/policies/marketing-consent")
 
         private static func makeURL(path: String) -> URL? {
             guard
@@ -76,6 +77,7 @@ public struct SettingsFeature: Sendable {
             case notificationButtonTapped
             case termsButtonTapped
             case privacyPolicyButtonTapped
+            case marketingConsentButtonTapped
             case loginButtonTapped
             case logoutButtonTapped
             case withdrawalButtonTapped
@@ -120,6 +122,12 @@ public struct SettingsFeature: Sendable {
 
             case .view(.privacyPolicyButtonTapped):
                 guard let url = TermsURL.privacyPolicy else { return .none }
+                state.termsWebCover = TermsWebViewFeature.State(url: url)
+                return .none
+
+            case .view(.marketingConsentButtonTapped):
+                // 가입 때 동의한 마케팅 수신 약관을 가입 후에도 다시 볼 수 있게 한다(#74).
+                guard let url = TermsURL.marketingConsent else { return .none }
                 state.termsWebCover = TermsWebViewFeature.State(url: url)
                 return .none
 
