@@ -117,6 +117,7 @@ private struct WebBridgeDialogModifier: ViewModifier {
                 .init(value: $0.value, label: $0.label, allowsCustomText: $0.allowsCustomText)
             },
             customTextPlaceholder: payload.customTextPlaceholder,
+            customTextMaxLength: payload.customTextMaxLength,
             submitText: payload.submitText
         )
     }

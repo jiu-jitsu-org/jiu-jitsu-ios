@@ -36,6 +36,9 @@ public struct SelectSheetConfiguration: Equatable {
     public let message: String?
     public let options: [Option]
     public let customTextPlaceholder: String?
+    /// 자유 입력 최대 글자 수. nil이면 제한 없음.
+    /// 웹 `maxlength`·서버와 같은 기준이 되도록 UTF-16 단위로 센다.
+    public let customTextMaxLength: Int?
     public let submitText: String
 
     public init(
@@ -43,12 +46,14 @@ public struct SelectSheetConfiguration: Equatable {
         message: String?,
         options: [Option],
         customTextPlaceholder: String?,
+        customTextMaxLength: Int? = nil,
         submitText: String
     ) {
         self.title = title
         self.message = message
         self.options = options
         self.customTextPlaceholder = customTextPlaceholder
+        self.customTextMaxLength = customTextMaxLength
         self.submitText = submitText
     }
 }
@@ -420,7 +425,7 @@ public struct SelectSheetView: View {
     private var customTextField: some View {
         // SwiftUI 기본 TextField는 placeholder 색을 못 바꿔, placeholder를 커스텀 오버레이로 그린다.
         // 입력 텍스트는 focused 색, placeholder는 default 색으로 분리한다.
-        TextField("", text: $customText, axis: .vertical)
+        TextField("", text: limitedCustomText, axis: .vertical)
             .focused($isCustomTextFocused)
             .font(.pretendard.bodyS)
             .foregroundStyle(Color.component.textfieldMultiline.focused.text)
@@ -448,6 +453,24 @@ public struct SelectSheetView: View {
                     .opacity(isCustomTextFocused ? 1 : 0)
                     .allowsHitTesting(false)
             }
+    }
+
+    /// 최대 글자 수를 넘는 입력(붙여넣기 포함)은 최대 글자 수에서 자른다.
+    private var limitedCustomText: Binding<String> {
+        Binding(
+            get: { customText },
+            set: { customText = Self.truncated($0, to: configuration.customTextMaxLength) }
+        )
+    }
+
+    /// UTF-16 길이가 넘지 않을 때까지 끝에서 한 글자(Character)씩 뺀다 — 이모지 등을 반쪽으로 자르지 않는다.
+    private static func truncated(_ text: String, to maxLength: Int?) -> String {
+        guard let maxLength, text.utf16.count > maxLength else { return text }
+        var result = text
+        while result.utf16.count > maxLength {
+            result.removeLast()
+        }
+        return result
     }
 
     private var submitButton: some View {
@@ -530,6 +553,7 @@ public struct SelectSheetView: View {
                         .init(value: "OTHER", label: "기타", allowsCustomText: true),
                     ],
                     customTextPlaceholder: "신고할 내용을 입력해주세요.",
+                    customTextMaxLength: 200,
                     submitText: "신고하기"
                 ),
                 screen: SelectSheetScreenMetrics(
