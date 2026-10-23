@@ -317,6 +317,11 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
                     message: payload?["message"] as? String,
                     options: options,
                     customTextPlaceholder: payload?["customTextPlaceholder"] as? String,
+                    // 웹이 넘긴 값을 쓰고, 값이 없거나(구버전 웹) 0 이하면 기본값으로 제한한다.
+                    customTextMaxLength: (payload?["customTextMaxLength"] as? NSNumber)
+                        .map(\.intValue)
+                        .flatMap { $0 > 0 ? $0 : nil }
+                        ?? SelectSheetPayload.defaultCustomTextMaxLength,
                     submitText: submitText
                 )
             )
@@ -440,6 +445,10 @@ public struct SelectSheetPayload: Equatable, Sendable {
     public let options: [Option]
     /// 자유 입력 필드의 placeholder(선택).
     public let customTextPlaceholder: String?
+    /// 자유 입력 최대 글자 수(#107). 웹이 정책 값을 넘기므로 숫자가 바뀌어도 앱 배포가 필요 없다.
+    public let customTextMaxLength: Int?
+    /// 웹이 값을 넘기지 않을 때의 제한. 200은 기획 정책이 아닌 임시 기준으로, QA에서 바뀔 수 있다.
+    static let defaultCustomTextMaxLength = 200
     public let submitText: String
 
     public init(
@@ -448,6 +457,7 @@ public struct SelectSheetPayload: Equatable, Sendable {
         message: String?,
         options: [Option],
         customTextPlaceholder: String?,
+        customTextMaxLength: Int? = nil,
         submitText: String
     ) {
         self.requestId = requestId
@@ -455,6 +465,7 @@ public struct SelectSheetPayload: Equatable, Sendable {
         self.message = message
         self.options = options
         self.customTextPlaceholder = customTextPlaceholder
+        self.customTextMaxLength = customTextMaxLength
         self.submitText = submitText
     }
 }
