@@ -67,7 +67,7 @@ struct LoginSceneView<Sheet: View>: View {
                         hop: hops[index]
                     )
                     .frame(width: frame.width, height: frame.height)
-                    .offset(x: frame.minX, y: frame.minY + entranceOffset(entrance, height: frame.height, scale: layout.scale))
+                    .offset(x: frame.minX, y: frame.minY + castEntranceOffset(entrance, height: frame.height, scale: layout.scale))
                     .opacity(entrance < 0.2 ? entrance / 0.2 : 1)
                     .zIndex(member.zIndex)
                 }
@@ -117,16 +117,6 @@ struct LoginSceneView<Sheet: View>: View {
             .frame(width: width)
             .offset(x: (layout.width - width) / 2, y: top)
             .accessibilityHidden(true)
-    }
-
-    /// 시트 아래에서 반쯤 숨은 채 나타나 살짝 지나쳐 올라갔다가 제자리에 앉는다.
-    private func entranceOffset(_ progress: Double, height: CGFloat, scale: CGFloat) -> CGFloat {
-        let overshoot = -8 * scale
-        switch progress {
-        case ..<0.2: return lerp(height * 0.5, height * 0.38, progress / 0.2)
-        case ..<0.75: return lerp(height * 0.38, overshoot, (progress - 0.2) / 0.55)
-        default: return lerp(overshoot, 0, (progress - 0.75) / 0.25)
-        }
     }
 
     // MARK: - 수다
@@ -186,6 +176,13 @@ struct LoginCastMember {
     let zIndex: Double
     let show: CGFloat
     var mirror = false
+    var eyes: ImageAsset = Assets.Login.Character.eyesMeh
+    /// 눈만 따로 기울이고(도), 보는 방향을 뒤집고, 같은 배율로 키운다. 다섯이 같은 눈으로 보이지 않게
+    var eyeTilt: Double = 0
+    var eyeFlip = false
+    var eyeScale: CGFloat = 1
+    /// 밴드 아래 곧은 부분을 같은 굵기로 이어 붙인 몸통(`bodyExt*`). 어깨가 드러나지 않고 화면 아래로 이어진다
+    var isExtended = false
 }
 
 enum LoginCast {
@@ -199,6 +196,9 @@ enum LoginCast {
     ]
     /// 몸통·눈 그림 캔버스(800×1260)의 세로/가로 비율
     static let aspect: CGFloat = 1260 / 800
+    /// 이어 붙인 몸통 그림은 원래 캔버스(360×567)를 왼쪽으로 100, 아래로 567 넓혔다(460×1134)
+    static let extendedSize = CGSize(width: 460.0 / 360, height: 2)
+    static let extendedLeft: CGFloat = 100.0 / 360
 }
 
 /// 이웃끼리 연달아 말하지 않도록 정해둔 순서를 돈다.
@@ -312,19 +312,22 @@ private enum Timing {
         return Segment(delay: 1.0 + stagger, duration: 0.72, curve: .init(0.3, 0.7, 0.4, 1))
     }
 
-    struct Segment {
-        let delay: Double
-        let duration: Double
-        let curve: CubicBezier
+    typealias Segment = SceneSegment
+}
 
-        func progress(at elapsed: TimeInterval) -> Double {
-            curve.value(at: min(max((elapsed - delay) / duration, 0), 1))
-        }
+/// 시작 시각(`delay`)부터 `duration` 동안 `curve`를 따라 0 → 1로 진행한다. 단위는 초.
+struct SceneSegment {
+    let delay: Double
+    let duration: Double
+    let curve: CubicBezier
+
+    func progress(at elapsed: TimeInterval) -> Double {
+        curve.value(at: min(max((elapsed - delay) / duration, 0), 1))
     }
 }
 
 /// CSS `cubic-bezier()`와 같은 곡선. 시간 비율에 대한 진행 정도를 돌려준다.
-private struct CubicBezier {
+struct CubicBezier {
     let control1: (x: Double, y: Double)
     let control2: (x: Double, y: Double)
 
@@ -353,14 +356,24 @@ private struct CubicBezier {
     }
 }
 
-private func lerp(_ from: CGFloat, _ to: CGFloat, _ progress: Double) -> CGFloat {
+/// 몸의 절반쯤 아래에서 나타나 살짝 지나쳐 올라갔다가 제자리에 앉는다. 로그인·인사 장면이 같은 움직임을 쓴다.
+func castEntranceOffset(_ progress: Double, height: CGFloat, scale: CGFloat) -> CGFloat {
+    let overshoot = -8 * scale
+    switch progress {
+    case ..<0.2: return lerp(height * 0.5, height * 0.38, progress / 0.2)
+    case ..<0.75: return lerp(height * 0.38, overshoot, (progress - 0.2) / 0.55)
+    default: return lerp(overshoot, 0, (progress - 0.75) / 0.25)
+    }
+}
+
+func lerp(_ from: CGFloat, _ to: CGFloat, _ progress: Double) -> CGFloat {
     from + (to - from) * progress
 }
 
 // MARK: - 캐릭터
 
 /// 몸통과 눈 두 장을 겹쳐 그린다. 다 모인 뒤에는 숨쉬기와 눈 깜빡임을 잔잔하게 이어간다.
-private struct LoginCharacterView: View {
+struct LoginCharacterView: View {
     let member: LoginCastMember
     let isIdle: Bool
     let hop: Int
@@ -368,14 +381,36 @@ private struct LoginCharacterView: View {
     @State private var isBreathing = false
     @State private var isBlinking = false
 
-    var body: some View {
-        ZStack {
+    private static let eyeCenter = UnitPoint(x: 0.435, y: 0.443)
+
+    /// 이어 붙인 몸통은 캔버스보다 왼쪽·아래로 넓어 머리·밴드 자리를 맞춰 그린다
+    @ViewBuilder
+    private var bodyImage: some View {
+        if member.isExtended {
+            GeometryReader { proxy in
+                member.body.swiftUIImage
+                    .resizable()
+                    .frame(
+                        width: proxy.size.width * LoginCast.extendedSize.width,
+                        height: proxy.size.height * LoginCast.extendedSize.height
+                    )
+                    .offset(x: -proxy.size.width * LoginCast.extendedLeft)
+            }
+        } else {
             member.body.swiftUIImage
                 .resizable()
-            Assets.Login.Character.eyesMeh.swiftUIImage
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            bodyImage
+            member.eyes.swiftUIImage
                 .resizable()
-                // 눈 그림의 가운데(캔버스 43.5%, 44.3%)를 기준으로 감는다
-                .scaleEffect(x: 1, y: isBlinking ? 0.08 : 1, anchor: UnitPoint(x: 0.435, y: 0.443))
+                // 눈 그림의 가운데(캔버스 43.5%, 44.3%)를 기준으로 감고, 기울이고, 뒤집는다
+                .scaleEffect(x: 1, y: isBlinking ? 0.08 : 1, anchor: Self.eyeCenter)
+                .rotationEffect(.degrees(member.eyeTilt), anchor: Self.eyeCenter)
+                .scaleEffect(x: (member.eyeFlip ? -1 : 1) * member.eyeScale, y: member.eyeScale, anchor: Self.eyeCenter)
         }
         .scaleEffect(x: isBreathing ? 1.006 : 1, y: isBreathing ? 1.018 : 1, anchor: .bottom)
         // 말할 때 한 번 들썩인다
