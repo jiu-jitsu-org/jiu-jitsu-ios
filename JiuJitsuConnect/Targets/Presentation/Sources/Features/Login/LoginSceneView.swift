@@ -130,31 +130,32 @@ struct LoginSceneView<Sheet: View>: View {
             return
         }
         var speaker = TalkSpeaker()
-        var removals: [Task<Void, Never>] = []
-        defer { removals.forEach { $0.cancel() } }
 
-        guard await pause(Timing.talkStart - Timing.introEnd) else { return }
-        removals += say(life: 1.8, speaker: &speaker)
-        guard await pause(1.3) else { return }
-        removals += say(life: 1.7, speaker: &speaker)
-        guard await pause(2.3) else { return }
-        while true {
-            removals += say(life: 2.0, speaker: &speaker)
-            removals.removeAll { $0.isCancelled }
-            guard await pause(2.8) else { return }
+        // 말풍선을 지우는 작업은 이 묶음 아래에 건다. 끝난 작업은 묶음이 바로 버리고,
+        // 화면을 떠나 talk()가 끊기면 아직 기다리던 작업도 함께 취소된다
+        await withDiscardingTaskGroup { removals in
+            guard await pause(Timing.talkStart - Timing.introEnd) else { return }
+            say(life: 1.8, speaker: &speaker, removals: &removals)
+            guard await pause(1.3) else { return }
+            say(life: 1.7, speaker: &speaker, removals: &removals)
+            guard await pause(2.3) else { return }
+            while true {
+                say(life: 2.0, speaker: &speaker, removals: &removals)
+                guard await pause(2.8) else { return }
+            }
         }
     }
 
-    /// 말풍선을 하나 띄우고, `life`초 뒤 지우는 작업을 돌려준다. 이미 둘이 떠 있으면 건너뛴다.
-    private func say(life: Double, speaker: inout TalkSpeaker) -> [Task<Void, Never>] {
-        guard bubbles.count < Timing.maxBubbles else { return [] }
+    /// 말풍선을 하나 띄우고, `life`초 뒤 지우는 작업을 `removals`에 건다. 이미 둘이 떠 있으면 건너뛴다.
+    private func say(life: Double, speaker: inout TalkSpeaker, removals: inout DiscardingTaskGroup) {
+        guard bubbles.count < Timing.maxBubbles else { return }
         let bubble = speaker.next()
         withAnimation(.spring(duration: 0.32, bounce: 0.35)) { bubbles.append(bubble) }
         hops[bubble.member] += 1
-        return [Task {
-            guard (try? await Task.sleep(for: .seconds(life))) != nil else { return }
+        removals.addTask { @MainActor in
+            guard await pause(life) else { return }
             withAnimation(.easeIn(duration: 0.22)) { bubbles.removeAll { $0.id == bubble.id } }
-        }]
+        }
     }
 
     private func pause(_ seconds: Double) async -> Bool {
