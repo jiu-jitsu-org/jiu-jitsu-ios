@@ -25,6 +25,7 @@ public struct SplashView: View {
             }
         }
         .ignoresSafeArea()
+        .lightStatusBar()
         .onAppear {
             store.send(.view(.onAppear))
         }

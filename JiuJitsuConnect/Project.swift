@@ -41,6 +41,8 @@ let appInfoPlist: [String: Plist.Value] = {
         ],
         "ITSAppUsesNonExemptEncryption": false,
         "UIUserInterfaceStyle": "Light",
+        // 런치스크린이 파란 바탕이라 시계·배터리 글자를 흰색으로 시작한다. 이후 화면은 각 화면이 정한다
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent",
         "UISupportedInterfaceOrientations": ["UIInterfaceOrientationPortrait"],
 
         "UIAppFonts": [
