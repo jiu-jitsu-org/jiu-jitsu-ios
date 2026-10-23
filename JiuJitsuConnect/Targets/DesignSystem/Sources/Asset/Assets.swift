@@ -51,6 +51,14 @@ public enum Assets {
       public static let secession = ImageAsset(name: "Common/Icon/secession")
       public static let version = ImageAsset(name: "Common/Icon/version")
     }
+    public enum Shaka {
+      public static let burstBlack = ImageAsset(name: "Common/Shaka/burst-black")
+      public static let burstBlue = ImageAsset(name: "Common/Shaka/burst-blue")
+      public static let burstBrown = ImageAsset(name: "Common/Shaka/burst-brown")
+      public static let burstPurple = ImageAsset(name: "Common/Shaka/burst-purple")
+      public static let burstWhite = ImageAsset(name: "Common/Shaka/burst-white")
+      public static let icon = ImageAsset(name: "Common/Shaka/icon")
+    }
   }
   public enum Login {
     public enum Logo {
