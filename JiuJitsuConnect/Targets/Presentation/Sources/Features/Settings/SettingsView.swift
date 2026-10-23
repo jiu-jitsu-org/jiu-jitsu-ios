@@ -50,6 +50,9 @@ public struct SettingsView: View {
                         SettingsInteractiveRow(asset: Assets.Common.Icon.documents, text: "개인정보 처리 방침") {
                             store.send(.view(.privacyPolicyButtonTapped))
                         }
+                        SettingsInteractiveRow(asset: Assets.Common.Icon.documents, text: "마케팅 정보 수신 동의") {
+                            store.send(.view(.marketingConsentButtonTapped))
+                        }
                     }
 
                     // MARK: - 버전 정보 섹션
