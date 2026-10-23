@@ -206,11 +206,13 @@ public struct AppTabFeature: Sendable {
                 return .send(.internal(.showLoginModal))
 
             case .home(.delegate(.logoutRequested)),
-                 .myPage(.delegate(.webSubview(.logoutRequested))):
+                 .myPage(.delegate(.webSubview(.logoutRequested))),
+                 .settings(.delegate(.webSubview(.logoutRequested))):
                 return .send(.internal(.performWebLogout))
 
             case .home(.delegate(.tokenRefreshRequested)),
-                 .myPage(.delegate(.webSubview(.tokenRefreshRequested))):
+                 .myPage(.delegate(.webSubview(.tokenRefreshRequested))),
+                 .settings(.delegate(.webSubview(.tokenRefreshRequested))):
                 // 하이브리드 토큰 소유권은 네이티브 — 웹뷰 만료 시 네이티브 refresh로 갱신해 웹에 돌려준다.
                 // 갱신 결과는 열려 있는 모든 웹뷰에 전파되므로, 진행 중이면 그 응답을 함께 기다리면 된다.
                 guard !state.isRefreshingWebToken else { return .none }
@@ -243,11 +245,24 @@ public struct AppTabFeature: Sendable {
                 return .send(.home(.myProfileImageChanged(url.flatMap(URL.init(string:)))))
 
             // MY 탭은 로그인 전용이라 웹의 대기 중 행위를 되살릴 일이 없어 커뮤니티발 로그인(pendingCommunityLogin)으로 표시하지 않는다.
-            case .myPage(.delegate(.webSubview(.loginPromptRequested))):
+            case .myPage(.delegate(.webSubview(.loginPromptRequested))),
+                 .settings(.delegate(.webSubview(.loginPromptRequested))):
                 return .send(.internal(.showLoginPromptAlert))
 
-            case .myPage(.delegate(.webSubview(.loginModalRequested))):
+            case .myPage(.delegate(.webSubview(.loginModalRequested))),
+                 .settings(.delegate(.webSubview(.loginModalRequested))):
                 return .send(.internal(.showLoginModal))
+
+            // MARK: - 설정 탭 웹 서브뷰 (#56)
+
+            // '차단한 회원'을 설정 스택에 push한다. MY의 '커뮤니티 활동'과 같은 이유로 리스트 웹뷰의 origin·최신 토큰을 쓴다.
+            case .settings(.delegate(.blockedUsersRequested)):
+                guard
+                    let base = state.home.url,
+                    let url = CommunityFeature.blockedUsersURL(base: base)
+                else { return .none }
+                state.settings.path.append(.communityDetail(.init(url: url, accessToken: state.home.accessToken)))
+                return .none
 
             // MARK: - DeepLink
 
@@ -291,7 +306,8 @@ public struct AppTabFeature: Sendable {
                     // 네이티브 API가 갱신한 토큰을 웹뷰에도 동기화.
                     return .merge(
                         .send(.home(.session(.loggedIn(accessToken: accessToken)))),
-                        .send(.myPage(.session(.loggedIn(accessToken: accessToken))))
+                        .send(.myPage(.session(.loggedIn(accessToken: accessToken)))),
+                        .send(.settings(.session(.loggedIn(accessToken: accessToken))))
                     )
                 case .sessionExpired:
                     return .send(.internal(.handleSessionExpired))
@@ -303,7 +319,8 @@ public struct AppTabFeature: Sendable {
                 // 다른 요청이 이미 갱신을 마쳐 토큰 값이 그대로여도, 요청한 웹뷰는 응답을 받아야 한다.
                 return .merge(
                     .send(.home(.session(.tokenRefreshed(accessToken: accessToken)))),
-                    .send(.myPage(.session(.tokenRefreshed(accessToken: accessToken))))
+                    .send(.myPage(.session(.tokenRefreshed(accessToken: accessToken)))),
+                    .send(.settings(.session(.tokenRefreshed(accessToken: accessToken))))
                 )
 
             case .internal(.handleSessionExpired):

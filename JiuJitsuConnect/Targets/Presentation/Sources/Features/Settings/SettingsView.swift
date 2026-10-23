@@ -40,6 +40,14 @@ public struct SettingsView: View {
                                 store.send(.view(.notificationButtonTapped))
                             }
                         }
+
+                        // MARK: - 차단한 회원 (#56) — 웹 화면을 서브뷰로 연다. 비로그인은 미노출
+                        // TODO: 디자인 확정 아이콘으로 교체 (시안에 아이콘 미지정)
+                        SettingsSection {
+                            SettingsInteractiveRow(asset: Assets.Common.Icon.profile, text: "차단한 회원") {
+                                store.send(.view(.blockedUsersButtonTapped))
+                            }
+                        }
                     }
 
                     // MARK: - 약관 및 정책 섹션
