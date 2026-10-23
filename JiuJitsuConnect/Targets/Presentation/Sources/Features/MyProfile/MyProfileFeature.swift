@@ -199,7 +199,6 @@ public struct MyProfileFeature: Sendable {
             case instructorVerificationRequestResponse(TaskResult<String>)
 
             // 닉네임 갱신 응답 (이미지와 동일한 PUT /api/user/profile 사용)
-            case nicknameUpdateResponse(TaskResult<CommunityProfile>)
         }
     }
     
@@ -374,25 +373,13 @@ public struct MyProfileFeature: Sendable {
                 // 취소 - 아무것도 하지 않음
                 return .none
                 
-            case let .destination(.presented(.nicknameSetting(.delegate(.saveNickname(nickname))))):
-                Log.trace("닉네임 저장 요청: \(nickname)", category: .debug, level: .info)
+            case let .destination(.presented(.nicknameSetting(.delegate(.didUpdateNickname(nickname))))):
+                // 저장은 닉네임 화면이 끝낸 상태. 성공했을 때만 화면을 닫는다(실패는 화면에서 안내, #66).
                 state.destination = nil
-                guard let profile = state.communityProfile else {
-                    return .send(.internal(.showToast(.init(
-                        message: "프로필 정보를 불러올 수 없어요", style: .info
-                    ))))
-                }
-                let updatedProfile = profile.updatingNickname(nickname)
-                state.isLoadingProfile = true
-                return .run { send in
-                    await send(.internal(.nicknameUpdateResponse(
-                        await TaskResult {
-                            // 닉네임 전용 엔드포인트 (PUT /api/user/profile/nickname, 쿼리 파라미터)
-                            try await userClient.updateNickname(nickname)
-                            return updatedProfile
-                        }
-                    )))
-                }
+                state.communityProfile = state.communityProfile?.updatingNickname(nickname)
+                return .send(.internal(.showToast(.init(
+                    message: "닉네임 수정을 완료했어요", style: .info
+                ))))
                 
             case .destination(.presented(.nicknameSetting(.delegate(.cancel)))):
                 // 취소 - 아무것도 하지 않음
@@ -1189,20 +1176,6 @@ public struct MyProfileFeature: Sendable {
                 Log.trace("Failed to update profile image url: \(error)", category: .network, level: .error)
                 return .send(.internal(.showToast(.init(
                     message: "프로필 저장에 실패했어요. 다시 시도해주세요", style: .info
-                ))))
-
-            case let .internal(.nicknameUpdateResponse(.success(updatedProfile))):
-                state.isLoadingProfile = false
-                state.communityProfile = updatedProfile
-                return .send(.internal(.showToast(.init(
-                    message: "닉네임 수정을 완료했어요", style: .info
-                ))))
-
-            case let .internal(.nicknameUpdateResponse(.failure(error))):
-                state.isLoadingProfile = false
-                Log.trace("Failed to update nickname: \(error)", category: .network, level: .error)
-                return .send(.internal(.showToast(.init(
-                    message: "닉네임 저장에 실패했어요. 다시 시도해주세요", style: .info
                 ))))
 
             case .destination, .sheet, .imageCropCover, .path, .view, .internal, .delegate:

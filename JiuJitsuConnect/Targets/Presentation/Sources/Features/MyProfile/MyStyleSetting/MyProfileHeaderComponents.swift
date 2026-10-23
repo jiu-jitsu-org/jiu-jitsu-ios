@@ -290,9 +290,13 @@ private struct NicknameEditRow: View {
                     .padding(.trailing, 5)
             }
 
-            Text(nickname)
-                .font(Font.pretendard.title3)
-                .foregroundStyle(Color.component.list.setting.background)
+            // 닉네임 텍스트도 수정 진입 영역(정책 2.1, #66)
+            Button(action: onEditTapped) {
+                Text(nickname)
+                    .font(Font.pretendard.title3)
+                    .foregroundStyle(Color.component.list.setting.background)
+            }
+            .buttonStyle(.plain)
 
             Button(action: onEditTapped) {
                 ZStack {

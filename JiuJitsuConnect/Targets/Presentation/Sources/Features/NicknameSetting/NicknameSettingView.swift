@@ -78,7 +78,7 @@ private extension NicknameSettingView {
     }
 
     var titleSection: some View {
-        Text(store.validationState.message)
+        Text(store.validationState.message(in: store.mode))
             .font(Font.pretendard.display1)
             .foregroundStyle(store.validationState.messageColor)
             .frame(maxWidth: .infinity, alignment: .center)
@@ -125,7 +125,7 @@ private extension NicknameSettingView {
     
     var ctaButtonSection: some View {
         CTAButton(
-            title: "확인",
+            title: store.mode.ctaTitle,
             type: .blue,
             style: .keypad,
             height: 56,
