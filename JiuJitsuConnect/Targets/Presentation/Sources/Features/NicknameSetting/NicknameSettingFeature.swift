@@ -45,12 +45,17 @@ public struct NicknameSettingFeature: Sendable {
         // MARK: - Passed Data (초기 설정 모드에만 사용)
         let tempToken: String?
         let isMarketingAgreed: Bool?
+
+        // MARK: - Edit Mode
+        // 진입 시 닉네임. 입력값이 같으면 서버 요청 없이 MY로 돌아간다(정책 2.2).
+        let originalNickname: String?
         
         // 초기 설정 모드 생성자
         public init(tempToken: String, isMarketingAgreed: Bool) {
             self.mode = .initial
             self.tempToken = tempToken
             self.isMarketingAgreed = isMarketingAgreed
+            self.originalNickname = nil
         }
         
         // 수정 모드 생성자
@@ -59,6 +64,7 @@ public struct NicknameSettingFeature: Sendable {
             self.nickname = nickname
             self.tempToken = nil
             self.isMarketingAgreed = nil
+            self.originalNickname = nickname
             
             // 수정 모드이고 기존 닉네임이 있으면 텍스트필드를 활성화 상태로 시작
             if mode == .edit && !nickname.isEmpty {
@@ -84,12 +90,13 @@ public struct NicknameSettingFeature: Sendable {
         public enum InternalAction: Sendable {
             case checkNicknameResponse(TaskResult<Bool>)
             case signupResponse(TaskResult<AuthInfo>)
+            case updateNicknameResponse(TaskResult<String>)
         }
         
         public enum DelegateAction: Sendable {
             case signupSuccessful(info: AuthInfo)
             case signupFailed(message: String)
-            case saveNickname(String)  // 닉네임 수정 요청
+            case didUpdateNickname(String)  // 닉네임 수정 저장 완료 — 부모가 화면을 닫고 프로필 반영
             case cancel
         }
     }
@@ -117,8 +124,8 @@ public struct NicknameSettingFeature: Sendable {
                 state.isCtaButtonEnabled = true
                 
                 // 입력 값이 변경되면 검증 상태 초기화
-                // 에러 상태(.invalidLength, .invalidCharacters, .saveFailed)나
-                // 성공 상태(.valid)에서 다시 입력하면 idle로 리셋
+                // 에러 상태(.invalidLength, .invalidCharacters, .unavailable, .saveFailed)나
+                // 성공 상태(.available)에서 다시 입력하면 idle로 리셋
                 if state.validationState != .idle {
                     state.validationState = .idle
                     state.validatedNickname = nil
@@ -144,10 +151,29 @@ public struct NicknameSettingFeature: Sendable {
                 // 2단계: 모드에 따른 분기
                 switch state.mode {
                 case .edit:
-                    // 수정 모드: 부모 Feature에게 저장 요청 위임
-                    state.validationState = .valid
-                    return .send(.delegate(.saveNickname(state.nickname)))
-                    
+                    // 기존 닉네임 그대로면 서버 요청 없이 MY로 복귀(정책 2.2)
+                    if state.nickname == state.originalNickname {
+                        return .concatenate(
+                            .send(.delegate(.cancel)),
+                            .run { _ in await self.dismiss() }
+                        )
+                    }
+                    if state.validationState == .available && state.nickname == state.validatedNickname {
+                        // 2차 탭: 중복 검사를 통과한 닉네임으로 최종 저장. 결과가 올 때까지 CTA를 막는다.
+                        state.isCtaButtonEnabled = false
+                        return .run { [nickname = state.nickname] send in
+                            await send(.internal(.updateNicknameResponse(
+                                await TaskResult {
+                                    try await userClient.updateNickname(nickname)
+                                    return nickname
+                                }
+                            )))
+                        }
+                        .cancellable(id: CancelID.apiCall)
+                    }
+                    // 1차 탭: 중복 검사 → 통과 시 '사용 가능' 문구로 전환(정책 2.3)
+                    return checkNickname(state.nickname)
+
                 case .initial:
                     // 초기 설정 모드: 기존 회원가입 플로우
                     if state.validationState == .available && state.nickname == state.validatedNickname {
@@ -171,12 +197,7 @@ public struct NicknameSettingFeature: Sendable {
                         
                     } else {
                         // 검증되지 않은 닉네임 -> 중복 검사 시도
-                        return .run { [nickname = state.nickname] send in
-                            await send(.internal(.checkNicknameResponse(
-                                await TaskResult { try await userClient.checkNickname(.init(nickname: nickname)) }
-                            )))
-                        }
-                        .cancellable(id: CancelID.apiCall)
+                        return checkNickname(state.nickname)
                     }
                 }
                 
@@ -205,6 +226,13 @@ public struct NicknameSettingFeature: Sendable {
                 
             case let .internal(.signupResponse(.failure(error))):
                 return handleError(state: &state, error: error)
+
+            case let .internal(.updateNicknameResponse(.success(nickname))):
+                return .send(.delegate(.didUpdateNickname(nickname)))
+
+            case let .internal(.updateNicknameResponse(.failure(error))):
+                Log.trace("Failed to update nickname: \(error)", category: .network, level: .error)
+                return handleError(state: &state, error: error)
                 
             case .view(.viewTapped):
                 state.isKeyboardVisible = false
@@ -217,6 +245,15 @@ public struct NicknameSettingFeature: Sendable {
         .ifLet(\.$alert, action: \.alert)
     }
 
+    private func checkNickname(_ nickname: String) -> Effect<Action> {
+        .run { send in
+            await send(.internal(.checkNicknameResponse(
+                await TaskResult { try await userClient.checkNickname(.init(nickname: nickname)) }
+            )))
+        }
+        .cancellable(id: CancelID.apiCall)
+    }
+
     // 정규식 검사 최적화
     private func isValid(nickname: String) -> Bool {
         guard let regex = Self.nicknameRegex else {
@@ -227,6 +264,9 @@ public struct NicknameSettingFeature: Sendable {
     }
     
     private func handleError(state: inout State, error: Error) -> Effect<Action> {
+        if state.mode == .edit {
+            return handleEditError(state: &state, error: error)
+        }
         guard let domainError = error as? DomainError else {
             Log.trace("Unknown API error: \(error)", category: .network, level: .error)
             state.validationState = .networkError
@@ -259,6 +299,29 @@ public struct NicknameSettingFeature: Sendable {
             return .send(.delegate(.signupFailed(message: "오류가 발생했습니다. 다시 시도해주세요.")))
         }
     }
+
+    /// 수정 모드는 화면을 닫지 않고 그 자리에서 원인을 안내한다(정책 2.3).
+    private func handleEditError(state: inout State, error: Error) -> Effect<Action> {
+        if case let .apiError(code, _) = error as? DomainError {
+            switch code {
+            case .nicknameDuplicated:
+                state.validationState = .unavailable
+                state.isCtaButtonEnabled = false
+                return .none
+            case .invalidNickname:
+                state.validationState = .invalidCharacters
+                state.isCtaButtonEnabled = false
+                return .none
+            default:
+                break
+            }
+        }
+        // 네트워크 등 일시 오류는 같은 닉네임으로 다시 시도할 수 있게 CTA를 살려 둔다.
+        state.validationState = .saveFailed
+        state.validatedNickname = nil
+        state.isCtaButtonEnabled = true
+        return .none
+    }
 }
 
 // MARK: - Validation State & View Helpers
@@ -275,6 +338,14 @@ public extension NicknameSettingFeature {
                 return "닉네임 수정"
             }
         }
+
+        /// CTA 문구 — 수정은 '수정'(정책 2.3), 가입은 '확인'
+        var ctaTitle: String {
+            switch self {
+            case .initial: return "확인"
+            case .edit: return "수정"
+            }
+        }
     }
     
     enum ValidationState: Equatable, Sendable {
@@ -284,23 +355,24 @@ public extension NicknameSettingFeature {
         case invalidLength
         case invalidCharacters
         case networkError
-        case valid  // 수정 모드에서 사용
+        case saveFailed  // 수정 모드에서 중복 검사·저장이 일시 오류로 실패
     }
 }
 
 public extension NicknameSettingFeature.ValidationState {
-    var message: String {
+    func message(in mode: NicknameSettingFeature.Mode) -> String {
         switch self {
         case .idle, .networkError:
-            return "어떻게 불러드리면 될까요?"
+            // 수정 상황은 안내 문구를 따로 둔다(정책 2.1)
+            return mode == .edit ? "어떻게 수정할까요?" : "어떻게 불러드리면 될까요?"
         case .available:
             return "사용 가능한 닉네임입니다."
         case .unavailable:
             return "이미 사용 중인 닉네임입니다."
         case .invalidLength, .invalidCharacters:
             return "한글/영문/숫자,\n2~12자로 작성해주세요"
-        case .valid:
-            return "닉네임이 설정되었습니다"
+        case .saveFailed:
+            return "잠시 문제가 생겼어요.\n다시 시도해주세요"
         }
     }
     
@@ -313,7 +385,7 @@ public extension NicknameSettingFeature.ValidationState {
     
     var textColor: Color {
         switch self {
-        case .idle, .available, .valid:
+        case .idle, .available, .saveFailed:
             return Color.component.textfieldDisplay.focus.text
         case .unavailable, .invalidLength, .invalidCharacters, .networkError:
             return Color.component.textfieldDisplay.default.placeholder
