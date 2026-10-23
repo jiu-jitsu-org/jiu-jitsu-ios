@@ -76,6 +76,7 @@ public struct AppTabFeature: Sendable {
         @CasePathable
         public enum ViewAction: Sendable {
             case onAppear
+            case sceneBecameActive
             case tabSelected(Tab)
             case loginPromptLoginTapped
             case loginPromptDismissed
@@ -143,9 +144,19 @@ public struct AppTabFeature: Sendable {
                         return .send(.internal(.showLoginPromptAlert))
                     }
                 } else {
+                    // 다른 탭에서 MY로 돌아오면 프로필을 재조회한다(탭 뷰가 유지돼 onAppear가 다시 오지 않음, #69).
+                    let isEnteringMyPage = tab == .myPage && state.selectedTab != .myPage
                     state.selectedTab = tab
+                    if isEnteringMyPage {
+                        return .send(.myPage(.view(.tabEntered)))
+                    }
                 }
                 return .none
+
+            case .view(.sceneBecameActive):
+                // MY 탭을 보고 있을 때만 포그라운드 복귀 재조회 (#69)
+                guard state.selectedTab == .myPage, !state.authInfo.isGuest else { return .none }
+                return .send(.myPage(.view(.sceneBecameActive)))
 
             case .settings(.delegate(.loginRequested)):
                 return .send(.internal(.showLoginModal))

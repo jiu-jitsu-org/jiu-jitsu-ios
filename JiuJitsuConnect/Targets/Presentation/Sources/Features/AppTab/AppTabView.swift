@@ -21,6 +21,8 @@ public struct AppTabView: View {
         static let tabBarHeight: CGFloat = 58
     }
 
+    @Environment(\.scenePhase) private var scenePhase
+
     public var body: some View {
         ZStack {
             // 탭별 NavigationStack을 모두 유지하여 탭 전환 시 상태가 보존되도록 한다.
@@ -104,6 +106,9 @@ public struct AppTabView: View {
             onSelectDismiss: { store.send(.home(.view(.selectSheetDismissed))) }
         )
         .onAppear { store.send(.view(.onAppear)) }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { store.send(.view(.sceneBecameActive)) }
+        }
     }
 
     // 게스트가 인증 필요 동작(MY 탭 진입·커뮤니티 행위 등)을 시도할 때 노출되는 공통 로그인 유도 알럿.

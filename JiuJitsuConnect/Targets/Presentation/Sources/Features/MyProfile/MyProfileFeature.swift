@@ -15,7 +15,7 @@ import CoreKit
 public struct MyProfileFeature: Sendable {
     public init() {}
     
-    private enum CancelID { case toast, profileImageUpload, instructorVerificationUpload }
+    private enum CancelID { case toast, profileImageUpload, instructorVerificationUpload, profileRefresh }
 
     @ObservableState
     public struct State: Equatable, Sendable {
@@ -29,6 +29,9 @@ public struct MyProfileFeature: Sendable {
         // 커뮤니티 프로필 정보
         var communityProfile: CommunityProfile?
         var isLoadingProfile: Bool = false
+        // 탭 재진입·포그라운드 복귀 시 백그라운드 재조회 중 (#69). 헤더 스피너와 묶인
+        // isLoadingProfile과 분리해, 재조회 중에도 기존 화면을 깜빡임 없이 유지한다.
+        var isRefreshingProfile: Bool = false
 
         // user-level 프로필 — 관장사범 인증 상태(ownerRequested)·제출 이미지(ownerRequestImageUrl) 등.
         // 닉네임/프로필이미지 등 community와 겹치는 필드는 표시에 쓰지 않는다(단일 소스는 communityProfile).
@@ -134,6 +137,10 @@ public struct MyProfileFeature: Sendable {
 
         public enum ViewAction: Sendable {
             case onAppear
+            // 다른 탭에서 MY로 전환 (탭 뷰가 유지돼 onAppear가 다시 오지 않으므로 AppTab이 보낸다)
+            case tabEntered
+            // MY 탭을 보는 중 앱이 포그라운드로 복귀
+            case sceneBecameActive
             case gymInfoButtonTapped
             case nicknameEditButtonTapped
             case registerBeltButtonTapped
@@ -159,6 +166,9 @@ public struct MyProfileFeature: Sendable {
             // user-level 프로필(GET /api/user/profile) 응답 — 관장사범 인증 상태(ownerRequested) 등.
             // community 프로필과 독립적으로 처리해 한쪽 실패가 다른 쪽을 막지 않게 한다.
             case userProfileResponse(TaskResult<UserProfile>)
+            case refreshProfile
+            case refreshProfileResponse(TaskResult<CommunityProfile>)
+            case refreshUserProfileResponse(TaskResult<UserProfile>)
             case updateProfileSection(ProfileSection, String?)
             case saveBeltAndWeightInfo(rank: BeltRank, stripe: BeltStripe, gender: Gender, weightKg: Double, isWeightHidden: Bool)
             case saveBeltInfoOnly(rank: BeltRank, stripe: BeltStripe)
@@ -222,6 +232,52 @@ public struct MyProfileFeature: Sendable {
                 // (toast dismiss 등 state 변화로 onAppear가 재트리거되는 경우 차단)
                 guard state.communityProfile == nil else { return .none }
                 return .send(.internal(.loadProfile))
+
+            case .view(.tabEntered), .view(.sceneBecameActive):
+                // 웹·다른 기기에서 바꾼 내용, 관장 사범 인증 승인 등을 반영한다(#69).
+                // 첫 조회가 아직 없으면(실패 포함) 일반 로딩으로 처리한다.
+                guard state.communityProfile != nil else {
+                    return .send(.view(.onAppear))
+                }
+                return .send(.internal(.refreshProfile))
+
+            case .internal(.refreshProfile):
+                // 저장·업로드 중이면 그 결과가 화면의 최신값이므로 재조회하지 않는다.
+                guard !state.authInfo.isGuest,
+                      !state.isLoadingProfile,
+                      !state.isUploadingInstructorVerification,
+                      !state.isRefreshingProfile else { return .none }
+                state.isRefreshingProfile = true
+                return .run { send in
+                    async let communityResult = TaskResult { try await communityClient.fetchProfile() }
+                    async let userResult = TaskResult { try await userClient.fetchUserProfile() }
+                    await send(.internal(.refreshProfileResponse(communityResult)))
+                    await send(.internal(.refreshUserProfileResponse(userResult)))
+                }
+                .cancellable(id: CancelID.profileRefresh, cancelInFlight: true)
+
+            case let .internal(.refreshProfileResponse(result)):
+                state.isRefreshingProfile = false
+                // 응답을 기다리는 사이 저장이 시작됐으면 오래된 값으로 덮어쓰지 않는다.
+                guard !state.isLoadingProfile else { return .none }
+                switch result {
+                case let .success(profile):
+                    state.communityProfile = profile
+                case let .failure(error):
+                    // 백그라운드 재조회 실패는 기존 화면을 유지하고 조용히 넘긴다.
+                    Log.trace("Failed to refresh profile: \(error)", category: .network, level: .error)
+                }
+                return .none
+
+            case let .internal(.refreshUserProfileResponse(result)):
+                guard !state.isUploadingInstructorVerification else { return .none }
+                switch result {
+                case let .success(profile):
+                    state.userProfile = profile
+                case let .failure(error):
+                    Log.trace("Failed to refresh user profile: \(error)", category: .network, level: .error)
+                }
+                return .none
 
             case .internal(.loadProfile):
                 guard !state.authInfo.isGuest else { return .none }
