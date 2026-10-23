@@ -45,6 +45,16 @@ public struct CommunityDetailFeature: Sendable {
             self.title = title
             self.accessToken = accessToken
         }
+
+        /// 글쓰기(`/community/write`)·글 수정(`/community/{id}/edit`) 화면인지.
+        /// 웹이 이탈 확인('작성 취소'/'수정 취소') 후 CLOSE_SUBVIEW로 닫으므로, 이 화면에서는
+        /// 스와이프 백이 확인을 우회해 작성 내용을 잃지 않도록 막는다(#82).
+        var blocksSwipeBack: Bool {
+            let segments = url.pathComponents.filter { $0 != "/" }
+            guard segments.first == "community" else { return false }
+            return segments == ["community", "write"]
+                || (segments.count == 3 && segments[2] == "edit")
+        }
     }
 
     public enum Action: Sendable {

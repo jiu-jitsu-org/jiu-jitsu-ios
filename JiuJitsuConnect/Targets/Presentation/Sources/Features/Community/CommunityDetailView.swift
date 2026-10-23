@@ -38,6 +38,11 @@ public struct CommunityDetailView: View {
         // chromeless: 네이티브 내비게이션 바를 숨겨 웹 자체 헤더만 보이게 한다.
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
+        .background {
+            if store.blocksSwipeBack {
+                InteractivePopBlocker()
+            }
+        }
         // 상세는 이미 풀스크린이라 확인 알럿·선택 시트를 로컬에서 그려도 화면 전체가 덮인다.
         .webBridgeDialogs(
             confirmDialog: store.pendingConfirmDialog,
@@ -133,4 +138,15 @@ public struct CommunityDetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.component.background.default)
     }
+}
+
+// MARK: - 스와이프 백 차단
+
+/// 이 화면이 맨 위에 있는 동안 내비게이션 스와이프 백을 막는다. (`UINavigationController+SwipeBack` 참고)
+private struct InteractivePopBlocker: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> InteractivePopBlockingViewController {
+        InteractivePopBlockingViewController()
+    }
+
+    func updateUIViewController(_ uiViewController: InteractivePopBlockingViewController, context: Context) {}
 }
