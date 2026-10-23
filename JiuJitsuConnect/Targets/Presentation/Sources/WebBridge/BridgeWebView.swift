@@ -77,6 +77,8 @@ struct BridgeWebView: UIViewRepresentable {
         // (사진/태그)를 키보드 위에 띄우므로 시스템 바는 불필요하고, 없는 편이 깔끔하다.
         let webView = ChromelessWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
+        // 새 창 링크(target=_blank, window.open)와 JS alert/confirm/prompt는 uiDelegate가 없으면 무반응이다(#63).
+        webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = allowsBackForwardNavigationGestures
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         // 오버스크롤/바운스 영역에 WKWebView 기본 회색이 비치지 않도록 웹 콘텐츠 배경과
@@ -149,7 +151,7 @@ struct BridgeWebView: UIViewRepresentable {
             .removeScriptMessageHandler(forName: WebBridge.appBridgeHandlerName)
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, UIScrollViewDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, UIScrollViewDelegate {
         private let source: WebBridgeSource
         private var onLoadingStarted: () -> Void
         private var onLoadingFinished: () -> Void
@@ -344,6 +346,82 @@ struct BridgeWebView: UIViewRepresentable {
                 return
             }
             decisionHandler(.allow)
+        }
+
+        // MARK: WKUIDelegate
+
+        // 새 창 요청. 커뮤니티 도메인이면 현재 웹뷰에서 이어 열고, 외부 도메인은 Safari로 넘긴다.
+        // 새 WKWebView를 만들지 않으므로 nil을 반환한다.
+        func webView(
+            _ webView: WKWebView,
+            createWebViewWith configuration: WKWebViewConfiguration,
+            for navigationAction: WKNavigationAction,
+            windowFeatures: WKWindowFeatures
+        ) -> WKWebView? {
+            guard let url = navigationAction.request.url else { return nil }
+            if url.host() == lastLoadedURL?.host() {
+                webView.load(navigationAction.request)
+            } else if url.scheme == "http" || url.scheme == "https" {
+                UIApplication.shared.open(url)
+            } else {
+                Log.trace("Bridge webview 새 창 요청 무시(지원하지 않는 scheme): \(url)", category: .view, level: .info)
+            }
+            return nil
+        }
+
+        // WebKit은 completionHandler가 정확히 한 번 호출되지 않으면 예외를 던지므로,
+        // 띄울 화면이 없을 때도 기본값으로 즉시 완료한다.
+        func webView(
+            _ webView: WKWebView,
+            runJavaScriptAlertPanelWithMessage message: String,
+            initiatedByFrame frame: WKFrameInfo,
+            completionHandler: @escaping () -> Void
+        ) {
+            let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "확인", style: .default) { _ in completionHandler() })
+            present(alert, from: webView, onFailure: completionHandler)
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            runJavaScriptConfirmPanelWithMessage message: String,
+            initiatedByFrame frame: WKFrameInfo,
+            completionHandler: @escaping (Bool) -> Void
+        ) {
+            let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "취소", style: .cancel) { _ in completionHandler(false) })
+            alert.addAction(UIAlertAction(title: "확인", style: .default) { _ in completionHandler(true) })
+            present(alert, from: webView, onFailure: { completionHandler(false) })
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            runJavaScriptTextInputPanelWithPrompt prompt: String,
+            defaultText: String?,
+            initiatedByFrame frame: WKFrameInfo,
+            completionHandler: @escaping (String?) -> Void
+        ) {
+            let alert = UIAlertController(title: nil, message: prompt, preferredStyle: .alert)
+            alert.addTextField { $0.text = defaultText }
+            alert.addAction(UIAlertAction(title: "취소", style: .cancel) { _ in completionHandler(nil) })
+            alert.addAction(UIAlertAction(title: "확인", style: .default) { [weak alert] _ in
+                completionHandler(alert?.textFields?.first?.text)
+            })
+            present(alert, from: webView, onFailure: { completionHandler(nil) })
+        }
+
+        /// 웹뷰가 속한 윈도우의 최상단 화면에서 알럿을 띄운다. (SwiftUI 시트·커버 위에서도 보이도록)
+        private func present(_ alert: UIAlertController, from webView: WKWebView, onFailure: () -> Void) {
+            var presenter = webView.window?.rootViewController
+            while let presented = presenter?.presentedViewController {
+                presenter = presented
+            }
+            guard let presenter else {
+                Log.trace("Bridge webview JS 패널을 띄울 화면이 없음", category: .view, level: .error)
+                onFailure()
+                return
+            }
+            presenter.present(alert, animated: true)
         }
     }
 }
