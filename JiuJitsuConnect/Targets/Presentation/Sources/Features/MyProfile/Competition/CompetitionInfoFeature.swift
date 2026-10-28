@@ -5,10 +5,18 @@
 
 import Foundation
 import ComposableArchitecture
+import CoreKit
 import Domain
 
 @Reducer
 public struct CompetitionInfoFeature: Sendable {
+
+    private enum CancelID {
+        case searchCompetitions
+    }
+
+    // 한 글자씩 칠 때마다 검색하지 않도록, 입력이 잠깐 멈춘 뒤에 검색한다.
+    private static let searchDebounce: Duration = .milliseconds(300)
 
     public init() {}
 
@@ -46,6 +54,9 @@ public struct CompetitionInfoFeature: Sendable {
         // 대회명은 닉네임과 달리 중복을 허용하므로 별도 검증 없이 "빈 값" 여부만 본다.
         // 빈 값이면 완료 버튼을 비활성화하므로(View의 .disabled) 별도 검증 상태/문구는 두지 않는다.
         var name: String = ""
+
+        // 입력한 대회명과 맞는 등록된 대회 목록. 고르면 이름이 채워지고, 없으면 직접 입력한 이름을 그대로 쓴다.
+        var suggestions: [RegisteredCompetition] = []
 
         public init() {}
 
@@ -108,6 +119,7 @@ public struct CompetitionInfoFeature: Sendable {
     public enum Action: BindableAction, Sendable {
         case binding(BindingAction<State>)
         case view(ViewAction)
+        case `internal`(InternalAction)
         case delegate(DelegateAction)
 
         public enum ViewAction: Sendable {
@@ -117,6 +129,11 @@ public struct CompetitionInfoFeature: Sendable {
             case deleteButtonTapped
             case yearOptionSelected(YearOption)
             case resultSelected(CompetitionRank)
+            case suggestionTapped(RegisteredCompetition)
+        }
+
+        public enum InternalAction: Sendable {
+            case suggestionsLoaded([RegisteredCompetition])
         }
 
         public enum DelegateAction: Sendable {
@@ -127,6 +144,8 @@ public struct CompetitionInfoFeature: Sendable {
     }
 
     @Dependency(\.dismiss) var dismiss
+    @Dependency(\.continuousClock) var clock
+    @Dependency(\.competitionClient) var competitionClient
 
     public var body: some ReducerOf<Self> {
         BindingReducer()
@@ -200,6 +219,37 @@ public struct CompetitionInfoFeature: Sendable {
 
             case let .view(.resultSelected(rank)):
                 state.result = rank
+                return .none
+
+            case .binding(\.name):
+                let keyword = state.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !keyword.isEmpty else {
+                    state.suggestions = []
+                    return .cancel(id: CancelID.searchCompetitions)
+                }
+                return .run { [clock, competitionClient] send in
+                    try await clock.sleep(for: Self.searchDebounce)
+                    do {
+                        let suggestions = try await competitionClient.searchCompetitions(keyword)
+                        await send(.internal(.suggestionsLoaded(suggestions)))
+                    } catch is CancellationError {
+                        return
+                    } catch {
+                        // 검색 API가 아직 없거나(backend #165) 실패해도 직접 입력으로 진행할 수 있으니 조용히 목록만 비운다.
+                        Log.trace("대회 검색 실패: \(error)", category: .network, level: .info)
+                        await send(.internal(.suggestionsLoaded([])))
+                    }
+                }
+                .cancellable(id: CancelID.searchCompetitions, cancelInFlight: true)
+
+            case let .view(.suggestionTapped(competition)):
+                state.name = competition.name
+                state.suggestions = []
+                // 고르기 직전 입력으로 시작된 검색이 늦게 돌아와 목록을 다시 띄우지 않게 한다.
+                return .cancel(id: CancelID.searchCompetitions)
+
+            case let .internal(.suggestionsLoaded(suggestions)):
+                state.suggestions = suggestions
                 return .none
 
             case .binding, .delegate:

@@ -1,5 +1,6 @@
 import SwiftUI
 import ComposableArchitecture
+import Domain
 import DesignSystem
 
 struct CompetitionNameView: View {
@@ -11,7 +12,12 @@ struct CompetitionNameView: View {
         VStack(spacing: 0) {
             titleSection
             textFieldSection
-            Spacer()
+            // 목록이 있으면 버튼 위 남은 공간을 목록이 채우고, 없으면 빈 공간으로 버튼을 키보드 위에 붙인다.
+            if store.suggestions.isEmpty {
+                Spacer()
+            } else {
+                suggestionSection
+            }
             ctaButtonSection
         }
         .onAppear {
@@ -23,13 +29,14 @@ struct CompetitionNameView: View {
     // MARK: - View Components
 
     private var titleSection: some View {
-        Text("대회명을 입력해주세요")
+        Text("어떤 대회였나요?")
             .font(Font.pretendard.display1)
             .foregroundStyle(Color.component.textfieldDisplay.focus.title)
             .frame(maxWidth: .infinity, alignment: .center)
             .multilineTextAlignment(.center)
             .padding(.horizontal, 30)
-            .padding(.top, 120)
+            // 자동완성 목록이 키보드 위에 보일 자리를 만들려고 다른 단계와 같은 상단 여백을 쓴다.
+            .padding(.top, 40)
             .padding(.bottom, 8)
     }
 
@@ -56,6 +63,35 @@ struct CompetitionNameView: View {
         .padding(.horizontal, 30)
     }
 
+    private var suggestionSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("등록된 대회")
+                .font(Font.pretendard.labelM)
+                .foregroundStyle(Color.component.list.setting.subText)
+                .padding(.horizontal, 4)
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(store.suggestions, id: \.name) { competition in
+                        CompetitionSuggestionRow(
+                            name: competition.name,
+                            keyword: store.name,
+                            onTapped: { store.send(.view(.suggestionTapped(competition))) }
+                        )
+                    }
+                }
+                .padding(.vertical, 4)
+                .background(Color.component.list.setting.background)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .padding(.horizontal, 20)
+        .padding(.top, 24)
+        .padding(.bottom, 12)
+    }
+
     private var ctaButtonSection: some View {
         CTAButton(
             title: "완료",
@@ -68,6 +104,39 @@ struct CompetitionNameView: View {
         )
         // 대회명이 비어있으면(공백만 입력 포함) 저장 불가 — 처음부터 비활성화한다.
         .disabled(store.name.trimmingCharacters(in: .whitespaces).isEmpty)
+    }
+}
+
+// MARK: - Suggestion Row
+
+/// 등록된 대회 한 줄 — 입력한 글자와 맞는 부분을 강조해 왜 이 대회가 떴는지 보이게 한다.
+private struct CompetitionSuggestionRow: View {
+    let name: String
+    let keyword: String
+    let onTapped: () -> Void
+
+    var body: some View {
+        Button(action: onTapped) {
+            Text(highlightedName)
+                .font(Font.pretendard.bodyM)
+                .foregroundStyle(Color.component.list.setting.text)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: 48)
+                .padding(.horizontal, 16)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var highlightedName: AttributedString {
+        var attributed = AttributedString(name)
+        let trimmed = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty,
+           let range = attributed.range(of: trimmed, options: .caseInsensitive) {
+            attributed[range].foregroundColor = Color.component.textfieldDisplay.focus.text
+        }
+        return attributed
     }
 }
 
@@ -88,4 +157,22 @@ private struct BlinkingCursorView: View {
                 }
             }
     }
+}
+
+// MARK: - Preview
+
+#Preview("자동완성 목록") {
+    var state = CompetitionInfoFeature.State()
+    state.step = .name
+    state.name = "서울"
+    state.suggestions = [
+        RegisteredCompetition(id: 1, name: "2026 서울 오픈"),
+        RegisteredCompetition(id: 2, name: "서울 주짓수 챔피언십"),
+        RegisteredCompetition(id: 3, name: "서울 국제 오픈")
+    ]
+    return CompetitionNameView(
+        store: Store(initialState: state) {
+            CompetitionInfoFeature()
+        }
+    )
 }
