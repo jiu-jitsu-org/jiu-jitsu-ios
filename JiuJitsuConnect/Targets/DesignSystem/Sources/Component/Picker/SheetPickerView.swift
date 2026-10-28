@@ -41,6 +41,9 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
     /// 항목의 표시 텍스트를 반환하는 클로저
     let displayText: (Item) -> String
 
+    /// 텍스트 왼쪽에 붙일 아이콘을 반환하는 클로저 (없으면 텍스트만 표시)
+    let icon: ((Item) -> Image)?
+
     /// 항목 선택 시 호출되는 클로저
     let onSelect: (Item) -> Void
 
@@ -55,9 +58,16 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
 
     // MARK: - State
 
-    /// 현재 화면 중앙에 정렬된 항목의 id.
-    /// `scrollPosition(id:anchor:.center)`이 스크롤에 맞춰 갱신하고, 외부 선택 변경 시 여기에 써 넣어 해당 항목으로 스크롤한다.
-    @State private var scrolledID: Item.ID?
+    /// 스크롤 위치. 항목 id가 아니라 "몇 번째 슬롯 × 슬롯 높이" 오프셋으로 움직인다.
+    /// id 기준(`scrollPosition(id:)`)으로 처음 위치를 잡으면 항목에 따라 중앙에서 항목 간격만큼 어긋나
+    /// 나란히 둔 피커끼리 높이가 달라 보였다(대회 날짜의 한 자리 월). 오프셋은 격자와 같은 계산이라 어긋나지 않는다.
+    @State private var position: ScrollPosition
+
+    /// 지금 화면 중앙에 있는 항목의 인덱스 — 강조 표시와 선택 전달의 기준
+    @State private var centeredIndex: Int
+
+    /// 사용자가 끌거나 관성으로 흐르는 중인지. 이때만 중앙 항목 변화를 선택으로 전달한다.
+    @State private var isUserScrolling = false
 
     // MARK: - Initialization
 
@@ -66,6 +76,7 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
     ///   - items: 표시할 항목 배열
     ///   - selectedItem: 현재 선택된 항목
     ///   - displayText: 각 항목의 표시 텍스트를 반환하는 클로저
+    ///   - icon: 텍스트 왼쪽에 붙일 아이콘 (기본값: nil)
     ///   - width: 피커의 너비 (기본값: 130)
     ///   - itemHeight: 각 항목의 높이 (기본값: 45)
     ///   - itemSpacing: 항목 간 간격 (기본값: 8)
@@ -74,6 +85,7 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
         items: [Item],
         selectedItem: Item,
         displayText: @escaping (Item) -> String,
+        icon: ((Item) -> Image)? = nil,
         width: CGFloat = 130,
         itemHeight: CGFloat = 45,
         itemSpacing: CGFloat = 8,
@@ -82,11 +94,14 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
         self.items = items
         self.selectedItem = selectedItem
         self.displayText = displayText
+        self.icon = icon
         self.width = width
         self.itemHeight = itemHeight
         self.itemSpacing = itemSpacing
         self.onSelect = onSelect
-        self._scrolledID = State(initialValue: selectedItem.id)
+        let initialIndex = items.firstIndex(of: selectedItem) ?? 0
+        self._centeredIndex = State(initialValue: initialIndex)
+        self._position = State(initialValue: ScrollPosition(y: Self.offset(for: initialIndex, pitch: itemHeight + itemSpacing)))
     }
 
     // MARK: - Layout Metrics
@@ -97,20 +112,24 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
     /// 정확히 3개 항목이 노출되는 뷰포트 높이
     private var viewportHeight: CGFloat { itemHeight * 3 + itemSpacing * 2 }
 
+    /// `index` 항목이 중앙에 오는 스크롤 오프셋.
+    /// 오프셋 0은 위 여백(한 슬롯)이 다 올라간 상태라 그때 중앙에는 두 번째 항목이 온다. 그래서 한 슬롯을 뺀다.
+    private static func offset(for index: Int, pitch: CGFloat) -> CGFloat {
+        CGFloat(index - 1) * pitch
+    }
+
     // MARK: - Body
 
     public var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(spacing: itemSpacing) {
-                ForEach(items) { item in
-                    pickerItemView(item)
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    pickerItemView(item, index: index)
                 }
             }
             .scrollTargetLayout()
         }
-        // 중앙 정렬은 아래 contentMargins + 스냅 격자가 전담한다.
-        // anchor: .center를 함께 주면 초기 레이아웃에서 정렬이 이중 적용되어 선택 항목이 한 슬롯 밀린다.
-        .scrollPosition(id: $scrolledID)
+        .scrollPosition($position)
         // 자유 스크롤 대신 슬롯 격자에 스냅 → 손을 떼면 항상 항목이 정확히 중앙에 정렬되어
         // 여러 피커를 나란히 둘 때 행끼리 수평 정렬이 어긋나지 않는다.
         .scrollTargetBehavior(SlotSnapScrollBehavior(pitch: slotPitch))
@@ -118,47 +137,74 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
         // 이 여백 덕분에 스크롤 오프셋 0에서 첫 항목이 중앙에 정렬된다.
         .contentMargins(.vertical, slotPitch, for: .scrollContent)
         .frame(width: width, height: viewportHeight)
-        .onChange(of: scrolledID) { _, newID in
-            // 사용자 스크롤로 중앙 항목이 바뀌면 선택을 전달 (외부 선택과 동일하면 무시)
-            guard let newID, newID != selectedItem.id,
-                  let item = items.first(where: { $0.id == newID }) else { return }
-            onSelect(item)
+        .onScrollGeometryChange(for: Int.self) { geometry in
+            // 위 여백(contentInsets.top)을 더해 "첫 항목이 중앙일 때 0"이 되도록 맞춘 뒤 슬롯 단위로 반올림
+            Int(((geometry.contentOffset.y + geometry.contentInsets.top) / slotPitch).rounded())
+        } action: { _, newIndex in
+            centeredIndex = min(max(newIndex, 0), items.count - 1)
+            if isUserScrolling { selectCenteredItem() }
+        }
+        .onScrollPhaseChange { _, newPhase in
+            isUserScrolling = newPhase == .interacting || newPhase == .decelerating
+            // 손을 떼고 스냅까지 끝난 시점에도 한 번 더 전달해, 마지막 칸이 빠지지 않게 한다.
+            if newPhase == .idle { selectCenteredItem() }
         }
         .onChange(of: selectedItem.id) { _, newID in
             // 외부에서 선택이 바뀐 경우에만 해당 항목으로 스크롤 (사용자 스크롤 → onSelect → 재스크롤 피드백 루프 방지)
-            guard scrolledID != newID else { return }
+            guard let index = items.firstIndex(where: { $0.id == newID }), index != centeredIndex else { return }
             withAnimation(.easeInOut(duration: 0.3)) {
-                scrolledID = newID
+                position.scrollTo(y: Self.offset(for: index, pitch: slotPitch))
             }
         }
+    }
+
+    /// 중앙 항목이 현재 선택과 다르면 선택을 전달한다.
+    private func selectCenteredItem() {
+        guard items.indices.contains(centeredIndex) else { return }
+        let item = items[centeredIndex]
+        guard item.id != selectedItem.id else { return }
+        onSelect(item)
     }
 
     // MARK: - Private Views
 
     @ViewBuilder
-    private func pickerItemView(_ item: Item) -> some View {
-        let isSelected = scrolledID == item.id
+    private func pickerItemView(_ item: Item, index: Int) -> some View {
+        let isSelected = centeredIndex == index
         Button {
             withAnimation(.easeInOut(duration: 0.3)) {
-                scrolledID = item.id
+                position.scrollTo(y: Self.offset(for: index, pitch: slotPitch))
+            }
+            if item.id != selectedItem.id {
+                onSelect(item)
             }
         } label: {
-            Text(displayText(item))
-                .font(isSelected
-                      ? .pretendard.custom(weight: .medium, size: 24)
-                      : .pretendard.custom(weight: .medium, size: 20))
-                .foregroundStyle(isSelected
-                                 ? Color.component.picker.itemSelectedText
-                                 : Color.component.picker.itemUnselectedText)
-                .frame(maxWidth: .infinity)
-                .frame(height: itemHeight)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(isSelected
-                              ? Color.component.picker.itemSelectedBg
-                              : Color.clear)
-                )
-                .animation(.easeOut(duration: 0.15), value: isSelected)
+            HStack(spacing: 8) {
+                if let icon {
+                    // 스크롤 중에도 항목을 글자보다 먼저 알아보도록 선택 여부와 상관없이 아이콘을 보여 준다
+                    icon(item)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: isSelected ? 24 : 20, height: isSelected ? 24 : 20)
+                }
+
+                Text(displayText(item))
+                    .font(isSelected
+                          ? .pretendard.custom(weight: .medium, size: 24)
+                          : .pretendard.custom(weight: .medium, size: 20))
+                    .foregroundStyle(isSelected
+                                     ? Color.component.picker.itemSelectedText
+                                     : Color.component.picker.itemUnselectedText)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: itemHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(isSelected
+                          ? Color.component.picker.itemSelectedBg
+                          : Color.clear)
+            )
+            .animation(.easeOut(duration: 0.15), value: isSelected)
         }
         .buttonStyle(.plain)
     }

@@ -18,15 +18,16 @@ struct CompetitionInfoView: View {
     var body: some View {
         VStack(spacing: 0) {
             headerView
+            progressBar
 
             Group {
                 switch store.step {
+                case .result:
+                    CompetitionResultView(store: store)
                 case .date:
                     CompetitionDateView(store: store)
                 case .name:
                     CompetitionNameView(store: store)
-                case .result:
-                    CompetitionResultView(store: store)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -93,6 +94,27 @@ struct CompetitionInfoView: View {
         }
         .padding(.horizontal, Style.horizontalPadding)
         .frame(height: Style.headerHeight)
+    }
+
+    // 지금 단계까지 칸을 채워, 남은 단계 수를 한눈에 보이게 한다.
+    private var progressBar: some View {
+        HStack(spacing: 4) {
+            ForEach(CompetitionInfoFeature.Step.allCases, id: \.self) { step in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(
+                        step.rawValue <= store.step.rawValue
+                            ? Color.primitive.blue.b500p
+                            : Color.primitive.coolGray.cg50
+                    )
+                    .frame(height: 3)
+            }
+        }
+        .padding(.horizontal, Style.horizontalPadding)
+        .animation(.default, value: store.step)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(CompetitionInfoFeature.Step.allCases.count)단계 중 \(store.step.rawValue + 1)단계"
+        )
     }
 
 }
