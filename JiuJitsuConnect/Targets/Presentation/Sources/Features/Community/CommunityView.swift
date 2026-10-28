@@ -135,16 +135,16 @@ public struct CommunityView: View {
                     }
                     .buttonStyle(.plain)
 
-                    if store.isMyActivityButtonVisible {
+                    if store.isMyProfileButtonVisible {
                         Button {
-                            store.send(.view(.myActivityTapped))
+                            store.send(.view(.myProfileTapped))
                         } label: {
                             myAvatar
                                 .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("커뮤니티 활동")
+                        .accessibilityLabel("MY")
                     }
                 }
             }
