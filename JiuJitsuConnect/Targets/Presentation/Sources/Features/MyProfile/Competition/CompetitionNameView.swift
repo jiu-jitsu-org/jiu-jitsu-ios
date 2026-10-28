@@ -18,6 +18,7 @@ struct CompetitionNameView: View {
             } else {
                 suggestionSection
             }
+            namelessButton
             ctaButtonSection
         }
         .onAppear {
@@ -90,6 +91,24 @@ struct CompetitionNameView: View {
         .padding(.horizontal, 20)
         .padding(.top, 24)
         .padding(.bottom, 12)
+    }
+
+    // 자동완성으로도 못 찾은 사람이 기록을 포기하지 않게 이름 없이 넘어가는 길(#125).
+    // 이름 없는 기록은 대회명을 채우기 전까지 나만 보이므로, 그 사실은 완료 화면과 프로필에서 알려 준다.
+    private var namelessButton: some View {
+        Button {
+            store.send(.view(.namelessButtonTapped))
+        } label: {
+            Text("대회명이 기억나지 않아요")
+                .font(Font.pretendard.bodyS)
+                .foregroundStyle(Color.component.list.setting.subText)
+                .underline()
+                .frame(height: 44)
+                .padding(.horizontal, 16)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.bottom, 4)
     }
 
     private var ctaButtonSection: some View {

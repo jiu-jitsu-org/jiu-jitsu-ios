@@ -72,7 +72,8 @@ public struct CompetitionInfoFeature: Sendable {
 
         // 3단계: 대회명 (TextField 직접 바인딩)
         // 대회명은 닉네임과 달리 중복을 허용하므로 별도 검증 없이 "빈 값" 여부만 본다.
-        // 빈 값이면 완료 버튼을 비활성화하므로(View의 .disabled) 별도 검증 상태/문구는 두지 않는다.
+        // 빈 값이면 다음 버튼을 비활성화하므로(View의 .disabled) 별도 검증 상태/문구는 두지 않는다.
+        // 이름이 기억나지 않으면 '대회명이 기억나지 않아요'로 빈 이름인 채 넘어간다(#125, 나만 보기로 저장).
         var name: String = ""
 
         // 입력한 대회명과 맞는 등록된 대회 목록. 고르면 이름이 채워지고, 없으면 직접 입력한 이름을 그대로 쓴다.
@@ -171,6 +172,7 @@ public struct CompetitionInfoFeature: Sendable {
             case yearOptionSelected(YearOption)
             case resultSelected(CompetitionRank)
             case suggestionTapped(RegisteredCompetition)
+            case namelessButtonTapped
             case uniformSelected(CompetitionUniform)
             case weightClassSelected(CompetitionWeightClass)
             case beltSelected(BeltRank)
@@ -338,6 +340,14 @@ public struct CompetitionInfoFeature: Sendable {
                     }
                 }
                 .cancellable(id: CancelID.searchCompetitions, cancelInFlight: true)
+
+            case .view(.namelessButtonTapped):
+                guard state.step == .name, !state.isSaving else { return .none }
+                // 기억 안 난다고 했으니 치다 만 글자는 대회명으로 남기지 않는다.
+                state.name = ""
+                state.suggestions = []
+                state.step = .division
+                return .cancel(id: CancelID.searchCompetitions)
 
             case let .view(.suggestionTapped(competition)):
                 state.name = competition.name

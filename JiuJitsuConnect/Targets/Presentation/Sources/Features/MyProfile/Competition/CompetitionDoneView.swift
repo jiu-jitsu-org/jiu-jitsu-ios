@@ -14,7 +14,12 @@ struct CompetitionDoneView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     resultSection
-                    addDivisionSection
+                    // 이름 없는 기록은 같은 대회끼리 묶을 수 없어 '부문 추가' 대신 나만 보기 안내를 둔다(#125).
+                    if store.savedRecords.last?.isNameless == true {
+                        namelessNoticeSection
+                    } else {
+                        addDivisionSection
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)
@@ -80,6 +85,23 @@ struct CompetitionDoneView: View {
         .padding(.top, 40)
     }
 
+    private var namelessNoticeSection: some View {
+        VStack(spacing: 6) {
+            Text("대회명 없이 저장한 기록은 나만 볼 수 있어요")
+                .font(Font.pretendard.bodyS)
+                .foregroundStyle(Color.component.sectionHeader.subTitle)
+            Text("프로필에서 대회명을 채우면 공개돼요")
+                .font(Font.pretendard.labelM)
+                .foregroundStyle(Color.component.list.setting.subText)
+        }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+        .background(Color.component.skillCard.container.bg)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .padding(.top, 40)
+    }
+
     private var confirmButton: some View {
         CTAButton(
             title: "완료",
@@ -106,6 +128,19 @@ struct CompetitionDoneView: View {
             competitionWeightClass: .under76,
             competitionBelt: .brown
         )
+    ]
+    return CompetitionDoneView(
+        store: Store(initialState: state) {
+            CompetitionInfoFeature()
+        }
+    )
+}
+
+#Preview("대회명 없이 저장") {
+    var state = CompetitionInfoFeature.State(mode: .add, currentBelt: .brown)
+    state.step = .done
+    state.savedRecords = [
+        Competition(competitionYear: 2025, competitionName: "", competitionRank: .bronze)
     ]
     return CompetitionDoneView(
         store: Store(initialState: state) {
