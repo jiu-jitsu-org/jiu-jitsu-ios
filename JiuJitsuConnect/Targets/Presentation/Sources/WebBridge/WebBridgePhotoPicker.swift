@@ -63,7 +63,8 @@ struct WebBridgePhotoPicker: UIViewControllerRepresentable {
                 return
             }
             let providers = PickedPhotoProviders(results.map(\.itemProvider))
-            Task { [onPicked] in
+            // 변환은 메인 밖에서 돌고, 결과 전달(store.send)은 메인에서 해야 하므로 명시한다.
+            Task { @MainActor [onPicked] in
                 let photos = await PickedPhotoEncoder.encode(providers)
                 onPicked(photos)
             }
