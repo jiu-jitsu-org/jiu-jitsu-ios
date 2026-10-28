@@ -69,7 +69,11 @@ struct CompetitionRequestDTO: Codable {
     let competitionMonth: Int
     let competitionName: String
     let competitionRank: String
-    
+    // 출전 부문(#122) — backend #164 계약 전 가정 키. nil이면 키를 아예 보내지 않는다(합성 Encodable의 encodeIfPresent).
+    let competitionUniform: String?
+    let competitionWeightClass: String?
+    let competitionBelt: String?
+
     init(from competition: Competition) {
         self.competitionYear = competition.competitionYear
         // backend #164 반영 전 임시: 서버가 아직 월을 필수로 받으므로, 월이 없는 새 기록은 자리값 1을 보낸다.
@@ -77,5 +81,8 @@ struct CompetitionRequestDTO: Codable {
         self.competitionMonth = competition.competitionMonth ?? Self.placeholderMonth
         self.competitionName = competition.competitionName
         self.competitionRank = competition.competitionRank.rawValue
+        self.competitionUniform = competition.competitionUniform?.rawValue
+        self.competitionWeightClass = competition.competitionWeightClass?.rawValue
+        self.competitionBelt = competition.competitionBelt?.rawValue
     }
 }

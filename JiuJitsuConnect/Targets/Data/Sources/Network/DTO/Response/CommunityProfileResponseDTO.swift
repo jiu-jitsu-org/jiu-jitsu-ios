@@ -65,13 +65,21 @@ struct CompetitionDTO: Codable {
     let competitionMonth: Int?
     let competitionName: String
     let competitionRank: String
-    
+    // 출전 부문(#122) — backend #164 계약 전 가정 키. 서버가 아직 내려 주지 않으므로 옵셔널로 디코딩한다.
+    let competitionUniform: String?
+    let competitionWeightClass: String?
+    let competitionBelt: String?
+
     func toDomain() -> Competition {
+        // 모르는 값은 부문 없음으로 둔다 — 체급표가 바뀌어도 프로필 전체 디코딩이 깨지지 않게.
         Competition(
             competitionYear: competitionYear,
             competitionMonth: competitionMonth,
             competitionName: competitionName,
-            competitionRank: CompetitionRank(rawValue: competitionRank) ?? .participation
+            competitionRank: CompetitionRank(rawValue: competitionRank) ?? .participation,
+            competitionUniform: competitionUniform.flatMap(CompetitionUniform.init(rawValue:)),
+            competitionWeightClass: competitionWeightClass.flatMap(CompetitionWeightClass.init(rawValue:)),
+            competitionBelt: competitionBelt.flatMap(BeltRank.init(rawValue:))
         )
     }
 }

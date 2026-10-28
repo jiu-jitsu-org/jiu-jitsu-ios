@@ -49,7 +49,7 @@ struct CompetitionNameView: View {
                     .allowsHitTesting(false)
             }
 
-            // 긴 대회명은 줄바꿈해서 보여주고, Return은 개행 없이 완료 버튼과 동일하게 처리한다.
+            // 긴 대회명은 줄바꿈해서 보여주고, Return은 개행 없이 다음 버튼과 동일하게 처리한다.
             MultilineTextField(
                 text: $store.name,
                 isFocused: $isKeyboardVisible,
@@ -94,7 +94,7 @@ struct CompetitionNameView: View {
 
     private var ctaButtonSection: some View {
         CTAButton(
-            title: "완료",
+            title: "다음",
             type: .blue,
             style: .keypad,
             height: 56,
@@ -102,7 +102,7 @@ struct CompetitionNameView: View {
                 store.send(.view(.nextButtonTapped))
             }
         )
-        // 대회명이 비어있으면(공백만 입력 포함) 저장 불가 — 처음부터 비활성화한다.
+        // 대회명이 비어있으면(공백만 입력 포함) 다음 단계로 넘어갈 수 없다 — 처음부터 비활성화한다.
         .disabled(store.name.trimmingCharacters(in: .whitespaces).isEmpty)
     }
 }

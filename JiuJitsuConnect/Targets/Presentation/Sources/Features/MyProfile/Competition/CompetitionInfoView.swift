@@ -28,6 +28,8 @@ struct CompetitionInfoView: View {
                     CompetitionYearView(store: store)
                 case .name:
                     CompetitionNameView(store: store)
+                case .division:
+                    CompetitionDivisionView(store: store)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

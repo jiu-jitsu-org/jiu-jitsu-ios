@@ -16,6 +16,19 @@ extension Competition {
     var formattedYear: String {
         String(competitionYear)
     }
+
+    /// 출전 부문 표기 — "도복 -76kg", "노기", "앱솔루트". 복장·체급을 모두 비웠으면 nil.
+    var divisionText: String? {
+        let parts = [competitionUniform?.displayName, competitionWeightClass?.displayName].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
+    /// 프로필 대회 줄의 상세 줄 — "2026 · 브라운 · 도복 -76kg". 입력하지 않은 부문 항목은 뺀다.
+    var detailText: String {
+        [formattedYear, competitionBelt?.displayName, divisionText]
+            .compactMap { $0 }
+            .joined(separator: " · ")
+    }
 }
 
 // MARK: - CompetitionRank Presentation Extensions

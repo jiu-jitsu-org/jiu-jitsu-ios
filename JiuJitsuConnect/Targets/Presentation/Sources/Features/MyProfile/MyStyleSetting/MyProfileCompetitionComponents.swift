@@ -105,20 +105,23 @@ private struct CompetitionRowView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 18, height: 18)
-                
-                // 대회 이름
-                Text(competition.competitionName)
-                    .font(.pretendard.bodyS)
-                    .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                
-                Spacer()
-                
-                Text(competition.formattedYear)
-                    .font(.pretendard.labelM)
-                    .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
+
+                // 대회 이름 + 상세 줄(연도 · 띠 · 부문) — 같은 메달도 띠·부문에 따라 무게가 달라 함께 보여 준다(#122).
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(competition.competitionName)
+                        .font(.pretendard.custom(weight: .semiBold, size: 14))
+                        .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
+                        .lineLimit(1)
+
+                    Text(competition.detailText)
+                        .font(.pretendard.labelM)
+                        .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(height: 40)
+            .padding(.vertical, 8)
+            .frame(minHeight: 40)
             .padding(.horizontal, 16)
             .contentShape(Rectangle())
         }
@@ -181,7 +184,10 @@ private struct EmptyCompetitionView: View {
                 competitionYear: 2025,
                 competitionMonth: 11,
                 competitionName: "2025 서울 오픈 챔피언십",
-                competitionRank: .gold
+                competitionRank: .gold,
+                competitionUniform: .gi,
+                competitionWeightClass: .under76,
+                competitionBelt: .brown
             ),
             Competition(
                 competitionYear: 2025,

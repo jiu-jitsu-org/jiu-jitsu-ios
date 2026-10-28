@@ -834,7 +834,10 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case .view(.addCompetitionButtonTapped):
-                state.destination = .competitionInfo(CompetitionInfoFeature.State())
+                // 출전 띠는 지금 띠로 미리 골라 둔다(#122).
+                state.destination = .competitionInfo(
+                    CompetitionInfoFeature.State(mode: .add, currentBelt: state.communityProfile?.beltRank)
+                )
                 return .none
 
             case let .destination(.presented(.competitionInfo(.delegate(.didFinishAdding(competition))))):

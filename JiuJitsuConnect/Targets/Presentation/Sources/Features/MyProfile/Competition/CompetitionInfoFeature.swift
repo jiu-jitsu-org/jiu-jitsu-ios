@@ -58,14 +58,29 @@ public struct CompetitionInfoFeature: Sendable {
         // 입력한 대회명과 맞는 등록된 대회 목록. 고르면 이름이 채워지고, 없으면 직접 입력한 이름을 그대로 쓴다.
         var suggestions: [RegisteredCompetition] = []
 
+        // 4단계: 출전 부문 — 건너뛸 수 있고, 고른 칩을 다시 누르면 선택이 풀린다.
+        // 도복 대회가 더 흔해 새 기록은 도복으로, 출전 띠는 지금 띠로 미리 골라 둔다(대부분 그대로 '완료'만 누르게).
+        var uniform: CompetitionUniform? = .gi
+        var weightClass: CompetitionWeightClass?
+        var belt: BeltRank?
+
         public init() {}
 
-        public init(mode: Mode) {
+        /// - Parameter currentBelt: 지금 프로필 띠. 새 기록의 출전 띠 기본값으로 쓴다.
+        public init(mode: Mode, currentBelt: BeltRank? = nil) {
             self.mode = mode
-            if case let .edit(original) = mode {
+            switch mode {
+            case .add:
+                self.belt = currentBelt
+            case let .edit(original):
                 self.year = original.competitionYear
                 self.name = original.competitionName
                 self.result = original.competitionRank
+                // 수정은 저장된 값을 그대로 보여 준다. 부문 없이 저장된 기록에 기본값을 채우면
+                // 이름만 고치려던 사람이 모르는 사이 부문까지 저장하게 되므로 비워 둔다.
+                self.uniform = original.competitionUniform
+                self.weightClass = original.competitionWeightClass
+                self.belt = original.competitionBelt
             }
         }
     }
@@ -76,11 +91,9 @@ public struct CompetitionInfoFeature: Sendable {
         case result
         case year
         case name
+        case division
 
-        // 진행 막대는 출전 부문 단계(#122)까지 포함한 4칸으로 보여 준다.
-        // 부문 단계가 생기기 전까지는 대회명 단계에서 저장하므로 마지막 칸은 빈 채로 끝난다.
-        // 부문 단계를 추가하면 allCases.count로 바꾼다.
-        static let progressSegmentCount = 4
+        static let progressSegmentCount = allCases.count
     }
 
     /// 연도 단계 선택지 — 올해부터 최근 5년 + '이전'.
@@ -130,6 +143,10 @@ public struct CompetitionInfoFeature: Sendable {
             case yearOptionSelected(YearOption)
             case resultSelected(CompetitionRank)
             case suggestionTapped(RegisteredCompetition)
+            case uniformSelected(CompetitionUniform)
+            case weightClassSelected(CompetitionWeightClass)
+            case beltSelected(BeltRank)
+            case skipButtonTapped
         }
 
         public enum InternalAction: Sendable {
@@ -161,30 +178,20 @@ public struct CompetitionInfoFeature: Sendable {
                     state.step = .name
                     return .none
                 case .name:
-                    // 빈 값(공백 포함)일 때 완료 버튼은 View에서 비활성화되지만,
-                    // 키보드 Return 등으로 빈 대회명이 저장되지 않도록 방어적으로 한 번 더 막는다.
+                    // 빈 값(공백 포함)일 때 다음 버튼은 View에서 비활성화되지만,
+                    // 키보드 Return 등으로 빈 대회명으로 넘어가지 않도록 방어적으로 한 번 더 막는다.
                     guard !state.name.trimmingCharacters(in: .whitespaces).isEmpty else {
                         return .none
                     }
-                    // 새 기록은 월 없이 저장하고, 월이 있던 기존 기록은 수정해도 원래 월을 유지한다.
-                    let originalMonth: Int? = if case let .edit(original) = state.mode {
-                        original.competitionMonth
-                    } else {
-                        nil
-                    }
-                    let updated = Competition(
-                        competitionYear: state.year,
-                        competitionMonth: originalMonth,
-                        competitionName: state.name,
-                        competitionRank: state.result
-                    )
-                    switch state.mode {
-                    case .add:
-                        return .send(.delegate(.didFinishAdding(updated)))
-                    case let .edit(original):
-                        return .send(.delegate(.didFinishEditing(original: original, updated: updated)))
-                    }
+                    state.step = .division
+                    return .none
+                case .division:
+                    return save(state, includingDivision: true)
                 }
+
+            case .view(.skipButtonTapped):
+                guard state.step == .division else { return .none }
+                return save(state, includingDivision: false)
 
             case .view(.backButtonTapped):
                 switch state.step {
@@ -195,6 +202,9 @@ public struct CompetitionInfoFeature: Sendable {
                     return .none
                 case .name:
                     state.step = .year
+                    return .none
+                case .division:
+                    state.step = .name
                     return .none
                 }
 
@@ -219,6 +229,18 @@ public struct CompetitionInfoFeature: Sendable {
 
             case let .view(.resultSelected(rank)):
                 state.result = rank
+                return .none
+
+            case let .view(.uniformSelected(uniform)):
+                state.uniform = state.uniform == uniform ? nil : uniform
+                return .none
+
+            case let .view(.weightClassSelected(weightClass)):
+                state.weightClass = state.weightClass == weightClass ? nil : weightClass
+                return .none
+
+            case let .view(.beltSelected(belt)):
+                state.belt = state.belt == belt ? nil : belt
                 return .none
 
             case .binding(\.name):
@@ -255,6 +277,34 @@ public struct CompetitionInfoFeature: Sendable {
             case .binding, .delegate:
                 return .none
             }
+        }
+    }
+
+    // MARK: - Helpers
+
+    /// 입력한 값으로 기록을 만들어 부모에게 저장을 맡긴다.
+    /// - Parameter includingDivision: '건너뛰기'면 false — 미리 골라 둔 도복·띠도 저장하지 않는다.
+    private func save(_ state: State, includingDivision: Bool) -> Effect<Action> {
+        // 새 기록은 월 없이 저장하고, 월이 있던 기존 기록은 수정해도 원래 월을 유지한다.
+        let originalMonth: Int? = if case let .edit(original) = state.mode {
+            original.competitionMonth
+        } else {
+            nil
+        }
+        let competition = Competition(
+            competitionYear: state.year,
+            competitionMonth: originalMonth,
+            competitionName: state.name,
+            competitionRank: state.result,
+            competitionUniform: includingDivision ? state.uniform : nil,
+            competitionWeightClass: includingDivision ? state.weightClass : nil,
+            competitionBelt: includingDivision ? state.belt : nil
+        )
+        switch state.mode {
+        case .add:
+            return .send(.delegate(.didFinishAdding(competition)))
+        case let .edit(original):
+            return .send(.delegate(.didFinishEditing(original: original, updated: competition)))
         }
     }
 }
