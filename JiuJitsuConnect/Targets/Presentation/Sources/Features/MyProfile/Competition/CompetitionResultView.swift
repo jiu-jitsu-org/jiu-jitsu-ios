@@ -34,8 +34,7 @@ struct CompetitionResultView: View {
                 items: CompetitionRank.allCases,
                 selectedItem: store.result,
                 displayText: { $0.displayName },
-                icon: { $0.medalImage },
-                width: 160,
+                width: 140,
                 onSelect: { rank in
                     store.send(.view(.resultSelected(rank)))
                 }

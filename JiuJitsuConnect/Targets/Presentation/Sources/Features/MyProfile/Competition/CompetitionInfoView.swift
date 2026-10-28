@@ -98,23 +98,23 @@ struct CompetitionInfoView: View {
 
     // 지금 단계까지 칸을 채워, 남은 단계 수를 한눈에 보이게 한다.
     private var progressBar: some View {
-        HStack(spacing: 4) {
-            ForEach(CompetitionInfoFeature.Step.allCases, id: \.self) { step in
-                RoundedRectangle(cornerRadius: 2)
+        let segmentCount = CompetitionInfoFeature.Step.progressSegmentCount
+        return HStack(spacing: 4) {
+            ForEach(0..<segmentCount, id: \.self) { index in
+                Capsule()
                     .fill(
-                        step.rawValue <= store.step.rawValue
+                        index <= store.step.rawValue
                             ? Color.primitive.blue.b500p
-                            : Color.primitive.coolGray.cg50
+                            : Color.primitive.coolGray.cg75
                     )
-                    .frame(height: 3)
+                    .frame(height: 4)
             }
         }
-        .padding(.horizontal, Style.horizontalPadding)
+        .padding(.horizontal, 20)
+        .padding(.top, 4)
         .animation(.default, value: store.step)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            "\(CompetitionInfoFeature.Step.allCases.count)단계 중 \(store.step.rawValue + 1)단계"
-        )
+        .accessibilityLabel("\(segmentCount)단계 중 \(store.step.rawValue + 1)단계")
     }
 
 }

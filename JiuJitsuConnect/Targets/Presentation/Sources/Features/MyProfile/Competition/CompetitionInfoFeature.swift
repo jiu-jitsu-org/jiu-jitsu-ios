@@ -60,11 +60,16 @@ public struct CompetitionInfoFeature: Sendable {
     }
 
     // 기록하는 이유(메달)를 먼저 보여 주려고 결과부터 묻는다.
-    // 선언 순서(rawValue)를 진행 막대 위치로 쓰므로, 단계를 추가할 때는 화면 순서대로 선언한다.
+    // rawValue를 진행 막대 위치로 쓰므로, 단계를 추가할 때는 화면 순서대로 선언한다.
     public enum Step: Int, CaseIterable, Equatable, Sendable {
         case result
         case date
         case name
+
+        // 진행 막대는 출전 부문 단계(#122)까지 포함한 4칸으로 보여 준다.
+        // 부문 단계가 생기기 전까지는 대회명 단계에서 저장하므로 마지막 칸은 빈 채로 끝난다.
+        // 부문 단계를 추가하면 allCases.count로 바꾼다.
+        static let progressSegmentCount = 4
     }
 
     public enum Action: BindableAction, Sendable {
