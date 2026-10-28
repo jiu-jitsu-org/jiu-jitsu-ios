@@ -18,6 +18,7 @@
 import SwiftUI
 import UIKit
 import DesignSystem
+import CoreKit
 
 /// 풀다운 리프레시 진행 단계.
 enum WebRefreshPhase: Equatable {
@@ -419,6 +420,10 @@ final class WebPullToRefreshController {
             collapse()
             return
         }
+        // 새 문서는 맨 위부터 보여야 한다(#113). 웹/WebKit이 이전 위치를 되살려 목록 중간에
+        // 멈춰 있더라도 밴드 바로 아래에 첫 글이 오도록 맞춘다. 실패는 이전 문서가 남아 있을 수
+        // 있어 건드리지 않는다.
+        scrollToTopIfIdle()
         phase = .success
         band.update(phase: .success, progress: 1)
         collapseTask?.cancel()
@@ -435,6 +440,11 @@ final class WebPullToRefreshController {
         isAdjustingInset = true
         UIView.animate(withDuration: Timing.insetAnimation) {
             scrollView.contentInset.top = 0
+            // 인셋만 줄이면 밴드를 보이던 음수 오프셋이 그대로 남아 위에 빈 띠가 생길 수 있다.
+            // 밴드 영역에 머물러 있을 때만 콘텐츠 원점으로 함께 올린다(이미 아래로 내린 위치는 유지).
+            if !scrollView.isTracking, scrollView.contentOffset.y < 0 {
+                scrollView.contentOffset.y = 0
+            }
             self.layoutBand(height: 0)
         } completion: { [weak self] _ in
             guard let self else { return }
@@ -442,6 +452,16 @@ final class WebPullToRefreshController {
             self.phase = .idle
             self.band.update(phase: .idle, progress: 0)
         }
+    }
+
+    /// 목록 맨 위(현재 인셋 기준 — 밴드 바로 아래)로 즉시 맞춘다.
+    /// 손가락으로 끌거나 관성으로 흐르는 중이면 사용자 조작을 끊지 않도록 건드리지 않는다.
+    private func scrollToTopIfIdle() {
+        guard let scrollView, !scrollView.isTracking, !scrollView.isDecelerating else { return }
+        let top = -scrollView.adjustedContentInset.top
+        guard scrollView.contentOffset.y != top else { return }
+        Log.trace("풀다운 리프레시 후 맨 위로 보정: \(scrollView.contentOffset.y) → \(top)", category: .view, level: .debug)
+        scrollView.setContentOffset(CGPoint(x: scrollView.contentOffset.x, y: top), animated: false)
     }
 
     /// 밴드가 안착할 자리(로딩 높이 띠)의 한가운데에서 손을 터뜨린다.

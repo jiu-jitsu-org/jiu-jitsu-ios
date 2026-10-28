@@ -258,7 +258,18 @@ struct BridgeWebView: UIViewRepresentable {
             // 리프레시로 웹 컨텍스트가 재초기화되므로 전달 기록을 비워
             // 재로드 후 WEBVIEW_READY 핸드셰이크에서 상태가 다시 동기화되게 한다.
             deliveredOutboundIDs.removeAll()
-            webView.reload()
+            // reload()는 같은 기록 칸을 다시 불러오므로 WebKit이 새로고침 직전 스크롤 위치를 되살린다.
+            // 되살리는 동안 화면은 스켈레톤 → 스트리밍 피드로 높이가 계속 바뀌어 위치가 어긋나고,
+            // 새로고침 뒤 목록 중간에 멈출 수 있다(#113, 프론트 #260). 당겨서 새로고침은 항상 맨 위에서 다시 보는
+            // 동작이므로 기록 칸의 되살리기를 끄고 reload 한다. 웹(홈)은 로드가 끝나면 다시 auto로
+            // 되돌려 상세 → 뒤로가기 위치 복원은 그대로 둔다(프론트 #262).
+            // JS 실행이 실패해도(페이지 오류 등) 새로고침 자체는 진행한다.
+            webView.evaluateJavaScript("history.scrollRestoration = 'manual'") { [weak self] _, error in
+                if let error {
+                    Log.trace("풀다운 리프레시 scrollRestoration 설정 실패: \(error)", category: .view, level: .error)
+                }
+                self?.webView?.reload()
+            }
         }
 
         private func endRefreshing(success: Bool) {
