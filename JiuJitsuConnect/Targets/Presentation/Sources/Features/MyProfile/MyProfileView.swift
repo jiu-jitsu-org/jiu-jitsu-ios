@@ -205,6 +205,9 @@ public struct MyProfileView: View {
             onAddCompetitionTapped: { store.send(.view(.addCompetitionButtonTapped)) },
             onCompetitionDetailTapped: { competition in
                 store.send(.view(.competitionDetailTapped(competition)))
+            },
+            onCompetitionPinToggled: { entries in
+                store.send(.view(.competitionPinToggled(entries)))
             }
         )
     }

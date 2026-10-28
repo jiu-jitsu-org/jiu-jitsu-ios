@@ -361,20 +361,17 @@ public struct CompetitionInfoFeature: Sendable {
     /// 새 기록은 부모가 저장 결과를 saveFinished로 돌려줄 때까지 기다렸다가 완료 화면으로 간다.
     /// - Parameter includingDivision: '건너뛰기'면 false — 미리 골라 둔 도복·띠도 저장하지 않는다.
     private func save(_ state: inout State, includingDivision: Bool) -> Effect<Action> {
-        // 새 기록은 월 없이 저장하고, 월이 있던 기존 기록은 수정해도 원래 월을 유지한다.
-        let originalMonth: Int? = if case let .edit(original) = state.mode {
-            original.competitionMonth
-        } else {
-            nil
-        }
+        // 새 기록은 월 없이 저장하고, 월이 있던 기존 기록은 수정해도 원래 월·고정 여부를 유지한다.
+        let original: Competition? = if case let .edit(original) = state.mode { original } else { nil }
         let competition = Competition(
             competitionYear: state.year,
-            competitionMonth: originalMonth,
+            competitionMonth: original?.competitionMonth,
             competitionName: state.name,
             competitionRank: state.result,
             competitionUniform: includingDivision ? state.uniform : nil,
             competitionWeightClass: includingDivision ? state.weightClass : nil,
-            competitionBelt: includingDivision ? state.belt : nil
+            competitionBelt: includingDivision ? state.belt : nil,
+            isPinned: original?.isPinned ?? false
         )
         switch state.mode {
         case .add:

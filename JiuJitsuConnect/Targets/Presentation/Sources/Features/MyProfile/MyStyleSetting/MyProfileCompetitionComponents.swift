@@ -16,6 +16,8 @@ public struct MyProfileCompetitionSection: View {
     let competitions: [Competition]?
     let onAddCompetitionTapped: () -> Void
     let onCompetitionDetailTapped: (Competition) -> Void
+    /// 묶인 한 줄의 부문들을 넘긴다 — 고정할지 풀지, 개수 제한은 부모(MyProfileFeature)가 판단한다.
+    var onCompetitionPinToggled: ([Competition]) -> Void = { _ in }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -50,7 +52,8 @@ public struct MyProfileCompetitionSection: View {
             if let competitions = competitions, !competitions.isEmpty {
                 CompetitionListView(
                     competitions: competitions,
-                    onCompetitionDetailTapped: onCompetitionDetailTapped
+                    onCompetitionDetailTapped: onCompetitionDetailTapped,
+                    onCompetitionPinToggled: onCompetitionPinToggled
                 )
             } else {
                 EmptyCompetitionView(onAddCompetitionTapped: onAddCompetitionTapped)
@@ -66,10 +69,19 @@ public struct MyProfileCompetitionSection: View {
 /// 서버는 아직 '대회 1개 = 메달 1개' 목록만 저장하므로(backend #164 전), 여러 부문은 같은 이름·연도로
 /// 항목을 여러 개 저장하고 표시할 때만 묶는다.
 struct CompetitionGroup {
+    /// 맨 위에 고정할 수 있는 줄 수(#124). 많이 고정하면 고정의 의미(대표 기록)가 흐려진다.
+    static let maxPinnedCount = 3
+
     let name: String
     let year: Int
     /// 입력한 순서 그대로의 부문별 기록
     let entries: [Competition]
+
+    /// 부문 하나라도 고정돼 있으면 줄 전체를 고정으로 본다.
+    /// 고정한 대회에 나중에 '부문 추가'로 더한 기록(고정 안 됨)이 섞여도 줄이 풀려 보이지 않게 한다.
+    var isPinned: Bool {
+        entries.contains(where: \.isPinned)
+    }
 
     /// 묶인 줄의 메달 아이콘 — 가장 높은 메달
     var representativeRank: CompetitionRank {
@@ -103,7 +115,8 @@ struct CompetitionGroup {
             .joined(separator: " · ")
     }
 
-    /// 같은 대회명(앞뒤 공백 무시) + 연도끼리 묶어 연도 최신순으로 돌려준다.
+    /// 같은 대회명(앞뒤 공백 무시) + 연도끼리 묶어, 고정한 줄을 맨 위에 두고 나머지는 연도 최신순으로 돌려준다.
+    /// 고정한 줄끼리도 연도 최신순이다(고정한 시각은 저장하지 않으므로).
     /// 같은 연도끼리는 처음 입력한 순서를 지킨다(월은 더 받지 않으므로).
     static func grouped(_ competitions: [Competition]) -> [CompetitionGroup] {
         struct Key: Hashable {
@@ -122,16 +135,21 @@ struct CompetitionGroup {
             }
             entriesByKey[key, default: []].append(competition)
         }
-        return order.enumerated()
+        return order
+            .map { key in
+                CompetitionGroup(name: key.name, year: key.year, entries: entriesByKey[key] ?? [])
+            }
+            .enumerated()
             .sorted { lhs, rhs in
+                if lhs.element.isPinned != rhs.element.isPinned {
+                    return lhs.element.isPinned
+                }
                 if lhs.element.year != rhs.element.year {
                     return lhs.element.year > rhs.element.year
                 }
                 return lhs.offset < rhs.offset
             }
-            .map { _, key in
-                CompetitionGroup(name: key.name, year: key.year, entries: entriesByKey[key] ?? [])
-            }
+            .map(\.element)
     }
 
     /// 섹션 머리 메달 합계 — "🥇 2 · 🥈 1 · 🥉 1". 부문(항목) 기준으로 세고 참가는 뺀다. 메달이 없으면 nil.
@@ -150,6 +168,7 @@ struct CompetitionGroup {
 private struct CompetitionListView: View {
     let competitions: [Competition]
     let onCompetitionDetailTapped: (Competition) -> Void
+    var onCompetitionPinToggled: ([Competition]) -> Void = { _ in }
 
     // 여러 부문이 묶인 줄을 눌렀을 때 고칠 부문을 묻는 선택지. 화면 표시용 일시 상태라 Feature로 올리지 않고,
     // 고른 결과만 기존 콜백(수정 진입)으로 보낸다.
@@ -166,7 +185,8 @@ private struct CompetitionListView: View {
                         } else {
                             groupPendingSelection = group
                         }
-                    }
+                    },
+                    onPinToggled: { onCompetitionPinToggled(group.entries) }
                 )
             }
         }
@@ -195,42 +215,72 @@ private struct CompetitionListView: View {
 // MARK: - CompetitionRowView
 
 /// 대회 한 줄 — 같은 대회의 여러 부문은 한 줄에 묶어 보여 준다.
+///
+/// 줄을 누르면 수정으로 들어가므로, 고정은 오른쪽 ⋯ 메뉴(또는 길게 누르기)로 따로 둔다(#124).
 private struct CompetitionRowView: View {
     let group: CompetitionGroup
     let onTapped: () -> Void
+    var onPinToggled: () -> Void = {}
 
     var body: some View {
-        Button {
-            onTapped()
-        } label: {
-            HStack(spacing: 8) {
-                // 메달 아이콘 — 묶인 부문 중 가장 높은 메달
-                group.representativeRank.medalImage
+        HStack(spacing: 0) {
+            Button {
+                onTapped()
+            } label: {
+                HStack(spacing: 8) {
+                    // 메달 아이콘 — 묶인 부문 중 가장 높은 메달
+                    group.representativeRank.medalImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 18, height: 18)
+
+                    // 대회 이름 + 상세 줄(연도 · 띠 · 부문) — 같은 메달도 띠·부문에 따라 무게가 달라 함께 보여 준다(#122).
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(group.isPinned ? "📌 \(group.name)" : group.name)
+                            .font(.pretendard.custom(weight: .semiBold, size: 14))
+                            .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
+                            .lineLimit(1)
+
+                        // 부문이 많으면 줄을 넘겨 다 보여 준다(잘리면 어떤 메달인지 알 수 없음).
+                        Text(group.detailText)
+                            .font(.pretendard.labelM)
+                            .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.vertical, 8)
+                .frame(minHeight: 40)
+                .padding(.leading, 16)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .contextMenu { menuItems }
+
+            Menu {
+                menuItems
+            } label: {
+                Assets.MyProfile.Icon.menu.swiftUIImage
+                    .renderingMode(.template)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 18, height: 18)
-
-                // 대회 이름 + 상세 줄(연도 · 띠 · 부문) — 같은 메달도 띠·부문에 따라 무게가 달라 함께 보여 준다(#122).
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(group.name)
-                        .font(.pretendard.custom(weight: .semiBold, size: 14))
-                        .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
-                        .lineLimit(1)
-
-                    // 부문이 많으면 줄을 넘겨 다 보여 준다(잘리면 어떤 메달인지 알 수 없음).
-                    Text(group.detailText)
-                        .font(.pretendard.labelM)
-                        .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(width: 16, height: 16)
+                    .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
+                    .frame(width: 40, height: 40)
+                    .contentShape(Rectangle())
             }
-            .padding(.vertical, 8)
-            .frame(minHeight: 40)
-            .padding(.horizontal, 16)
-            .contentShape(Rectangle())
+            .accessibilityLabel("\(group.name) 더보기")
+            .padding(.trailing, 4)
         }
-        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var menuItems: some View {
+        Button {
+            onPinToggled()
+        } label: {
+            Text(group.isPinned ? "고정 해제" : "맨 위에 고정")
+        }
     }
 }
 
@@ -321,6 +371,21 @@ private struct EmptyCompetitionView: View {
                 competitionName: "강남 주짓수 토너먼트",
                 competitionRank: .participation
             )
+        ],
+        onAddCompetitionTapped: { },
+        onCompetitionDetailTapped: { _ in }
+    )
+    .padding()
+    .background(Color.component.background.default)
+}
+
+#Preview("MyProfileCompetitionSection - 맨 위 고정") {
+    MyProfileCompetitionSection(
+        competitions: [
+            Competition(competitionYear: 2026, competitionName: "2026 서울 오픈", competitionRank: .silver),
+            // 오래된 대회라도 고정하면 최신 대회보다 위에 온다.
+            Competition(competitionYear: 2022, competitionName: "2022 아시안 오픈", competitionRank: .gold, isPinned: true),
+            Competition(competitionYear: 2024, competitionName: "2024 부산 오픈", competitionRank: .bronze)
         ],
         onAddCompetitionTapped: { },
         onCompetitionDetailTapped: { _ in }

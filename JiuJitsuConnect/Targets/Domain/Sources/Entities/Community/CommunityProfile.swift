@@ -137,6 +137,21 @@ extension CommunityProfile {
         return replacingCompetitions(newCompetitions)
     }
 
+    /// 여러 항목(묶인 한 줄의 부문들)의 고정 여부를 한꺼번에 바꾼다.
+    /// 값이 완전히 같은 항목이 여럿이어도 대상 개수만큼만 바꾸도록, 이미 바꾼 위치는 다시 고르지 않는다.
+    public func settingCompetitionsPinned(_ targets: [Competition], isPinned: Bool) -> CommunityProfile {
+        var newCompetitions = competitions
+        var changedIndices = Set<Int>()
+        for target in targets {
+            guard let index = newCompetitions.indices.first(where: {
+                !changedIndices.contains($0) && newCompetitions[$0] == target
+            }) else { continue }
+            newCompetitions[index] = target.settingPinned(isPinned)
+            changedIndices.insert(index)
+        }
+        return replacingCompetitions(newCompetitions)
+    }
+
     private func replacingCompetitions(_ newCompetitions: [Competition]) -> CommunityProfile {
         CommunityProfile(
             nickname: nickname,
@@ -601,6 +616,10 @@ public struct Competition: Codable, Equatable, Sendable {
     /// 출전 띠 — 같은 메달이라도 그때 띠에 따라 무게가 달라 대회 당시 띠를 따로 남긴다.
     public let competitionBelt: BeltRank?
 
+    /// 프로필 맨 위 고정(#124) — 가장 자랑하고 싶은 대회가 최신순에 밀려 내려가지 않게 회원이 직접 고른다.
+    /// 같은 대회의 여러 부문은 한 줄로 묶여 보이므로, 고정·해제는 묶인 항목 전부에 같은 값을 넣는다.
+    public let isPinned: Bool
+
     public init(
         competitionYear: Int,
         competitionMonth: Int? = nil,
@@ -608,7 +627,8 @@ public struct Competition: Codable, Equatable, Sendable {
         competitionRank: CompetitionRank,
         competitionUniform: CompetitionUniform? = nil,
         competitionWeightClass: CompetitionWeightClass? = nil,
-        competitionBelt: BeltRank? = nil
+        competitionBelt: BeltRank? = nil,
+        isPinned: Bool = false
     ) {
         self.competitionYear = competitionYear
         self.competitionMonth = competitionMonth
@@ -617,11 +637,26 @@ public struct Competition: Codable, Equatable, Sendable {
         self.competitionUniform = competitionUniform
         self.competitionWeightClass = competitionWeightClass
         self.competitionBelt = competitionBelt
+        self.isPinned = isPinned
     }
 
     /// 출전 부문을 하나라도 입력했는지
     public var hasDivision: Bool {
         competitionUniform != nil || competitionWeightClass != nil || competitionBelt != nil
+    }
+
+    /// 고정 여부만 바꾼 사본
+    public func settingPinned(_ isPinned: Bool) -> Competition {
+        Competition(
+            competitionYear: competitionYear,
+            competitionMonth: competitionMonth,
+            competitionName: competitionName,
+            competitionRank: competitionRank,
+            competitionUniform: competitionUniform,
+            competitionWeightClass: competitionWeightClass,
+            competitionBelt: competitionBelt,
+            isPinned: isPinned
+        )
     }
 }
 

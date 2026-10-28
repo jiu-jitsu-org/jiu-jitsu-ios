@@ -69,6 +69,8 @@ struct CompetitionDTO: Codable {
     let competitionUniform: String?
     let competitionWeightClass: String?
     let competitionBelt: String?
+    // 맨 위 고정(#124) — 서버 계약 전 가정 키. 내려오지 않으면 고정 안 함.
+    let competitionPinned: Bool?
 
     func toDomain() -> Competition {
         // 모르는 값은 부문 없음으로 둔다 — 체급표가 바뀌어도 프로필 전체 디코딩이 깨지지 않게.
@@ -79,7 +81,8 @@ struct CompetitionDTO: Codable {
             competitionRank: CompetitionRank(rawValue: competitionRank) ?? .participation,
             competitionUniform: competitionUniform.flatMap(CompetitionUniform.init(rawValue:)),
             competitionWeightClass: competitionWeightClass.flatMap(CompetitionWeightClass.init(rawValue:)),
-            competitionBelt: competitionBelt.flatMap(BeltRank.init(rawValue:))
+            competitionBelt: competitionBelt.flatMap(BeltRank.init(rawValue:)),
+            isPinned: competitionPinned ?? false
         )
     }
 }

@@ -152,6 +152,7 @@ public struct MyProfileFeature: Sendable {
             case toastButtonTapped(ToastState.Action)
             case addCompetitionButtonTapped  // 대회 정보 추가 버튼 탭
             case competitionDetailTapped(Competition)  // 대회 정보 행 탭
+            case competitionPinToggled([Competition])  // 대회 줄 ⋯ 메뉴 '맨 위에 고정'/'고정 해제' — 묶인 부문 전부 (#124)
             case moreButtonTapped                   // 우측 상단 "..." 버튼 탭 (토글)
             case instructorVerificationMenuTapped   // "관장 사범 인증" 메뉴 항목 탭
             case imagePicked(Data)                  // 카메라/앨범 픽커에서 이미지 선택됨
@@ -188,6 +189,7 @@ public struct MyProfileFeature: Sendable {
             case competitionAddFailed                              // 대회 정보 추가 저장 실패
             case competitionUpdated(CommunityProfile) // 대회 정보 수정 저장 완료
             case competitionDeleted(CommunityProfile) // 대회 정보 삭제 저장 완료
+            case competitionPinUpdated(CommunityProfile, isPinned: Bool) // 대회 고정/해제 저장 완료
             
             case showToast(ToastState)
             case toastDismissed
@@ -939,6 +941,40 @@ public struct MyProfileFeature: Sendable {
                 state.isLoadingProfile = false
                 state.communityProfile = profile
                 return .send(.internal(.showToast(.init(message: "대회 정보를 삭제했어요", style: .info))))
+
+            case let .view(.competitionPinToggled(entries)):
+                // 저장 중에 또 누르면 저장 전 목록 기준으로 한 번 더 저장해 앞의 변경을 덮으므로 막는다.
+                guard let profile = state.communityProfile, !entries.isEmpty, !state.isLoadingProfile else { return .none }
+                // 묶인 줄은 부문 하나라도 고정돼 있으면 고정으로 보이므로(CompetitionGroup.isPinned) 같은 기준으로 푼다.
+                let isPinning = !entries.contains(where: \.isPinned)
+                if isPinning {
+                    let pinnedCount = CompetitionGroup.grouped(profile.competitions).filter(\.isPinned).count
+                    guard pinnedCount < CompetitionGroup.maxPinnedCount else {
+                        return .send(.internal(.showToast(.init(
+                            message: "대표 기록은 \(CompetitionGroup.maxPinnedCount)개까지 고정할 수 있어요",
+                            style: .info
+                        ))))
+                    }
+                }
+                let updatedProfile = profile.settingCompetitionsPinned(entries, isPinned: isPinning)
+                state.isLoadingProfile = true
+                return .run { send in
+                    let result = await TaskResult {
+                        try await communityClient.updateProfile(updatedProfile, .competition)
+                    }
+                    switch result {
+                    case .success(let saved):
+                        await send(.internal(.competitionPinUpdated(saved, isPinned: isPinning)))
+                    case .failure(let error):
+                        await send(.internal(.updateProfileResponse(.failure(error))))
+                    }
+                }
+
+            case let .internal(.competitionPinUpdated(profile, isPinned)):
+                state.isLoadingProfile = false
+                state.communityProfile = profile
+                let message = isPinned ? "맨 위에 고정했어요" : "고정을 해제했어요"
+                return .send(.internal(.showToast(.init(message: message, style: .info))))
 
             case let .view(.competitionDetailTapped(competition)):
                 state.destination = .competitionInfo(
