@@ -31,12 +31,13 @@ extension CompetitionClient: DependencyKey {
         }
     )
 
+    // 연도가 있는 항목은 공개 일정에서 온 대회(#126), 없는 항목은 날짜를 모르는 대회.
     static let mockCompetitions: [RegisteredCompetition] = [
-        RegisteredCompetition(id: 1, name: "2026 서울 오픈"),
+        RegisteredCompetition(id: 1, name: "2026 서울 오픈", year: 2026),
         RegisteredCompetition(id: 2, name: "서울 주짓수 챔피언십"),
-        RegisteredCompetition(id: 3, name: "서울 국제 오픈"),
-        RegisteredCompetition(id: 4, name: "2025 전국 주짓수 선수권"),
-        RegisteredCompetition(id: 5, name: "2024 부산 오픈"),
+        RegisteredCompetition(id: 3, name: "서울 국제 오픈", year: 2025),
+        RegisteredCompetition(id: 4, name: "2025 전국 주짓수 선수권", year: 2025),
+        RegisteredCompetition(id: 5, name: "2024 부산 오픈", year: 2024),
         RegisteredCompetition(id: 6, name: "강남 주짓수 토너먼트")
     ]
 }

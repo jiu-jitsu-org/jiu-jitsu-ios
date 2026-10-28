@@ -78,6 +78,7 @@ struct CompetitionNameView: View {
                     ForEach(store.suggestions, id: \.name) { competition in
                         CompetitionSuggestionRow(
                             name: competition.name,
+                            year: competition.year,
                             keyword: store.name,
                             onTapped: { store.send(.view(.suggestionTapped(competition))) }
                         )
@@ -131,21 +132,32 @@ struct CompetitionNameView: View {
 // MARK: - Suggestion Row
 
 /// 등록된 대회 한 줄 — 입력한 글자와 맞는 부분을 강조해 왜 이 대회가 떴는지 보이게 한다.
+/// 공개 일정에서 온 대회는 오른쪽에 연도를 보여 줘, 고르면 연도가 그 해로 맞춰진다는 걸 미리 알 수 있게 한다(#126).
 private struct CompetitionSuggestionRow: View {
     let name: String
+    let year: Int?
     let keyword: String
     let onTapped: () -> Void
 
     var body: some View {
         Button(action: onTapped) {
-            Text(highlightedName)
-                .font(Font.pretendard.bodyM)
-                .foregroundStyle(Color.component.list.setting.text)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: 48)
-                .padding(.horizontal, 16)
-                .contentShape(Rectangle())
+            HStack(spacing: 8) {
+                Text(highlightedName)
+                    .font(Font.pretendard.bodyM)
+                    .foregroundStyle(Color.component.list.setting.text)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                // 이름에 이미 연도가 있으면("2026 서울 오픈") 반복하지 않는다.
+                if let year, !name.contains(String(year)) {
+                    Text(String(year))
+                        .font(Font.pretendard.bodyS)
+                        .foregroundStyle(Color.component.list.setting.subText)
+                }
+            }
+            .frame(height: 48)
+            .padding(.horizontal, 16)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -187,9 +199,9 @@ private struct BlinkingCursorView: View {
     state.step = .name
     state.name = "서울"
     state.suggestions = [
-        RegisteredCompetition(id: 1, name: "2026 서울 오픈"),
+        RegisteredCompetition(id: 1, name: "2026 서울 오픈", year: 2026),
         RegisteredCompetition(id: 2, name: "서울 주짓수 챔피언십"),
-        RegisteredCompetition(id: 3, name: "서울 국제 오픈")
+        RegisteredCompetition(id: 3, name: "서울 국제 오픈", year: 2025)
     ]
     return CompetitionNameView(
         store: Store(initialState: state) {

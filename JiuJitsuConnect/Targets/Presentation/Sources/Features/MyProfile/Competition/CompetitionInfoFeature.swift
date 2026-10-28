@@ -48,7 +48,7 @@ public struct CompetitionInfoFeature: Sendable {
         // 하나라도 있으면 그다음 입력은 '부문 추가' — 대회명·연도는 그대로 두고 메달과 부문만 다시 묻는다(#123).
         var savedRecords: [Competition] = []
         var isSaving = false
-        // 저장 실패 안내. 이 화면이 MY 화면 위에 push돼 있어 MY 화면 토스트는 가려지므로 여기서 띄운다.
+        // 저장 실패·연도 자동 변경(#126) 안내. 이 화면이 MY 화면 위에 push돼 있어 MY 화면 토스트는 가려지므로 여기서 띄운다.
         var toast: ToastState?
 
         var isAddingDivision: Bool { !savedRecords.isEmpty }
@@ -249,13 +249,7 @@ public struct CompetitionInfoFeature: Sendable {
             case .saveFinished(.failed):
                 // 입력한 값은 그대로 두어 같은 화면에서 다시 저장할 수 있게 한다.
                 state.isSaving = false
-                let toast = ToastState(message: "저장에 실패했어요. 다시 시도해주세요", style: .info)
-                state.toast = toast
-                return .run { [clock] send in
-                    try await clock.sleep(for: toast.duration)
-                    await send(.internal(.toastDismissed))
-                }
-                .cancellable(id: CancelID.toast, cancelInFlight: true)
+                return showToast(&state, message: "저장에 실패했어요. 다시 시도해주세요")
 
             case .view(.toastSwiped), .internal(.toastDismissed):
                 state.toast = nil
@@ -353,7 +347,17 @@ public struct CompetitionInfoFeature: Sendable {
                 state.name = competition.name
                 state.suggestions = []
                 // 고르기 직전 입력으로 시작된 검색이 늦게 돌아와 목록을 다시 띄우지 않게 한다.
-                return .cancel(id: CancelID.searchCompetitions)
+                let cancelSearch: Effect<Action> = .cancel(id: CancelID.searchCompetitions)
+                // 공개 일정에서 온 대회는 열린 연도를 알므로 기록 연도를 맞춘다(#126).
+                // 연도 단계가 대회명보다 앞이라 이미 고른 연도를 고쳐 주는 방식이고, 바뀌었을 때만 알린다.
+                guard let scheduledYear = competition.year, scheduledYear != state.year else {
+                    return cancelSearch
+                }
+                state.year = scheduledYear
+                return .merge(
+                    cancelSearch,
+                    showToast(&state, message: "대회 일정에 맞춰 \(scheduledYear)년으로 바꿨어요")
+                )
 
             case let .internal(.suggestionsLoaded(suggestions)):
                 state.suggestions = suggestions
@@ -366,6 +370,17 @@ public struct CompetitionInfoFeature: Sendable {
     }
 
     // MARK: - Helpers
+
+    /// 이 화면 안에서 토스트를 띄운다. 이 화면이 MY 화면 위에 push돼 있어 MY 화면 토스트는 가려지기 때문이다.
+    private func showToast(_ state: inout State, message: String) -> Effect<Action> {
+        let toast = ToastState(message: message, style: .info)
+        state.toast = toast
+        return .run { [clock] send in
+            try await clock.sleep(for: toast.duration)
+            await send(.internal(.toastDismissed))
+        }
+        .cancellable(id: CancelID.toast, cancelInFlight: true)
+    }
 
     /// 입력한 값으로 기록을 만들어 부모에게 저장을 맡긴다.
     /// 새 기록은 부모가 저장 결과를 saveFinished로 돌려줄 때까지 기다렸다가 완료 화면으로 간다.
