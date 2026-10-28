@@ -184,7 +184,8 @@ public struct MyProfileFeature: Sendable {
             case positionSaved(CommunityProfile)    // 포지션 저장 → register 시 기술 단계로
             case submissionSaved(CommunityProfile)  // 서브미션 저장 → 프로필 화면으로 복귀
             case techniqueSaved(CommunityProfile)   // 기술 저장 → register 시 서브미션 단계로
-            case competitionAdded(CommunityProfile)   // 대회 정보 추가 저장 완료
+            case competitionAdded(CommunityProfile, Competition)   // 대회 정보 추가 저장 완료
+            case competitionAddFailed                              // 대회 정보 추가 저장 실패
             case competitionUpdated(CommunityProfile) // 대회 정보 수정 저장 완료
             case competitionDeleted(CommunityProfile) // 대회 정보 삭제 저장 완료
             
@@ -851,7 +852,7 @@ public struct MyProfileFeature: Sendable {
                     level: .info
                 )
                 let updatedProfile = profile.addingCompetition(competition)
-                state.destination = nil
+                // 저장 결과를 보고 완료 화면('부문 추가')으로 넘어가야 하므로 입력 화면은 닫지 않는다(#123).
                 state.isLoadingProfile = true
                 return .run { send in
                     let result = await TaskResult {
@@ -859,9 +860,10 @@ public struct MyProfileFeature: Sendable {
                     }
                     switch result {
                     case .success(let saved):
-                        await send(.internal(.competitionAdded(saved)))
+                        await send(.internal(.competitionAdded(saved, competition)))
                     case .failure(let error):
-                        await send(.internal(.updateProfileResponse(.failure(error))))
+                        Log.trace("Failed to add competition: \(error)", category: .network, level: .error)
+                        await send(.internal(.competitionAddFailed))
                     }
                 }
 
@@ -911,10 +913,22 @@ public struct MyProfileFeature: Sendable {
                     }
                 }
 
-            case let .internal(.competitionAdded(profile)):
+            case let .internal(.competitionAdded(profile, competition)):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
-                return .send(.internal(.showToast(.init(message: "대회 정보를 추가했어요", style: .info))))
+                // 입력 화면이 완료 화면을 대신 보여 준다. 저장 중 화면이 닫혔으면(예외적) 토스트로 알린다.
+                guard case .competitionInfo? = state.destination else {
+                    return .send(.internal(.showToast(.init(message: "대회 정보를 추가했어요", style: .info))))
+                }
+                return .send(.destination(.presented(.competitionInfo(.saveFinished(.succeeded(competition))))))
+
+            case .internal(.competitionAddFailed):
+                state.isLoadingProfile = false
+                // MY 화면 토스트는 입력 화면에 가려지므로 입력 화면이 실패를 안내하고, 입력값을 지켜 다시 저장하게 한다.
+                guard case .competitionInfo? = state.destination else {
+                    return .send(.internal(.showToast(.init(message: "저장에 실패했어요. 다시 시도해주세요", style: .info))))
+                }
+                return .send(.destination(.presented(.competitionInfo(.saveFinished(.failed)))))
 
             case let .internal(.competitionUpdated(profile)):
                 state.isLoadingProfile = false

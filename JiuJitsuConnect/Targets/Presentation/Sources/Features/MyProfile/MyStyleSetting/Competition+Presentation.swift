@@ -29,11 +29,47 @@ extension Competition {
             .compactMap { $0 }
             .joined(separator: " · ")
     }
+
+    /// 부문 + 메달 — "도복 -76kg 은메달". 부문이 없으면 메달만.
+    var divisionResultText: String {
+        [divisionText, competitionRank.displayName]
+            .compactMap { $0 }
+            .joined(separator: " ")
+    }
+
+    /// 완료 화면 한 줄 — "2026 서울 오픈 · 도복 -76kg 은메달".
+    /// 등록된 대회명에는 연도가 들어 있는 경우가 많아, 이름에 연도가 없을 때만 앞에 붙인다.
+    var completionSummary: String {
+        let year = formattedYear
+        let title = competitionName.contains(year) ? competitionName : "\(year) \(competitionName)"
+        guard let divisionText else { return "\(title) \(competitionRank.displayName)" }
+        return "\(title) · \(divisionText) \(competitionRank.displayName)"
+    }
 }
 
 // MARK: - CompetitionRank Presentation Extensions
 
 extension CompetitionRank {
+    /// 여러 부문을 한 줄에 늘어놓을 때 쓰는 짧은 이름 — "도복 -76kg 은 · 앱솔루트 금"
+    var shortName: String {
+        switch self {
+        case .gold: return "금"
+        case .silver: return "은"
+        case .bronze: return "동"
+        case .participation: return "참가"
+        }
+    }
+
+    /// 묶인 줄의 대표 메달을 고를 때 쓰는 순서 — 작을수록 높은 메달.
+    var medalOrder: Int {
+        switch self {
+        case .gold: return 0
+        case .silver: return 1
+        case .bronze: return 2
+        case .participation: return 3
+        }
+    }
+
     /// 순위에 따른 메달 아이콘 이미지
     var medalImage: Image {
         switch self {

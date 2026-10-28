@@ -7,12 +7,14 @@ import Foundation
 import ComposableArchitecture
 import CoreKit
 import Domain
+import DesignSystem
 
 @Reducer
 public struct CompetitionInfoFeature: Sendable {
 
     private enum CancelID {
         case searchCompetitions
+        case toast
     }
 
     // 한 글자씩 칠 때마다 검색하지 않도록, 입력이 잠깐 멈춘 뒤에 검색한다.
@@ -41,6 +43,24 @@ public struct CompetitionInfoFeature: Sendable {
     public struct State: Equatable, Sendable {
         var mode: Mode = .add
         var step: Step = .result
+
+        // 이번 흐름에서 저장한 기록(첫 기록 + '부문 추가'로 더한 기록). 완료 화면에 한 줄씩 보여 준다.
+        // 하나라도 있으면 그다음 입력은 '부문 추가' — 대회명·연도는 그대로 두고 메달과 부문만 다시 묻는다(#123).
+        var savedRecords: [Competition] = []
+        var isSaving = false
+        // 저장 실패 안내. 이 화면이 MY 화면 위에 push돼 있어 MY 화면 토스트는 가려지므로 여기서 띄운다.
+        var toast: ToastState?
+
+        var isAddingDivision: Bool { !savedRecords.isEmpty }
+
+        /// 지금 흐름에서 입력받는 단계 — 진행 막대 칸 수와 위치의 기준.
+        var inputSteps: [Step] {
+            isAddingDivision ? [.result, .division] : [.result, .year, .name, .division]
+        }
+
+        var headerTitle: String {
+            isAddingDivision && step != .done ? "부문 추가" : mode.headerTitle
+        }
 
         // 1단계: 결과 — Picker UI 특성상 초기 선택값이 필요하므로 옵셔널이 아닌 기본값 사용
         var result: CompetitionRank = .gold
@@ -86,14 +106,21 @@ public struct CompetitionInfoFeature: Sendable {
     }
 
     // 기록하는 이유(메달)를 먼저 보여 주려고 결과부터 묻는다.
-    // rawValue를 진행 막대 위치로 쓰므로, 단계를 추가할 때는 화면 순서대로 선언한다.
-    public enum Step: Int, CaseIterable, Equatable, Sendable {
+    // 진행 막대는 State.inputSteps 기준이라 '부문 추가'처럼 단계를 건너뛰는 흐름에서도 칸 수가 맞는다.
+    public enum Step: Equatable, Sendable {
         case result
         case year
         case name
         case division
+        /// 저장 후 완료 화면 — 새 기록에서만 거친다(수정은 저장 후 바로 닫는다).
+        case done
+    }
 
-        static let progressSegmentCount = allCases.count
+    /// 부모(MyProfileFeature)가 저장을 마치고 돌려주는 결과.
+    /// 저장은 프로필 전체를 다루는 부모가 하므로, 완료 화면은 저장이 성공한 뒤에만 보여 준다.
+    public enum SaveResult: Sendable {
+        case succeeded(Competition)
+        case failed
     }
 
     /// 연도 단계 선택지 — 올해부터 최근 5년 + '이전'.
@@ -134,6 +161,7 @@ public struct CompetitionInfoFeature: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
         case delegate(DelegateAction)
+        case saveFinished(SaveResult)
 
         public enum ViewAction: Sendable {
             case backButtonTapped
@@ -147,10 +175,14 @@ public struct CompetitionInfoFeature: Sendable {
             case weightClassSelected(CompetitionWeightClass)
             case beltSelected(BeltRank)
             case skipButtonTapped
+            case addDivisionButtonTapped
+            case doneButtonTapped
+            case toastSwiped
         }
 
         public enum InternalAction: Sendable {
             case suggestionsLoaded([RegisteredCompetition])
+            case toastDismissed
         }
 
         public enum DelegateAction: Sendable {
@@ -170,9 +202,10 @@ public struct CompetitionInfoFeature: Sendable {
         Reduce { state, action in
             switch action {
             case .view(.nextButtonTapped):
+                guard !state.isSaving else { return .none }
                 switch state.step {
                 case .result:
-                    state.step = .year
+                    state.step = state.isAddingDivision ? .division : .year
                     return .none
                 case .year:
                     state.step = .name
@@ -186,16 +219,55 @@ public struct CompetitionInfoFeature: Sendable {
                     state.step = .division
                     return .none
                 case .division:
-                    return save(state, includingDivision: true)
+                    return save(&state, includingDivision: true)
+                case .done:
+                    return .none
                 }
 
             case .view(.skipButtonTapped):
-                guard state.step == .division else { return .none }
-                return save(state, includingDivision: false)
+                guard state.step == .division, !state.isSaving else { return .none }
+                return save(&state, includingDivision: false)
+
+            case .view(.addDivisionButtonTapped):
+                // 같은 대회의 다른 부문은 보통 같은 복장·같은 띠라 그대로 두고, 체급과 메달만 다시 고르게 한다.
+                state.step = .result
+                state.result = .gold
+                state.weightClass = nil
+                return .none
+
+            case .view(.doneButtonTapped):
+                return .run { _ in await self.dismiss() }
+
+            case let .saveFinished(.succeeded(competition)):
+                state.isSaving = false
+                state.savedRecords.append(competition)
+                state.step = .done
+                return .none
+
+            case .saveFinished(.failed):
+                // 입력한 값은 그대로 두어 같은 화면에서 다시 저장할 수 있게 한다.
+                state.isSaving = false
+                let toast = ToastState(message: "저장에 실패했어요. 다시 시도해주세요", style: .info)
+                state.toast = toast
+                return .run { [clock] send in
+                    try await clock.sleep(for: toast.duration)
+                    await send(.internal(.toastDismissed))
+                }
+                .cancellable(id: CancelID.toast, cancelInFlight: true)
+
+            case .view(.toastSwiped), .internal(.toastDismissed):
+                state.toast = nil
+                return .cancel(id: CancelID.toast)
 
             case .view(.backButtonTapped):
+                guard !state.isSaving else { return .none }
                 switch state.step {
                 case .result:
+                    // 부문 추가 중이면 이미 저장한 기록의 완료 화면으로 돌아간다.
+                    if state.isAddingDivision {
+                        state.step = .done
+                        return .none
+                    }
                     return .run { _ in await self.dismiss() }
                 case .year:
                     state.step = .result
@@ -204,12 +276,15 @@ public struct CompetitionInfoFeature: Sendable {
                     state.step = .year
                     return .none
                 case .division:
-                    state.step = .name
+                    state.step = state.isAddingDivision ? .result : .name
                     return .none
+                case .done:
+                    return .run { _ in await self.dismiss() }
                 }
 
             case .view(.cancelButtonTapped):
-                // 입력 중단: 스텝과 무관하게 플로우 전체를 종료한다.
+                // 입력 중단: 스텝과 무관하게 플로우 전체를 종료한다. 이미 저장한 기록은 그대로 남는다.
+                guard !state.isSaving else { return .none }
                 return .run { _ in await self.dismiss() }
 
             case .view(.deleteButtonTapped):
@@ -283,8 +358,9 @@ public struct CompetitionInfoFeature: Sendable {
     // MARK: - Helpers
 
     /// 입력한 값으로 기록을 만들어 부모에게 저장을 맡긴다.
+    /// 새 기록은 부모가 저장 결과를 saveFinished로 돌려줄 때까지 기다렸다가 완료 화면으로 간다.
     /// - Parameter includingDivision: '건너뛰기'면 false — 미리 골라 둔 도복·띠도 저장하지 않는다.
-    private func save(_ state: State, includingDivision: Bool) -> Effect<Action> {
+    private func save(_ state: inout State, includingDivision: Bool) -> Effect<Action> {
         // 새 기록은 월 없이 저장하고, 월이 있던 기존 기록은 수정해도 원래 월을 유지한다.
         let originalMonth: Int? = if case let .edit(original) = state.mode {
             original.competitionMonth
@@ -302,6 +378,7 @@ public struct CompetitionInfoFeature: Sendable {
         )
         switch state.mode {
         case .add:
+            state.isSaving = true
             return .send(.delegate(.didFinishAdding(competition)))
         case let .edit(original):
             return .send(.delegate(.didFinishEditing(original: original, updated: competition)))
