@@ -24,8 +24,8 @@ struct CompetitionInfoView: View {
                 switch store.step {
                 case .result:
                     CompetitionResultView(store: store)
-                case .date:
-                    CompetitionDateView(store: store)
+                case .year:
+                    CompetitionYearView(store: store)
                 case .name:
                     CompetitionNameView(store: store)
                 }

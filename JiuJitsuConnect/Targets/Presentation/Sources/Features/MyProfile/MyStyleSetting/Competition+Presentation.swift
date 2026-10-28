@@ -12,9 +12,9 @@ import DesignSystem
 // MARK: - Competition Presentation Extensions
 
 extension Competition {
-    /// 대회 날짜를 YYYY.MM 형식으로 포맷팅
-    var formattedDate: String {
-        String(format: "%d.%02d", competitionYear, competitionMonth)
+    /// 대회 연도 표시 — 연도만 받으므로(#120) 월이 남아 있는 기존 기록도 연도만 보여 준다.
+    var formattedYear: String {
+        String(competitionYear)
     }
 }
 

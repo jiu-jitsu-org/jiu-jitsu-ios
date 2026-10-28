@@ -843,7 +843,7 @@ public struct MyProfileFeature: Sendable {
                     return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
                 }
                 Log.trace(
-                    "대회 추가 요청: \(competition.competitionYear)/\(competition.competitionMonth) \(competition.competitionName) \(competition.competitionRank.displayName)",
+                    "대회 추가 요청: \(competition.competitionYear) \(competition.competitionName) \(competition.competitionRank.displayName)",
                     category: .debug,
                     level: .info
                 )
