@@ -133,6 +133,8 @@ private extension WebBridgeInboundMessage {
             return "OPEN_SUBVIEW  url=\(payload.url) presentation=\(payload.presentation.rawValue) title=\(payload.title ?? "-")"
         case .closeSubview:
             return "CLOSE_SUBVIEW  (payload 없음)"
+        case let .setLeaveGuard(enabled):
+            return "SET_LEAVE_GUARD  enabled=\(enabled)"
         case let .showConfirmDialog(payload):
             return "SHOW_CONFIRM_DIALOG  reqId=\(payload.requestId) destructive=\(payload.destructive)"
         case let .showSelectSheet(payload):
@@ -154,6 +156,8 @@ private extension WebBridgeOutboundMessage {
             return "AUTH_SESSION_EXPIRED"
         case .authLogout:
             return "AUTH_LOGOUT"
+        case .backPressed:
+            return "BACK_PRESSED"
         case let .confirmDialogResult(requestId, outcome):
             return "CONFIRM_DIALOG_RESULT  reqId=\(requestId) result=\(outcome.rawValue)"
         case let .selectSheetResult(requestId, outcome):
@@ -191,6 +195,10 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 현재 최상단 서브뷰를 닫으라는 요청(웹 헤더의 뒤로가기). 이탈 가드(작성 취소 확인 등)는
     /// 뒤로가기 버튼을 소유한 웹이 끝내고 오므로, 네이티브는 묻지 않고 닫는다.
     case closeSubview
+    /// 지금 이 화면을 스와이프 백으로 바로 닫으면 안 되는지 통지(#115). 쓰던 내용이 있거나 웹 안의
+    /// 시트·편집 화면이 열려 있으면 true — 그동안 네이티브는 스와이프를 막고 BACK_PRESSED를 보내
+    /// 웹이 헤더 뒤로가기와 같은 처리(시트 닫기·이탈 확인)를 하게 한다. false면 스와이프로 바로 닫는다.
+    case setLeaveGuard(enabled: Bool)
     /// 확인 알럿 표시 요청. 웹뷰는 자기 프레임 밖(GNB·하단 탭바)을 딤 처리할 수 없어, 풀스크린 딤이
     /// 필요한 표면은 네이티브가 소유한다. 문구는 웹이 payload로 넘기고, 결과(confirm/cancel/dismiss)는
     /// requestId로 짝지어 CONFIRM_DIALOG_RESULT로 회신한다.
@@ -209,6 +217,7 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case authTokenRefresh = "AUTH_TOKEN_REFRESH_REQUEST"
         case openSubview = "OPEN_SUBVIEW"
         case closeSubview = "CLOSE_SUBVIEW"
+        case setLeaveGuard = "SET_LEAVE_GUARD"
         case showConfirmDialog = "SHOW_CONFIRM_DIALOG"
         case showSelectSheet = "SHOW_SELECT_SHEET"
     }
@@ -256,6 +265,14 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             )
         case .closeSubview:
             return .closeSubview
+        case .setLeaveGuard:
+            // enabled가 없으면 어느 쪽인지 알 수 없어 무시하고 직전 상태를 유지한다
+            // (false로 간주하면 작성 중인 화면이 확인 없이 스와이프로 닫힐 수 있다).
+            guard let enabled = payload?["enabled"] as? Bool else {
+                Log.trace("SET_LEAVE_GUARD payload enabled 누락", category: .network, level: .error)
+                return nil
+            }
+            return .setLeaveGuard(enabled: enabled)
         case .showConfirmDialog:
             // requestId·title·confirmText는 필수. 하나라도 없으면 회신할 대상/문구가 없어 무시한다
             // (웹은 무응답을 타임아웃 후 cancel로 간주하므로 화면이 멈추지 않는다).
@@ -526,6 +543,9 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
     case authSessionExpired
     /// 네이티브 주도 로그아웃 → 웹 세션 정리.
     case authLogout
+    /// 가드(SET_LEAVE_GUARD enabled:true) 중 스와이프 백 시도 통지(#115). 네이티브는 화면을 닫지 않고,
+    /// 웹이 헤더 뒤로가기와 같은 처리를 한 뒤 실제로 나갈 때만 CLOSE_SUBVIEW를 보낸다.
+    case backPressed
     /// SHOW_CONFIRM_DIALOG의 결과. requestId로 어느 요청의 답인지 웹이 식별한다.
     case confirmDialogResult(requestId: String, outcome: ConfirmDialogOutcome)
     /// SHOW_SELECT_SHEET의 결과. submit이면 선택값(+자유 입력)을 함께 싣는다.
@@ -537,6 +557,7 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         case .authLoginCancelled: return "AUTH_LOGIN_CANCELLED"
         case .authSessionExpired: return "AUTH_SESSION_EXPIRED"
         case .authLogout: return "AUTH_LOGOUT"
+        case .backPressed: return "BACK_PRESSED"
         case .confirmDialogResult: return "CONFIRM_DIALOG_RESULT"
         case .selectSheetResult: return "SELECT_SHEET_RESULT"
         }
@@ -546,7 +567,7 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         switch self {
         case let .authLoginSuccess(accessToken):
             return ["accessToken": accessToken]
-        case .authLoginCancelled, .authSessionExpired, .authLogout:
+        case .authLoginCancelled, .authSessionExpired, .authLogout, .backPressed:
             return nil
         case let .confirmDialogResult(requestId, outcome):
             return ["requestId": requestId, "result": outcome.rawValue]
