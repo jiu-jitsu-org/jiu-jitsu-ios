@@ -75,9 +75,9 @@ struct LoginSceneView<Sheet: View>: View {
             .accessibilityHidden(true)
 
             // 가라앉는 그래픽이 캐릭터를 가리고 있다가 드러낸다. 그래서 캐릭터보다 위에 둔다
-            centered(Assets.Login.pattern, width: layout.width, top: lerp(layout.patternTop, layout.patternRestTop, sink), in: layout)
-            centered(Assets.Splash.tagline, width: lerp(layout.splashTaglineWidth, 150, brand), top: lerp(layout.splashTaglineTop, layout.brandTop, brand), in: layout)
-            centered(Assets.Splash.logo, width: lerp(layout.splashLogoWidth, 116, brand), top: lerp(layout.splashLogoTop, layout.brandTop + 24, brand), in: layout)
+            centered(Assets.Login.pattern, width: layout.splash.patternWidth, top: lerp(layout.splash.patternTop, layout.patternRestTop, sink), in: layout)
+            centered(Assets.Splash.tagline, width: lerp(layout.splash.taglineWidth, 150, brand), top: lerp(layout.splash.taglineTop, layout.brandTop, brand), in: layout)
+            centered(Assets.Splash.logo, width: lerp(layout.splash.logoWidth, 116, brand), top: lerp(layout.splash.logoTop, layout.brandTop + 24, brand), in: layout)
 
             ForEach(bubbles) { bubble in
                 let frame = layout.frame(of: LoginCast.members[bubble.member])
@@ -199,6 +199,21 @@ enum LoginCast {
     /// 이어 붙인 몸통 그림은 원래 캔버스(360×567)를 왼쪽으로 100, 아래로 567 넓혔다(460×1134)
     static let extendedSize = CGSize(width: 460.0 / 360, height: 2)
     static let extendedLeft: CGFloat = 100.0 / 360
+
+    /// 출연진 전체를 처음 시안보다 이만큼 줄여 그린다(#111). 다섯이 화면 양옆을 꽉 채워 답답해 보여서,
+    /// 무리 전체를 화면 가운데·아래 기준선을 축으로 한꺼번에 줄여 서로 겹치는 모양은 그대로 두고 양옆과 머리 위 여백만 늘린다
+    static let groupScale: CGFloat = 0.78
+    /// 시안 화면 폭(393pt)의 가운데. 출연진 `centerX`가 이 점에서 떨어진 거리를 `groupScale`만큼 줄인다
+    private static let designCenterX: CGFloat = 393.0 / 2
+
+    /// 아래 끝을 `baseline`보다 `1 - show`만큼 내려 세운 자리. 로그인(시트 위 끝)·인사(화면 아래 끝) 장면이 같이 쓴다
+    static func frame(of member: LoginCastMember, scale: CGFloat, screenWidth: CGFloat, baseline: CGFloat) -> CGRect {
+        let width = member.width * scale * groupScale
+        let height = width * aspect
+        let centerX = screenWidth / 2 + (member.centerX - designCenterX) * scale * groupScale
+        let bottom = baseline + height * (1 - member.show)
+        return CGRect(x: centerX - width / 2, y: bottom - height, width: width, height: height)
+    }
 }
 
 /// 이웃끼리 연달아 말하지 않도록 정해둔 순서를 돈다.
@@ -235,11 +250,8 @@ private struct SceneLayout {
     let safeTop: CGFloat
     let sheetHeight: CGFloat
     let sheetBottomPadding: CGFloat
-    let patternTop: CGFloat
-    let splashTaglineWidth: CGFloat
-    let splashTaglineTop: CGFloat
-    let splashLogoWidth: CGFloat
-    let splashLogoTop: CGFloat
+    /// 장면이 시작하는 모습. SplashView와 같은 배치여야 스플래시에서 넘어오는 순간 그림이 튀지 않는다
+    let splash: SplashLayout
 
     init(size: CGSize, safeArea: EdgeInsets) {
         width = size.width
@@ -250,14 +262,7 @@ private struct SceneLayout {
         sheetBottomPadding = max(safeArea.bottom - 4, 16)
         sheetHeight = 260 + sheetBottomPadding
 
-        // SplashView와 같은 계산이어야 스플래시에서 넘어오는 순간 그림이 튀지 않는다
-        let frameHeight = size.width * 1200 / 555
-        let frameTop = (size.height - frameHeight) / 2
-        patternTop = frameTop + frameHeight * 0.1775
-        splashTaglineWidth = size.width * 0.477477
-        splashTaglineTop = frameTop + frameHeight * 0.429167
-        splashLogoWidth = size.width * 0.488288
-        splashLogoTop = frameTop + frameHeight * 0.465
+        splash = SplashLayout(size: size)
     }
 
     var sheetTop: CGFloat { height - sheetHeight }
@@ -274,10 +279,7 @@ private struct SceneLayout {
     var patternRestTop: CGFloat { sheetTop + 50 }
 
     func frame(of member: LoginCastMember) -> CGRect {
-        let width = member.width * scale
-        let height = width * LoginCast.aspect
-        let bottom = sheetTop + height * (1 - member.show)
-        return CGRect(x: member.centerX * scale - width / 2, y: bottom - height, width: width, height: height)
+        LoginCast.frame(of: member, scale: scale, screenWidth: width, baseline: sheetTop)
     }
 
     /// 머리 꼭대기 옆, 캐릭터가 바라보는 쪽에 띄운다. 화면 밖으로 나가지 않게 민다.
