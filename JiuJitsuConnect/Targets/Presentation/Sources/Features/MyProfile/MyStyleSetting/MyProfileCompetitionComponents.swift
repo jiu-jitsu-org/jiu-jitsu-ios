@@ -19,11 +19,13 @@ public struct MyProfileCompetitionSection: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // 섹션 타이틀 + 추가 버튼
-            HStack(spacing: 0) {
-                Text("대회 정보")
+            // 섹션 타이틀 + 메달 합계 + 추가 버튼
+            HStack(spacing: 8) {
+                Text("대회 기록")
                     .font(.pretendard.title3)
                     .foregroundStyle(Color.component.sectionHeader.title)
+
+                MedalSummaryView(competitions: competitions ?? [])
 
                 Spacer()
 
@@ -48,6 +50,41 @@ public struct MyProfileCompetitionSection: View {
                 )
             } else {
                 EmptyCompetitionView(onAddCompetitionTapped: onAddCompetitionTapped)
+            }
+        }
+    }
+}
+
+// MARK: - MedalSummaryView
+
+/// 금·은·동 메달 개수 합계. 0개인 메달과 참가 기록은 세지 않는다.
+private struct MedalSummaryView: View {
+    let competitions: [Competition]
+
+    private var medalCounts: [(rank: CompetitionRank, count: Int)] {
+        [CompetitionRank.gold, .silver, .bronze].compactMap { rank in
+            let count = competitions.filter { $0.competitionRank == rank }.count
+            return count > 0 ? (rank, count) : nil
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(Array(medalCounts.enumerated()), id: \.offset) { index, medal in
+                if index > 0 {
+                    Text("·")
+                        .font(.pretendard.bodyS)
+                        .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
+                }
+
+                medal.rank.medalImage
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 16, height: 16)
+
+                Text("\(medal.count)")
+                    .font(.pretendard.bodyS)
+                    .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
             }
         }
     }

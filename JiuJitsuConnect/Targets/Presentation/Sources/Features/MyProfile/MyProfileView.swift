@@ -85,20 +85,13 @@ public struct MyProfileView: View {
                             }
                             .zIndex(0)
 
-                        // 2. 벨트/체급 카드
+                        // 2. 벨트 카드 (관장·사범 인증 표시 포함)
                         cardView
                             .offset(y: -cardOverlapHeight)
                             .padding(.bottom, -cardOverlapHeight)
                             .zIndex(1)
 
-                        // 3. 커뮤니티 활동 진입 줄 — 벨트 미등록(빈 카드)일 때도 같은 자리 (#44)
-                        MyProfileCommunityActivityRow(
-                            onTapped: { store.send(.view(.communityActivityTapped)) }
-                        )
-                        .padding(.top, 12)
-                        .padding(.horizontal, 20)
-
-                        // 4. 콘텐츠 영역
+                        // 3. 콘텐츠 영역 — 남에게 보여 줄 정보를 위로: 대회 기록 → 스타일 → 커뮤니티 활동 (#117)
                         contentView
                             .padding(.top, 36)
                             .padding(.horizontal, 20)
@@ -140,7 +133,6 @@ public struct MyProfileView: View {
             profileImageUrl: store.userProfile?.profileImageUrl,
             beltRank: store.communityProfile?.beltRank,
             safeAreaTop: safeAreaTop,
-            isOwner: store.userProfile?.userRole == .owner,
             // Optimistic Update — 업로드/삭제 진행 중 헤더 이미지 미리보기·로딩 표시
             pendingProfileImageData: store.pendingProfileImageData,
             isProfileImageDeleting: store.isProfileImageDeleting,
@@ -153,21 +145,18 @@ public struct MyProfileView: View {
         )
     }
     
-    /// 벨트/체급 카드
+    /// 벨트 카드
     private var cardView: some View {
-        BeltWeightCardView(
+        BeltCardView(
             beltRank: store.communityProfile?.beltRank,
             beltStripe: store.communityProfile?.beltStripe,
-            weightKg: store.communityProfile?.weightKg,
-            isWeightHidden: store.communityProfile?.isWeightHidden ?? false,
+            isOwner: store.userProfile?.userRole == .owner,
             onBeltTapped: { store.send(.view(.beltTapped)) },
-            onWeightClassTapped: { store.send(.view(.weightClassTapped)) },
-            onWeightVisibilityToggleTapped: { store.send(.view(.weightVisibilityToggleButtonTapped)) },
             onRegisterTapped: { store.send(.view(.registerBeltButtonTapped)) }
         )
     }
     
-    /// 콘텐츠 영역 (스타일 + 대회)
+    /// 콘텐츠 영역 (대회 + 스타일 + 커뮤니티 활동)
     private var contentView: some View {
         VStack(spacing: 0) {
             if showsDefaultScreen {
@@ -177,11 +166,17 @@ public struct MyProfileView: View {
                 .padding(.bottom, 18)
             } else {
                 VStack(alignment: .leading, spacing: 36) {
-                    styleSection
                     competitionSection
+                    styleSection
                 }
-                .padding(.bottom, 29)
+                .padding(.bottom, 36)
             }
+
+            // 커뮤니티 활동 진입 줄 — 스타일·대회 유무와 상관없이 맨 아래 (#44, #117)
+            MyProfileCommunityActivityRow(
+                onTapped: { store.send(.view(.communityActivityTapped)) }
+            )
+            .padding(.bottom, 29)
         }
     }
     
