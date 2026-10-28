@@ -182,6 +182,10 @@ public struct CommunityDetailFeature: Sendable {
             case .internal(.loadingStarted):
                 state.isLoading = true
                 state.hasError = false
+                // 문서를 새로 불러오면 직전 페이지의 가드는 의미가 없다. 웹은 언마운트 때 false를 보내지만
+                // 페이지 자체가 교체될 땐 그 정리가 돌지 않아, 남은 true가 BACK_PRESSED에 답하지 않는 페이지의
+                // 스와이프를 계속 막을 수 있다. 새 페이지가 다시 알려 줄 때까지 처음 열 때의 기본값으로 되돌린다.
+                state.leaveGuardEnabled = State.isWriteOrEditScreen(state.url)
                 return .none
 
             case .internal(.loadingFinished):
