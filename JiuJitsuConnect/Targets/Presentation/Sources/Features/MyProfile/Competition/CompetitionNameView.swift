@@ -15,10 +15,12 @@ struct CompetitionNameView: View {
             // 목록이 있으면 버튼 위 남은 공간을 목록이 채우고, 없으면 빈 공간으로 버튼을 키보드 위에 붙인다.
             if store.suggestions.isEmpty {
                 Spacer()
+                // 목록이 떠 있으면 고르면 되고, 이 버튼까지 두면 키보드 위 좁은 자리에서 목록이 두 줄만 보인다.
+                // 그래서 맞는 대회가 없을 때(못 찾았을 때)만 보인다.
+                namelessButton
             } else {
                 suggestionSection
             }
-            namelessButton
             ctaButtonSection
         }
         .onAppear {
