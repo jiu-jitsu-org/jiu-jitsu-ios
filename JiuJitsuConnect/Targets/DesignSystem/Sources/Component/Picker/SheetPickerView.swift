@@ -151,7 +151,9 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
         }
         .onChange(of: selectedItem.id) { _, newID in
             // 외부에서 선택이 바뀐 경우에만 해당 항목으로 스크롤 (사용자 스크롤 → onSelect → 재스크롤 피드백 루프 방지)
-            guard let index = items.firstIndex(where: { $0.id == newID }), index != centeredIndex else { return }
+            // 손으로 굴리는 중에는 한 박자 늦게 돌아온 선택값으로 되감지 않는다 — 멈춘 뒤 중앙 항목이 다시 전달된다.
+            guard !isUserScrolling,
+                  let index = items.firstIndex(where: { $0.id == newID }), index != centeredIndex else { return }
             withAnimation(.easeInOut(duration: 0.3)) {
                 position.scrollTo(y: Self.offset(for: index, pitch: slotPitch))
             }
