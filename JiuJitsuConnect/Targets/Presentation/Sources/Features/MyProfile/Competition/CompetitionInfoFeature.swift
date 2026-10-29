@@ -108,6 +108,20 @@ public struct CompetitionInfoFeature: Sendable {
                 self.belt = original.competitionBelt
             }
         }
+
+        /// 이미 저장한 대회에 부문을 더한다(프로필에서 진입).
+        /// 저장해 둔 기록을 이번 흐름의 기록으로 넣어 두면 '부문 추가' 흐름(메달 → 부문)이 되고,
+        /// 완료 화면에는 이 대회의 기존 부문까지 한 줄씩 보인다.
+        public init(addingDivisionTo entries: [Competition], currentBelt: BeltRank? = nil) {
+            self.init(mode: .add, currentBelt: currentBelt)
+            guard let last = entries.last else { return }
+            self.savedRecords = entries
+            self.name = last.competitionName
+            self.year = last.competitionYear
+            // 같은 대회의 다른 부문은 보통 같은 복장·같은 띠라 마지막 기록을 따른다.
+            self.uniform = last.competitionUniform ?? .gi
+            self.belt = last.competitionBelt ?? currentBelt
+        }
     }
 
     // 기록하는 이유(메달)를 먼저 보여 주려고 결과부터 묻는다.
