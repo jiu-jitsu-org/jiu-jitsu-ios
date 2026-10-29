@@ -37,9 +37,10 @@ public struct CompetitionInfoFeature: Sendable {
         // 1단계: 결과 — Picker UI 특성상 초기 선택값이 필요하므로 옵셔널이 아닌 기본값 사용
         var result: CompetitionRank = .gold
 
-        // 2단계: 날짜 — 기본 선택 연도는 가장 최신(현재) 연도. 연도 Picker 상한과 일치한다.
+        // 2단계: 연도 — 몇 월이었는지는 기억이 가장 흐려 입력이 막히므로 연도만 받는다.
+        // 기본 선택은 올해.
+        let currentYear: Int = Calendar.current.component(.year, from: Date())
         var year: Int = Calendar.current.component(.year, from: Date())
-        var month: Int = 1
 
         // 3단계: 대회명 (TextField 직접 바인딩)
         // 대회명은 닉네임과 달리 중복을 허용하므로 별도 검증 없이 "빈 값" 여부만 본다.
@@ -52,7 +53,6 @@ public struct CompetitionInfoFeature: Sendable {
             self.mode = mode
             if case let .edit(original) = mode {
                 self.year = original.competitionYear
-                self.month = original.competitionMonth
                 self.name = original.competitionName
                 self.result = original.competitionRank
             }
@@ -63,13 +63,34 @@ public struct CompetitionInfoFeature: Sendable {
     // rawValue를 진행 막대 위치로 쓰므로, 단계를 추가할 때는 화면 순서대로 선언한다.
     public enum Step: Int, CaseIterable, Equatable, Sendable {
         case result
-        case date
+        case year
         case name
 
         // 진행 막대는 출전 부문 단계(#122)까지 포함한 4칸으로 보여 준다.
         // 부문 단계가 생기기 전까지는 대회명 단계에서 저장하므로 마지막 칸은 빈 채로 끝난다.
         // 부문 단계를 추가하면 allCases.count로 바꾼다.
         static let progressSegmentCount = 4
+    }
+
+    /// 연도 단계 선택지 — 올해부터 1990년까지 최신순.
+    ///
+    /// 오래 수련한 사람은 옛 대회도 정확한 연도로 남기고 싶어 하므로 묶음('이전') 없이 연도를 전부 늘어놓는다.
+    /// 휠은 올해에 맞춰 열리므로 최근 대회는 바로 넘어가고, 목록이 길어져도 휠 크기는 그대로다.
+    /// 수정 중인 기록의 연도가 범위 밖이면 그 연도도 목록에 넣어 원래 값이 사라지지 않게 한다.
+    public struct YearOption: Hashable, Identifiable, Sendable {
+        let year: Int
+
+        static let earliestYear = 1990
+
+        public var id: Int { year }
+
+        var displayText: String { "\(year)년" }
+
+        static func options(currentYear: Int, including selectedYear: Int) -> [YearOption] {
+            let upper = max(currentYear, selectedYear)
+            let lower = min(earliestYear, selectedYear)
+            return stride(from: upper, through: lower, by: -1).map(YearOption.init)
+        }
     }
 
     public enum Action: BindableAction, Sendable {
@@ -82,8 +103,7 @@ public struct CompetitionInfoFeature: Sendable {
             case nextButtonTapped
             case cancelButtonTapped
             case deleteButtonTapped
-            case yearSelected(Int)
-            case monthSelected(Int)
+            case yearOptionSelected(YearOption)
             case resultSelected(CompetitionRank)
         }
 
@@ -104,9 +124,9 @@ public struct CompetitionInfoFeature: Sendable {
             case .view(.nextButtonTapped):
                 switch state.step {
                 case .result:
-                    state.step = .date
+                    state.step = .year
                     return .none
-                case .date:
+                case .year:
                     state.step = .name
                     return .none
                 case .name:
@@ -115,9 +135,15 @@ public struct CompetitionInfoFeature: Sendable {
                     guard !state.name.trimmingCharacters(in: .whitespaces).isEmpty else {
                         return .none
                     }
+                    // 새 기록은 월 없이 저장하고, 월이 있던 기존 기록은 수정해도 원래 월을 유지한다.
+                    let originalMonth: Int? = if case let .edit(original) = state.mode {
+                        original.competitionMonth
+                    } else {
+                        nil
+                    }
                     let updated = Competition(
                         competitionYear: state.year,
-                        competitionMonth: state.month,
+                        competitionMonth: originalMonth,
                         competitionName: state.name,
                         competitionRank: state.result
                     )
@@ -133,11 +159,11 @@ public struct CompetitionInfoFeature: Sendable {
                 switch state.step {
                 case .result:
                     return .run { _ in await self.dismiss() }
-                case .date:
+                case .year:
                     state.step = .result
                     return .none
                 case .name:
-                    state.step = .date
+                    state.step = .year
                     return .none
                 }
 
@@ -149,12 +175,8 @@ public struct CompetitionInfoFeature: Sendable {
                 guard case let .edit(original) = state.mode else { return .none }
                 return .send(.delegate(.didDelete(original)))
 
-            case let .view(.yearSelected(year)):
-                state.year = year
-                return .none
-
-            case let .view(.monthSelected(month)):
-                state.month = month
+            case let .view(.yearOptionSelected(option)):
+                state.year = option.year
                 return .none
 
             case let .view(.resultSelected(rank)):

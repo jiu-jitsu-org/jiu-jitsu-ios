@@ -580,8 +580,9 @@ public struct Competition: Codable, Equatable, Sendable {
     /// 대회 년도
     public let competitionYear: Int
     
-    /// 대회 월
-    public let competitionMonth: Int
+    /// 대회 월 — 몇 월이었는지 기억하지 못해 입력이 막히지 않도록 연도만 받는다(#120).
+    /// 연도만 받기 전에 저장된 기록에만 값이 있다. 새 기록은 nil.
+    public let competitionMonth: Int?
     
     /// 대회 이름
     public let competitionName: String
@@ -591,7 +592,7 @@ public struct Competition: Codable, Equatable, Sendable {
     
     public init(
         competitionYear: Int,
-        competitionMonth: Int,
+        competitionMonth: Int? = nil,
         competitionName: String,
         competitionRank: CompetitionRank
     ) {

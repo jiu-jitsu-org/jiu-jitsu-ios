@@ -74,14 +74,17 @@ private struct CompetitionListView: View {
         .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 
-    // 참가 날짜(년·월) 기준 최신순. 원본 배열은 그대로 두고 표시 시점에만 정렬한다.
+    // 연도 최신순. 월은 더 받지 않으므로 같은 연도끼리는 입력한 순서를 그대로 둔다.
+    // 원본 배열은 그대로 두고 표시 시점에만 정렬한다.
     private var sortedCompetitions: [Competition] {
-        competitions.sorted { lhs, rhs in
-            if lhs.competitionYear != rhs.competitionYear {
-                return lhs.competitionYear > rhs.competitionYear
+        competitions.enumerated()
+            .sorted { lhs, rhs in
+                if lhs.element.competitionYear != rhs.element.competitionYear {
+                    return lhs.element.competitionYear > rhs.element.competitionYear
+                }
+                return lhs.offset < rhs.offset
             }
-            return lhs.competitionMonth > rhs.competitionMonth
-        }
+            .map(\.element)
     }
 }
 
@@ -111,8 +114,7 @@ private struct CompetitionRowView: View {
                 
                 Spacer()
                 
-                // 날짜 (YYYY.MM 형식)
-                Text(competition.formattedDate)
+                Text(competition.formattedYear)
                     .font(.pretendard.labelM)
                     .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
             }

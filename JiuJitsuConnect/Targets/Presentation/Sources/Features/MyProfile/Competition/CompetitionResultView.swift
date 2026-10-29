@@ -46,7 +46,7 @@ struct CompetitionResultView: View {
     }
 
     private var confirmButton: some View {
-        // 키보드가 없는 단계라 날짜 단계와 같은 둥근 버튼을 쓴다. 키패드형은 키보드가 올라오는 대회명 단계만.
+        // 키보드가 없는 단계라 연도 단계와 같은 둥근 버튼을 쓴다. 키패드형은 키보드가 올라오는 대회명 단계만.
         CTAButton(
             title: "다음",
             action: {

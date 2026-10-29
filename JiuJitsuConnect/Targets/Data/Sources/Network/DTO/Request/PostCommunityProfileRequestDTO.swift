@@ -63,6 +63,8 @@ struct PostCommunityProfileRequestDTO: Codable {
 
 /// 대회 정보 요청 DTO
 struct CompetitionRequestDTO: Codable {
+    private static let placeholderMonth = 1
+
     let competitionYear: Int
     let competitionMonth: Int
     let competitionName: String
@@ -70,7 +72,9 @@ struct CompetitionRequestDTO: Codable {
     
     init(from competition: Competition) {
         self.competitionYear = competition.competitionYear
-        self.competitionMonth = competition.competitionMonth
+        // backend #164 반영 전 임시: 서버가 아직 월을 필수로 받으므로, 월이 없는 새 기록은 자리값 1을 보낸다.
+        // 기존 기록은 원래 월을 그대로 보내 서버 값이 바뀌지 않게 한다.
+        self.competitionMonth = competition.competitionMonth ?? Self.placeholderMonth
         self.competitionName = competition.competitionName
         self.competitionRank = competition.competitionRank.rawValue
     }

@@ -61,7 +61,8 @@ struct CommunityProfileResponseDTO: Codable {
 /// 대회 정보 DTO
 struct CompetitionDTO: Codable {
     let competitionYear: Int
-    let competitionMonth: Int
+    // 연도만 받는 서버(backend #164)로 바뀌면 월이 빠질 수 있어 옵셔널로 디코딩한다.
+    let competitionMonth: Int?
     let competitionName: String
     let competitionRank: String
     
