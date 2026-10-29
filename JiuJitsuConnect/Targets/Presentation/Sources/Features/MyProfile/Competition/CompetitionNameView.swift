@@ -32,7 +32,7 @@ struct CompetitionNameView: View {
     // MARK: - View Components
 
     private var titleSection: some View {
-        Text("어떤 대회였나요?")
+        Text("대회명이 뭐였나요?")
             .font(Font.pretendard.display1)
             .foregroundStyle(Color.component.textfieldDisplay.focus.title)
             .frame(maxWidth: .infinity, alignment: .center)
