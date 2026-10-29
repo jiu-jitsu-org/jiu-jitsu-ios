@@ -72,12 +72,9 @@ struct CompetitionDoneView: View {
             }
             .appButtonStyle(.tint, size: .medium, height: 44)
         }
+        // 회색 면으로 감싸면 면 전체가 버튼처럼 보여, 문구와 버튼만 둔다.
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 20)
-        // 흰 화면 위에서 구분되도록 MY 화면 바탕과 같은 회색 면을 쓴다.
-        .background(Color.component.skillCard.container.bg)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .padding(.top, 40)
+        .padding(.top, 48)
     }
 
     private var confirmButton: some View {
