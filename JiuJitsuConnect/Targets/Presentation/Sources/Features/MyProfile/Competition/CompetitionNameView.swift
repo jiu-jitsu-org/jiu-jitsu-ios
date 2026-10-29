@@ -184,12 +184,26 @@ private struct CompetitionSuggestionRow: View {
 
     private var highlightedName: AttributedString {
         var attributed = AttributedString(name)
-        let trimmed = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty,
-           let range = attributed.range(of: trimmed, options: .caseInsensitive) {
-            attributed[range].foregroundColor = Color.component.textfieldDisplay.focus.text
+        if let range = Self.matchRange(in: name, keyword: keyword),
+           let lower = AttributedString.Index(range.lowerBound, within: attributed),
+           let upper = AttributedString.Index(range.upperBound, within: attributed) {
+            attributed[lower..<upper].foregroundColor = Color.component.textfieldDisplay.focus.text
         }
         return attributed
+    }
+
+    /// 띄어쓰기를 빼고 맞춰 본 뒤 원래 이름의 구간으로 돌려준다 — '서울오픈'으로 쳐도 '서울 오픈'이 강조된다.
+    private static func matchRange(in name: String, keyword: String) -> Range<String.Index>? {
+        let positions = name.indices.filter { !name[$0].isWhitespace }
+        let letters = positions.map { name[$0].lowercased() }
+        let target = keyword.filter { !$0.isWhitespace }.map { $0.lowercased() }
+        guard !target.isEmpty, target.count <= letters.count else { return nil }
+        for start in 0...(letters.count - target.count)
+        where Array(letters[start..<(start + target.count)]) == target {
+            let last = positions[start + target.count - 1]
+            return positions[start]..<name.index(after: last)
+        }
+        return nil
     }
 }
 

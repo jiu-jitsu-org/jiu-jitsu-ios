@@ -360,7 +360,11 @@ public struct CompetitionInfoFeature: Sendable {
                 )
 
             case let .internal(.suggestionsLoaded(suggestions)):
-                state.suggestions = suggestions
+                // 입력한 말로 시작하는 이름을 먼저 둔다(띄어쓰기 무시). 그 안의 순서는 서버가 준 대로 둔다.
+                let key = state.name.competitionSearchKey
+                let startsWithKey = suggestions.filter { $0.name.competitionSearchKey.hasPrefix(key) }
+                let others = suggestions.filter { !$0.name.competitionSearchKey.hasPrefix(key) }
+                state.suggestions = startsWithKey + others
                 return .none
 
             case .binding, .delegate:
