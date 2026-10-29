@@ -39,6 +39,10 @@ public struct CommunityDetailFeature: Sendable {
         // CommunityDetailView가 로컬로 그려도 GNB·탭바까지 덮인다. 한 번에 하나만 표시한다.
         var pendingConfirmDialog: ConfirmDialogPayload?
         var pendingSelectSheet: SelectSheetPayload?
+        // 웹이 요청한 사진 선택(글쓰기 '앨범에서 선택'). 피커가 닫힌 뒤에도 사진 변환을 마치고
+        // 회신할 때까지 남아 있어, 그 사이에 온 다른 다이얼로그 요청을 막는다.
+        var pendingPhotoPick: PickPhotosPayload?
+        var isPhotoPickerPresented = false
 
         public init(url: URL, title: String? = nil, accessToken: String? = nil) {
             self.url = url
@@ -73,6 +77,11 @@ public struct CommunityDetailFeature: Sendable {
             case confirmDialogDismissed
             case selectSheetSubmitted(value: String, customText: String?)
             case selectSheetDismissed
+            // 피커에서 선택(또는 취소)을 마쳐 피커를 닫는다. 결과는 변환 후 photosPicked로 온다.
+            case photoPickerFinished
+            case photosPicked([PickedPhoto])
+            // 피커가 선택 없이 닫힘(아래로 쓸어내리기 등).
+            case photoPickerDismissed
         }
 
         public enum InternalAction: Sendable {
@@ -152,6 +161,25 @@ public struct CommunityDetailFeature: Sendable {
                 Self.enqueue(.selectSheetResult(requestId: pending.requestId, outcome: .dismiss), into: &state)
                 return .none
 
+            case .view(.photoPickerFinished):
+                state.isPhotoPickerPresented = false
+                return .none
+
+            case let .view(.photosPicked(files)):
+                guard let pending = state.pendingPhotoPick else { return .none }
+                state.pendingPhotoPick = nil
+                state.isPhotoPickerPresented = false
+                Self.enqueue(.photosPicked(requestId: pending.requestId, files: files), into: &state)
+                return .none
+
+            case .view(.photoPickerDismissed):
+                // 피커가 선택을 마치며 스스로 닫힌 경우(photoPickerFinished 이후)는 결과가 곧 오므로 무시한다.
+                guard state.isPhotoPickerPresented, let pending = state.pendingPhotoPick else { return .none }
+                state.pendingPhotoPick = nil
+                state.isPhotoPickerPresented = false
+                Self.enqueue(.photosPicked(requestId: pending.requestId, files: []), into: &state)
+                return .none
+
             case .internal(.loadingStarted):
                 state.isLoading = true
                 state.hasError = false
@@ -194,6 +222,9 @@ public struct CommunityDetailFeature: Sendable {
 
                 case let .showSelectSheet(payload):
                     return Self.presentSelectSheet(payload, into: &state)
+
+                case let .pickPhotos(payload):
+                    return Self.presentPhotoPicker(payload, into: &state)
 
                 case let .authLoginPrompt(reason):
                     return .send(.delegate(.loginPromptRequested(reason: reason)))
@@ -246,9 +277,14 @@ public struct CommunityDetailFeature: Sendable {
         }
     }
 
+    /// 웹 요청으로 띄운 네이티브 표면(알럿·시트·사진 피커)이 있는지. 한 번에 하나만 띄운다.
+    private static func hasPendingBridgeSurface(_ state: State) -> Bool {
+        state.pendingConfirmDialog != nil || state.pendingSelectSheet != nil || state.pendingPhotoPick != nil
+    }
+
     /// 확인 알럿 표시 요청 처리. 이미 다이얼로그가 떠 있으면 새 요청은 즉시 dismiss로 회신한다.
     private static func presentConfirmDialog(_ payload: ConfirmDialogPayload, into state: inout State) -> Effect<Action> {
-        guard state.pendingConfirmDialog == nil, state.pendingSelectSheet == nil else {
+        guard !hasPendingBridgeSurface(state) else {
             enqueue(.confirmDialogResult(requestId: payload.requestId, outcome: .dismiss), into: &state)
             return .none
         }
@@ -258,11 +294,23 @@ public struct CommunityDetailFeature: Sendable {
 
     /// 선택 시트 표시 요청 처리(동시 표시 방지는 presentConfirmDialog와 동일).
     private static func presentSelectSheet(_ payload: SelectSheetPayload, into state: inout State) -> Effect<Action> {
-        guard state.pendingConfirmDialog == nil, state.pendingSelectSheet == nil else {
+        guard !hasPendingBridgeSurface(state) else {
             enqueue(.selectSheetResult(requestId: payload.requestId, outcome: .dismiss), into: &state)
             return .none
         }
         state.pendingSelectSheet = payload
+        return .none
+    }
+
+    /// 사진 피커 표시 요청 처리. 띄울 수 없으면(다른 표면 표시 중·남은 자리 없음) 빈 결과로 바로 회신한다.
+    /// limit이 0이면 PHPicker는 '무제한'으로 해석하므로 그대로 열면 안 된다.
+    private static func presentPhotoPicker(_ payload: PickPhotosPayload, into state: inout State) -> Effect<Action> {
+        guard !hasPendingBridgeSurface(state), payload.limit > 0 else {
+            enqueue(.photosPicked(requestId: payload.requestId, files: []), into: &state)
+            return .none
+        }
+        state.pendingPhotoPick = payload
+        state.isPhotoPickerPresented = true
         return .none
     }
 

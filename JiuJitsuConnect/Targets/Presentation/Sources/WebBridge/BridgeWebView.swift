@@ -36,6 +36,9 @@ struct BridgeWebView: UIViewRepresentable {
     // 오버스크롤(바운스) 영역에 드러나는 색. 웹 콘텐츠 배경과 어긋나면 바운스할 때 이음새가
     // 보이므로 화면별로 주입한다. 리스트 피드는 B&W/White, 상세 서브뷰는 True-White.
     var overscrollBackground: Color = Color.primitive.bw.trueWhite
+    // 이 웹뷰를 소유한 Feature가 실제로 처리하는 '사전 확인형' 메시지. 처리하지 않는 웹뷰가 지원한다고
+    // 알리면 웹이 요청을 보내 놓고 응답 없이 기다리므로, 처리하는 화면만 넘긴다.
+    var capabilities: [WebBridgeCapability] = []
     let onLoadingStarted: () -> Void
     let onLoadingFinished: () -> Void
     let onLoadingFailed: () -> Void
@@ -71,6 +74,12 @@ struct BridgeWebView: UIViewRepresentable {
             WebBridgeScriptMessageProxy(delegate: context.coordinator),
             name: WebBridge.appBridgeHandlerName
         )
+        // 웹이 첫 사용자 탭 전에 지원 여부를 읽을 수 있도록 페이지 스크립트보다 먼저 주입한다.
+        if !capabilities.isEmpty, let source = WebBridgeCapability.injectionScriptSource(for: capabilities) {
+            contentController.addUserScript(
+                WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+            )
+        }
         config.userContentController = contentController
 
         // 시스템 기본 입력 액세서리 바(위/아래/완료 회색 바)를 제거한다. 웹이 자체 하단 툴바
