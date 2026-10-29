@@ -52,6 +52,17 @@ public struct CommunityDetailView: View {
             onSelectSubmit: { store.send(.view(.selectSheetSubmitted(value: $0, customText: $1))) },
             onSelectDismiss: { store.send(.view(.selectSheetDismissed)) }
         )
+        .sheet(isPresented: Binding(
+            get: { store.isPhotoPickerPresented },
+            set: { if !$0 { store.send(.view(.photoPickerDismissed)) } }
+        )) {
+            WebBridgePhotoPicker(
+                selectionLimit: store.pendingPhotoPick?.limit ?? 1,
+                onFinishPicking: { store.send(.view(.photoPickerFinished)) },
+                onPicked: { store.send(.view(.photosPicked($0))) }
+            )
+            .ignoresSafeArea()
+        }
     }
 
     private var webViewLayer: some View {
@@ -68,6 +79,8 @@ public struct CommunityDetailView: View {
                 enablesPullToRefresh: false,
                 // 키보드가 문서를 밀어올려 고정 헤더가 화면 밖으로 나가는 것을 막는다.
                 locksDocumentScroll: true,
+                // 글쓰기·수정은 서브뷰로만 열리므로 사진 선택은 상세 웹뷰만 처리한다.
+                capabilities: [.pickPhotos],
                 onLoadingStarted: { store.send(.internal(.loadingStarted)) },
                 onLoadingFinished: { store.send(.internal(.loadingFinished)) },
                 onLoadingFailed: { store.send(.internal(.loadingFailed)) },

@@ -7,11 +7,12 @@ import SwiftUI
 import Domain
 import DesignSystem
 
-/// 프로필 대회 줄(또는 ⋯)을 눌렀을 때의 시트 — 고칠 부문을 고르거나, 부문을 더하거나, 대회를 지운다(#123).
+/// 프로필 대회 줄(또는 ⋯)을 눌렀을 때의 시트 — 맨 위 고정(#124), 부문 수정, 부문 추가, 대회 삭제(#123).
 ///
 /// 프로필 사진 수정 시트(ProfileImageEditView)와 같은 모양(손잡이 · 제목 · 행 · 취소)을 쓴다.
 struct CompetitionActionSheetView: View {
     let entries: [Competition]
+    let onPinToggled: () -> Void
     let onDivisionTapped: (Competition) -> Void
     let onAddDivisionTapped: () -> Void
     let onDeleteTapped: () -> Void
@@ -23,15 +24,15 @@ struct CompetitionActionSheetView: View {
         static let rowHeight: CGFloat = 51
         static let rowSpacing: CGFloat = 8
         static let leadingIconSize: CGFloat = 18
-        // 작은 화면(SE, 667pt)에서도 상태바 아래로 들어오는 높이
-        static let maxContentHeight: CGFloat = 560
+        // 작은 화면(SE, 667pt)에서도 상태바 아래로 들어오는 높이 — 부문 4개(행 7개)까지는 스크롤 없이 다 보인다.
+        static let maxContentHeight: CGFloat = 630
     }
 
     /// 바텀 시트 detent용 본문 높이(safe area 미포함).
     /// 24(handle) + 48(title) + 16+20(optionsTop) + rows + 20(optionsBottom) + 8+51+24(CTA)
     /// 부문이 많으면 maxContentHeight에서 멈추고 행 목록이 스크롤된다.
     static func contentHeight(divisionCount: Int) -> CGFloat {
-        let rowCount = CGFloat(divisionCount + 2)
+        let rowCount = CGFloat(divisionCount + 3)
         let rows = Metrics.rowHeight * rowCount + Metrics.rowSpacing * (rowCount - 1)
         return min(24 + 48 + 16 + 20 + rows + 20 + 8 + 51 + 24, Metrics.maxContentHeight)
     }
@@ -82,6 +83,19 @@ struct CompetitionActionSheetView: View {
 
     private var optionsSection: some View {
         VStack(spacing: Metrics.rowSpacing) {
+            optionRow(
+                title: (group?.isPinned ?? false) ? "고정 해제" : "맨 위에 고정",
+                showsChevron: false,
+                action: onPinToggled
+            ) {
+                // 프로필 줄의 고정 표시와 같은 압정을 회색으로 — 동작 아이콘(+)보다 한 단계 낮게 둔다.
+                Assets.Common.Icon.pin.swiftUIImage
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(Color.component.bottomSheet.unselected.listItem.leadingIcon)
+            }
+
             // 부문마다 한 행 — 누르면 그 부문을 고친다.
             ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
                 optionRow(
@@ -164,6 +178,7 @@ struct CompetitionActionSheetView: View {
             Competition(competitionYear: 2026, competitionName: "서울 오픈", competitionRank: .gold,
                         competitionUniform: .gi, competitionWeightClass: .absolute, competitionBelt: .brown)
         ],
+        onPinToggled: { },
         onDivisionTapped: { _ in },
         onAddDivisionTapped: { },
         onDeleteTapped: { },

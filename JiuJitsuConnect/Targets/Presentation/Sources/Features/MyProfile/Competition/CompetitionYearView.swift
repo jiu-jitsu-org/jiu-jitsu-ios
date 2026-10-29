@@ -30,8 +30,8 @@ struct CompetitionYearView: View {
         HStack {
             Spacer()
             SheetPickerView(
-                items: CompetitionInfoFeature.YearOption.options(currentYear: store.currentYear),
-                selectedItem: CompetitionInfoFeature.YearOption(year: store.year, currentYear: store.currentYear),
+                items: CompetitionInfoFeature.YearOption.options(currentYear: store.currentYear, including: store.year),
+                selectedItem: CompetitionInfoFeature.YearOption(year: store.year),
                 displayText: { $0.displayText },
                 width: 140,
                 onSelect: { option in

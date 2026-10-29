@@ -12,6 +12,8 @@ private enum Style {
     static let horizontalPadding: CGFloat = 16
     // 뒤로가기 버튼과, 완료 화면에서 그 자리를 비워 제목을 가운데에 두는 빈 칸이 같은 크기를 쓴다.
     static let backButtonSize: CGFloat = 36
+    // 화면 폭을 다 채우면 막대가 눈을 끌어, 가운데에 짧게 둔다.
+    static let progressBarWidth: CGFloat = 160
 }
 
 struct CompetitionInfoView: View {
@@ -146,7 +148,8 @@ struct CompetitionInfoView: View {
                     .frame(height: 4)
             }
         }
-        .padding(.horizontal, 20)
+        .frame(width: Style.progressBarWidth)
+        .frame(maxWidth: .infinity)
         .padding(.top, 4)
         .animation(.default, value: store.step)
         .accessibilityElement(children: .ignore)

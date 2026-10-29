@@ -63,11 +63,23 @@ public struct MyProfileCompetitionSection: View {
 /// 서버는 아직 '대회 1개 = 메달 1개' 목록만 저장하므로(backend #164 전), 여러 부문은 같은 이름·연도로
 /// 항목을 여러 개 저장하고 표시할 때만 묶는다.
 struct CompetitionGroup {
+    /// 맨 위에 고정할 수 있는 줄 수(#124). 많이 고정하면 고정의 의미(대표 기록)가 흐려진다.
+    static let maxPinnedCount = 3
+
     /// 처음 입력한 기록의 대회명
     let name: String
     let year: Int
     /// 입력한 순서 그대로의 부문별 기록
     let entries: [Competition]
+
+    /// 대회명 없이 저장한 기록(#125) — 나만 보이고, 다른 기록과 묶지 않는다.
+    var isNameless: Bool { name.isEmpty }
+
+    /// 부문 하나라도 고정돼 있으면 줄 전체를 고정으로 본다.
+    /// 고정한 대회에 나중에 '부문 추가'로 더한 기록(고정 안 됨)이 섞여도 줄이 풀려 보이지 않게 한다.
+    var isPinned: Bool {
+        entries.contains(where: \.isPinned)
+    }
 
     /// 대회 줄의 메달 — 묶인 부문 중 가장 높은 메달
     var representativeRank: CompetitionRank {
@@ -112,37 +124,47 @@ struct CompetitionGroup {
             .lowercased()
     }
 
-    /// 같은 대회끼리 묶어 연도 최신순으로 돌려준다.
+    /// 같은 대회끼리 묶어, 고정한 줄을 맨 위에 두고 나머지는 연도 최신순으로 돌려준다.
+    /// 고정한 줄끼리도 연도 최신순이다(고정한 시각은 저장하지 않으므로).
     /// 같은 연도끼리는 처음 입력한 순서를 지킨다(월은 더 받지 않으므로).
+    /// 대회명 없는 기록은 같은 대회인지 알 수 없어 하나씩 따로 둔다(#125).
     static func grouped(_ competitions: [Competition]) -> [CompetitionGroup] {
         struct Key: Hashable {
             let name: String
             let year: Int
+            /// 대회명 없는 기록끼리 묶이지 않게 하는 자리값 — 이름 있는 기록은 nil
+            let namelessIndex: Int?
         }
         var order: [Key] = []
         var entriesByKey: [Key: [Competition]] = [:]
-        for competition in competitions {
+        for (index, competition) in competitions.enumerated() {
             let key = Key(
                 name: matchingName(competition.competitionName, year: competition.competitionYear),
-                year: competition.competitionYear
+                year: competition.competitionYear,
+                namelessIndex: competition.isNameless ? index : nil
             )
             if entriesByKey[key] == nil {
                 order.append(key)
             }
             entriesByKey[key, default: []].append(competition)
         }
-        return order.enumerated()
+        return order
+            .map { key in
+                let entries = entriesByKey[key] ?? []
+                let name = entries.first?.competitionName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                return CompetitionGroup(name: name, year: key.year, entries: entries)
+            }
+            .enumerated()
             .sorted { lhs, rhs in
+                if lhs.element.isPinned != rhs.element.isPinned {
+                    return lhs.element.isPinned
+                }
                 if lhs.element.year != rhs.element.year {
                     return lhs.element.year > rhs.element.year
                 }
                 return lhs.offset < rhs.offset
             }
-            .map { _, key in
-                let entries = entriesByKey[key] ?? []
-                let name = entries.first?.competitionName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                return CompetitionGroup(name: name, year: key.year, entries: entries)
-            }
+            .map(\.element)
     }
 
     /// 부문 한 줄 — "도복 -76kg 은". 메달은 글로 적는다(아이콘은 대회 줄에 하나만).
@@ -154,9 +176,11 @@ struct CompetitionGroup {
     }
 
     /// 섹션 머리 메달 합계 — 금·은·동 순으로 (메달, 개수). 부문(항목) 기준으로 세고 참가와 0개는 뺀다.
+    /// 대회명 없는 기록은 어느 대회 메달인지 확인할 수 없어 합계에서 뺀다(#125).
     static func medalCounts(of competitions: [Competition]) -> [(rank: CompetitionRank, count: Int)] {
-        [CompetitionRank.gold, .silver, .bronze].compactMap { rank in
-            let count = competitions.filter { $0.competitionRank == rank }.count
+        let counted = competitions.filter { !$0.isNameless }
+        return [CompetitionRank.gold, .silver, .bronze].compactMap { rank in
+            let count = counted.filter { $0.competitionRank == rank }.count
             return count > 0 ? (rank, count) : nil
         }
     }
@@ -241,11 +265,14 @@ private struct CompetitionRowView: View {
 
                     // 대회 이름 + 상세 줄(연도 · 띠 · 부문) — 같은 메달도 띠·부문에 따라 무게가 달라 함께 보여 준다(#122).
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(group.name)
-                            .font(.pretendard.custom(weight: .semiBold, size: 14))
-                            .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
-                            .lineLimit(1)
-                            .frame(minHeight: Metrics.titleLineHeight)
+                        Group {
+                            if group.isNameless {
+                                namelessTitle
+                            } else {
+                                title
+                            }
+                        }
+                        .frame(minHeight: Metrics.titleLineHeight)
 
                         Text(group.detailText)
                             .font(.pretendard.labelM)
@@ -264,6 +291,14 @@ private struct CompetitionRowView: View {
                             }
                             .padding(.top, 6)
                         }
+
+                        // 줄을 누르면 수정으로 들어가므로, 여기서 대회명을 채우면 공개된다는 걸 알려 준다.
+                        if group.isNameless {
+                            Text("대회명을 채우면 공개돼요 ›")
+                                .font(.pretendard.labelM)
+                                .foregroundStyle(Color.primitive.blue.b500p)
+                                .padding(.top, 2)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -274,23 +309,69 @@ private struct CompetitionRowView: View {
             }
             .buttonStyle(.plain)
 
-            Button {
-                onTapped()
-            } label: {
-                Assets.MyProfile.Icon.menu.swiftUIImage
+            // 나만 보는 기록은 대표 기록(고정)으로 내세울 수 없고 줄을 누르면 바로 수정으로 들어가 ⋯ 을 두지 않는다.
+            if group.isNameless {
+                Spacer().frame(width: 16)
+            } else {
+                menuButton
+            }
+        }
+    }
+
+    // 고정 표시는 이름 뒤에 옅은 회색 압정으로 — 대회 이름보다 눈에 띄지 않게 한다(#124).
+    private var title: some View {
+        HStack(spacing: 4) {
+            Text(group.name)
+                .font(.pretendard.custom(weight: .semiBold, size: 14))
+                .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
+                .lineLimit(1)
+
+            if group.isPinned {
+                Assets.Common.Icon.pin.swiftUIImage
                     .renderingMode(.template)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 16, height: 16)
+                    .frame(width: 12, height: 12)
                     .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                    .accessibilityLabel("고정됨")
             }
-            .buttonStyle(.plain)
-            // 줄을 눌러도 같은 시트가 떠서, 화면 읽기에서는 줄 하나만 읽히게 한다.
-            .accessibilityHidden(true)
-            .padding(.trailing, 2)
         }
+    }
+
+    private var namelessTitle: some View {
+        HStack(spacing: 6) {
+            Text(Competition.namelessTitle)
+                .font(.pretendard.custom(weight: .semiBold, size: 14))
+                .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
+                .lineLimit(1)
+
+            Text("나만 보기")
+                .font(.pretendard.labelS)
+                .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.primitive.coolGray.cg75)
+                .clipShape(Capsule())
+        }
+    }
+
+    private var menuButton: some View {
+        Button {
+            onTapped()
+        } label: {
+            Assets.MyProfile.Icon.menu.swiftUIImage
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 16, height: 16)
+                .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        // 줄을 눌러도 같은 시트가 떠서, 화면 읽기에서는 줄 하나만 읽히게 한다.
+        .accessibilityHidden(true)
+        .padding(.trailing, 2)
     }
 }
 
@@ -381,6 +462,36 @@ private struct EmptyCompetitionView: View {
                 competitionName: "강남 주짓수 토너먼트",
                 competitionRank: .participation
             )
+        ],
+        onAddCompetitionTapped: { },
+        onCompetitionTapped: { _ in }
+    )
+    .padding()
+    .background(Color.component.background.default)
+}
+
+#Preview("MyProfileCompetitionSection - 맨 위 고정") {
+    MyProfileCompetitionSection(
+        competitions: [
+            Competition(competitionYear: 2026, competitionName: "2026 서울 오픈", competitionRank: .silver),
+            // 오래된 대회라도 고정하면 최신 대회보다 위에 온다.
+            Competition(competitionYear: 2022, competitionName: "2022 아시안 오픈", competitionRank: .gold, isPinned: true),
+            Competition(competitionYear: 2024, competitionName: "2024 부산 오픈", competitionRank: .bronze)
+        ],
+        onAddCompetitionTapped: { },
+        onCompetitionTapped: { _ in }
+    )
+    .padding()
+    .background(Color.component.background.default)
+}
+
+#Preview("MyProfileCompetitionSection - 대회명 없는 기록") {
+    MyProfileCompetitionSection(
+        competitions: [
+            Competition(competitionYear: 2026, competitionName: "2026 서울 오픈", competitionRank: .silver),
+            // 합계에 들어가지 않고, 서로 묶이지도 않는다.
+            Competition(competitionYear: 2025, competitionName: "", competitionRank: .gold),
+            Competition(competitionYear: 2025, competitionName: "", competitionRank: .bronze)
         ],
         onAddCompetitionTapped: { },
         onCompetitionTapped: { _ in }

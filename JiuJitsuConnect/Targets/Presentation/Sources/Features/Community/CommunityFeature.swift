@@ -402,6 +402,13 @@ public struct CommunityFeature: Sendable {
                 case let .showSelectSheet(payload):
                     return Self.presentSelectSheet(payload, into: &state)
 
+                case let .pickPhotos(payload):
+                    // 리스트 웹뷰는 PICK_PHOTOS 지원을 알리지 않으므로 오지 않아야 한다. 혹시 오면
+                    // 웹이 타임아웃까지 기다리지 않도록 빈 결과로 바로 회신한다.
+                    Log.trace("리스트 웹뷰 PICK_PHOTOS 수신 — 빈 결과로 회신", category: .network, level: .info)
+                    Self.enqueue(.photosPicked(requestId: payload.requestId, files: []), into: &state)
+                    return .none
+
                 case let .unknown(type):
                     // 계약에 없는 타입 — 한쪽만 먼저 배포된 경우를 대비해 무시한다.
                     Log.trace("WebBridge 미지원 메시지 무시: \(type)", category: .network, level: .info)

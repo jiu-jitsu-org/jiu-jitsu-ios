@@ -53,7 +53,7 @@ public struct CompetitionInfoFeature: Sendable {
         var hasSavedInThisFlow = false
         // 완료 화면 꽃가루 — 방금 저장했을 때만 터뜨리고, 뒤로 가기로 돌아왔을 때는 다시 터뜨리지 않는다.
         var celebratesOnDone = false
-        // 저장 실패 안내. 이 화면이 MY 화면 위에 push돼 있어 MY 화면 토스트는 가려지므로 여기서 띄운다.
+        // 저장 실패·연도 자동 변경(#126) 안내. 이 화면이 MY 화면 위에 push돼 있어 MY 화면 토스트는 가려지므로 여기서 띄운다.
         var toast: ToastState?
 
         var isAddingDivision: Bool { !savedRecords.isEmpty }
@@ -71,13 +71,14 @@ public struct CompetitionInfoFeature: Sendable {
         var result: CompetitionRank = .gold
 
         // 2단계: 연도 — 몇 월이었는지는 기억이 가장 흐려 입력이 막히므로 연도만 받는다.
-        // 기본 선택은 올해. '이전'을 고르면 year에는 경계 연도(올해 - 5) 이하 값이 들어간다(YearOption 참고).
+        // 기본 선택은 올해.
         let currentYear: Int = Calendar.current.component(.year, from: Date())
         var year: Int = Calendar.current.component(.year, from: Date())
 
         // 3단계: 대회명 (TextField 직접 바인딩)
         // 대회명은 닉네임과 달리 중복을 허용하므로 별도 검증 없이 "빈 값" 여부만 본다.
-        // 빈 값이면 완료 버튼을 비활성화하므로(View의 .disabled) 별도 검증 상태/문구는 두지 않는다.
+        // 빈 값이면 다음 버튼을 비활성화하므로(View의 .disabled) 별도 검증 상태/문구는 두지 않는다.
+        // 이름이 기억나지 않으면 '대회명이 기억나지 않아요'로 빈 이름인 채 넘어간다(#125, 나만 보기로 저장).
         var name: String = ""
 
         // 입력한 대회명과 맞는 등록된 대회 목록. 고르면 이름이 채워지고, 없으면 직접 입력한 이름을 그대로 쓴다.
@@ -142,36 +143,24 @@ public struct CompetitionInfoFeature: Sendable {
         case failed
     }
 
-    /// 연도 단계 선택지 — 올해부터 최근 5년 + '이전'.
+    /// 연도 단계 선택지 — 올해부터 1990년까지 최신순.
     ///
-    /// 오래된 대회일수록 정확한 연도도 흐려서 5년보다 이전은 하나로 묶는다.
-    /// 서버는 연도를 정수로만 받으므로 '이전'은 경계 연도(올해 - 5) 이하 값으로 저장한다.
-    /// 수정 모드에서 경계 이하 연도는 '이전'으로 보이고, 다른 연도를 고르지 않으면 원래 연도를 그대로 둔다.
-    public enum YearOption: Hashable, Identifiable, Sendable {
-        case year(Int)
-        case earlier
+    /// 오래 수련한 사람은 옛 대회도 정확한 연도로 남기고 싶어 하므로 묶음('이전') 없이 연도를 전부 늘어놓는다.
+    /// 휠은 올해에 맞춰 열리므로 최근 대회는 바로 넘어가고, 목록이 길어져도 휠 크기는 그대로다.
+    /// 수정 중인 기록의 연도가 범위 밖이면 그 연도도 목록에 넣어 원래 값이 사라지지 않게 한다.
+    public struct YearOption: Hashable, Identifiable, Sendable {
+        let year: Int
 
-        static let recentYearCount = 5
+        static let earliestYear = 1990
 
-        public var id: Self { self }
+        public var id: Int { year }
 
-        var displayText: String {
-            switch self {
-            case let .year(year): return "\(year)년"
-            case .earlier: return "이전"
-            }
-        }
+        var displayText: String { "\(year)년" }
 
-        static func options(currentYear: Int) -> [YearOption] {
-            (0..<recentYearCount).map { .year(currentYear - $0) } + [.earlier]
-        }
-
-        static func earliestRecentYear(currentYear: Int) -> Int {
-            currentYear - (recentYearCount - 1)
-        }
-
-        init(year: Int, currentYear: Int) {
-            self = year < Self.earliestRecentYear(currentYear: currentYear) ? .earlier : .year(year)
+        static func options(currentYear: Int, including selectedYear: Int) -> [YearOption] {
+            let upper = max(currentYear, selectedYear)
+            let lower = min(earliestYear, selectedYear)
+            return stride(from: upper, through: lower, by: -1).map(YearOption.init)
         }
     }
 
@@ -190,6 +179,7 @@ public struct CompetitionInfoFeature: Sendable {
             case yearOptionSelected(YearOption)
             case resultSelected(CompetitionRank)
             case suggestionTapped(RegisteredCompetition)
+            case namelessButtonTapped
             case uniformSelected(CompetitionUniform)
             case weightClassSelected(CompetitionWeightClass)
             case beltSelected(BeltRank)
@@ -268,13 +258,7 @@ public struct CompetitionInfoFeature: Sendable {
             case .saveFinished(.failed):
                 // 입력한 값은 그대로 두어 같은 화면에서 다시 저장할 수 있게 한다.
                 state.isSaving = false
-                let toast = ToastState(message: "저장에 실패했어요. 다시 시도해주세요", style: .info)
-                state.toast = toast
-                return .run { [clock] send in
-                    try await clock.sleep(for: toast.duration)
-                    await send(.internal(.toastDismissed))
-                }
-                .cancellable(id: CancelID.toast, cancelInFlight: true)
+                return showToast(&state, message: "저장에 실패했어요. 다시 시도해주세요")
 
             case .view(.toastSwiped), .internal(.toastDismissed):
                 state.toast = nil
@@ -314,14 +298,7 @@ public struct CompetitionInfoFeature: Sendable {
                 return .send(.delegate(.didDelete(original)))
 
             case let .view(.yearOptionSelected(option)):
-                switch option {
-                case let .year(year):
-                    state.year = year
-                case .earlier:
-                    // 이미 '이전'에 해당하는 연도(수정 중인 오래된 기록)면 원래 연도를 지킨다.
-                    let boundary = YearOption.earliestRecentYear(currentYear: state.currentYear) - 1
-                    state.year = min(state.year, boundary)
-                }
+                state.year = option.year
                 return .none
 
             case let .view(.resultSelected(rank)):
@@ -361,14 +338,36 @@ public struct CompetitionInfoFeature: Sendable {
                 }
                 .cancellable(id: CancelID.searchCompetitions, cancelInFlight: true)
 
+            case .view(.namelessButtonTapped):
+                guard state.step == .name, !state.isSaving else { return .none }
+                // 기억 안 난다고 했으니 치다 만 글자는 대회명으로 남기지 않는다.
+                state.name = ""
+                state.suggestions = []
+                state.step = .division
+                return .cancel(id: CancelID.searchCompetitions)
+
             case let .view(.suggestionTapped(competition)):
                 state.name = competition.name
                 state.suggestions = []
                 // 고르기 직전 입력으로 시작된 검색이 늦게 돌아와 목록을 다시 띄우지 않게 한다.
-                return .cancel(id: CancelID.searchCompetitions)
+                let cancelSearch: Effect<Action> = .cancel(id: CancelID.searchCompetitions)
+                // 공개 일정에서 온 대회는 열린 연도를 알므로 기록 연도를 맞춘다(#126).
+                // 연도 단계가 대회명보다 앞이라 이미 고른 연도를 고쳐 주는 방식이고, 바뀌었을 때만 알린다.
+                guard let scheduledYear = competition.year, scheduledYear != state.year else {
+                    return cancelSearch
+                }
+                state.year = scheduledYear
+                return .merge(
+                    cancelSearch,
+                    showToast(&state, message: "대회 일정에 맞춰 \(scheduledYear)년으로 바꿨어요")
+                )
 
             case let .internal(.suggestionsLoaded(suggestions)):
-                state.suggestions = suggestions
+                // 입력한 말로 시작하는 이름을 먼저 둔다(띄어쓰기 무시). 그 안의 순서는 서버가 준 대로 둔다.
+                let key = state.name.competitionSearchKey
+                let startsWithKey = suggestions.filter { $0.name.competitionSearchKey.hasPrefix(key) }
+                let others = suggestions.filter { !$0.name.competitionSearchKey.hasPrefix(key) }
+                state.suggestions = startsWithKey + others
                 return .none
 
             case .binding, .delegate:
@@ -379,24 +378,32 @@ public struct CompetitionInfoFeature: Sendable {
 
     // MARK: - Helpers
 
+    /// 이 화면 안에서 토스트를 띄운다. 이 화면이 MY 화면 위에 push돼 있어 MY 화면 토스트는 가려지기 때문이다.
+    private func showToast(_ state: inout State, message: String) -> Effect<Action> {
+        let toast = ToastState(message: message, style: .info)
+        state.toast = toast
+        return .run { [clock] send in
+            try await clock.sleep(for: toast.duration)
+            await send(.internal(.toastDismissed))
+        }
+        .cancellable(id: CancelID.toast, cancelInFlight: true)
+    }
+
     /// 입력한 값으로 기록을 만들어 부모에게 저장을 맡긴다.
     /// 새 기록은 부모가 저장 결과를 saveFinished로 돌려줄 때까지 기다렸다가 완료 화면으로 간다.
     /// - Parameter includingDivision: '건너뛰기'면 false — 미리 골라 둔 도복·띠도 저장하지 않는다.
     private func save(_ state: inout State, includingDivision: Bool) -> Effect<Action> {
-        // 새 기록은 월 없이 저장하고, 월이 있던 기존 기록은 수정해도 원래 월을 유지한다.
-        let originalMonth: Int? = if case let .edit(original) = state.mode {
-            original.competitionMonth
-        } else {
-            nil
-        }
+        // 새 기록은 월 없이 저장하고, 월이 있던 기존 기록은 수정해도 원래 월·고정 여부를 유지한다.
+        let original: Competition? = if case let .edit(original) = state.mode { original } else { nil }
         let competition = Competition(
             competitionYear: state.year,
-            competitionMonth: originalMonth,
+            competitionMonth: original?.competitionMonth,
             competitionName: state.name,
             competitionRank: state.result,
             competitionUniform: includingDivision ? state.uniform : nil,
             competitionWeightClass: includingDivision ? state.weightClass : nil,
-            competitionBelt: includingDivision ? state.belt : nil
+            competitionBelt: includingDivision ? state.belt : nil,
+            isPinned: original?.isPinned ?? false
         )
         switch state.mode {
         case .add:
