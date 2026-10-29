@@ -10,8 +10,14 @@ struct CompetitionNameView: View {
     // 목록이 넘칠 때 위·아래 끝을 흐리게 해 더 있다는 걸 알린다(선이나 개수 글자 대신).
     @State private var suggestionFade = SuggestionFade()
 
-    // 키보드 위 좁은 자리라 앞에서 이만큼만 보여 주고, 더 있으면 더 쳐서 좁히게 한다.
-    private static let suggestionLimit = 20
+    private enum Metrics {
+        // 키보드 위 좁은 자리라 앞에서 이만큼만 보여 주고, 더 있으면 더 쳐서 좁히게 한다.
+        static let suggestionLimit = 20
+        static let topFadeHeight: CGFloat = 24
+        static let bottomFadeHeight: CGFloat = 48
+        // 끝까지 지우지 않고 옅게 남겨, 다음 줄이 살짝 비쳐 보이게 한다.
+        static let bottomFadeOpacity: CGFloat = 0.15
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -75,7 +81,8 @@ struct CompetitionNameView: View {
     private var suggestionSection: some View {
         ScrollView {
             VStack(spacing: 0) {
-                ForEach(store.suggestions.prefix(Self.suggestionLimit), id: \.name) { competition in
+                // 공개 일정 대회는 이름이 같고 연도만 다를 수 있어 이름 대신 순서로 구분한다.
+                ForEach(Array(store.suggestions.prefix(Metrics.suggestionLimit).enumerated()), id: \.offset) { _, competition in
                     CompetitionSuggestionRow(
                         name: competition.name,
                         year: competition.year,
@@ -84,7 +91,7 @@ struct CompetitionNameView: View {
                     )
                 }
                 // 끝까지 내려온 사람에게만 보이도록 목록 맨 끝에 둔다.
-                if store.suggestions.count > Self.suggestionLimit {
+                if store.suggestions.count > Metrics.suggestionLimit {
                     Text("대회명을 더 정확히 입력해 보세요")
                         .font(Font.pretendard.labelM)
                         .foregroundStyle(Color.component.list.setting.subText)
@@ -105,11 +112,14 @@ struct CompetitionNameView: View {
         .mask {
             VStack(spacing: 0) {
                 LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
-                    .frame(height: suggestionFade.top ? 24 : 0)
+                    .frame(height: suggestionFade.top ? Metrics.topFadeHeight : 0)
                 Rectangle()
-                // 끝까지 지우지 않고 옅게 남겨, 다음 줄이 살짝 비쳐 보이게 한다.
-                LinearGradient(colors: [.black, .black.opacity(0.15)], startPoint: .top, endPoint: .bottom)
-                    .frame(height: suggestionFade.bottom ? 48 : 0)
+                LinearGradient(
+                    colors: [.black, .black.opacity(Metrics.bottomFadeOpacity)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: suggestionFade.bottom ? Metrics.bottomFadeHeight : 0)
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)
