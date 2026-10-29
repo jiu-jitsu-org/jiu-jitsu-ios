@@ -94,11 +94,13 @@ public struct CompetitionInfoFeature: Sendable {
         var weightText: String = ""
         var weightBound: CompetitionWeightLimit.Bound = .under
 
-        // 앱솔루트는 체급과 별개 부문이라 따로 체크한다.
+        // 앱솔루트는 체급 제한이 없는 무제한급이라, 체크하면 체급은 저장하지 않는다(부문 하나 = 체급 또는 앱솔루트).
+        // 입력해 둔 숫자는 지우지 않아 체크를 풀면 그대로 돌아온다.
         var isAbsolute = false
 
-        /// 입력한 체급 — 숫자로 읽히지 않거나 0 이하면 체급 없음.
+        /// 입력한 체급 — 앱솔루트이거나, 숫자로 읽히지 않거나 0 이하면 체급 없음.
         var weightLimit: CompetitionWeightLimit? {
+            guard !isAbsolute else { return nil }
             let normalized = weightText.replacingOccurrences(of: ",", with: ".")
             guard let kg = Double(normalized), kg > 0 else { return nil }
             return CompetitionWeightLimit(kg: kg, bound: weightBound)

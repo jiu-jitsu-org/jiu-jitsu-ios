@@ -613,7 +613,7 @@ public struct Competition: Codable, Equatable, Sendable {
     /// 출전 체급 (경계 무게와 이하/초과)
     public let competitionWeightLimit: CompetitionWeightLimit?
 
-    /// 앱솔루트(무차별급) 부문 — 체급과 별개로 둔다.
+    /// 앱솔루트(무차별급) 부문 — 한 부문은 체급 또는 앱솔루트 중 하나라, true면 체급은 비어 있다.
     public let competitionAbsolute: Bool
 
     /// 출전 띠 — 같은 메달이라도 그때 띠에 따라 무게가 달라 대회 당시 띠를 따로 남긴다.

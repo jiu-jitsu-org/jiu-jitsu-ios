@@ -27,7 +27,7 @@ public enum CompetitionUniform: String, Codable, Equatable, Sendable, CaseIterab
 ///
 /// 체급표는 단체·대회·성별·복장마다 달라 표에서 고르지 않고 숫자로 받는다(예: 76kg 이하).
 /// 숫자로 남겨야 어느 단체 체급이든 그대로 기록되고, 나중에 체급별 통계·필터를 만들 수 있다.
-/// 앱솔루트(무차별급)는 체급과 별개라 `Competition.competitionAbsolute`로 따로 둔다.
+/// 앱솔루트(무차별급)는 체급 제한이 없는 부문이라 `Competition.competitionAbsolute`로 따로 두고, 앱솔루트면 체급은 비운다.
 public struct CompetitionWeightLimit: Codable, Equatable, Sendable, Hashable {
     public enum Bound: String, Codable, Equatable, Sendable, CaseIterable, Hashable {
         /// 이하 — 표기 "-76kg"
