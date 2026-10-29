@@ -62,7 +62,8 @@ struct CompetitionDoneView: View {
 
     private var addDivisionSection: some View {
         VStack(spacing: 12) {
-            Text("같은 대회에서 다른 부문도 나갔나요?")
+            // 바로 위에 방금 기록한 대회가 보이므로 '같은 대회에서'는 빼도 뜻이 남는다.
+            Text("다른 부문도 나갔나요?")
                 .font(Font.pretendard.bodyS)
                 .foregroundStyle(Color.component.list.setting.subText)
 
