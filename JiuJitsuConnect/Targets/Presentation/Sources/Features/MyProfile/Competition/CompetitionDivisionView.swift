@@ -16,6 +16,8 @@ struct CompetitionDivisionView: View {
     // 입력칸이 직접 들고 있는 글자. 다듬은 값이 store에 이미 있던 값과 같으면 TextField가
     // 다시 그려지지 않아 막은 글자가 남아 보이므로, 칸 쪽에서 되돌린 뒤 store에 넘긴다.
     @State private var weightInput = ""
+    // '확인'으로 키보드를 내리는 동안 버튼이 곧바로 '완료'가 되어, 빠르게 두 번 누르면 가려진 줄을 보기 전에 저장될 수 있어 잠시 막는다.
+    @State private var isKeyboardClosing = false
 
     private enum Metrics {
         static let segmentWidth: CGFloat = 160
@@ -235,6 +237,8 @@ struct CompetitionDivisionView: View {
     /// 출전 띠는 지금 띠로 채워 두고 "출전 띠 블루 ›"로 접어 둔다. 누르면 아래로 펼쳐 고친다.
     private var beltToggle: some View {
         Button {
+            // 띠를 고르려는 것이니 키보드를 내려 펼친 칩이 가려지지 않게 한다.
+            isWeightFocused = false
             store.send(.view(.beltRowTapped), animation: Self.expandAnimation)
         } label: {
             HStack(spacing: 4) {
@@ -284,23 +288,39 @@ struct CompetitionDivisionView: View {
 
     private var buttonSection: some View {
         VStack(spacing: 4) {
+            // 숫자를 치는 동안엔 키보드가 앱솔루트·출전 띠 줄을 가린다. 이때 '완료'로 바로 저장되면
+            // 띠를 바꾸려던 사람도 저장돼 버리므로, 버튼은 '확인'(키보드만 내림)으로 두고 내린 뒤에 '완료'로 저장한다.
             CTAButton(
-                title: store.isSaving ? "저장 중…" : "완료",
+                title: store.isSaving ? "저장 중…" : (isWeightFocused ? "확인" : "완료"),
                 action: {
-                    store.send(.view(.nextButtonTapped))
+                    if isWeightFocused {
+                        isWeightFocused = false
+                        isKeyboardClosing = true
+                        Task {
+                            try? await Task.sleep(for: .milliseconds(500))
+                            isKeyboardClosing = false
+                        }
+                    } else if !isKeyboardClosing {
+                        store.send(.view(.nextButtonTapped))
+                    }
                 }
             )
+            .accessibilityHint(isWeightFocused ? "키보드 닫기" : "")
 
             // 수정은 보이는 값을 그대로 저장하므로(비우려면 입력을 지우거나 체크를 해제) 건너뛰기는 새 기록에만 둔다.
-            if !store.mode.isEdit {
+            // 숫자를 치는 중에도 숨긴다 — 누르면 가려진 줄을 보지 못한 채 저장되기 때문이다.
+            if !store.mode.isEdit, !isWeightFocused {
                 Button {
                     store.send(.view(.skipButtonTapped))
                 } label: {
                     AppButtonConfiguration(title: "건너뛰기", size: .medium)
                 }
                 .appButtonStyle(.text, size: .medium, height: 44)
+                .transition(.opacity)
             }
         }
+        // 건너뛰기가 숨고 나타날 때 버튼·내용이 튀지 않게 한 동작으로 움직인다.
+        .animation(Self.expandAnimation, value: isWeightFocused)
         .padding(.horizontal, 20)
         .padding(.bottom, store.mode.isEdit ? 24 : 8)
     }
