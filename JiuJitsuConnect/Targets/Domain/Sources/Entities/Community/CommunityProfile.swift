@@ -606,6 +606,7 @@ public struct Competition: Codable, Equatable, Sendable {
     public let competitionRank: CompetitionRank
 
     // 출전 부문(#122) — 부문 단계는 건너뛸 수 있고, 이전에 저장된 기록에는 없으므로 모두 옵셔널이다.
+    // 출전 부문과 고정(#124)은 backend #164가 개발 서버에 반영되기 전이라 요청 DTO에 싣지 않는다 — 다시 불러오면 비어 있다.
 
     /// 출전 복장 (도복 / 노기)
     public let competitionUniform: CompetitionUniform?

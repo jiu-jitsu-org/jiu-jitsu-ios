@@ -36,10 +36,6 @@ enum RepositoryFactory {
         CommunityRepositoryImpl(networkService: networkService)
     }
 
-    static func makeCompetitionRepository(networkService: NetworkService) -> CompetitionRepository {
-        CompetitionRepositoryImpl(networkService: networkService)
-    }
-
     static func makeImageUploadRepository(networkService: NetworkService) -> ImageUploadRepository {
         ImageUploadRepositoryImpl(networkService: networkService)
     }

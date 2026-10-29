@@ -54,9 +54,6 @@ public final class DependencyContainer {
     private lazy var communityRepository: CommunityRepository = RepositoryFactory.makeCommunityRepository(
         networkService: sharedNetworkService
     )
-    private lazy var competitionRepository: CompetitionRepository = RepositoryFactory.makeCompetitionRepository(
-        networkService: sharedNetworkService
-    )
     private lazy var imageUploadRepository: ImageUploadRepository = RepositoryFactory.makeImageUploadRepository(
         networkService: sharedNetworkService
     )
@@ -163,14 +160,6 @@ public final class DependencyContainer {
             },
             updateProfile: { profile, section in
                 try await self.communityRepository.updateProfile(profile, section: section)
-            }
-        )
-    }
-
-    public func configureCompetitionClient() -> CompetitionClient {
-        CompetitionClient(
-            searchCompetitions: { keyword in
-                try await self.competitionRepository.searchCompetitions(keyword: keyword)
             }
         )
     }
