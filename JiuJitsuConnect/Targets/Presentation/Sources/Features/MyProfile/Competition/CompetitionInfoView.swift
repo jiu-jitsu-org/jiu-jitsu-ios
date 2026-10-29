@@ -10,6 +10,8 @@ import DesignSystem
 private enum Style {
     static let headerHeight: CGFloat = 60
     static let horizontalPadding: CGFloat = 16
+    // 화면 폭을 다 채우면 막대가 눈을 끌어, 가운데에 짧게 둔다.
+    static let progressBarWidth: CGFloat = 160
 }
 
 struct CompetitionInfoView: View {
@@ -18,15 +20,16 @@ struct CompetitionInfoView: View {
     var body: some View {
         VStack(spacing: 0) {
             headerView
+            progressBar
 
             Group {
                 switch store.step {
+                case .result:
+                    CompetitionResultView(store: store)
                 case .date:
                     CompetitionDateView(store: store)
                 case .name:
                     CompetitionNameView(store: store)
-                case .result:
-                    CompetitionResultView(store: store)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -93,6 +96,28 @@ struct CompetitionInfoView: View {
         }
         .padding(.horizontal, Style.horizontalPadding)
         .frame(height: Style.headerHeight)
+    }
+
+    // 지금 단계까지 칸을 채워, 남은 단계 수를 한눈에 보이게 한다.
+    private var progressBar: some View {
+        let segmentCount = CompetitionInfoFeature.Step.progressSegmentCount
+        return HStack(spacing: 4) {
+            ForEach(0..<segmentCount, id: \.self) { index in
+                Capsule()
+                    .fill(
+                        index <= store.step.rawValue
+                            ? Color.primitive.blue.b500p
+                            : Color.primitive.coolGray.cg75
+                    )
+                    .frame(height: 4)
+            }
+        }
+        .frame(width: Style.progressBarWidth)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
+        .animation(.default, value: store.step)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(segmentCount)단계 중 \(store.step.rawValue + 1)단계")
     }
 
 }
