@@ -7,6 +7,11 @@ struct CompetitionNameView: View {
     @Bindable var store: StoreOf<CompetitionInfoFeature>
     // 포커스는 이 화면에서만 쓰므로 Feature 상태로 올리지 않고 View에 둔다.
     @State private var isKeyboardVisible = false
+    // 목록이 넘칠 때 위·아래 끝을 흐리게 해 더 있다는 걸 알린다(선이나 개수 글자 대신).
+    @State private var suggestionFade = SuggestionFade()
+
+    // 키보드 위 좁은 자리라 앞에서 이만큼만 보여 주고, 더 있으면 더 쳐서 좁히게 한다.
+    private static let suggestionLimit = 20
 
     var body: some View {
         VStack(spacing: 0) {
@@ -66,34 +71,50 @@ struct CompetitionNameView: View {
         .padding(.horizontal, 30)
     }
 
+    // 위의 큰 질문·입력과 한 기둥으로 읽히도록 머리줄·면 없이 가운데 정렬로 둔다.
     private var suggestionSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("등록된 대회")
-                .font(Font.pretendard.labelM)
-                .foregroundStyle(Color.component.list.setting.subText)
-                .padding(.horizontal, 4)
-
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(store.suggestions, id: \.name) { competition in
-                        CompetitionSuggestionRow(
-                            name: competition.name,
-                            year: competition.year,
-                            keyword: store.name,
-                            onTapped: { store.send(.view(.suggestionTapped(competition))) }
-                        )
-                    }
+        ScrollView {
+            VStack(spacing: 0) {
+                ForEach(store.suggestions.prefix(Self.suggestionLimit), id: \.name) { competition in
+                    CompetitionSuggestionRow(
+                        name: competition.name,
+                        year: competition.year,
+                        keyword: store.name,
+                        onTapped: { store.send(.view(.suggestionTapped(competition))) }
+                    )
                 }
-                .padding(.vertical, 4)
-                .background(Color.component.list.setting.background)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
+                // 끝까지 내려온 사람에게만 보이도록 목록 맨 끝에 둔다.
+                if store.suggestions.count > Self.suggestionLimit {
+                    Text("대회명을 더 정확히 입력해 보세요")
+                        .font(Font.pretendard.labelM)
+                        .foregroundStyle(Color.component.list.setting.subText)
+                        .frame(height: 44)
+                }
             }
-            .scrollBounceBehavior(.basedOnSize)
+        }
+        .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize)
+        .onScrollGeometryChange(for: SuggestionFade.self) { geometry in
+            SuggestionFade(
+                top: geometry.visibleRect.minY > 1,
+                bottom: geometry.visibleRect.maxY < geometry.contentSize.height - 1
+            )
+        } action: { _, fade in
+            suggestionFade = fade
+        }
+        .mask {
+            VStack(spacing: 0) {
+                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                    .frame(height: suggestionFade.top ? 24 : 0)
+                Rectangle()
+                // 끝까지 지우지 않고 옅게 남겨, 다음 줄이 살짝 비쳐 보이게 한다.
+                LinearGradient(colors: [.black, .black.opacity(0.15)], startPoint: .top, endPoint: .bottom)
+                    .frame(height: suggestionFade.bottom ? 48 : 0)
+            }
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .padding(.horizontal, 20)
-        .padding(.top, 24)
-        .padding(.bottom, 12)
+        .padding(.top, 16)
     }
 
     // 자동완성으로도 못 찾은 사람이 기록을 포기하지 않게 이름 없이 넘어가는 길(#125).
@@ -132,7 +153,7 @@ struct CompetitionNameView: View {
 // MARK: - Suggestion Row
 
 /// 등록된 대회 한 줄 — 입력한 글자와 맞는 부분을 강조해 왜 이 대회가 떴는지 보이게 한다.
-/// 공개 일정에서 온 대회는 오른쪽에 연도를 보여 줘, 고르면 연도가 그 해로 맞춰진다는 걸 미리 알 수 있게 한다(#126).
+/// 공개 일정에서 온 대회는 이름 뒤에 연도를 보여 줘, 고르면 연도가 그 해로 맞춰진다는 걸 미리 알 수 있게 한다(#126).
 private struct CompetitionSuggestionRow: View {
     let name: String
     let year: Int?
@@ -141,22 +162,21 @@ private struct CompetitionSuggestionRow: View {
 
     var body: some View {
         Button(action: onTapped) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Text(highlightedName)
                     .font(Font.pretendard.bodyM)
-                    .foregroundStyle(Color.component.list.setting.text)
+                    .foregroundStyle(Color.component.list.setting.subText)
                     .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 // 이름에 이미 연도가 있으면("2026 서울 오픈") 반복하지 않는다.
                 if let year, !name.contains(String(year)) {
                     Text(String(year))
                         .font(Font.pretendard.bodyS)
-                        .foregroundStyle(Color.component.list.setting.subText)
+                        .foregroundStyle(Color.component.textfieldDisplay.default.placeholder)
                 }
             }
+            .frame(maxWidth: .infinity)
             .frame(height: 48)
-            .padding(.horizontal, 16)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -171,6 +191,12 @@ private struct CompetitionSuggestionRow: View {
         }
         return attributed
     }
+}
+
+/// 목록의 위·아래에 가려진 후보가 있는지.
+private struct SuggestionFade: Equatable {
+    var top = false
+    var bottom = false
 }
 
 // MARK: - Custom Cursor View
