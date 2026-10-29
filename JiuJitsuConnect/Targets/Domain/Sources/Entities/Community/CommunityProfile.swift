@@ -137,6 +137,21 @@ extension CommunityProfile {
         return replacingCompetitions(newCompetitions)
     }
 
+    /// 여러 항목(묶인 한 줄의 부문들)의 고정 여부를 한꺼번에 바꾼다.
+    /// 값이 완전히 같은 항목이 여럿이어도 대상 개수만큼만 바꾸도록, 이미 바꾼 위치는 다시 고르지 않는다.
+    public func settingCompetitionsPinned(_ targets: [Competition], isPinned: Bool) -> CommunityProfile {
+        var newCompetitions = competitions
+        var changedIndices = Set<Int>()
+        for target in targets {
+            guard let index = newCompetitions.indices.first(where: {
+                !changedIndices.contains($0) && newCompetitions[$0] == target
+            }) else { continue }
+            newCompetitions[index] = target.settingPinned(isPinned)
+            changedIndices.insert(index)
+        }
+        return replacingCompetitions(newCompetitions)
+    }
+
     private func replacingCompetitions(_ newCompetitions: [Competition]) -> CommunityProfile {
         CommunityProfile(
             nickname: nickname,
@@ -589,17 +604,72 @@ public struct Competition: Codable, Equatable, Sendable {
     
     /// 대회 순위
     public let competitionRank: CompetitionRank
-    
+
+    // 출전 부문(#122) — 부문 단계는 건너뛸 수 있고, 이전에 저장된 기록에는 없으므로 모두 옵셔널이다.
+
+    /// 출전 복장 (도복 / 노기)
+    public let competitionUniform: CompetitionUniform?
+
+    /// 출전 체급 (경계 무게와 이하/초과)
+    public let competitionWeightLimit: CompetitionWeightLimit?
+
+    /// 앱솔루트(무차별급) 부문 — 체급과 별개로 둔다.
+    public let competitionAbsolute: Bool
+
+    /// 출전 띠 — 같은 메달이라도 그때 띠에 따라 무게가 달라 대회 당시 띠를 따로 남긴다.
+    public let competitionBelt: BeltRank?
+
+    /// 프로필 맨 위 고정(#124) — 가장 자랑하고 싶은 대회가 최신순에 밀려 내려가지 않게 회원이 직접 고른다.
+    /// 같은 대회의 여러 부문은 한 줄로 묶여 보이므로, 고정·해제는 묶인 항목 전부에 같은 값을 넣는다.
+    public let isPinned: Bool
+
     public init(
         competitionYear: Int,
         competitionMonth: Int? = nil,
         competitionName: String,
-        competitionRank: CompetitionRank
+        competitionRank: CompetitionRank,
+        competitionUniform: CompetitionUniform? = nil,
+        competitionWeightLimit: CompetitionWeightLimit? = nil,
+        competitionAbsolute: Bool = false,
+        competitionBelt: BeltRank? = nil,
+        isPinned: Bool = false
     ) {
         self.competitionYear = competitionYear
         self.competitionMonth = competitionMonth
         self.competitionName = competitionName
         self.competitionRank = competitionRank
+        self.competitionUniform = competitionUniform
+        self.competitionWeightLimit = competitionWeightLimit
+        self.competitionAbsolute = competitionAbsolute
+        self.competitionBelt = competitionBelt
+        self.isPinned = isPinned
+    }
+
+    /// 출전 부문을 하나라도 입력했는지
+    public var hasDivision: Bool {
+        competitionUniform != nil || competitionWeightLimit != nil || competitionAbsolute || competitionBelt != nil
+    }
+
+    /// 대회명 없이 저장한 기록인지(#125).
+    /// 자동완성으로도 대회를 못 찾은 사람이 기록을 포기하지 않게 이름 없이도 저장하게 하되,
+    /// 어느 대회인지 모르는 메달이 프로필을 부풀리지 않도록 대회명을 채우기 전까지는 나만 본다(메달 합계에서도 뺀다).
+    public var isNameless: Bool {
+        competitionName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// 고정 여부만 바꾼 사본
+    public func settingPinned(_ isPinned: Bool) -> Competition {
+        Competition(
+            competitionYear: competitionYear,
+            competitionMonth: competitionMonth,
+            competitionName: competitionName,
+            competitionRank: competitionRank,
+            competitionUniform: competitionUniform,
+            competitionWeightLimit: competitionWeightLimit,
+            competitionAbsolute: competitionAbsolute,
+            competitionBelt: competitionBelt,
+            isPinned: isPinned
+        )
     }
 }
 

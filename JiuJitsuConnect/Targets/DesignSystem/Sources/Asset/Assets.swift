@@ -42,6 +42,7 @@ public enum Assets {
       public static let logOut = ImageAsset(name: "Common/Icon/log-out")
       public static let pencilLine = ImageAsset(name: "Common/Icon/pencil-line")
       public static let pencil = ImageAsset(name: "Common/Icon/pencil")
+      public static let pin = ImageAsset(name: "Common/Icon/pin")
       public static let plus = ImageAsset(name: "Common/Icon/plus")
       public static let profile = ImageAsset(name: "Common/Icon/profile")
       public static let radioOff = ImageAsset(name: "Common/Icon/radio-off")
@@ -49,6 +50,7 @@ public enum Assets {
       public static let refresh = ImageAsset(name: "Common/Icon/refresh")
       public static let search = ImageAsset(name: "Common/Icon/search")
       public static let secession = ImageAsset(name: "Common/Icon/secession")
+      public static let trash = ImageAsset(name: "Common/Icon/trash")
       public static let version = ImageAsset(name: "Common/Icon/version")
     }
     public enum Shaka {
