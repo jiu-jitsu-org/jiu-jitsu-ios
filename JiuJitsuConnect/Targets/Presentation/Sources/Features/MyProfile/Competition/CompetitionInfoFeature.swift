@@ -48,6 +48,11 @@ public struct CompetitionInfoFeature: Sendable {
         // 하나라도 있으면 그다음 입력은 '부문 추가' — 대회명·연도는 그대로 두고 메달과 부문만 다시 묻는다(#123).
         var savedRecords: [Competition] = []
         var isSaving = false
+        // 이번 흐름에서 실제로 저장했는지. 프로필에서 '부문 추가'로 들어오면 savedRecords가 미리 차 있어
+        // 그것만으로는 '돌아갈 완료 화면이 있는지' 알 수 없다.
+        var hasSavedInThisFlow = false
+        // 완료 화면 꽃가루 — 방금 저장했을 때만 터뜨리고, 뒤로 가기로 돌아왔을 때는 다시 터뜨리지 않는다.
+        var celebratesOnDone = false
         // 저장 실패 안내. 이 화면이 MY 화면 위에 push돼 있어 MY 화면 토스트는 가려지므로 여기서 띄운다.
         var toast: ToastState?
 
@@ -241,6 +246,8 @@ public struct CompetitionInfoFeature: Sendable {
             case let .saveFinished(.succeeded(competition)):
                 state.isSaving = false
                 state.savedRecords.append(competition)
+                state.hasSavedInThisFlow = true
+                state.celebratesOnDone = true
                 state.step = .done
                 return .none
 
@@ -263,9 +270,10 @@ public struct CompetitionInfoFeature: Sendable {
                 guard !state.isSaving else { return .none }
                 switch state.step {
                 case .result:
-                    // 부문 추가 중이면 이미 저장한 기록의 완료 화면으로 돌아간다.
-                    if state.isAddingDivision {
+                    // 이번 흐름에서 저장한 뒤 부문 추가 중이면 그 완료 화면으로 돌아간다.
+                    if state.hasSavedInThisFlow {
                         state.step = .done
+                        state.celebratesOnDone = false
                         return .none
                     }
                     return .run { _ in await self.dismiss() }

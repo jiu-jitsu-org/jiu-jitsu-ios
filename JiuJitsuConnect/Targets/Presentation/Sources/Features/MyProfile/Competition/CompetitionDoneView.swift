@@ -34,6 +34,14 @@ struct CompetitionDoneView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 64, height: 64)
+                    // 회원가입 완료와 같은 꽃가루를 메달 뒤에서 한 번 터뜨린다. 부문을 더해 저장할 때마다 다시 터진다.
+                    .background {
+                        if store.celebratesOnDone {
+                            JJSLottieView("Confetti", loopMode: .playOnce)
+                                .frame(width: 280, height: 280)
+                                .allowsHitTesting(false)
+                        }
+                    }
             }
 
             Text("기록했어요")
@@ -94,6 +102,7 @@ struct CompetitionDoneView: View {
 #Preview {
     var state = CompetitionInfoFeature.State(mode: .add, currentBelt: .brown)
     state.step = .done
+    state.celebratesOnDone = true
     state.savedRecords = [
         Competition(
             competitionYear: 2026,
