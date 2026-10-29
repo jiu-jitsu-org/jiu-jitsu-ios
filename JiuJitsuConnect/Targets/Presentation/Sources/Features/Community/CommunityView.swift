@@ -144,7 +144,7 @@ public struct CommunityView: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("MY")
+                        .accessibilityLabel("내 프로필")
                     }
                 }
             }
