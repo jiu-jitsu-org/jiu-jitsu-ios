@@ -20,7 +20,7 @@ extension Competition {
         String(competitionYear)
     }
 
-    /// 출전 부문 표기 — "도복 -76kg", "노기 앱솔루트", "-76kg 앱솔루트". 복장·체급·앱솔루트를 모두 비웠으면 nil.
+    /// 출전 부문 표기 — "도복 -76kg", "노기 앱솔루트". 복장·체급·앱솔루트를 모두 비웠으면 nil.
     var divisionText: String? {
         let parts = [
             competitionUniform?.displayName,

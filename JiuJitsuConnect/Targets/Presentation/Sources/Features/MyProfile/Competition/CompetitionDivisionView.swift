@@ -16,6 +16,8 @@ struct CompetitionDivisionView: View {
     // 입력칸이 직접 들고 있는 글자. 다듬은 값이 store에 이미 있던 값과 같으면 TextField가
     // 다시 그려지지 않아 막은 글자가 남아 보이므로, 칸 쪽에서 되돌린 뒤 store에 넘긴다.
     @State private var weightInput = ""
+    // '확인'으로 키보드를 내리는 동안 버튼이 곧바로 '완료'가 되어, 빠르게 두 번 누르면 가려진 줄을 보기 전에 저장될 수 있어 잠시 막는다.
+    @State private var isKeyboardClosing = false
 
     private enum Metrics {
         static let segmentWidth: CGFloat = 160
@@ -103,6 +105,21 @@ struct CompetitionDivisionView: View {
                 .padding(.leading, Metrics.unitBoundSpacing)
         }
         .frame(maxWidth: .infinity)
+        // 앱솔루트(무제한급)를 고르면 체급은 의미가 없어 흐리게 하고 입력을 막는다.
+        .disabled(store.isAbsolute)
+        // 앱솔루트인 동안은 칸을 비워 "00"으로 보이고, 풀면 입력해 둔 숫자(store에 남겨 둔 값)를 다시 보인다.
+        .onChange(of: store.isAbsolute) { _, isAbsolute in
+            if isAbsolute { isWeightFocused = false }
+            weightInput = isAbsolute ? "" : store.weightText
+        }
+    }
+
+    private var weightTextColor: Color {
+        store.isAbsolute ? Color.semantic.text.disabled : Color.component.textfieldDisplay.focus.text
+    }
+
+    private var weightLabelColor: Color {
+        store.isAbsolute ? Color.semantic.text.disabled : Color.semantic.text.secondary
     }
 
     /// 숫자만 담은 칸 — 숫자 길이와 상관없이 폭을 고정해 칠 때 흔들리지 않게 한다.
@@ -113,19 +130,20 @@ struct CompetitionDivisionView: View {
             prompt: Text("00").foregroundStyle(Color.semantic.text.tertiary)
         )
         .font(Self.weightFont)
-        .foregroundStyle(Color.component.textfieldDisplay.focus.text)
+        .foregroundStyle(weightTextColor)
         .tint(Color.component.textfieldDisplay.focus.text)
         .keyboardType(.decimalPad)
         .multilineTextAlignment(.center)
         .focused($isWeightFocused)
-        .accessibilityLabel("체급, 킬로그램")
-        .onAppear { weightInput = store.weightText }
+        .accessibilityLabel(store.isAbsolute ? "체급, 앱솔루트라 입력하지 않음" : "체급, 킬로그램")
+        .onAppear { weightInput = store.isAbsolute ? "" : store.weightText }
         .onChange(of: weightInput) { oldValue, newValue in
             // 정수가 3자리를 넘으면(1000 붙여넣기 등) 잘라서 다른 값으로 바꾸지 않고 입력 전으로 되돌린다.
             let integerDigits = newValue.prefix { $0 != "." && $0 != "," }.filter(\.isNumber).count
             let accepted = integerDigits > 3 ? oldValue : CompetitionInfoFeature.sanitizedWeightText(newValue)
             if accepted != newValue { weightInput = accepted }
-            if store.weightText != accepted { store.weightText = accepted }
+            // 앱솔루트로 칸을 비운 건 화면만 비운 것이라 store의 숫자는 지우지 않는다.
+            if !store.isAbsolute, store.weightText != accepted { store.weightText = accepted }
         }
         .frame(width: Metrics.weightBoxWidth, height: Metrics.weightBoxHeight)
         .background(Color.component.picker.itemSelectedBg)
@@ -138,7 +156,7 @@ struct CompetitionDivisionView: View {
     private var weightUnit: some View {
         Text("kg")
             .font(Font.pretendard.custom(weight: .medium, size: 24))
-            .foregroundStyle(Color.component.picker.unit)
+            .foregroundStyle(store.isAbsolute ? Color.semantic.text.disabled : Color.component.picker.unit)
             .offset(y: Metrics.unitOpticalOffset)
     }
 
@@ -161,7 +179,7 @@ struct CompetitionDivisionView: View {
                     }
                 }
             }
-            .foregroundStyle(Color.semantic.text.secondary)
+            .foregroundStyle(weightLabelColor)
             .frame(height: Metrics.weightBoxHeight)
             .contentShape(Rectangle())
         }
@@ -185,10 +203,10 @@ struct CompetitionDivisionView: View {
         }
     }
 
-    /// 앱솔루트 — 체급과 별개 부문이라 체크 하나로 따로 받는다.
+    /// 앱솔루트(무제한급) — 체크하면 체급 대신 이 부문으로 저장한다.
     private var absoluteToggle: some View {
         Button {
-            store.send(.view(.absoluteToggled))
+            store.send(.view(.absoluteToggled), animation: Self.expandAnimation)
         } label: {
             HStack(spacing: 4) {
                 Assets.Common.Icon.check.swiftUIImage
@@ -219,6 +237,8 @@ struct CompetitionDivisionView: View {
     /// 출전 띠는 지금 띠로 채워 두고 "출전 띠 블루 ›"로 접어 둔다. 누르면 아래로 펼쳐 고친다.
     private var beltToggle: some View {
         Button {
+            // 띠를 고르려는 것이니 키보드를 내려 펼친 칩이 가려지지 않게 한다.
+            isWeightFocused = false
             store.send(.view(.beltRowTapped), animation: Self.expandAnimation)
         } label: {
             HStack(spacing: 4) {
@@ -268,23 +288,39 @@ struct CompetitionDivisionView: View {
 
     private var buttonSection: some View {
         VStack(spacing: 4) {
+            // 숫자를 치는 동안엔 키보드가 앱솔루트·출전 띠 줄을 가린다. 이때 '완료'로 바로 저장되면
+            // 띠를 바꾸려던 사람도 저장돼 버리므로, 버튼은 '확인'(키보드만 내림)으로 두고 내린 뒤에 '완료'로 저장한다.
             CTAButton(
-                title: store.isSaving ? "저장 중…" : "완료",
+                title: store.isSaving ? "저장 중…" : (isWeightFocused ? "확인" : "완료"),
                 action: {
-                    store.send(.view(.nextButtonTapped))
+                    if isWeightFocused {
+                        isWeightFocused = false
+                        isKeyboardClosing = true
+                        Task {
+                            try? await Task.sleep(for: .milliseconds(500))
+                            isKeyboardClosing = false
+                        }
+                    } else if !isKeyboardClosing {
+                        store.send(.view(.nextButtonTapped))
+                    }
                 }
             )
+            .accessibilityHint(isWeightFocused ? "키보드 닫기" : "")
 
             // 수정은 보이는 값을 그대로 저장하므로(비우려면 입력을 지우거나 체크를 해제) 건너뛰기는 새 기록에만 둔다.
-            if !store.mode.isEdit {
+            // 숫자를 치는 중에도 숨긴다 — 누르면 가려진 줄을 보지 못한 채 저장되기 때문이다.
+            if !store.mode.isEdit, !isWeightFocused {
                 Button {
                     store.send(.view(.skipButtonTapped))
                 } label: {
                     AppButtonConfiguration(title: "건너뛰기", size: .medium)
                 }
                 .appButtonStyle(.text, size: .medium, height: 44)
+                .transition(.opacity)
             }
         }
+        // 건너뛰기가 숨고 나타날 때 버튼·내용이 튀지 않게 한 동작으로 움직인다.
+        .animation(Self.expandAnimation, value: isWeightFocused)
         .padding(.horizontal, 20)
         .padding(.bottom, store.mode.isEdit ? 24 : 8)
     }
