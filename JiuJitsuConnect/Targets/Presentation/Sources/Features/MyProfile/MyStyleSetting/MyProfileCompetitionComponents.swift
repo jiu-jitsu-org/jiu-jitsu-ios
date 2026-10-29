@@ -68,6 +68,8 @@ struct CompetitionGroup {
     /// 맨 위에 고정할 수 있는 줄 수(#124). 많이 고정하면 고정의 의미(대표 기록)가 흐려진다.
     static let maxPinnedCount = 3
 
+    /// 줄 구분값 — 끌어서 옮기는 줄을 알아보는 데 쓴다. 대회명 없는 기록은 하나씩 따로 구분한다.
+    let id: String
     let name: String
     let year: Int
     /// 입력한 순서 그대로의 부문별 기록
@@ -80,6 +82,11 @@ struct CompetitionGroup {
     /// 고정한 대회에 나중에 '부문 추가'로 더한 기록(고정 안 됨)이 섞여도 줄이 풀려 보이지 않게 한다.
     var isPinned: Bool {
         entries.contains(where: \.isPinned)
+    }
+
+    /// 회원이 끌어서 정한 자리 — 묶인 부문 중 가장 앞 자리. 정한 적 없으면 nil.
+    var displayOrder: Int? {
+        entries.compactMap(\.displayOrder).min()
     }
 
     /// 묶인 줄의 메달 아이콘 — 가장 높은 메달
@@ -114,8 +121,10 @@ struct CompetitionGroup {
             .joined(separator: " · ")
     }
 
-    /// 같은 대회명(앞뒤 공백 무시) + 연도끼리 묶어, 고정한 줄을 맨 위에 두고 나머지는 연도 최신순으로 돌려준다.
-    /// 고정한 줄끼리도 연도 최신순이다(고정한 시각은 저장하지 않으므로).
+    /// 같은 대회명(앞뒤 공백 무시) + 연도끼리 묶어, 고정한 줄을 맨 위에 두고 그 아래 고정 안 한 줄을 둔다.
+    /// - 고정한 줄: 자리 순. 새로 고정한 줄이 맨 위(자리 0)로 들어가고, 회원이 끌어서 바꿀 수 있다.
+    /// - 고정 안 한 줄: 연도 최신순이 기본. 회원이 끌어서 정한 자리가 있으면 그 순서를 지키고,
+    ///   자리를 정한 적 없는 기록(새로 입력한 기록 등)은 그 사이 연도에 맞는 자리(처음 나오는 더 오래된 줄 앞)로 들어간다.
     /// 같은 연도끼리는 처음 입력한 순서를 지킨다(월은 더 받지 않으므로).
     /// 대회명 없는 기록은 같은 대회인지 알 수 없어 하나씩 따로 둔다.
     static func grouped(_ competitions: [Competition]) -> [CompetitionGroup] {
@@ -138,21 +147,45 @@ struct CompetitionGroup {
             }
             entriesByKey[key, default: []].append(competition)
         }
-        return order
-            .map { key in
-                CompetitionGroup(name: key.name, year: key.year, entries: entriesByKey[key] ?? [])
+        let groups = order.enumerated().map { inputIndex, key in
+            (
+                inputIndex: inputIndex,
+                group: CompetitionGroup(
+                    id: key.namelessIndex.map { "nameless|\($0)" } ?? "\(key.year)|\(key.name)",
+                    name: key.name,
+                    year: key.year,
+                    entries: entriesByKey[key] ?? []
+                )
+            )
+        }
+        typealias Indexed = (inputIndex: Int, group: CompetitionGroup)
+        let newestYearFirst: (Indexed, Indexed) -> Bool = { lhs, rhs in
+            lhs.group.year != rhs.group.year ? lhs.group.year > rhs.group.year : lhs.inputIndex < rhs.inputIndex
+        }
+
+        let pinned = groups.filter { $0.group.isPinned }.sorted { lhs, rhs in
+            switch (lhs.group.displayOrder, rhs.group.displayOrder) {
+            case let (lhsOrder?, rhsOrder?) where lhsOrder != rhsOrder:
+                return lhsOrder < rhsOrder
+            case (_?, nil):
+                return true
+            case (nil, _?):
+                return false
+            default:
+                return newestYearFirst(lhs, rhs)
             }
-            .enumerated()
-            .sorted { lhs, rhs in
-                if lhs.element.isPinned != rhs.element.isPinned {
-                    return lhs.element.isPinned
-                }
-                if lhs.element.year != rhs.element.year {
-                    return lhs.element.year > rhs.element.year
-                }
-                return lhs.offset < rhs.offset
-            }
-            .map(\.element)
+        }
+
+        let unpinned = groups.filter { !$0.group.isPinned }
+        var placed = unpinned
+            .filter { $0.group.displayOrder != nil }
+            .sorted { ($0.group.displayOrder ?? 0, $0.inputIndex) < ($1.group.displayOrder ?? 0, $1.inputIndex) }
+            .map(\.group)
+        for item in unpinned.filter({ $0.group.displayOrder == nil }).sorted(by: newestYearFirst) {
+            let index = placed.firstIndex { $0.year < item.group.year } ?? placed.endIndex
+            placed.insert(item.group, at: index)
+        }
+        return pinned.map(\.group) + placed
     }
 
     /// 섹션 머리 메달 합계 — 금·은·동 순으로 (메달, 개수). 부문(항목) 기준으로 세고 참가와 0개는 뺀다.

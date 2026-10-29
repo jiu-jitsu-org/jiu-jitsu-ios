@@ -124,6 +124,12 @@ extension CommunityProfile {
         var newCompetitions = competitions
         if let index = newCompetitions.firstIndex(of: original) {
             newCompetitions[index] = updated
+            // 고정한 대회의 부문 하나만 대회명·연도를 바꾸면 그 부문은 따로 떨어진 새 줄이 된다.
+            // 고정을 그대로 두면 고정 줄이 하나 늘어 3개 제한을 넘을 수 있으므로, 떨어져 나온 부문은 고정을 푼다.
+            let leftSiblings = newCompetitions.contains { $0.isSameCompetition(as: original) }
+            if updated.isPinned, !updated.isSameCompetition(as: original), leftSiblings {
+                newCompetitions[index] = updated.settingPinned(false, displayOrder: nil)
+            }
         }
         return replacingCompetitions(newCompetitions)
     }
@@ -137,16 +143,49 @@ extension CommunityProfile {
         return replacingCompetitions(newCompetitions)
     }
 
-    /// 여러 항목(묶인 한 줄의 부문들)의 고정 여부를 한꺼번에 바꾼다.
-    /// 값이 완전히 같은 항목이 여럿이어도 대상 개수만큼만 바꾸도록, 이미 바꾼 위치는 다시 고르지 않는다.
+    /// 여러 항목(묶인 한 줄의 부문들)을 고정하거나 푼다.
+    /// 새로 고정한 줄은 고정 묶음 맨 위(자리 0)로 들어가고, 이미 고정한 줄은 한 칸씩 내려간다.
+    /// 풀면 자리를 비워 고정 안 한 줄 사이 연도 자리로 돌아가고, 남은 고정 줄은 빈 자리 없이 당긴다.
     public func settingCompetitionsPinned(_ targets: [Competition], isPinned: Bool) -> CommunityProfile {
+        replacing(targets) { $0.settingPinned(isPinned, displayOrder: isPinned ? -1 : nil) }
+            .compactingDisplayOrders(ofPinned: true)
+    }
+
+    /// 줄들을 화면에 놓인 순서대로 받아 자리를 매긴다(끌어서 순서 바꾸기).
+    /// 고정한 줄끼리, 고정 안 한 줄끼리 각각 0부터 센다. 한 줄에 묶인 부문들은 같은 자리를 받는다.
+    /// 순서를 바꾼 묶음의 줄만 넘기면 다른 묶음은 그대로 둔다.
+    public func reorderingCompetitions(_ groups: [[Competition]]) -> CommunityProfile {
+        var profile = self
+        var nextOrder: [Bool: Int] = [:]
+        for entries in groups {
+            // 한 줄은 부문 하나라도 고정이면 고정으로 보이므로, 옮길 때 줄 전체를 같은 상태로 맞춘다.
+            let isPinned = entries.contains(where: \.isPinned)
+            let order = nextOrder[isPinned, default: 0]
+            nextOrder[isPinned] = order + 1
+            profile = profile.replacing(entries) { $0.settingPinned(isPinned, displayOrder: order) }
+        }
+        return profile
+    }
+
+    /// 고정한(또는 고정 안 한) 항목의 자리를 0, 1, 2… 로 당긴다. 같은 자리(한 줄에 묶인 부문들)는 같은 자리로 남는다.
+    private func compactingDisplayOrders(ofPinned isPinned: Bool) -> CommunityProfile {
+        let orders = Array(Set(competitions.filter { $0.isPinned == isPinned }.compactMap(\.displayOrder))).sorted()
+        let compacted = Dictionary(uniqueKeysWithValues: orders.enumerated().map { ($1, $0) })
+        return replacingCompetitions(competitions.map { competition in
+            guard competition.isPinned == isPinned, let order = competition.displayOrder else { return competition }
+            return competition.settingPinned(isPinned, displayOrder: compacted[order])
+        })
+    }
+
+    /// 대상 항목들만 바꾼다. 값이 완전히 같은 항목이 여럿이어도 대상 개수만큼만 바꾸도록, 이미 바꾼 위치는 다시 고르지 않는다.
+    private func replacing(_ targets: [Competition], with transform: (Competition) -> Competition) -> CommunityProfile {
         var newCompetitions = competitions
         var changedIndices = Set<Int>()
         for target in targets {
             guard let index = newCompetitions.indices.first(where: {
                 !changedIndices.contains($0) && newCompetitions[$0] == target
             }) else { continue }
-            newCompetitions[index] = target.settingPinned(isPinned)
+            newCompetitions[index] = transform(target)
             changedIndices.insert(index)
         }
         return replacingCompetitions(newCompetitions)
@@ -617,8 +656,12 @@ public struct Competition: Codable, Equatable, Sendable {
     public let competitionBelt: BeltRank?
 
     /// 프로필 맨 위 고정(#124) — 가장 자랑하고 싶은 대회가 최신순에 밀려 내려가지 않게 회원이 직접 고른다.
-    /// 같은 대회의 여러 부문은 한 줄로 묶여 보이므로, 고정·해제는 묶인 항목 전부에 같은 값을 넣는다.
+    /// 같은 대회의 여러 부문은 한 줄로 묶여 보이므로, 고정·해제·자리는 묶인 항목 전부에 같은 값을 넣는다.
     public let isPinned: Bool
+
+    /// 회원이 끌어서 정한 자리(#124) — 고정한 줄끼리, 고정 안 한 줄끼리 각각 0이 맨 위.
+    /// nil이면 아직 자리를 정하지 않은 기록 — 고정 안 한 줄 사이에서는 연도에 맞는 자리로 들어간다.
+    public let displayOrder: Int?
 
     public init(
         competitionYear: Int,
@@ -628,7 +671,8 @@ public struct Competition: Codable, Equatable, Sendable {
         competitionUniform: CompetitionUniform? = nil,
         competitionWeightClass: CompetitionWeightClass? = nil,
         competitionBelt: BeltRank? = nil,
-        isPinned: Bool = false
+        isPinned: Bool = false,
+        displayOrder: Int? = nil
     ) {
         self.competitionYear = competitionYear
         self.competitionMonth = competitionMonth
@@ -638,6 +682,7 @@ public struct Competition: Codable, Equatable, Sendable {
         self.competitionWeightClass = competitionWeightClass
         self.competitionBelt = competitionBelt
         self.isPinned = isPinned
+        self.displayOrder = displayOrder
     }
 
     /// 출전 부문을 하나라도 입력했는지
@@ -652,8 +697,16 @@ public struct Competition: Codable, Equatable, Sendable {
         competitionName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// 고정 여부만 바꾼 사본
-    public func settingPinned(_ isPinned: Bool) -> Competition {
+    /// 같은 대회(앞뒤 공백을 뺀 대회명 + 연도)의 부문인지 — 프로필에서 한 줄로 묶이는 기준과 같다.
+    public func isSameCompetition(as other: Competition) -> Bool {
+        !isNameless
+            && competitionYear == other.competitionYear
+            && competitionName.trimmingCharacters(in: .whitespacesAndNewlines)
+                == other.competitionName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// 고정 여부와 자리만 바꾼 사본
+    public func settingPinned(_ isPinned: Bool, displayOrder: Int?) -> Competition {
         Competition(
             competitionYear: competitionYear,
             competitionMonth: competitionMonth,
@@ -662,7 +715,8 @@ public struct Competition: Codable, Equatable, Sendable {
             competitionUniform: competitionUniform,
             competitionWeightClass: competitionWeightClass,
             competitionBelt: competitionBelt,
-            isPinned: isPinned
+            isPinned: isPinned,
+            displayOrder: displayOrder
         )
     }
 }

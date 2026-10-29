@@ -76,6 +76,8 @@ struct CompetitionRequestDTO: Codable {
     // 맨 위 고정(#124) — 서버 계약 전 가정 키. 고정한 항목만 true를 보내고, 아니면 키를 보내지 않는다.
     // 목록 전체를 매번 다시 보내므로 키가 없으면 '고정 안 함'으로 읽힌다고 가정한다.
     let competitionPinned: Bool?
+    // 회원이 끌어서 정한 자리(고정한 줄끼리, 고정 안 한 줄끼리 각각 0이 맨 위) — 서버 계약 전 가정 키. 정한 적 없으면 보내지 않는다.
+    let competitionDisplayOrder: Int?
 
     init(from competition: Competition) {
         self.competitionYear = competition.competitionYear
@@ -88,5 +90,6 @@ struct CompetitionRequestDTO: Codable {
         self.competitionWeightClass = competition.competitionWeightClass?.rawValue
         self.competitionBelt = competition.competitionBelt?.rawValue
         self.competitionPinned = competition.isPinned ? true : nil
+        self.competitionDisplayOrder = competition.displayOrder
     }
 }
