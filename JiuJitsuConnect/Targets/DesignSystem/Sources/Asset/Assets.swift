@@ -50,6 +50,7 @@ public enum Assets {
       public static let refresh = ImageAsset(name: "Common/Icon/refresh")
       public static let search = ImageAsset(name: "Common/Icon/search")
       public static let secession = ImageAsset(name: "Common/Icon/secession")
+      public static let trash = ImageAsset(name: "Common/Icon/trash")
       public static let version = ImageAsset(name: "Common/Icon/version")
     }
     public enum Shaka {

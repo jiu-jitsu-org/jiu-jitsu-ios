@@ -117,9 +117,13 @@ struct CompetitionActionSheetView: View {
                     .foregroundStyle(Color.component.bottomSheet.selected.listItem.leadingIcon)
             }
 
-            // 휴지통 아이콘이 kit에 없어 자리만 둔다 — 글자는 다른 행과 같은 줄에 선다.
             optionRow(title: "삭제", showsChevron: false, action: onDeleteTapped) {
-                Color.clear
+                // 고정과 같은 회색 — 파란 아이콘은 이어서 입력하는 동작(부문 추가)에만 쓴다.
+                Assets.Common.Icon.trash.swiftUIImage
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(Color.component.bottomSheet.unselected.listItem.leadingIcon)
             }
         }
         .padding(.vertical, 20)
