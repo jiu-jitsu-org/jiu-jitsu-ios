@@ -208,7 +208,11 @@ public struct MyProfileView: View {
             },
             onCompetitionPinToggled: { entries in
                 store.send(.view(.competitionPinToggled(entries)))
-            }
+            },
+            onCompetitionsReordered: { groups in
+                store.send(.view(.competitionsReordered(groups)))
+            },
+            isSaving: store.isLoadingProfile
         )
     }
     

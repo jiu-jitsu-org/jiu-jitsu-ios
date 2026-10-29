@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 import DesignSystem
 import Domain
 
@@ -18,6 +19,14 @@ public struct MyProfileCompetitionSection: View {
     let onCompetitionDetailTapped: (Competition) -> Void
     /// 묶인 한 줄의 부문들을 넘긴다 — 고정할지 풀지, 개수 제한은 부모(MyProfileFeature)가 판단한다.
     var onCompetitionPinToggled: ([Competition]) -> Void = { _ in }
+    /// 순서를 바꾸고 '완료' — 순서가 바뀐 묶음(고정한 줄들 / 고정 안 한 줄들)의 줄별 부문들, 위에서부터. 저장은 부모가 한다.
+    var onCompetitionsReordered: ([[Competition]]) -> Void = { _ in }
+    /// 프로필 저장 중 — 저장 전 목록으로 순서를 바꾸면 앞의 저장을 덮으므로 끌기를 막는다.
+    var isSaving: Bool = false
+
+    // 끌어 놓았지만 아직 저장하지 않은 줄 순서. 처음 하나를 옮기면 생기고, '완료'로 저장·'취소'로 처음 순서로 돌린다.
+    // 여러 번 옮긴 뒤에도 한 번에 되돌릴 수 있게 놓을 때마다 저장하지 않는다. 화면 표시용 일시 상태라 Feature로 올리지 않는다.
+    @State private var pendingGroups: [CompetitionGroup]?
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -31,17 +40,35 @@ public struct MyProfileCompetitionSection: View {
 
                 Spacer()
 
-                Button {
-                    onAddCompetitionTapped()
-                } label: {
-                    Assets.Common.Icon.plus.swiftUIImage
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 16, height: 16)
-                        .foregroundStyle(Color.component.button.ghost.defaultText)
+                // 순서를 옮기는 중에는 추가 대신 취소·완료 — 끝내는 자리를 눈 가는 머리줄 오른쪽에 둔다.
+                if pendingGroups != nil {
+                    HStack(spacing: 16) {
+                        Button("취소") {
+                            withAnimation(.easeInOut(duration: 0.5)) { pendingGroups = nil }
+                        }
+                        .foregroundStyle(Color.component.sectionHeader.subTitle)
+
+                        Button("완료") { finishReordering() }
+                            .foregroundStyle(Color.component.button.ghost.defaultText)
+                            .opacity(isSaving ? 0.3 : 1)
+                            .disabled(isSaving)
+                    }
+                    .font(.pretendard.buttonS)
+                    .buttonStyle(.plain)
+                    .frame(height: 32)
+                } else {
+                    Button {
+                        onAddCompetitionTapped()
+                    } label: {
+                        Assets.Common.Icon.plus.swiftUIImage
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 16, height: 16)
+                            .foregroundStyle(Color.component.button.ghost.defaultText)
+                    }
+                    .frame(width: 32, height: 32)
+                    .buttonStyle(.plain)
                 }
-                .frame(width: 32, height: 32)
-                .buttonStyle(.plain)
             }
 
             // 대회 정보 컨테이너
@@ -49,12 +76,43 @@ public struct MyProfileCompetitionSection: View {
                 CompetitionListView(
                     competitions: competitions,
                     onCompetitionDetailTapped: onCompetitionDetailTapped,
-                    onCompetitionPinToggled: onCompetitionPinToggled
+                    onCompetitionPinToggled: onCompetitionPinToggled,
+                    isSaving: isSaving,
+                    pendingGroups: $pendingGroups
                 )
             } else {
                 EmptyCompetitionView(onAddCompetitionTapped: onAddCompetitionTapped)
             }
         }
+        // 옮기는 중에 목록이 바뀌면(다시 불러오기 등) 옮겨 둔 순서는 지키고, 사라진 줄은 빼고 새 줄은 그 묶음 끝에 둔다.
+        // 목록이 비면 옮길 것이 없으므로 취소·완료도 거둔다.
+        .onChange(of: competitions) {
+            guard let pending = pendingGroups else { return }
+            let latest = CompetitionGroup.grouped(competitions ?? [])
+            guard !latest.isEmpty else {
+                pendingGroups = nil
+                return
+            }
+            let kept = pending.compactMap { group in latest.first { $0.id == group.id } }
+            let added = latest.filter { group in !kept.contains { $0.id == group.id } }
+            let merged = kept + added
+            pendingGroups = merged.filter(\.isPinned) + merged.filter { !$0.isPinned }
+        }
+    }
+
+    /// 순서가 바뀐 묶음만 넘겨 저장한다 — 고정 안 한 줄을 건드리지 않았으면 그 줄들은 계속 연도순으로 둔다.
+    private func finishReordering() {
+        guard let pendingGroups else { return }
+        let original = CompetitionGroup.grouped(competitions ?? [])
+        let changed = [true, false].flatMap { isPinned -> [CompetitionGroup] in
+            let moved = pendingGroups.filter { $0.isPinned == isPinned }
+            let before = original.filter { $0.isPinned == isPinned }
+            return moved.map(\.id) == before.map(\.id) ? [] : moved
+        }
+        if !changed.isEmpty {
+            onCompetitionsReordered(changed.map(\.entries))
+        }
+        withAnimation(.easeInOut(duration: 0.5)) { self.pendingGroups = nil }
     }
 }
 
@@ -227,21 +285,55 @@ private struct CompetitionMedalSummaryView: View {
 // MARK: - CompetitionListView
 
 /// 대회 정보 리스트 (정보가 있을 때)
+///
+/// 줄을 길게 눌러 끌면 순서를 바꾼다(#124). 처음 하나를 옮기면 머리줄에 취소·완료가 나오고, 완료를 눌러야 저장한다.
+/// 고정한 줄은 고정한 줄끼리,
+/// 고정 안 한 줄은 고정 안 한 줄끼리만 자리를 바꾼다 — 고정 안 한 줄을 고정 자리로 올리려면 '맨 위에 고정'을 쓴다.
+/// 길게 누르기는 끌기에만 쓴다 — 고정·해제는 ⋯ 에만 둔다(같은 메뉴를 두 곳에 두지 않고, 시스템 메뉴도 띄우지 않는다).
 private struct CompetitionListView: View {
     let competitions: [Competition]
     let onCompetitionDetailTapped: (Competition) -> Void
     var onCompetitionPinToggled: ([Competition]) -> Void = { _ in }
+    var isSaving: Bool = false
+    /// 끌어 놓았지만 아직 저장하지 않은 순서(섹션이 갖고 취소·완료를 받는다)
+    @Binding var pendingGroups: [CompetitionGroup]?
 
     // 여러 부문이 묶인 줄을 눌렀을 때 고칠 부문을 묻는 선택지. 화면 표시용 일시 상태라 Feature로 올리지 않고,
     // 고른 결과만 기존 콜백(수정 진입)으로 보낸다.
     @State private var groupPendingSelection: CompetitionGroup?
 
+    // 끄는 동안의 줄 순서(손가락을 따라 바로 바뀜)와 끄는 줄. 놓으면 pendingGroups로 넘기고 비운다.
+    @State private var liveGroups: [CompetitionGroup]?
+    @State private var draggingID: String?
+    @State private var rowHeights: [String: CGFloat] = [:]
+
+    private enum Metrics {
+        static let rowSpacing: CGFloat = 4
+    }
+
+    private var groups: [CompetitionGroup] { CompetitionGroup.grouped(competitions) }
+    /// 끌기를 시작할 때의 순서 — 앞서 옮겨 둔 순서가 있으면 그것부터
+    private var baseGroups: [CompetitionGroup] { pendingGroups ?? groups }
+
+    /// 같은 묶음(고정/고정 안 함) 안에서 한 칸 옮겨 '저장 전 순서'로 남긴다.
+    private func moveByOne(_ group: CompetitionGroup, offset: Int) {
+        var order = baseGroups
+        guard let from = order.firstIndex(where: { $0.id == group.id }) else { return }
+        let to = from + offset
+        guard order.indices.contains(to), order[to].isPinned == group.isPinned, !isSaving else { return }
+        order.swapAt(from, to)
+        withAnimation(.easeInOut(duration: 0.2)) { pendingGroups = order }
+    }
+
     var body: some View {
-        VStack(spacing: 4) {
-            ForEach(Array(CompetitionGroup.grouped(competitions).enumerated()), id: \.offset) { _, group in
+        VStack(spacing: Metrics.rowSpacing) {
+            ForEach(liveGroups ?? baseGroups, id: \.id) { group in
                 CompetitionRowView(
                     group: group,
+                    // 순서를 옮기는 중에는 수정·고정으로 들어가지 않는다(저장 안 한 순서를 잃지 않게).
+                    isInteractionDisabled: pendingGroups != nil,
                     onTapped: {
+                        guard pendingGroups == nil else { return }
                         if group.entries.count == 1, let entry = group.entries.first {
                             onCompetitionDetailTapped(entry)
                         } else {
@@ -250,11 +342,34 @@ private struct CompetitionListView: View {
                     },
                     onPinToggled: { onCompetitionPinToggled(group.entries) }
                 )
+                // 끄는 동안 원래 자리는 옅게 남겨 어디로 들어갈지 보이게 한다.
+                .opacity(liveGroups != nil && draggingID == group.id ? 0.3 : 1)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { rowHeights[group.id] = $0 }
+                // 끌 수 없는 VoiceOver 사용자도 같은 묶음 안에서 한 칸씩 옮길 수 있게 한다.
+                .accessibilityAction(named: "위로 이동") { moveByOne(group, offset: -1) }
+                .accessibilityAction(named: "아래로 이동") { moveByOne(group, offset: 1) }
+                .contentShape(.dragPreview, RoundedRectangle(cornerRadius: 14))
+                .onDrag {
+                    draggingID = group.id
+                    return CompetitionDropDelegate.itemProvider(for: group)
+                }
             }
         }
+        .onDrop(of: [CompetitionDropDelegate.rowType], delegate: CompetitionDropDelegate(
+            groups: baseGroups,
+            isSaving: isSaving,
+            rowHeights: rowHeights,
+            rowSpacing: Metrics.rowSpacing,
+            liveGroups: $liveGroups,
+            draggingID: $draggingID,
+            pendingGroups: $pendingGroups
+        ))
         .padding(.vertical, 8)
         .background(Color.component.skillCard.default.bg)
         .clipShape(RoundedRectangle(cornerRadius: 18))
+        // 끌기를 시작·끝낼 때가 아니라 줄이 실제로 자리를 바꿀 때만 울린다.
+        .sensoryFeedback(.selection, trigger: liveGroups?.map(\.id)) { old, new in old != nil && new != nil }
+
         .confirmationDialog(
             "수정할 부문을 골라주세요",
             isPresented: Binding(
@@ -274,13 +389,92 @@ private struct CompetitionListView: View {
     }
 }
 
+/// 끄는 줄이 다른 줄의 가운데를 넘으면 그 자리로 옮기고, 놓으면 그 순서를 '저장 전 순서'로 남긴다.
+/// 고정한 줄과 고정 안 한 줄은 서로의 자리로 넘어가지 않는다.
+private struct CompetitionDropDelegate: DropDelegate {
+    /// 이 앱 안에서만 쓰는 끌기 형식 — 다른 앱의 글을 끌어와도 순서가 바뀌지 않고, 줄을 다른 앱에 놓아도 내부 값이 붙여지지 않는다.
+    static let rowType = UTType(importedAs: "com.jiujitsulab.connect.competition-row")
+
+    static func itemProvider(for group: CompetitionGroup) -> NSItemProvider {
+        let provider = NSItemProvider()
+        provider.registerDataRepresentation(forTypeIdentifier: rowType.identifier, visibility: .ownProcess) { completion in
+            completion(Data(group.id.utf8), nil)
+            return nil
+        }
+        return provider
+    }
+
+    let groups: [CompetitionGroup]
+    /// 프로필 저장 중 — 저장 전 목록으로 순서를 바꾸면 앞의 저장을 덮으므로 놓기를 받지 않는다.
+    let isSaving: Bool
+    let rowHeights: [String: CGFloat]
+    let rowSpacing: CGFloat
+    @Binding var liveGroups: [CompetitionGroup]?
+    @Binding var draggingID: String?
+    @Binding var pendingGroups: [CompetitionGroup]?
+
+    func validateDrop(info: DropInfo) -> Bool {
+        draggingID != nil && !isSaving && info.hasItemsConforming(to: [Self.rowType])
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard validateDrop(info: info) else { return }
+        if liveGroups == nil { liveGroups = groups }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        moveDraggedRow(toward: info.location.y)
+        return DropProposal(operation: .move)
+    }
+
+    /// 카드 밖으로 끌고 나가면 바꾸던 순서를 되돌린다(밖에 놓으면 취소).
+    func dropExited(info: DropInfo) {
+        withAnimation(.easeInOut(duration: 0.2)) { liveGroups = nil }
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        defer {
+            liveGroups = nil
+            draggingID = nil
+        }
+        guard let live = liveGroups else { return false }
+        if live.map(\.id) != groups.map(\.id) {
+            pendingGroups = live
+        }
+        return true
+    }
+
+    private func moveDraggedRow(toward y: CGFloat) {
+        guard var live = liveGroups,
+              let from = live.firstIndex(where: { $0.id == draggingID }) else { return }
+        var top: CGFloat = 0
+        for (index, group) in live.enumerated() {
+            let height = rowHeights[group.id] ?? 0
+            defer { top += height + rowSpacing }
+            guard y >= top, y < top + height + rowSpacing, index != from else { continue }
+            // 고정한 줄과 고정 안 한 줄은 서로의 자리로 옮기지 않는다.
+            guard group.isPinned == live[from].isPinned else { return }
+            // 옆 줄의 가운데를 넘어야 옮긴다 — 키가 다른 줄끼리 바뀐 직후 되돌아 바뀌며 떨리지 않게.
+            let middle = top + height / 2
+            guard index > from ? y > middle : y < middle else { return }
+            let moving = live.remove(at: from)
+            live.insert(moving, at: index)
+            withAnimation(.easeInOut(duration: 0.2)) { liveGroups = live }
+            return
+        }
+    }
+}
+
 // MARK: - CompetitionRowView
 
 /// 대회 한 줄 — 같은 대회의 여러 부문은 한 줄에 묶어 보여 준다.
 ///
-/// 줄을 누르면 수정으로 들어가므로, 고정은 오른쪽 ⋯ 메뉴(또는 길게 누르기)로 따로 둔다(#124).
+/// 줄을 누르면 수정으로 들어가므로, 고정은 오른쪽 ⋯ 메뉴로 따로 둔다(#124).
+/// 길게 눌러 끌면 순서를 바꾼다(CompetitionListView).
 private struct CompetitionRowView: View {
     let group: CompetitionGroup
+    /// 순서를 옮기는 중 — ⋯ 을 막는다(줄 탭은 목록이 무시한다. 버튼을 막으면 끌기까지 막힐 수 있어서).
+    var isInteractionDisabled = false
     let onTapped: () -> Void
     var onPinToggled: () -> Void = {}
 
@@ -342,7 +536,6 @@ private struct CompetitionRowView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .contextMenu { if !group.isNameless { menuItems } }
 
             // 나만 보는 기록은 대표 기록(고정)으로 내세울 수 없어 메뉴를 두지 않는다.
             if group.isNameless {
@@ -384,6 +577,8 @@ private struct CompetitionRowView: View {
                 .contentShape(Rectangle())
         }
         .accessibilityLabel("\(group.name) 더보기")
+        .disabled(isInteractionDisabled)
+        .opacity(isInteractionDisabled ? 0.3 : 1)
         .padding(.trailing, 4)
     }
 
@@ -570,7 +765,8 @@ private struct EmptyCompetitionView: View {
                 competitionRank: .participation
             )
         ],
-        onCompetitionDetailTapped: { _ in }
+        onCompetitionDetailTapped: { _ in },
+        pendingGroups: .constant(nil)
     )
     .padding()
     .background(Color.component.background.default)
