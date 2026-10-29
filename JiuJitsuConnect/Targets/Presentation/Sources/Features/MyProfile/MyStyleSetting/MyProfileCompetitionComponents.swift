@@ -27,11 +27,7 @@ public struct MyProfileCompetitionSection: View {
                     .font(.pretendard.title3)
                     .foregroundStyle(Color.component.sectionHeader.title)
 
-                if let medalSummary = CompetitionGroup.medalSummary(of: competitions ?? []) {
-                    Text(medalSummary)
-                        .font(.pretendard.bodyS)
-                        .foregroundStyle(Color.component.sectionHeader.subTitle)
-                }
+                CompetitionMedalSummaryView(competitions: competitions ?? [])
 
                 Spacer()
 
@@ -159,15 +155,39 @@ struct CompetitionGroup {
             .map(\.element)
     }
 
-    /// 섹션 머리 메달 합계 — "🥇 2 · 🥈 1 · 🥉 1". 부문(항목) 기준으로 세고 참가는 뺀다. 메달이 없으면 nil.
+    /// 섹션 머리 메달 합계 — 금·은·동 순으로 (메달, 개수). 부문(항목) 기준으로 세고 참가와 0개는 뺀다.
     /// 대회명 없는 기록은 어느 대회 메달인지 확인할 수 없어 합계에서 뺀다(#125).
-    static func medalSummary(of competitions: [Competition]) -> String? {
+    static func medalCounts(of competitions: [Competition]) -> [(rank: CompetitionRank, count: Int)] {
         let counted = competitions.filter { !$0.isNameless }
-        let parts = [CompetitionRank.gold, .silver, .bronze].compactMap { rank -> String? in
+        return [CompetitionRank.gold, .silver, .bronze].compactMap { rank in
             let count = counted.filter { $0.competitionRank == rank }.count
-            return count > 0 ? "\(rank.emoji) \(count)" : nil
+            return count > 0 ? (rank, count) : nil
         }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+}
+
+// MARK: - CompetitionMedalSummaryView
+
+/// 섹션 머리 메달 합계 — 메달 아이콘 + 개수. 이모지는 앱 글꼴에서 깨져 보여 목록과 같은 메달 아이콘을 쓴다.
+private struct CompetitionMedalSummaryView: View {
+    let competitions: [Competition]
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(CompetitionGroup.medalCounts(of: competitions), id: \.rank) { item in
+                HStack(spacing: 2) {
+                    item.rank.medalImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 16, height: 16)
+                    Text("\(item.count)")
+                        .font(.pretendard.bodyS)
+                        .foregroundStyle(Color.component.sectionHeader.subTitle)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(item.rank.displayName) \(item.count)개")
+            }
+        }
     }
 }
 
