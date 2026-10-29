@@ -50,7 +50,7 @@ extension Competition {
 // MARK: - CompetitionRank Presentation Extensions
 
 extension CompetitionRank {
-    /// 여러 부문을 한 줄에 늘어놓을 때 쓰는 짧은 이름 — "도복 -76kg 은 · 앱솔루트 금"
+    /// 부문 줄에 붙이는 짧은 이름 — "도복 -76kg 은"
     var shortName: String {
         switch self {
         case .gold: return "금"
@@ -60,7 +60,7 @@ extension CompetitionRank {
         }
     }
 
-    /// 묶인 줄의 대표 메달을 고를 때 쓰는 순서 — 작을수록 높은 메달.
+    /// 묶인 대회 줄의 대표 메달을 고를 때 쓰는 순서 — 작을수록 높은 메달.
     var medalOrder: Int {
         switch self {
         case .gold: return 0
