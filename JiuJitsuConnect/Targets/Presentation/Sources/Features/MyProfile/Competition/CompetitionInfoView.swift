@@ -10,6 +10,8 @@ import DesignSystem
 private enum Style {
     static let headerHeight: CGFloat = 60
     static let horizontalPadding: CGFloat = 16
+    // 화면 폭을 다 채우면 막대가 눈을 끌어, 가운데에 짧게 둔다.
+    static let progressBarWidth: CGFloat = 160
 }
 
 struct CompetitionInfoView: View {
@@ -110,7 +112,8 @@ struct CompetitionInfoView: View {
                     .frame(height: 4)
             }
         }
-        .padding(.horizontal, 20)
+        .frame(width: Style.progressBarWidth)
+        .frame(maxWidth: .infinity)
         .padding(.top, 4)
         .animation(.default, value: store.step)
         .accessibilityElement(children: .ignore)
