@@ -84,6 +84,17 @@ public struct CompetitionInfoFeature: Sendable {
         let currentYear: Int = Calendar.current.component(.year, from: Date())
         var year: Int = Calendar.current.component(.year, from: Date())
 
+        // 휠 목록은 연도를 미리 골라 둘 때만 다시 만든다. 휠을 굴릴 때마다 고른 연도로 목록 끝이 바뀌면
+        // (예: 내년 대회를 골라 둔 뒤 올해로 굴림) 칸이 밀려 다른 연도가 저장된다.
+        private(set) var yearOptions: [YearOption] = YearOption.options(
+            currentYear: Calendar.current.component(.year, from: Date()),
+            including: Calendar.current.component(.year, from: Date())
+        )
+
+        // 추천 대회를 골라 연도를 바꾸기 전의 연도. 고른 뒤 대회명을 고쳐 쓰거나 '기억나지 않아요'를 누르면
+        // 그 대회가 아니므로 이 연도로 되돌린다.
+        var yearBeforeSuggestion: YearBeforeSuggestion?
+
         // 4단계: 출전 부문 — 건너뛸 수 있다. 출전 띠는 고른 칩을 다시 누르면 선택이 풀린다.
         // 도복 대회가 더 흔해 새 기록은 도복으로, 출전 띠는 지금 띠로 미리 골라 둔다(대부분 그대로 '완료'만 누르게).
         var uniform: CompetitionUniform? = .gi
@@ -121,7 +132,7 @@ public struct CompetitionInfoFeature: Sendable {
             case .add:
                 self.belt = currentBelt
             case let .edit(original):
-                self.year = original.competitionYear
+                self.preselectYear(original.competitionYear)
                 self.name = original.competitionName
                 self.result = original.competitionRank
                 // 수정은 저장된 값을 그대로 보여 준다. 부문 없이 저장된 기록에 기본값을 채우면
@@ -136,6 +147,19 @@ public struct CompetitionInfoFeature: Sendable {
             }
         }
 
+        /// 연도를 미리 골라 두고 휠 목록도 그 연도가 들어가게 맞춘다.
+        mutating func preselectYear(_ year: Int) {
+            self.year = year
+            yearOptions = YearOption.options(currentYear: currentYear, including: year)
+        }
+
+        /// 추천 대회로 바꾼 연도를 되돌린다.
+        mutating func restoreYearBeforeSuggestion() {
+            guard let saved = yearBeforeSuggestion else { return }
+            yearBeforeSuggestion = nil
+            preselectYear(saved.year)
+        }
+
         /// 이미 저장한 대회에 부문을 더한다(프로필에서 진입).
         /// 저장해 둔 기록을 이번 흐름의 기록으로 넣어 두면 '부문 추가' 흐름(메달 → 부문)이 되고,
         /// 완료 화면에는 이 대회의 기존 부문까지 한 줄씩 보인다.
@@ -144,7 +168,7 @@ public struct CompetitionInfoFeature: Sendable {
             guard let last = entries.last else { return }
             self.savedRecords = entries
             self.name = last.competitionName
-            self.year = last.competitionYear
+            self.preselectYear(last.competitionYear)
             // 같은 대회의 다른 부문은 보통 같은 복장·같은 띠라 마지막 기록을 따른다.
             self.uniform = last.competitionUniform ?? .gi
             self.belt = last.competitionBelt ?? currentBelt
@@ -154,6 +178,11 @@ public struct CompetitionInfoFeature: Sendable {
     // 기록하는 이유(메달)를 먼저 보여 주려고 결과부터 묻는다.
     // 대회명을 연도보다 먼저 물어, 공개 일정의 대회를 고르면 연도 단계에 그 연도를 골라 둔다(#126).
     // 진행 막대는 State.inputSteps 기준이라 '부문 추가'처럼 단계를 건너뛰는 흐름에서도 칸 수가 맞는다.
+    struct YearBeforeSuggestion: Equatable, Sendable {
+        let year: Int
+        let pickedName: String
+    }
+
     public enum Step: Equatable, Sendable {
         case result
         case name
@@ -254,6 +283,8 @@ public struct CompetitionInfoFeature: Sendable {
                     state.step = .year
                     return .none
                 case .year:
+                    // 골라 둔 연도를 보고 넘어갔으니 받아들인 것으로 본다. 뒤로 가 대회명을 고쳐도 되돌리지 않는다.
+                    state.yearBeforeSuggestion = nil
                     state.step = .division
                     return .none
                 case .division:
@@ -335,7 +366,9 @@ public struct CompetitionInfoFeature: Sendable {
                 return .send(.delegate(.didDelete(original)))
 
             case let .view(.yearOptionSelected(option)):
+                // 직접 고른 연도라 목록은 그대로 둔다(굴리는 중에 목록이 바뀌면 칸이 밀린다).
                 state.year = option.year
+                state.yearBeforeSuggestion = nil
                 return .none
 
             case let .view(.resultSelected(rank)):
@@ -376,6 +409,9 @@ public struct CompetitionInfoFeature: Sendable {
                 return .none
 
             case .binding(\.name):
+                if let saved = state.yearBeforeSuggestion, state.name != saved.pickedName {
+                    state.restoreYearBeforeSuggestion()
+                }
                 let keyword = state.name.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !keyword.isEmpty else {
                     state.suggestions = []
@@ -401,6 +437,7 @@ public struct CompetitionInfoFeature: Sendable {
                 // 기억 안 난다고 했으니 치다 만 글자는 대회명으로 남기지 않는다.
                 state.name = ""
                 state.suggestions = []
+                state.restoreYearBeforeSuggestion()
                 state.step = .year
                 return .cancel(id: CancelID.searchCompetitions)
 
@@ -411,8 +448,11 @@ public struct CompetitionInfoFeature: Sendable {
                 let cancelSearch: Effect<Action> = .cancel(id: CancelID.searchCompetitions)
                 // 공개 일정에서 온 대회는 열린 연도를 알므로, 다음 연도 단계에 그 연도를 골라 둔다(#126).
                 // 단계를 건너뛰지 않고 골라 둔 연도를 한 번 보여 주므로 따로 알리지 않는다.
+                // 연도를 모르는 대회를 고르면 앞서 다른 추천으로 바꾼 연도도 되돌린다.
+                state.restoreYearBeforeSuggestion()
                 if let scheduledYear = competition.year {
-                    state.year = scheduledYear
+                    state.yearBeforeSuggestion = YearBeforeSuggestion(year: state.year, pickedName: competition.name)
+                    state.preselectYear(scheduledYear)
                 }
                 return cancelSearch
 
