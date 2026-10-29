@@ -248,10 +248,23 @@ private struct CompetitionRowView: View {
                         if group.isNameless {
                             namelessTitle
                         } else {
-                            Text(group.isPinned ? "📌 \(group.name)" : group.name)
-                                .font(.pretendard.custom(weight: .semiBold, size: 14))
-                                .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
-                                .lineLimit(1)
+                            // 고정 표시는 이름 뒤에 옅은 회색으로 — 대회 이름보다 눈에 띄지 않게 한다.
+                            HStack(spacing: 4) {
+                                Text(group.name)
+                                    .font(.pretendard.custom(weight: .semiBold, size: 14))
+                                    .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
+                                    .lineLimit(1)
+
+                                if group.isPinned {
+                                    Assets.Common.Icon.pin.swiftUIImage
+                                        .renderingMode(.template)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 12, height: 12)
+                                        .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
+                                        .accessibilityLabel("고정됨")
+                                }
+                            }
                         }
 
                         // 부문이 많으면 줄을 넘겨 다 보여 준다(잘리면 어떤 메달인지 알 수 없음).
