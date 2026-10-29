@@ -53,14 +53,14 @@ public struct CompetitionInfoFeature: Sendable {
         var hasSavedInThisFlow = false
         // 완료 화면 꽃가루 — 방금 저장했을 때만 터뜨리고, 뒤로 가기로 돌아왔을 때는 다시 터뜨리지 않는다.
         var celebratesOnDone = false
-        // 저장 실패·연도 자동 변경(#126) 안내. 이 화면이 MY 화면 위에 push돼 있어 MY 화면 토스트는 가려지므로 여기서 띄운다.
+        // 저장 실패 안내. 이 화면이 MY 화면 위에 push돼 있어 MY 화면 토스트는 가려지므로 여기서 띄운다.
         var toast: ToastState?
 
         var isAddingDivision: Bool { !savedRecords.isEmpty }
 
         /// 지금 흐름에서 입력받는 단계 — 진행 막대 칸 수와 위치의 기준.
         var inputSteps: [Step] {
-            isAddingDivision ? [.result, .division] : [.result, .year, .name, .division]
+            isAddingDivision ? [.result, .division] : [.result, .name, .year, .division]
         }
 
         var headerTitle: String {
@@ -70,12 +70,7 @@ public struct CompetitionInfoFeature: Sendable {
         // 1단계: 결과 — Picker UI 특성상 초기 선택값이 필요하므로 옵셔널이 아닌 기본값 사용
         var result: CompetitionRank = .gold
 
-        // 2단계: 연도 — 몇 월이었는지는 기억이 가장 흐려 입력이 막히므로 연도만 받는다.
-        // 기본 선택은 올해.
-        let currentYear: Int = Calendar.current.component(.year, from: Date())
-        var year: Int = Calendar.current.component(.year, from: Date())
-
-        // 3단계: 대회명 (TextField 직접 바인딩)
+        // 2단계: 대회명 (TextField 직접 바인딩)
         // 대회명은 닉네임과 달리 중복을 허용하므로 별도 검증 없이 "빈 값" 여부만 본다.
         // 빈 값이면 다음 버튼을 비활성화하므로(View의 .disabled) 별도 검증 상태/문구는 두지 않는다.
         // 이름이 기억나지 않으면 '대회명이 기억나지 않아요'로 빈 이름인 채 넘어간다(#125, 나만 보기로 저장).
@@ -83,6 +78,11 @@ public struct CompetitionInfoFeature: Sendable {
 
         // 입력한 대회명과 맞는 등록된 대회 목록. 고르면 이름이 채워지고, 없으면 직접 입력한 이름을 그대로 쓴다.
         var suggestions: [RegisteredCompetition] = []
+
+        // 3단계: 연도 — 몇 월이었는지는 기억이 가장 흐려 입력이 막히므로 연도만 받는다.
+        // 기본 선택은 올해.
+        let currentYear: Int = Calendar.current.component(.year, from: Date())
+        var year: Int = Calendar.current.component(.year, from: Date())
 
         // 4단계: 출전 부문 — 건너뛸 수 있다. 출전 띠는 고른 칩을 다시 누르면 선택이 풀린다.
         // 도복 대회가 더 흔해 새 기록은 도복으로, 출전 띠는 지금 띠로 미리 골라 둔다(대부분 그대로 '완료'만 누르게).
@@ -152,11 +152,12 @@ public struct CompetitionInfoFeature: Sendable {
     }
 
     // 기록하는 이유(메달)를 먼저 보여 주려고 결과부터 묻는다.
+    // 대회명을 연도보다 먼저 물어, 공개 일정의 대회를 고르면 연도 단계에 그 연도를 골라 둔다(#126).
     // 진행 막대는 State.inputSteps 기준이라 '부문 추가'처럼 단계를 건너뛰는 흐름에서도 칸 수가 맞는다.
     public enum Step: Equatable, Sendable {
         case result
-        case year
         case name
+        case year
         case division
         /// 저장 후 완료 화면 — 새 기록에서만 거친다(수정은 저장 후 바로 닫는다).
         case done
@@ -242,10 +243,7 @@ public struct CompetitionInfoFeature: Sendable {
                 guard !state.isSaving else { return .none }
                 switch state.step {
                 case .result:
-                    state.step = state.isAddingDivision ? .division : .year
-                    return .none
-                case .year:
-                    state.step = .name
+                    state.step = state.isAddingDivision ? .division : .name
                     return .none
                 case .name:
                     // 빈 값(공백 포함)일 때 다음 버튼은 View에서 비활성화되지만,
@@ -253,6 +251,9 @@ public struct CompetitionInfoFeature: Sendable {
                     guard !state.name.trimmingCharacters(in: .whitespaces).isEmpty else {
                         return .none
                     }
+                    state.step = .year
+                    return .none
+                case .year:
                     state.step = .division
                     return .none
                 case .division:
@@ -311,14 +312,14 @@ public struct CompetitionInfoFeature: Sendable {
                         return .none
                     }
                     return .run { _ in await self.dismiss() }
-                case .year:
+                case .name:
                     state.step = .result
                     return .none
-                case .name:
-                    state.step = .year
+                case .year:
+                    state.step = .name
                     return .none
                 case .division:
-                    state.step = state.isAddingDivision ? .result : .name
+                    state.step = state.isAddingDivision ? .result : .year
                     return .none
                 case .done:
                     return .run { _ in await self.dismiss() }
@@ -400,7 +401,7 @@ public struct CompetitionInfoFeature: Sendable {
                 // 기억 안 난다고 했으니 치다 만 글자는 대회명으로 남기지 않는다.
                 state.name = ""
                 state.suggestions = []
-                state.step = .division
+                state.step = .year
                 return .cancel(id: CancelID.searchCompetitions)
 
             case let .view(.suggestionTapped(competition)):
@@ -408,16 +409,12 @@ public struct CompetitionInfoFeature: Sendable {
                 state.suggestions = []
                 // 고르기 직전 입력으로 시작된 검색이 늦게 돌아와 목록을 다시 띄우지 않게 한다.
                 let cancelSearch: Effect<Action> = .cancel(id: CancelID.searchCompetitions)
-                // 공개 일정에서 온 대회는 열린 연도를 알므로 기록 연도를 맞춘다(#126).
-                // 연도 단계가 대회명보다 앞이라 이미 고른 연도를 고쳐 주는 방식이고, 바뀌었을 때만 알린다.
-                guard let scheduledYear = competition.year, scheduledYear != state.year else {
-                    return cancelSearch
+                // 공개 일정에서 온 대회는 열린 연도를 알므로, 다음 연도 단계에 그 연도를 골라 둔다(#126).
+                // 단계를 건너뛰지 않고 골라 둔 연도를 한 번 보여 주므로 따로 알리지 않는다.
+                if let scheduledYear = competition.year {
+                    state.year = scheduledYear
                 }
-                state.year = scheduledYear
-                return .merge(
-                    cancelSearch,
-                    showToast(&state, message: "대회 일정에 맞춰 \(scheduledYear)년으로 바꿨어요")
-                )
+                return cancelSearch
 
             case let .internal(.suggestionsLoaded(suggestions)):
                 // 입력한 말로 시작하는 이름을 먼저 둔다(띄어쓰기 무시). 그 안의 순서는 서버가 준 대로 둔다.
