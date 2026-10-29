@@ -283,7 +283,7 @@ private struct CompetitionRowView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 12)
                 .frame(minHeight: 40)
                 .padding(.leading, 16)
                 .contentShape(Rectangle())
