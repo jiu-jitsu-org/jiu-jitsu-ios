@@ -65,13 +65,36 @@ struct CompetitionDTO: Codable {
     let competitionMonth: Int?
     let competitionName: String
     let competitionRank: String
-    
+    // 출전 부문(#122) — backend #164 계약 전 가정 키. 서버가 아직 내려 주지 않으므로 옵셔널로 디코딩한다.
+    let competitionUniform: String?
+    let competitionWeightLimit: Double?
+    let competitionWeightBound: String?
+    let competitionAbsolute: Bool?
+    let competitionBelt: String?
+    // 맨 위 고정(#124) — 서버 계약 전 가정 키. 내려오지 않으면 고정 안 함.
+    let competitionPinned: Bool?
+
+    /// 무게와 이하/초과가 모두 있어야 체급으로 본다.
+    private var weightLimit: CompetitionWeightLimit? {
+        guard let competitionWeightLimit,
+              let bound = competitionWeightBound.flatMap(CompetitionWeightLimit.Bound.init(rawValue:)) else {
+            return nil
+        }
+        return CompetitionWeightLimit(kg: competitionWeightLimit, bound: bound)
+    }
+
     func toDomain() -> Competition {
+        // 모르는 값은 부문 없음으로 둔다 — 체급표가 바뀌어도 프로필 전체 디코딩이 깨지지 않게.
         Competition(
             competitionYear: competitionYear,
             competitionMonth: competitionMonth,
             competitionName: competitionName,
-            competitionRank: CompetitionRank(rawValue: competitionRank) ?? .participation
+            competitionRank: CompetitionRank(rawValue: competitionRank) ?? .participation,
+            competitionUniform: competitionUniform.flatMap(CompetitionUniform.init(rawValue:)),
+            competitionWeightLimit: weightLimit,
+            competitionAbsolute: competitionAbsolute ?? false,
+            competitionBelt: competitionBelt.flatMap(BeltRank.init(rawValue:)),
+            isPinned: competitionPinned ?? false
         )
     }
 }
