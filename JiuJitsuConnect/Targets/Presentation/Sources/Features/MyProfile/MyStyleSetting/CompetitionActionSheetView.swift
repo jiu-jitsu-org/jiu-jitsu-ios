@@ -94,6 +94,8 @@ struct CompetitionActionSheetView: View {
                     .resizable()
                     .scaledToFit()
                     .foregroundStyle(Color.component.bottomSheet.unselected.listItem.leadingIcon)
+                    // 글자와 같은 뜻의 장식이라 화면 읽기에서는 빼고 행 글자만 읽힌다.
+                    .accessibilityHidden(true)
             }
 
             // 부문마다 한 행 — 누르면 그 부문을 고친다.
@@ -115,6 +117,8 @@ struct CompetitionActionSheetView: View {
                     .resizable()
                     .scaledToFit()
                     .foregroundStyle(Color.component.bottomSheet.selected.listItem.leadingIcon)
+                    // 글자와 같은 뜻의 장식이라 화면 읽기에서는 빼고 행 글자만 읽힌다.
+                    .accessibilityHidden(true)
             }
 
             optionRow(title: "삭제", showsChevron: false, action: onDeleteTapped) {
@@ -124,6 +128,8 @@ struct CompetitionActionSheetView: View {
                     .resizable()
                     .scaledToFit()
                     .foregroundStyle(Color.component.bottomSheet.unselected.listItem.leadingIcon)
+                    // 글자와 같은 뜻의 장식이라 화면 읽기에서는 빼고 행 글자만 읽힌다.
+                    .accessibilityHidden(true)
             }
         }
         .padding(.vertical, 20)
