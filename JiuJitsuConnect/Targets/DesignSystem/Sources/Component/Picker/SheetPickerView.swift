@@ -145,9 +145,12 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
             if isUserScrolling { selectCenteredItem() }
         }
         .onScrollPhaseChange { _, newPhase in
+            let wasUserScrolling = isUserScrolling
             isUserScrolling = newPhase == .interacting || newPhase == .decelerating
             // 손을 떼고 스냅까지 끝난 시점에도 한 번 더 전달해, 마지막 칸이 빠지지 않게 한다.
-            if newPhase == .idle { selectCenteredItem() }
+            // 손으로 굴린 뒤의 idle만 본다 — 화면이 닫히며 레이아웃이 바뀌어 생기는 idle에서 전달하면
+            // 이미 사라진 화면에 엉뚱한 칸이 선택으로 전달된다(TCA ifLet 경고).
+            if newPhase == .idle, wasUserScrolling { selectCenteredItem() }
         }
         .onChange(of: selectedItem.id) { _, newID in
             // 외부에서 선택이 바뀐 경우에만 해당 항목으로 스크롤 (사용자 스크롤 → onSelect → 재스크롤 피드백 루프 방지)

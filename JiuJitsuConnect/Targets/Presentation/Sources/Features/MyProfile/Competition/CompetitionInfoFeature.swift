@@ -66,7 +66,7 @@ public struct CompetitionInfoFeature: Sendable {
         var result: CompetitionRank = .gold
 
         // 2단계: 연도 — 몇 월이었는지는 기억이 가장 흐려 입력이 막히므로 연도만 받는다.
-        // 기본 선택은 올해. '이전'을 고르면 year에는 경계 연도(올해 - 5) 이하 값이 들어간다(YearOption 참고).
+        // 기본 선택은 올해.
         let currentYear: Int = Calendar.current.component(.year, from: Date())
         var year: Int = Calendar.current.component(.year, from: Date())
 
@@ -124,36 +124,24 @@ public struct CompetitionInfoFeature: Sendable {
         case failed
     }
 
-    /// 연도 단계 선택지 — 올해부터 최근 5년 + '이전'.
+    /// 연도 단계 선택지 — 올해부터 1990년까지 최신순.
     ///
-    /// 오래된 대회일수록 정확한 연도도 흐려서 5년보다 이전은 하나로 묶는다.
-    /// 서버는 연도를 정수로만 받으므로 '이전'은 경계 연도(올해 - 5) 이하 값으로 저장한다.
-    /// 수정 모드에서 경계 이하 연도는 '이전'으로 보이고, 다른 연도를 고르지 않으면 원래 연도를 그대로 둔다.
-    public enum YearOption: Hashable, Identifiable, Sendable {
-        case year(Int)
-        case earlier
+    /// 오래 수련한 사람은 옛 대회도 정확한 연도로 남기고 싶어 하므로 묶음('이전') 없이 연도를 전부 늘어놓는다.
+    /// 휠은 올해에 맞춰 열리므로 최근 대회는 바로 넘어가고, 목록이 길어져도 휠 크기는 그대로다.
+    /// 수정 중인 기록의 연도가 범위 밖이면 그 연도도 목록에 넣어 원래 값이 사라지지 않게 한다.
+    public struct YearOption: Hashable, Identifiable, Sendable {
+        let year: Int
 
-        static let recentYearCount = 5
+        static let earliestYear = 1990
 
-        public var id: Self { self }
+        public var id: Int { year }
 
-        var displayText: String {
-            switch self {
-            case let .year(year): return "\(year)년"
-            case .earlier: return "이전"
-            }
-        }
+        var displayText: String { "\(year)년" }
 
-        static func options(currentYear: Int) -> [YearOption] {
-            (0..<recentYearCount).map { .year(currentYear - $0) } + [.earlier]
-        }
-
-        static func earliestRecentYear(currentYear: Int) -> Int {
-            currentYear - (recentYearCount - 1)
-        }
-
-        init(year: Int, currentYear: Int) {
-            self = year < Self.earliestRecentYear(currentYear: currentYear) ? .earlier : .year(year)
+        static func options(currentYear: Int, including selectedYear: Int) -> [YearOption] {
+            let upper = max(currentYear, selectedYear)
+            let lower = min(earliestYear, selectedYear)
+            return stride(from: upper, through: lower, by: -1).map(YearOption.init)
         }
     }
 
@@ -288,14 +276,7 @@ public struct CompetitionInfoFeature: Sendable {
                 return .send(.delegate(.didDelete(original)))
 
             case let .view(.yearOptionSelected(option)):
-                switch option {
-                case let .year(year):
-                    state.year = year
-                case .earlier:
-                    // 이미 '이전'에 해당하는 연도(수정 중인 오래된 기록)면 원래 연도를 지킨다.
-                    let boundary = YearOption.earliestRecentYear(currentYear: state.currentYear) - 1
-                    state.year = min(state.year, boundary)
-                }
+                state.year = option.year
                 return .none
 
             case let .view(.resultSelected(rank)):
