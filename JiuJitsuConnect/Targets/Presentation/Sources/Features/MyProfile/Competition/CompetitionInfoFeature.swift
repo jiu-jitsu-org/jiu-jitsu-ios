@@ -58,11 +58,33 @@ public struct CompetitionInfoFeature: Sendable {
         // 입력한 대회명과 맞는 등록된 대회 목록. 고르면 이름이 채워지고, 없으면 직접 입력한 이름을 그대로 쓴다.
         var suggestions: [RegisteredCompetition] = []
 
-        // 4단계: 출전 부문 — 건너뛸 수 있고, 고른 칩을 다시 누르면 선택이 풀린다.
+        // 4단계: 출전 부문 — 건너뛸 수 있다. 출전 띠는 고른 칩을 다시 누르면 선택이 풀린다.
         // 도복 대회가 더 흔해 새 기록은 도복으로, 출전 띠는 지금 띠로 미리 골라 둔다(대부분 그대로 '완료'만 누르게).
         var uniform: CompetitionUniform? = .gi
-        var weightClass: CompetitionWeightClass?
         var belt: BeltRank?
+
+        // 체급은 단체·대회마다 표가 달라 숫자로 받는다(TextField 직접 바인딩, 소수점 허용).
+        // 대부분 '이하' 체급이라 이하를 기본으로 두고, 가장 무거운 체급만 '초과'로 바꾼다.
+        var weightText: String = ""
+        var weightBound: CompetitionWeightLimit.Bound = .under
+
+        // 앱솔루트는 체급과 별개 부문이라 따로 체크한다.
+        var isAbsolute = false
+
+        /// 입력한 체급 — 숫자로 읽히지 않거나 0 이하면 체급 없음.
+        var weightLimit: CompetitionWeightLimit? {
+            let normalized = weightText.replacingOccurrences(of: ",", with: ".")
+            guard let kg = Double(normalized), kg > 0 else { return nil }
+            return CompetitionWeightLimit(kg: kg, bound: weightBound)
+        }
+
+        // 미리 골라 둔 값과 사람이 직접 고른 값을 '건너뛰기'에서 구분하려고 둔다.
+        // 체급·앱솔루트는 미리 채우지 않으므로 값이 있으면 직접 고른 것이다.
+        var didPickUniform = false
+        var didPickBelt = false
+
+        // 출전 띠는 대부분 지금 띠 그대로라 접어 두고, 줄을 누르면 펼친다.
+        var isBeltExpanded = false
 
         public init() {}
 
@@ -79,7 +101,11 @@ public struct CompetitionInfoFeature: Sendable {
                 // 수정은 저장된 값을 그대로 보여 준다. 부문 없이 저장된 기록에 기본값을 채우면
                 // 이름만 고치려던 사람이 모르는 사이 부문까지 저장하게 되므로 비워 둔다.
                 self.uniform = original.competitionUniform
-                self.weightClass = original.competitionWeightClass
+                if let weightLimit = original.competitionWeightLimit {
+                    self.weightText = weightLimit.kgText
+                    self.weightBound = weightLimit.bound
+                }
+                self.isAbsolute = original.competitionAbsolute
                 self.belt = original.competitionBelt
             }
         }
@@ -144,8 +170,10 @@ public struct CompetitionInfoFeature: Sendable {
             case resultSelected(CompetitionRank)
             case suggestionTapped(RegisteredCompetition)
             case uniformSelected(CompetitionUniform)
-            case weightClassSelected(CompetitionWeightClass)
+            case weightBoundToggled
+            case absoluteToggled
             case beltSelected(BeltRank)
+            case beltRowTapped
             case skipButtonTapped
         }
 
@@ -186,12 +214,17 @@ public struct CompetitionInfoFeature: Sendable {
                     state.step = .division
                     return .none
                 case .division:
-                    return save(state, includingDivision: true)
+                    return save(state, uniform: state.uniform, belt: state.belt)
                 }
 
             case .view(.skipButtonTapped):
                 guard state.step == .division else { return .none }
-                return save(state, includingDivision: false)
+                // 미리 채워 둔 도복·띠는 본인이 고른 값이 아니라 버리고, 직접 누른 칩만 남긴다.
+                return save(
+                    state,
+                    uniform: state.didPickUniform ? state.uniform : nil,
+                    belt: state.didPickBelt ? state.belt : nil
+                )
 
             case .view(.backButtonTapped):
                 switch state.step {
@@ -232,15 +265,36 @@ public struct CompetitionInfoFeature: Sendable {
                 return .none
 
             case let .view(.uniformSelected(uniform)):
-                state.uniform = state.uniform == uniform ? nil : uniform
+                // 두 칸짜리 선택이라 다시 눌러도 풀지 않는다 — 풀리면 화면에 보이는 것과 저장 값이 어긋난다.
+                state.uniform = uniform
+                state.didPickUniform = true
                 return .none
 
-            case let .view(.weightClassSelected(weightClass)):
-                state.weightClass = state.weightClass == weightClass ? nil : weightClass
+            case .view(.weightBoundToggled):
+                state.weightBound = state.weightBound == .under ? .over : .under
+                return .none
+
+            case .view(.absoluteToggled):
+                state.isAbsolute.toggle()
                 return .none
 
             case let .view(.beltSelected(belt)):
                 state.belt = state.belt == belt ? nil : belt
+                state.didPickBelt = true
+                // 고르면 바로 접어 체급 화면으로 돌아간다.
+                state.isBeltExpanded = false
+                return .none
+
+            case .view(.beltRowTapped):
+                state.isBeltExpanded.toggle()
+                return .none
+
+            case .binding(\.weightText):
+                // 숫자와 소수점 한 자리까지만 받는다(예: 76, 76.5, 100.5). 붙여넣기나 쉼표 입력도 같은 모양으로 맞춘다.
+                let sanitized = Self.sanitizedWeightText(state.weightText)
+                if sanitized != state.weightText {
+                    state.weightText = sanitized
+                }
                 return .none
 
             case .binding(\.name):
@@ -282,9 +336,35 @@ public struct CompetitionInfoFeature: Sendable {
 
     // MARK: - Helpers
 
+    /// 체급 입력을 "정수 3자리 + 소수 1자리"까지로 다듬는다. 쉼표는 소수점으로 본다.
+    static func sanitizedWeightText(_ text: String) -> String {
+        var integerPart = ""
+        var fractionPart: String?
+        for character in text.replacingOccurrences(of: ",", with: ".") {
+            if character == "." {
+                // ".5"처럼 소수점부터 치면 "0.5"로 읽는다(5로 바뀌지 않게).
+                if fractionPart == nil {
+                    if integerPart.isEmpty { integerPart = "0" }
+                    fractionPart = ""
+                }
+            } else if character.isASCII, character.isNumber {
+                if var fraction = fractionPart {
+                    if fraction.isEmpty { fraction.append(character) }
+                    fractionPart = fraction
+                } else if integerPart.count < 3 {
+                    integerPart.append(character)
+                }
+            }
+        }
+        guard let fractionPart else { return integerPart }
+        return integerPart + "." + fractionPart
+    }
+
     /// 입력한 값으로 기록을 만들어 부모에게 저장을 맡긴다.
-    /// - Parameter includingDivision: '건너뛰기'면 false — 미리 골라 둔 도복·띠도 저장하지 않는다.
-    private func save(_ state: State, includingDivision: Bool) -> Effect<Action> {
+    /// - Parameters:
+    ///   - uniform: 저장할 도복/노기. '건너뛰기'면 직접 고른 경우에만 넘긴다.
+    ///   - belt: 저장할 출전 띠. '건너뛰기'면 직접 고른 경우에만 넘긴다.
+    private func save(_ state: State, uniform: CompetitionUniform?, belt: BeltRank?) -> Effect<Action> {
         // 새 기록은 월 없이 저장하고, 월이 있던 기존 기록은 수정해도 원래 월을 유지한다.
         let originalMonth: Int? = if case let .edit(original) = state.mode {
             original.competitionMonth
@@ -296,9 +376,10 @@ public struct CompetitionInfoFeature: Sendable {
             competitionMonth: originalMonth,
             competitionName: state.name,
             competitionRank: state.result,
-            competitionUniform: includingDivision ? state.uniform : nil,
-            competitionWeightClass: includingDivision ? state.weightClass : nil,
-            competitionBelt: includingDivision ? state.belt : nil
+            competitionUniform: uniform,
+            competitionWeightLimit: state.weightLimit,
+            competitionAbsolute: state.isAbsolute,
+            competitionBelt: belt
         )
         switch state.mode {
         case .add:

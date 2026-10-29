@@ -595,8 +595,11 @@ public struct Competition: Codable, Equatable, Sendable {
     /// 출전 복장 (도복 / 노기)
     public let competitionUniform: CompetitionUniform?
 
-    /// 출전 체급 (체급 상한 또는 앱솔루트)
-    public let competitionWeightClass: CompetitionWeightClass?
+    /// 출전 체급 (경계 무게와 이하/초과)
+    public let competitionWeightLimit: CompetitionWeightLimit?
+
+    /// 앱솔루트(무차별급) 부문 — 체급과 별개로 둔다.
+    public let competitionAbsolute: Bool
 
     /// 출전 띠 — 같은 메달이라도 그때 띠에 따라 무게가 달라 대회 당시 띠를 따로 남긴다.
     public let competitionBelt: BeltRank?
@@ -607,7 +610,8 @@ public struct Competition: Codable, Equatable, Sendable {
         competitionName: String,
         competitionRank: CompetitionRank,
         competitionUniform: CompetitionUniform? = nil,
-        competitionWeightClass: CompetitionWeightClass? = nil,
+        competitionWeightLimit: CompetitionWeightLimit? = nil,
+        competitionAbsolute: Bool = false,
         competitionBelt: BeltRank? = nil
     ) {
         self.competitionYear = competitionYear
@@ -615,13 +619,14 @@ public struct Competition: Codable, Equatable, Sendable {
         self.competitionName = competitionName
         self.competitionRank = competitionRank
         self.competitionUniform = competitionUniform
-        self.competitionWeightClass = competitionWeightClass
+        self.competitionWeightLimit = competitionWeightLimit
+        self.competitionAbsolute = competitionAbsolute
         self.competitionBelt = competitionBelt
     }
 
     /// 출전 부문을 하나라도 입력했는지
     public var hasDivision: Bool {
-        competitionUniform != nil || competitionWeightClass != nil || competitionBelt != nil
+        competitionUniform != nil || competitionWeightLimit != nil || competitionAbsolute || competitionBelt != nil
     }
 }
 

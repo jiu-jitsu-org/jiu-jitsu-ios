@@ -17,9 +17,13 @@ extension Competition {
         String(competitionYear)
     }
 
-    /// 출전 부문 표기 — "도복 -76kg", "노기", "앱솔루트". 복장·체급을 모두 비웠으면 nil.
+    /// 출전 부문 표기 — "도복 -76kg", "노기 앱솔루트", "-76kg 앱솔루트". 복장·체급·앱솔루트를 모두 비웠으면 nil.
     var divisionText: String? {
-        let parts = [competitionUniform?.displayName, competitionWeightClass?.displayName].compactMap { $0 }
+        let parts = [
+            competitionUniform?.displayName,
+            competitionWeightLimit?.displayText,
+            competitionAbsolute ? "앱솔루트" : nil
+        ].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " ")
     }
 
@@ -28,6 +32,20 @@ extension Competition {
         [formattedYear, competitionBelt?.displayName, divisionText]
             .compactMap { $0 }
             .joined(separator: " · ")
+    }
+}
+
+// MARK: - CompetitionWeightLimit Presentation Extensions
+
+extension CompetitionWeightLimit {
+    /// 무게 숫자만 — "76", "82.3". 소수점이 없으면 정수로 보이고 입력란에도 그대로 쓴다.
+    var kgText: String {
+        kg.formatted(.number.precision(.fractionLength(0...1)).grouping(.never))
+    }
+
+    /// 대회에서 쓰는 체급 표기 — 이하는 "-76kg", 초과는 "+100.5kg".
+    var displayText: String {
+        "\(bound == .under ? "-" : "+")\(kgText)kg"
     }
 }
 

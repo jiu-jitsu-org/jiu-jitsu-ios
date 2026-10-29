@@ -23,28 +23,24 @@ public enum CompetitionUniform: String, Codable, Equatable, Sendable, CaseIterab
     }
 }
 
-/// 출전 체급 — 체급 상한 또는 앱솔루트(무차별급).
+/// 출전 체급 — 체급 경계 무게와 그 이하/초과.
 ///
-/// IBJJF 성인 남자 도복 체급을 기준으로 한다. 성별·복장·대회마다 체급표가 달라
-/// 서버 계약이 정해지면 자유 값(문자열)이나 대회별 체급표로 바뀔 수 있다.
-public enum CompetitionWeightClass: String, Codable, Equatable, Sendable, CaseIterable, Identifiable, Hashable {
-    case under57_5 = "-57.5kg"
-    case under64 = "-64kg"
-    case under70 = "-70kg"
-    case under76 = "-76kg"
-    case under82_3 = "-82.3kg"
-    case under88_3 = "-88.3kg"
-    case under94_3 = "-94.3kg"
-    case under100_5 = "-100.5kg"
-    case over100_5 = "+100.5kg"
-    case absolute = "ABSOLUTE"
+/// 체급표는 단체·대회·성별·복장마다 달라 표에서 고르지 않고 숫자로 받는다(예: 76kg 이하).
+/// 숫자로 남겨야 어느 단체 체급이든 그대로 기록되고, 나중에 체급별 통계·필터를 만들 수 있다.
+/// 앱솔루트(무차별급)는 체급과 별개라 `Competition.competitionAbsolute`로 따로 둔다.
+public struct CompetitionWeightLimit: Codable, Equatable, Sendable, Hashable {
+    public enum Bound: String, Codable, Equatable, Sendable, CaseIterable, Hashable {
+        /// 이하 — 표기 "-76kg"
+        case under = "UNDER"
+        /// 초과 — 표기 "+100.5kg"
+        case over = "OVER"
+    }
 
-    public var id: String { rawValue }
+    public let kg: Double
+    public let bound: Bound
 
-    public var displayName: String {
-        switch self {
-        case .absolute: return "앱솔루트"
-        default: return rawValue
-        }
+    public init(kg: Double, bound: Bound) {
+        self.kg = kg
+        self.bound = bound
     }
 }

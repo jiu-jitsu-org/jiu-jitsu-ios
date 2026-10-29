@@ -71,7 +71,9 @@ struct CompetitionRequestDTO: Codable {
     let competitionRank: String
     // 출전 부문(#122) — backend #164 계약 전 가정 키. nil이면 키를 아예 보내지 않는다(합성 Encodable의 encodeIfPresent).
     let competitionUniform: String?
-    let competitionWeightClass: String?
+    let competitionWeightLimit: Double?
+    let competitionWeightBound: String?
+    let competitionAbsolute: Bool?
     let competitionBelt: String?
 
     init(from competition: Competition) {
@@ -82,7 +84,10 @@ struct CompetitionRequestDTO: Codable {
         self.competitionName = competition.competitionName
         self.competitionRank = competition.competitionRank.rawValue
         self.competitionUniform = competition.competitionUniform?.rawValue
-        self.competitionWeightClass = competition.competitionWeightClass?.rawValue
+        self.competitionWeightLimit = competition.competitionWeightLimit?.kg
+        self.competitionWeightBound = competition.competitionWeightLimit?.bound.rawValue
+        // 수정에서 앱솔루트를 끈 것도 서버에 닿도록 false까지 그대로 보낸다.
+        self.competitionAbsolute = competition.competitionAbsolute
         self.competitionBelt = competition.competitionBelt?.rawValue
     }
 }
