@@ -71,6 +71,8 @@ struct CompetitionDTO: Codable {
     let competitionWeightBound: String?
     let competitionAbsolute: Bool?
     let competitionBelt: String?
+    // 맨 위 고정(#124) — 서버 계약 전 가정 키. 내려오지 않으면 고정 안 함.
+    let competitionPinned: Bool?
 
     /// 무게와 이하/초과가 모두 있어야 체급으로 본다.
     private var weightLimit: CompetitionWeightLimit? {
@@ -91,7 +93,8 @@ struct CompetitionDTO: Codable {
             competitionUniform: competitionUniform.flatMap(CompetitionUniform.init(rawValue:)),
             competitionWeightLimit: weightLimit,
             competitionAbsolute: competitionAbsolute ?? false,
-            competitionBelt: competitionBelt.flatMap(BeltRank.init(rawValue:))
+            competitionBelt: competitionBelt.flatMap(BeltRank.init(rawValue:)),
+            isPinned: competitionPinned ?? false
         )
     }
 }

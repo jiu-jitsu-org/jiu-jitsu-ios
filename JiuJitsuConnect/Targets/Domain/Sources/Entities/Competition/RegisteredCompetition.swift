@@ -16,8 +16,13 @@ public struct RegisteredCompetition: Equatable, Sendable {
     /// 대회명
     public let name: String
 
-    public init(id: Int? = nil, name: String) {
+    /// 대회가 열린 연도 — 공개 일정에서 온 대회만 있다(#126). 회원이 등록한 대회 등 날짜를 모르면 nil.
+    /// 고르면 기록의 연도를 이 값으로 맞춘다.
+    public let year: Int?
+
+    public init(id: Int? = nil, name: String, year: Int? = nil) {
         self.id = id
         self.name = name
+        self.year = year
     }
 }

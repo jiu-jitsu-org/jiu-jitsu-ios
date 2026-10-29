@@ -306,6 +306,7 @@ public struct ComponentColors {
         public struct Setting {
             public let text = Color.semantic.text.primary
             public let background = Color.semantic.surface.container
+            public let pressedBackground = Color.semantic.surface.containerPressed
             public let subText = Color.semantic.text.secondary
             public let icon = Color.semantic.icon.secondary
             public let leadingIcon = Color.semantic.icon.primary

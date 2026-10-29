@@ -269,7 +269,7 @@ struct CompetitionDivisionView: View {
     private var buttonSection: some View {
         VStack(spacing: 4) {
             CTAButton(
-                title: "완료",
+                title: store.isSaving ? "저장 중…" : "완료",
                 action: {
                     store.send(.view(.nextButtonTapped))
                 }

@@ -75,6 +75,9 @@ struct CompetitionRequestDTO: Codable {
     let competitionWeightBound: String?
     let competitionAbsolute: Bool?
     let competitionBelt: String?
+    // 맨 위 고정(#124) — 서버 계약 전 가정 키. 고정한 항목만 true를 보내고, 아니면 키를 보내지 않는다.
+    // 목록 전체를 매번 다시 보내므로 키가 없으면 '고정 안 함'으로 읽힌다고 가정한다.
+    let competitionPinned: Bool?
 
     init(from competition: Competition) {
         self.competitionYear = competition.competitionYear
@@ -89,5 +92,6 @@ struct CompetitionRequestDTO: Codable {
         // 수정에서 앱솔루트를 끈 것도 서버에 닿도록 false까지 그대로 보낸다.
         self.competitionAbsolute = competition.competitionAbsolute
         self.competitionBelt = competition.competitionBelt?.rawValue
+        self.competitionPinned = competition.isPinned ? true : nil
     }
 }
