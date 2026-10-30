@@ -100,6 +100,8 @@ public struct SettingsFeature: Sendable {
 
         public enum InternalAction: Sendable {
             case withdrawalResponse(TaskResult<Bool>)
+            // 알림 화면이 닫힐 때 이어받은 저장의 결과.
+            case notificationSettingSaveResponse(TaskResult<NoticeSetting>)
             case showToast(ToastState)
             case toastDismissed
         }
@@ -118,6 +120,7 @@ public struct SettingsFeature: Sendable {
     // MARK: - Dependencies
     @Dependency(\.authClient) var authClient
     @Dependency(\.userClient) var userClient
+    @Dependency(\.noticeClient) var noticeClient
     @Dependency(\.continuousClock) var clock
 
     // MARK: - Reducer Body
@@ -256,6 +259,26 @@ public struct SettingsFeature: Sendable {
 
             case .view(.toastButtonTapped):
                 return .send(.internal(.toastDismissed))
+
+            case .destination(.dismiss):
+                // 알림 화면이 닫히면 그 화면의 디바운스·저장 요청도 함께 취소된다(뒤로가기·스와이프 모두).
+                // 아직 서버에 반영되지 않은 값이 있으면 화면보다 오래 사는 여기서 대신 저장한다.
+                // (dismiss는 자식 상태가 지워지기 전에 이 리듀서를 거치므로 마지막 값을 읽을 수 있다)
+                guard case let .notificationSetting(notification)? = state.destination,
+                      let setting = notification.unsavedSetting
+                else { return .none }
+                return .run { send in
+                    await send(.internal(.notificationSettingSaveResponse(
+                        await TaskResult { try await noticeClient.updateSetting(setting) }
+                    )))
+                }
+
+            case .internal(.notificationSettingSaveResponse(.success)):
+                return .none
+
+            case let .internal(.notificationSettingSaveResponse(.failure(error))):
+                Log.trace("알림 화면 이탈 후 설정 저장 실패: \(error)", category: .network, level: .error)
+                return handleError(error)
 
             case .destination:
                 return .none
