@@ -205,6 +205,14 @@ public struct AppTabFeature: Sendable {
                 Log.trace("커뮤니티 로그인 모달 요청: reason=\(reason ?? "-")", category: .view, level: .info)
                 return .send(.internal(.showLoginModal))
 
+            // 헤더의 내 사진 버튼(#128). 탭바에서 MY를 누른 것과 같은 경로라 프로필 재조회·게스트 처리도 그대로 따른다.
+            // 내 사진은 내 프로필을 뜻하므로, MY에 열어 둔 하위 화면(커뮤니티 활동 등)은 닫고 프로필 첫 화면으로 보낸다.
+            case .home(.delegate(.myTabRequested)):
+                if !state.authInfo.isGuest {
+                    state.myPage.path.removeAll()
+                }
+                return .send(.view(.tabSelected(.myPage)))
+
             case .home(.delegate(.logoutRequested)),
                  .myPage(.delegate(.webSubview(.logoutRequested))),
                  .settings(.delegate(.webSubview(.logoutRequested))):

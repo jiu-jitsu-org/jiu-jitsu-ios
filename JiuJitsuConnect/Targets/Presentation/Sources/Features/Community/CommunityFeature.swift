@@ -102,8 +102,8 @@ public struct CommunityFeature: Sendable {
 
         // 알림함은 로그인 사용자 전용이라 비로그인이면 종 아이콘 자체를 숨긴다(알림함 정책).
         var isNotificationButtonVisible: Bool { accessToken != nil }
-        // '커뮤니티 활동'(내 글·저장한 글)도 내 것 입구라 비로그인이면 내 사진 버튼을 숨긴다. (#43)
-        var isMyActivityButtonVisible: Bool { accessToken != nil }
+        // 내 사진 버튼은 MY(로그인 전용) 입구라 비로그인이면 숨긴다. (#43, #128)
+        var isMyProfileButtonVisible: Bool { accessToken != nil }
 
         public init(accessToken: String? = nil) {
             self.accessToken = accessToken
@@ -144,8 +144,8 @@ public struct CommunityFeature: Sendable {
             case tabSelected(Tab)
             case notificationTapped
             case searchTapped
-            // GNB 맨 오른쪽 내 사진 버튼 → '커뮤니티 활동' 서브뷰. (#43)
-            case myActivityTapped
+            // GNB 맨 오른쪽 내 사진 버튼 → MY 탭. (#43, #128)
+            case myProfileTapped
 
             // MARK: 브릿지 다이얼로그 결과 (AppTabView가 그린 알럿/시트 → Feature로 회신)
             // 확인 알럿의 [확인]/[취소] 버튼 탭.
@@ -189,6 +189,8 @@ public struct CommunityFeature: Sendable {
             case logoutRequested
             // 웹뷰 토큰 만료 → 부모가 네이티브 refresh로 갱신 후 결과를 웹에 주입한다.
             case tokenRefreshRequested
+            // 헤더의 내 사진 버튼 → 부모가 하단 탭을 MY로 바꾼다. (#128)
+            case myTabRequested
         }
 
         /// 부모가 세션 상태 변화를 알려주면 그에 맞는 아웃바운드 메시지를 웹에 주입한다.
@@ -245,16 +247,11 @@ public struct CommunityFeature: Sendable {
                 state.path.append(.detail(.init(url: url, accessToken: state.accessToken)))
                 return .none
 
-            // 커뮤니티 활동도 알림함처럼 iOS/Android 공용 웹 화면이라 같은 chromeless 서브뷰로 연다.
-            // 웹 안에서 내 이름을 눌러 OPEN_SUBVIEW(push)로 열 때와 같은 경로다. (#43)
-            case .view(.myActivityTapped):
-                guard
-                    state.isMyActivityButtonVisible,
-                    let base = state.url,
-                    let url = Self.myActivityURL(base: base)
-                else { return .none }
-                state.path.append(.detail(.init(url: url, accessToken: state.accessToken)))
-                return .none
+            // 앱 다른 곳에서 내 사진은 MY를 뜻하므로 커뮤니티 헤더도 MY 탭으로 보낸다. 커뮤니티 활동은
+            // MY 화면의 '커뮤니티 활동' 줄로 계속 들어갈 수 있다. 탭 전환은 부모의 탭 선택 경로를 탄다. (#128)
+            case .view(.myProfileTapped):
+                guard state.isMyProfileButtonVisible else { return .none }
+                return .send(.delegate(.myTabRequested))
 
             // FIXME: 검색 화면 진입 (커뮤니티 검색 기능 도입 시 구현)
             case .view(.searchTapped):
@@ -432,7 +429,7 @@ public struct CommunityFeature: Sendable {
 
             case let .internal(.myProfileImageResponse(.success(url))):
                 // 응답 전에 로그아웃됐다면 이전 계정의 사진을 버린다.
-                guard state.isMyActivityButtonVisible else { return .none }
+                guard state.isMyProfileButtonVisible else { return .none }
                 state.myProfileImageURL = url
                 return .none
 
@@ -485,7 +482,7 @@ public struct CommunityFeature: Sendable {
             // MARK: - 내 사진 변경 (부모 주입)
 
             case let .myProfileImageChanged(url):
-                guard state.isMyActivityButtonVisible else { return .none }
+                guard state.isMyProfileButtonVisible else { return .none }
                 state.myProfileImageURL = url
                 // MY의 업로드·삭제가 끝나기 전에 홈으로 넘어오면 탭 진입 조회가 변경 전 사진을 들고 늦게 도착해
                 // 방금 반영한 값을 덮는다. 진행 중인 조회는 이미 낡은 값이므로 버린다.
@@ -543,7 +540,7 @@ public struct CommunityFeature: Sendable {
 
     /// 내 프로필 사진을 다시 조회한다(GET /api/user/profile). 비로그인이면 버튼이 없으므로 조회하지 않는다.
     private func refreshMyProfileImage(_ state: State) -> Effect<Action> {
-        guard state.isMyActivityButtonVisible else { return .none }
+        guard state.isMyProfileButtonVisible else { return .none }
         return .run { [userClient] send in
             await send(.internal(.myProfileImageResponse(
                 await TaskResult {
@@ -579,7 +576,7 @@ public struct CommunityFeature: Sendable {
     private static let myActivityPath = "/\(DeepLinkParser.communitySegment)/me"
 
     /// 알림함과 같은 이유로 리스트 웹뷰와 같은 origin에 커뮤니티 활동 경로를 붙인다.
-    /// MY 탭의 '커뮤니티 활동' 줄(#44)도 같은 origin으로 열도록 AppTabFeature가 함께 쓴다.
+    /// MY 탭의 '커뮤니티 활동' 줄(#44)이 이 origin으로 열도록 AppTabFeature가 쓴다.
     static func myActivityURL(base: URL) -> URL? {
         URL(string: myActivityPath, relativeTo: base)?.absoluteURL
     }
