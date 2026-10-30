@@ -7,11 +7,13 @@
 //  끝까지 확인하려고 넣은 가짜 데이터다. API 연결 PR에서 이 파일과 사용처를 함께 지운다.
 //  - 사용처 1: CompetitionClient.liveValue (#121·#126)
 //  - 사용처 2: JiuJitsuConnectApp의 `withCompetitionDummyFields()` (#122·#123·#124)
+//  - 대회 저장 500(backend #166, PR #167)이 개발 서버에 남아 있는 동안은 저장 실패도 기기 저장으로 대신한다.
 //
 
 #if DEBUG || BETA
 import Foundation
 import ComposableArchitecture
+import CoreKit
 import Domain
 
 // MARK: - #121·#126 대회 검색
@@ -53,6 +55,7 @@ extension CompetitionClient {
 extension CommunityClient {
     /// 서버(backend #164)가 아직 부문·고정을 저장하지 않아, 앱이 저장한 값을 기기에 남겨 두고 서버 응답에 다시 얹는다.
     /// 대회명·연도·메달이 같은 기록끼리 짝지으며, 앱을 다시 켜도 남는다(UserDefaults).
+    /// 대회 저장이 서버에서 실패하면(backend #166) 저장한 것으로 치고 기기에 남긴 목록을 그대로 보여 준다.
     public func withCompetitionDummyFields() -> CommunityClient {
         let base = self
         return CommunityClient(
@@ -60,10 +63,19 @@ extension CommunityClient {
                 CompetitionDummyStore.applying(to: try await base.fetchProfile())
             },
             updateProfile: { profile, section in
-                if section == .competition {
-                    CompetitionDummyStore.save(profile.competitions)
+                guard section == .competition else {
+                    return CompetitionDummyStore.applying(to: try await base.updateProfile(profile, section))
                 }
-                return CompetitionDummyStore.applying(to: try await base.updateProfile(profile, section))
+                CompetitionDummyStore.save(profile.competitions)
+                do {
+                    let saved = try await base.updateProfile(profile, section)
+                    CompetitionDummyStore.setLocalOnly(false)
+                    return CompetitionDummyStore.applying(to: saved)
+                } catch {
+                    Log.trace("[더미] 대회 저장 실패 — 기기 저장으로 대신함: \(error)", category: .network, level: .error)
+                    CompetitionDummyStore.setLocalOnly(true)
+                    return profile
+                }
             }
         )
     }
@@ -71,6 +83,12 @@ extension CommunityClient {
 
 private enum CompetitionDummyStore {
     private static let key = "debug.competitionDummyFields"
+    // 서버 저장이 실패해 기기 목록이 정답인 상태. 다음 저장이 성공하면 풀린다.
+    private static let localOnlyKey = "debug.competitionDummyLocalOnly"
+
+    static func setLocalOnly(_ isLocalOnly: Bool) {
+        UserDefaults.standard.set(isLocalOnly, forKey: localOnlyKey)
+    }
 
     static func save(_ competitions: [Competition]) {
         guard let data = try? JSONEncoder().encode(competitions) else { return }
@@ -80,6 +98,10 @@ private enum CompetitionDummyStore {
     static func applying(to profile: CommunityProfile) -> CommunityProfile {
         guard let data = UserDefaults.standard.data(forKey: key),
               let stored = try? JSONDecoder().decode([Competition].self, from: data) else { return profile }
+
+        if UserDefaults.standard.bool(forKey: localOnlyKey) {
+            return replacingCompetitions(of: profile, with: stored)
+        }
 
         var used = Set<Int>()
         let merged = profile.competitions.map { server -> Competition in
@@ -100,9 +122,13 @@ private enum CompetitionDummyStore {
                 isPinned: local.isPinned
             )
         }
-        // replacingCompetitions가 private이라 공개 메서드로 목록을 갈아 끼운다.
+        return replacingCompetitions(of: profile, with: merged)
+    }
+
+    // CommunityProfile.replacingCompetitions가 private이라 공개 메서드로 목록을 갈아 끼운다.
+    private static func replacingCompetitions(of profile: CommunityProfile, with competitions: [Competition]) -> CommunityProfile {
         let cleared = profile.competitions.reduce(profile) { $0.removingCompetition($1) }
-        return merged.reduce(cleared) { $0.addingCompetition($1) }
+        return competitions.reduce(cleared) { $0.addingCompetition($1) }
     }
 
     private static func isSameRecord(_ lhs: Competition, _ rhs: Competition) -> Bool {
