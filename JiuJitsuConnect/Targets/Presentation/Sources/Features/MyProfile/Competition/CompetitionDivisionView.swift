@@ -272,16 +272,13 @@ struct CompetitionDivisionView: View {
             spacing: Metrics.chipSpacing
         ) {
             ForEach(BeltRank.allCases) { belt in
-                Button {
+                BeltSelectButton(
+                    color: belt.selectButtonColor,
+                    title: belt.displayName,
+                    isSelected: store.belt == belt
+                ) {
                     store.send(.view(.beltSelected(belt)), animation: Self.expandAnimation)
-                } label: {
-                    Text(belt.displayName)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .frame(maxWidth: .infinity)
                 }
-                .appButtonStyle(store.belt == belt ? .primary : .neutral, size: .medium, height: 40, horizontalPadding: 4)
-                .accessibilityAddTraits(store.belt == belt ? .isSelected : [])
             }
         }
     }
