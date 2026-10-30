@@ -22,7 +22,12 @@ public struct CompetitionClient: Sendable {
 extension CompetitionClient: DependencyKey {
     /// 등록 대회 검색 API(backend #165)가 개발 서버에 없어 서버에 연결하지 않고 빈 목록을 돌려준다.
     /// 배포되면 다른 Client처럼 DependencyContainer에서 주입하고 `.unimplemented`로 되돌린다.
+    /// Debug·Beta는 화면 확인용 더미 목록을 쓴다(CompetitionDummyData.swift, API 연결 시 삭제).
+    #if DEBUG || BETA
+    public static let liveValue: Self = .dummyValue
+    #else
     public static let liveValue: Self = Self(searchCompetitions: { _ in [] })
+    #endif
 
     public static let testValue: Self = .unimplemented
 
