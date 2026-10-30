@@ -154,8 +154,8 @@ public struct ProfileImageEditView: View {
 
 // MARK: - PressableRowButtonStyle
 
-/// 터치 다운 동안에만 배경을 노출하는 옵션 행 버튼 스타일
-private struct PressableRowButtonStyle: ButtonStyle {
+/// 터치 다운 동안에만 배경을 노출하는 옵션 행 버튼 스타일 (대회 선택 시트에서도 쓴다)
+struct PressableRowButtonStyle: ButtonStyle {
     let cornerRadius: CGFloat
 
     func makeBody(configuration: Configuration) -> some View {
