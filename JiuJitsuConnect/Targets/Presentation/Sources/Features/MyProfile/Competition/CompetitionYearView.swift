@@ -9,7 +9,6 @@ struct CompetitionYearView: View {
         VStack(spacing: 0) {
             titleSection
             pickerSection
-            Spacer()
             confirmButton
         }
     }
@@ -27,20 +26,22 @@ struct CompetitionYearView: View {
     }
 
     private var pickerSection: some View {
-        HStack {
-            Spacer()
-            SheetPickerView(
-                items: store.yearOptions,
-                selectedItem: CompetitionInfoFeature.YearOption(year: store.year),
-                displayText: { $0.displayText },
-                width: 140,
-                onSelect: { option in
-                    store.send(.view(.yearOptionSelected(option)))
-                }
-            )
-            Spacer()
-        }
-        .padding(.top, 40)
+        // 메달 단계와 같은 크기·자리. 제목과 버튼 사이 빈 곳 전체가 끌기 영역이다.
+        SheetPickerView(
+            items: store.yearOptions,
+            selectedItem: CompetitionInfoFeature.YearOption(year: store.year),
+            displayText: { $0.displayText },
+            width: CompetitionWheelPickerMetrics.width,
+            itemHeight: CompetitionWheelPickerMetrics.itemHeight,
+            dragArea: .fill(
+                verticalOffset: CompetitionWheelPickerMetrics.verticalOffset,
+                minimumTopSpacing: CompetitionWheelPickerMetrics.minimumTopSpacing
+            ),
+            onSelect: { option in
+                store.send(.view(.yearOptionSelected(option)))
+            }
+        )
+        .frame(maxHeight: .infinity)
     }
 
     private var confirmButton: some View {

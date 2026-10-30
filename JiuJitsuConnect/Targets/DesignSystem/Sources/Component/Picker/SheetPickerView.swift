@@ -7,6 +7,16 @@
 
 import SwiftUI
 
+/// 휠 피커를 손가락으로 굴릴 수 있는 영역
+public enum SheetPickerDragArea: Equatable, Sendable {
+    /// 보이는 칸 안에서만 굴린다 (기본)
+    case viewport
+    /// 받은 공간 전체 어디를 위아래로 끌어도 굴린다. 보이는 칸 밖 빈 곳은 투명한 끌기 영역이 된다.
+    /// 선택 칸은 공간 세로 가운데에서 `verticalOffset`만큼 옮긴 자리에 온다(음수면 위로).
+    /// 작은 화면에서 옮긴 만큼 위가 모자라면, 보이는 칸이 공간 위 끝에서 `minimumTopSpacing`보다 붙지 않게 내려 둔다.
+    case fill(verticalOffset: CGFloat = 0, minimumTopSpacing: CGFloat = 0)
+}
+
 /// 바텀 시트에서 사용되는 휠 스타일 피커 뷰
 ///
 /// 3개의 항목을 표시하며 중앙에 선택된 항목이 강조 표시됩니다.
@@ -30,31 +40,114 @@ import SwiftUI
 /// ```
 public struct SheetPickerView<Item: Identifiable & Hashable>: View {
 
+    let items: [Item]
+    let selectedItem: Item
+    let displayText: (Item) -> String
+    let icon: ((Item) -> Image)?
+    let onSelect: (Item) -> Void
+    let width: CGFloat
+    let itemHeight: CGFloat
+    let itemSpacing: CGFloat
+    let dragArea: SheetPickerDragArea
+
+    /// SheetPickerView 초기화
+    /// - Parameters:
+    ///   - items: 표시할 항목 배열
+    ///   - selectedItem: 현재 선택된 항목
+    ///   - displayText: 각 항목의 표시 텍스트를 반환하는 클로저
+    ///   - icon: 텍스트 왼쪽에 붙일 아이콘 (기본값: nil)
+    ///   - width: 피커의 너비 (기본값: 130)
+    ///   - itemHeight: 각 항목의 높이 (기본값: 45)
+    ///   - itemSpacing: 항목 간 간격 (기본값: 8)
+    ///   - dragArea: 손가락으로 굴릴 수 있는 영역 (기본값: 보이는 칸)
+    ///   - onSelect: 항목 선택 시 호출되는 클로저
+    public init(
+        items: [Item],
+        selectedItem: Item,
+        displayText: @escaping (Item) -> String,
+        icon: ((Item) -> Image)? = nil,
+        width: CGFloat = 130,
+        itemHeight: CGFloat = 45,
+        itemSpacing: CGFloat = 8,
+        dragArea: SheetPickerDragArea = .viewport,
+        onSelect: @escaping (Item) -> Void
+    ) {
+        self.items = items
+        self.selectedItem = selectedItem
+        self.displayText = displayText
+        self.icon = icon
+        self.width = width
+        self.itemHeight = itemHeight
+        self.itemSpacing = itemSpacing
+        self.dragArea = dragArea
+        self.onSelect = onSelect
+    }
+
+    /// 정확히 3개 항목이 노출되는 높이
+    private var viewportHeight: CGFloat { itemHeight * 3 + itemSpacing * 2 }
+
+    public var body: some View {
+        switch dragArea {
+        case .viewport:
+            wheel(frameHeight: viewportHeight, viewportTop: 0)
+                .frame(width: width, height: viewportHeight)
+        case let .fill(verticalOffset, minimumTopSpacing):
+            // 받은 공간 전체를 스크롤 영역으로 써서 빈 곳을 끌어도 휠이 돈다.
+            // 보이는 건 공간 세로 가운데(+ verticalOffset)의 칸들뿐이다.
+            GeometryReader { proxy in
+                let centered = (proxy.size.height - viewportHeight) / 2 + verticalOffset
+                let lowest = max(minimumTopSpacing, proxy.size.height - viewportHeight)
+                // 1pt 미만 흔들림으로 휠을 다시 그리지 않도록 정수 pt로 맞춘다.
+                let viewportTop = min(max(minimumTopSpacing, centered), lowest).rounded()
+                wheel(frameHeight: proxy.size.height, viewportTop: viewportTop)
+                    // 칸 자리가 바뀌면 스크롤 기준점도 바뀐다. 이미 뜬 스크롤 뷰에서 여백과 위치를 함께 옮기면
+                    // 위치가 맨 위로 튀어(첫 항목이 가운데) 고른 값과 어긋나므로, 새 자리에서 처음부터 다시 그린다.
+                    // 다시 그리면 고른 값(selectedItem)에서 시작하므로, 멈춰 있을 때는 보이는 값이 바뀌지 않는다.
+                    .id(viewportTop)
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+            }
+        }
+    }
+
+    private func wheel(frameHeight: CGFloat, viewportTop: CGFloat) -> some View {
+        SheetPickerWheel(
+            items: items,
+            selectedItem: selectedItem,
+            displayText: displayText,
+            icon: icon,
+            width: width,
+            itemHeight: itemHeight,
+            itemSpacing: itemSpacing,
+            frameHeight: frameHeight,
+            viewportTop: viewportTop,
+            limitsTapToVisibleRows: dragArea != .viewport,
+            onSelect: onSelect
+        )
+    }
+}
+
+/// 휠 본체. 스크롤 영역(`frameHeight`) 안에서 위 끝으로부터 `viewportTop`만큼 내려온 곳에 칸들을 보인다.
+private struct SheetPickerWheel<Item: Identifiable & Hashable>: View {
+
     // MARK: - Properties
 
-    /// 표시할 항목 배열
     let items: [Item]
-
-    /// 현재 선택된 항목
     let selectedItem: Item
-
-    /// 항목의 표시 텍스트를 반환하는 클로저
     let displayText: (Item) -> String
-
-    /// 텍스트 왼쪽에 붙일 아이콘을 반환하는 클로저 (없으면 텍스트만 표시)
     let icon: ((Item) -> Image)?
-
-    /// 항목 선택 시 호출되는 클로저
     let onSelect: (Item) -> Void
-
-    /// 피커의 너비 (기본값: 130)
     let width: CGFloat
-
-    /// 각 항목의 높이 (기본값: 45)
     let itemHeight: CGFloat
-
-    /// 항목 간 간격 (기본값: 8)
     let itemSpacing: CGFloat
+
+    /// 스크롤 영역 전체 높이
+    let frameHeight: CGFloat
+
+    /// 스크롤 영역 위 끝에서 보이는 칸들의 위 끝까지 거리
+    let viewportTop: CGFloat
+
+    /// 보이는 칸 밖(가려진) 항목은 누르지 못하게 할지 — 넓힌 끌기 영역에서 빈 곳을 눌러도 값이 바뀌지 않게
+    let limitsTapToVisibleRows: Bool
 
     // MARK: - State
 
@@ -71,24 +164,17 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
 
     // MARK: - Initialization
 
-    /// SheetPickerView 초기화
-    /// - Parameters:
-    ///   - items: 표시할 항목 배열
-    ///   - selectedItem: 현재 선택된 항목
-    ///   - displayText: 각 항목의 표시 텍스트를 반환하는 클로저
-    ///   - icon: 텍스트 왼쪽에 붙일 아이콘 (기본값: nil)
-    ///   - width: 피커의 너비 (기본값: 130)
-    ///   - itemHeight: 각 항목의 높이 (기본값: 45)
-    ///   - itemSpacing: 항목 간 간격 (기본값: 8)
-    ///   - onSelect: 항목 선택 시 호출되는 클로저
-    public init(
+    init(
         items: [Item],
         selectedItem: Item,
         displayText: @escaping (Item) -> String,
-        icon: ((Item) -> Image)? = nil,
-        width: CGFloat = 130,
-        itemHeight: CGFloat = 45,
-        itemSpacing: CGFloat = 8,
+        icon: ((Item) -> Image)?,
+        width: CGFloat,
+        itemHeight: CGFloat,
+        itemSpacing: CGFloat,
+        frameHeight: CGFloat,
+        viewportTop: CGFloat,
+        limitsTapToVisibleRows: Bool,
         onSelect: @escaping (Item) -> Void
     ) {
         self.items = items
@@ -98,10 +184,16 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
         self.width = width
         self.itemHeight = itemHeight
         self.itemSpacing = itemSpacing
+        self.frameHeight = frameHeight
+        self.viewportTop = viewportTop
+        self.limitsTapToVisibleRows = limitsTapToVisibleRows
         self.onSelect = onSelect
+        let pitch = itemHeight + itemSpacing
         let initialIndex = items.firstIndex(of: selectedItem) ?? 0
         self._centeredIndex = State(initialValue: initialIndex)
-        self._position = State(initialValue: ScrollPosition(y: Self.offset(for: initialIndex, pitch: itemHeight + itemSpacing)))
+        self._position = State(initialValue: ScrollPosition(
+            y: Self.offset(for: initialIndex, pitch: pitch, centerSlotTop: viewportTop + pitch)
+        ))
     }
 
     // MARK: - Layout Metrics
@@ -109,36 +201,55 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
     /// 스냅 격자의 기준이 되는 한 슬롯(항목 높이 + 간격)의 높이
     private var slotPitch: CGFloat { itemHeight + itemSpacing }
 
-    /// 정확히 3개 항목이 노출되는 뷰포트 높이
+    /// 스크롤 영역 위 끝에서 가운데 칸 위 끝까지의 거리. 세 칸짜리면 한 슬롯이다.
+    private var centerSlotTop: CGFloat { viewportTop + slotPitch }
+
+    /// 정확히 3개 항목이 노출되는 높이
     private var viewportHeight: CGFloat { itemHeight * 3 + itemSpacing * 2 }
 
     /// `index` 항목이 중앙에 오는 스크롤 오프셋.
-    /// 오프셋 0은 위 여백(한 슬롯)이 다 올라간 상태라 그때 중앙에는 두 번째 항목이 온다. 그래서 한 슬롯을 뺀다.
-    private static func offset(for index: Int, pitch: CGFloat) -> CGFloat {
-        CGFloat(index - 1) * pitch
+    /// 오프셋 0은 위 여백이 다 올라가 첫 항목이 스크롤 영역 맨 위에 붙은 상태다.
+    /// 그 항목이 가운데 칸까지 내려오려면 가운데 칸 위 끝까지의 거리(`centerSlotTop`)만큼 빼야 한다.
+    /// 세 칸짜리면 `centerSlotTop`이 한 슬롯이라 (index - 1) × 슬롯이 된다.
+    private static func offset(for index: Int, pitch: CGFloat, centerSlotTop: CGFloat) -> CGFloat {
+        CGFloat(index) * pitch - centerSlotTop
+    }
+
+    private func offset(for index: Int) -> CGFloat {
+        Self.offset(for: index, pitch: slotPitch, centerSlotTop: centerSlotTop)
     }
 
     // MARK: - Body
 
-    public var body: some View {
+    var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(spacing: itemSpacing) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     pickerItemView(item, index: index)
+                        // 세 칸 밖 항목은 가려져 안 보이므로 눌리지 않게 한다 — 빈 곳을 누르면 끌기만 된다.
+                        .allowsHitTesting(!limitsTapToVisibleRows || abs(index - centeredIndex) <= 1)
                 }
             }
+            .frame(width: width)
+            .frame(maxWidth: .infinity)
             .scrollTargetLayout()
         }
         .scrollPosition($position)
         // 자유 스크롤 대신 슬롯 격자에 스냅 → 손을 떼면 항상 항목이 정확히 중앙에 정렬되어
         // 여러 피커를 나란히 둘 때 행끼리 수평 정렬이 어긋나지 않는다.
         .scrollTargetBehavior(SlotSnapScrollBehavior(pitch: slotPitch))
-        // 첫/마지막 항목도 중앙까지 올라올 수 있도록 위·아래로 한 슬롯만큼 스크롤 여백을 둔다.
-        // 이 여백 덕분에 스크롤 오프셋 0에서 첫 항목이 중앙에 정렬된다.
-        .contentMargins(.vertical, slotPitch, for: .scrollContent)
-        .frame(width: width, height: viewportHeight)
+        // 첫/마지막 항목도 가운데 칸까지 올 수 있도록 위·아래 여백을 둔다.
+        // 위 여백이 가운데 칸 위 끝까지의 거리라, 스크롤을 맨 위로 올리면 첫 항목이 가운데 칸에 온다.
+        .contentMargins(.top, centerSlotTop, for: .scrollContent)
+        .contentMargins(.bottom, max(0, frameHeight - centerSlotTop - itemHeight), for: .scrollContent)
+        // 넓힌 스크롤 영역에서도 보이는 건 세 칸뿐이다.
+        .mask(alignment: .top) {
+            Rectangle()
+                .frame(height: viewportHeight)
+                .padding(.top, viewportTop)
+        }
         .onScrollGeometryChange(for: Int.self) { geometry in
-            // 위 여백(contentInsets.top)을 더해 "첫 항목이 중앙일 때 0"이 되도록 맞춘 뒤 슬롯 단위로 반올림
+            // 위 여백(contentInsets.top = 가운데 칸 위 끝까지 거리)을 더해 "첫 항목이 중앙일 때 0"이 되도록 맞춘 뒤 슬롯 단위로 반올림
             Int(((geometry.contentOffset.y + geometry.contentInsets.top) / slotPitch).rounded())
         } action: { _, newIndex in
             centeredIndex = min(max(newIndex, 0), items.count - 1)
@@ -158,7 +269,7 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
             guard !isUserScrolling,
                   let index = items.firstIndex(where: { $0.id == newID }), index != centeredIndex else { return }
             withAnimation(.easeInOut(duration: 0.3)) {
-                position.scrollTo(y: Self.offset(for: index, pitch: slotPitch))
+                position.scrollTo(y: offset(for: index))
             }
         }
     }
@@ -178,7 +289,7 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
         let isSelected = centeredIndex == index
         Button {
             withAnimation(.easeInOut(duration: 0.3)) {
-                position.scrollTo(y: Self.offset(for: index, pitch: slotPitch))
+                position.scrollTo(y: offset(for: index))
             }
             if item.id != selectedItem.id {
                 onSelect(item)
@@ -225,6 +336,8 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
 private struct SlotSnapScrollBehavior: ScrollTargetBehavior {
     let pitch: CGFloat
 
+    /// `target.rect`는 위 여백까지 포함한 좌표라(0 = 첫 항목이 가운데 칸) 슬롯 배수가 곧 "항목이 가운데 칸에 딱 오는" 자리다.
+    /// 위 여백이 한 슬롯이 아니어도(빈 곳까지 넓힌 휠) 그대로 맞는다.
     func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
         guard pitch > 0 else { return }
         target.rect.origin.y = (target.rect.minY / pitch).rounded() * pitch
