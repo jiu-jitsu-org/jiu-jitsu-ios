@@ -6,7 +6,7 @@
 import Foundation
 
 // 출전 부문(#122) — 대회는 띠 × 체급으로 나가고, 도복·노기를 따로 여는 대회가 많아 메달의 무게가 부문마다 다르다.
-// 서버 계약(backend #164)이 개발 서버에 없어 아직 서버로 보내거나 받지 않는다 — 앱 안에서만 쓰는 값이다.
+// rawValue는 서버 요청/응답의 값 그대로다.
 
 /// 출전 복장 — 도복(기) / 노기
 public enum CompetitionUniform: String, Codable, Equatable, Sendable, CaseIterable, Identifiable, Hashable {

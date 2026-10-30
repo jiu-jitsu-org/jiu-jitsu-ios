@@ -60,8 +60,8 @@ public struct MyProfileCompetitionSection: View {
 
 /// 같은 대회(대회명 + 연도)에서 나간 부문들을 묶은 단위(#123).
 ///
-/// 서버는 아직 '대회 1개 = 메달 1개' 목록만 저장하므로(backend #164 전), 여러 부문은 같은 이름·연도로
-/// 항목을 여러 개 저장하고 표시할 때만 묶는다.
+/// 앱의 `Competition`은 한 건 = 한 부문이라 같은 이름·연도의 기록을 표시할 때 묶는다.
+/// 서버와는 대회 → 부문 중첩으로 주고받고, 그 변환은 Data 레이어 DTO가 맡는다.
 struct CompetitionGroup {
     /// 맨 위에 고정할 수 있는 줄 수(#124). 많이 고정하면 고정의 의미(대표 기록)가 흐려진다.
     static let maxPinnedCount = 3

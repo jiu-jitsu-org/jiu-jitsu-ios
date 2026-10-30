@@ -42,7 +42,8 @@ struct CommunityProfileResponseDTO: Codable {
             weightKg: weightKg,
             // 도장 삭제 시 BE가 "" 로 회신 → nil 정규화 (UI는 nil 여부로 "입력하기" 버튼 분기)
             academyName: academyName.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 },
-            competitions: competitions?.map { $0.toDomain() } ?? [],
+            // 서버는 대회 → 부문 중첩으로 내려 준다. 앱은 한 건 = 한 부문이라 부문마다 펼친다(순서는 서버 정렬 그대로).
+            competitions: competitions?.flatMap { $0.toDomain() } ?? [],
             bestSubmission: bestSubmission.flatMap { SubmissionType(rawValue: $0) },
             favoriteSubmission: favoriteSubmission.flatMap { SubmissionType(rawValue: $0) },
             bestTechnique: bestTechnique.flatMap { TechniqueType(rawValue: $0) },
@@ -58,20 +59,54 @@ struct CommunityProfileResponseDTO: Codable {
     }
 }
 
-/// 대회 정보 DTO
+/// 대회 정보 DTO — 대회 한 건 아래에 출전 부문들이 있다.
 struct CompetitionDTO: Codable {
     let competitionYear: Int
-    // 연도만 받는 서버(backend #164)로 바뀌면 월이 빠질 수 있어 옵셔널로 디코딩한다.
-    let competitionMonth: Int?
+    // 대회명 없는 기록은 ""로 온다.
     let competitionName: String
+    let competitionPinned: Bool?
+    let divisions: [CompetitionDivisionDTO]?
+
+    func toDomain() -> [Competition] {
+        (divisions ?? []).map { division in
+            division.toDomain(
+                year: competitionYear,
+                name: competitionName,
+                isPinned: competitionPinned ?? false
+            )
+        }
+    }
+}
+
+/// 출전 부문 DTO
+struct CompetitionDivisionDTO: Codable {
     let competitionRank: String
-    
-    func toDomain() -> Competition {
+    let competitionUniform: String?
+    let competitionBelt: String?
+    let competitionWeightLimit: Double?
+    let competitionWeightBound: String?
+    let competitionAbsolute: Bool?
+
+    /// 무게와 이하/초과가 모두 있어야 체급으로 본다.
+    private var weightLimit: CompetitionWeightLimit? {
+        guard let competitionWeightLimit,
+              let bound = competitionWeightBound.flatMap(CompetitionWeightLimit.Bound.init(rawValue:)) else {
+            return nil
+        }
+        return CompetitionWeightLimit(kg: competitionWeightLimit, bound: bound)
+    }
+
+    func toDomain(year: Int, name: String, isPinned: Bool) -> Competition {
+        // 모르는 값은 부문 없음으로 둔다 — 값이 늘어나도 프로필 전체 디코딩이 깨지지 않게.
         Competition(
-            competitionYear: competitionYear,
-            competitionMonth: competitionMonth,
-            competitionName: competitionName,
-            competitionRank: CompetitionRank(rawValue: competitionRank) ?? .participation
+            competitionYear: year,
+            competitionName: name,
+            competitionRank: CompetitionRank(rawValue: competitionRank) ?? .participation,
+            competitionUniform: competitionUniform.flatMap(CompetitionUniform.init(rawValue:)),
+            competitionWeightLimit: weightLimit,
+            competitionAbsolute: competitionAbsolute ?? false,
+            competitionBelt: competitionBelt.flatMap(BeltRank.init(rawValue:)),
+            isPinned: isPinned
         )
     }
 }
