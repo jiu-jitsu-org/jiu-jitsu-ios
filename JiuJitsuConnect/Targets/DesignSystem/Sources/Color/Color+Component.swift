@@ -93,6 +93,7 @@ public struct ComponentColors {
         public let primary = Primary()
         public let white = White()
         public let transparentText = TransparentText()
+        public let tint = Tint()
 
         public struct Dark {
             public let bg = Color.semantic.interactive.strong
@@ -123,6 +124,15 @@ public struct ComponentColors {
             public let text = Color.semantic.interactive.primary
             public let pressedBg = Color.semantic.surface.primarySubtle
             public let disabledBg = Color.semantic.transparent.transparent
+            public let disabledText = Color.semantic.text.disabled
+        }
+
+        /// 주 CTA 옆·아래에 두는 보조 CTA — 연한 파랑 면. 색은 일반 버튼의 tint와 같다.
+        public struct Tint {
+            public let bg = Color.semantic.surface.primarySubtle
+            public let text = Color.semantic.interactive.primary
+            public let pressedBg = Color.semantic.surface.primarySubtlePressed
+            public let disabledBg = Color.semantic.surface.disabled
             public let disabledText = Color.semantic.text.disabled
         }
     }
