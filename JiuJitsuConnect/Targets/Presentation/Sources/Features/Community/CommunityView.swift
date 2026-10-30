@@ -137,7 +137,9 @@ public struct CommunityView: View {
 
                     if store.isMyProfileButtonVisible {
                         Button {
-                            store.send(.view(.myProfileTapped))
+                            // 탭바와 달리 화면 안 버튼으로 MY에 가는 길이라, 바로 바뀌면 끊겨 보여 MY가 서서히 드러나게 한다(#139).
+                            // 탭 전환은 부모가 같은 차례에 처리하므로 이 애니메이션이 그대로 이어진다.
+                            store.send(.view(.myProfileTapped), animation: .easeInOut(duration: 0.5))
                         } label: {
                             myAvatar
                                 .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)

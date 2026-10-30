@@ -43,6 +43,8 @@ public struct CompetitionInfoFeature: Sendable {
     public struct State: Equatable, Sendable {
         var mode: Mode = .add
         var step: Step = .result
+        // 마지막 단계 이동이 뒤로 가기였는지. 화면이 단계 전환을 어느 쪽으로 밀지 정하는 데 쓴다.
+        var isMovingBack = false
 
         // 이번 흐름에서 저장한 기록(첫 기록 + '부문 추가'로 더한 기록). 완료 화면에 한 줄씩 보여 준다.
         // 하나라도 있으면 그다음 입력은 '부문 추가' — 대회명·연도는 그대로 두고 메달과 부문만 다시 묻는다(#123).
@@ -270,6 +272,7 @@ public struct CompetitionInfoFeature: Sendable {
             switch action {
             case .view(.nextButtonTapped):
                 guard !state.isSaving else { return .none }
+                state.isMovingBack = false
                 switch state.step {
                 case .result:
                     state.step = state.isAddingDivision ? .division : .name
@@ -305,6 +308,7 @@ public struct CompetitionInfoFeature: Sendable {
 
             case .view(.addDivisionButtonTapped):
                 // 같은 대회의 다른 부문은 보통 같은 복장·같은 띠라 그대로 두고, 체급과 메달만 다시 고르게 한다.
+                state.isMovingBack = false
                 state.step = .result
                 state.result = .gold
                 state.weightText = ""
@@ -320,6 +324,7 @@ public struct CompetitionInfoFeature: Sendable {
                 state.savedRecords.append(competition)
                 state.hasSavedInThisFlow = true
                 state.celebratesOnDone = true
+                state.isMovingBack = false
                 state.step = .done
                 return .none
 
@@ -334,6 +339,7 @@ public struct CompetitionInfoFeature: Sendable {
 
             case .view(.backButtonTapped):
                 guard !state.isSaving else { return .none }
+                state.isMovingBack = true
                 switch state.step {
                 case .result:
                     // 이번 흐름에서 저장한 뒤 부문 추가 중이면 그 완료 화면으로 돌아간다.
