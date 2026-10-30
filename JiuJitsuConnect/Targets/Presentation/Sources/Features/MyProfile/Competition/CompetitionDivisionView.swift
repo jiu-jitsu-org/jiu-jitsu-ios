@@ -18,6 +18,9 @@ struct CompetitionDivisionView: View {
     @State private var weightInput = ""
     // '확인'으로 키보드를 내리는 동안 버튼이 곧바로 '완료'가 되어, 빠르게 두 번 누르면 가려진 줄을 보기 전에 저장될 수 있어 잠시 막는다.
     @State private var isKeyboardClosing = false
+    // 체급 묶음을 제목 아래 빈 곳에 맞춰 두려고 스크롤 영역과 묶음 높이를 잰다.
+    @State private var scrollHeight: CGFloat = 0
+    @State private var blockHeight: CGFloat = 0
 
     private enum Metrics {
         static let segmentWidth: CGFloat = 160
@@ -39,6 +42,16 @@ struct CompetitionDivisionView: View {
         // 앱솔루트 체크 — 켜면 원이 채워지는 체크 표시. 버튼처럼 보이지 않게 글자 옆 작은 원으로만 둔다.
         static let checkCircleSize: CGFloat = 20
         static let checkMarkSize: CGFloat = 14
+        // 제목 위아래 여백과 제목 높이 — 이 아래 남은 곳에 체급 묶음을 둔다.
+        static let titleTopPadding: CGFloat = 40
+        static let titleHeight: CGFloat = 36
+        static let titleMinGap: CGFloat = 40
+        static let contentBottomPadding: CGFloat = 24
+        // 띠 칩이 펼쳐질 자리(줄 간격 12 + 칩 40)를 늘 비워 둔다. 펼쳐도 위 내용이 움직이지 않게 하고,
+        // 같은 높이를 위에도 비워 보이는 묶음이 가운데에 오게 한다.
+        static let beltChipsReserve: CGFloat = 52
+        // 정가운데는 아래로 처져 보여, 남는 곳을 위 1 : 아래 2로 나눠 살짝 올린다.
+        static let blockTopRatio: CGFloat = 1.0 / 3.0
     }
 
     // 체급 숫자가 화면에서 가장 위계가 높다 — 질문 제목(30pt)보다 크게.
@@ -50,28 +63,47 @@ struct CompetitionDivisionView: View {
     var body: some View {
         VStack(spacing: 0) {
             // 단계를 넘겨도 제목이 흔들리지 않게, 다른 단계처럼 위에서 같은 자리에 둔다.
+            // 체급 묶음은 제목과 아래 버튼 사이 빈 곳의 가운데보다 살짝 위에 둔다.
             ScrollView {
                 VStack(spacing: 0) {
                     titleSection
-                        .padding(.top, 40)
-                        .padding(.bottom, 40)
+                        .padding(.top, Metrics.titleTopPadding)
+                        .padding(.bottom, Metrics.titleMinGap)
 
-                    uniformSegment
-                        .padding(.bottom, 32)
+                    VStack(spacing: 0) {
+                        uniformSegment
+                            .padding(.bottom, 32)
 
-                    weightSection
-                        .padding(.bottom, 24)
+                        weightSection
+                            .padding(.bottom, 24)
 
-                    optionSection
+                        optionSection
+                    }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { blockHeight = $0 }
+                    .padding(.top, blockTopPadding)
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 24)
+                .padding(.bottom, Metrics.contentBottomPadding)
             }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { scrollHeight = $0 }
             .scrollBounceBehavior(.basedOnSize)
             .scrollDismissesKeyboard(.interactively)
 
             buttonSection
         }
+    }
+
+    /// 제목 아래 남은 높이. 묶음이 이보다 크면(작은 화면) 위 여백 없이 이어 붙고 스크롤된다.
+    private var centeredAreaHeight: CGFloat {
+        max(0, scrollHeight - Metrics.titleTopPadding - Metrics.titleHeight - Metrics.titleMinGap - Metrics.contentBottomPadding)
+    }
+
+    /// 띠 칩 자리만큼 위에도 비워 보이는 묶음을 맞추고, 남는 곳은 위 1 : 아래 2로 나눈다.
+    /// 키보드가 올라오거나 작은 화면이라 남는 곳이 없으면 위 여백을 줄여 체급 칸이 버튼에 가리지 않게 한다.
+    private var blockTopPadding: CGFloat {
+        let free = max(0, centeredAreaHeight - blockHeight)
+        let biased = Metrics.beltChipsReserve + max(0, free - Metrics.beltChipsReserve) * Metrics.blockTopRatio
+        return min(free, biased)
     }
 
     // MARK: - View Components
@@ -80,7 +112,7 @@ struct CompetitionDivisionView: View {
         Text("어떤 체급으로 나갔나요?")
             .font(Font.pretendard.display1)
             .foregroundStyle(Color.component.textfieldDisplay.focus.title)
-            .frame(height: 36)
+            .frame(height: Metrics.titleHeight)
             .frame(maxWidth: .infinity, alignment: .center)
     }
 
@@ -210,9 +242,13 @@ struct CompetitionDivisionView: View {
             }
             .frame(maxWidth: .infinity)
 
-            if store.isBeltExpanded {
-                beltChips
+            // 펼칠 자리는 늘 잡아 두어, 칩이 나와도 위 내용이 밀리지 않는다.
+            ZStack(alignment: .top) {
+                if store.isBeltExpanded {
+                    beltChips
+                }
             }
+            .frame(height: Metrics.beltChipsReserve - 12, alignment: .top)
         }
     }
 
