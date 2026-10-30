@@ -117,6 +117,8 @@ public struct CommunityDetailFeature: Sendable {
         /// AUTH_TOKEN_REFRESH_REQUEST에 대한 갱신 성공 응답. `loggedIn`(수동 동기화)과 달리
         /// 토큰 값이 같아도 반드시 웹에 회신한다 — 요청한 웹뷰가 응답을 기다리고 있기 때문이다.
         case tokenRefreshed(accessToken: String)
+        /// 로그인 안내를 닫음. 상세 웹이 보관한 행위(좋아요 등)를 버리지 않으면 나중에 다른 곳에서 로그인할 때 실행된다.
+        case loginCancelled
         case loggedOut
         case sessionExpired
     }
@@ -273,6 +275,8 @@ public struct CommunityDetailFeature: Sendable {
             state.accessToken = accessToken
             WebBridge.logEvent("토큰 갱신 완료 → AUTH_LOGIN_SUCCESS(갱신 후 토큰) 회신", source: .detail(state.url))
             enqueueLoginSuccess(accessToken: accessToken, into: &state)
+        case .loginCancelled:
+            enqueue(.authLoginCancelled, into: &state)
         case .loggedOut:
             state.accessToken = nil
             enqueue(.authLogout, into: &state)
