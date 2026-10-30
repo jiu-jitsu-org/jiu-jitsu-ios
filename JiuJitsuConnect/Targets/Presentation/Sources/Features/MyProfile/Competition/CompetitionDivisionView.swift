@@ -21,6 +21,8 @@ struct CompetitionDivisionView: View {
     // 체급 묶음을 제목 아래 빈 곳에 맞춰 두려고 스크롤 영역과 묶음 높이를 잰다.
     @State private var scrollHeight: CGFloat = 0
     @State private var blockHeight: CGFloat = 0
+    // 숫자를 치기 시작할 때의 위 여백. '건너뛰기'가 숨어 잠깐 넓어진 공간 때문에 묶음이 내려갔다 올라가지 않게 그 이상 늘리지 않는다.
+    @State private var focusedTopPaddingCap: CGFloat?
 
     private enum Metrics {
         static let segmentWidth: CGFloat = 160
@@ -52,6 +54,8 @@ struct CompetitionDivisionView: View {
         // 띠 칩이 펼쳐질 자리(줄 간격 + 칩)를 늘 비워 둔다. 펼쳐도 위 내용이 움직이지 않게 하고,
         // 같은 높이를 위에도 비워 보이는 묶음이 가운데에 오게 한다.
         static let beltChipsReserve: CGFloat = optionRowChipsSpacing + beltChipHeight
+        // 키보드가 오르내려 남는 곳이 바뀔 때 묶음도 키보드와 비슷한 박자로 따라 움직인다.
+        static let keyboardFollowAnimation: Animation = .smooth(duration: 0.35)
         // 정가운데는 아래로 처져 보여, 남는 곳을 위 1 : 아래 2로 나눠 살짝 올린다.
         static let blockTopRatio: CGFloat = 1.0 / 3.0
     }
@@ -87,7 +91,17 @@ struct CompetitionDivisionView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, Metrics.contentBottomPadding)
             }
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { scrollHeight = $0 }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                // 처음 잴 때는 바로 그 자리에 두고, 이후(키보드 등) 바뀔 때만 움직임을 준다.
+                if scrollHeight == 0 {
+                    scrollHeight = height
+                } else {
+                    withAnimation(Metrics.keyboardFollowAnimation) { scrollHeight = height }
+                }
+            }
+            .onChange(of: isWeightFocused) { _, isFocused in
+                focusedTopPaddingCap = isFocused ? blockTopPadding : nil
+            }
             .scrollBounceBehavior(.basedOnSize)
             .scrollDismissesKeyboard(.interactively)
 
@@ -105,7 +119,7 @@ struct CompetitionDivisionView: View {
     private var blockTopPadding: CGFloat {
         let free = max(0, centeredAreaHeight - blockHeight)
         let biased = Metrics.beltChipsReserve + max(0, free - Metrics.beltChipsReserve) * Metrics.blockTopRatio
-        return min(free, biased)
+        return min(free, biased, focusedTopPaddingCap ?? .infinity)
     }
 
     // MARK: - View Components
