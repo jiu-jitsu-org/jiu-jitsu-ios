@@ -188,7 +188,7 @@ public struct LoginFeature: Sendable {
                     try await self.clock.sleep(for: toastState.duration)
                     await send(.internal(.toastDismissed))
                 }
-                .cancellable(id: CancelID.toast)
+                .cancellable(id: CancelID.toast, cancelInFlight: true)
                 
             case .internal(.toastDismissed):
                 state.toast = nil
