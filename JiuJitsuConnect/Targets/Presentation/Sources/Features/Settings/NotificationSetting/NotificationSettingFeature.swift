@@ -19,7 +19,8 @@ public struct NotificationSettingFeature: Sendable {
 
     @ObservableState
     public struct State: Equatable, Sendable {
-        // 첫 GET 완료 전에는 토글을 스켈레톤으로 표시 (잘못된 초기값 노출 방지)
+        // 첫 GET 성공 전에는 토글을 스켈레톤으로 표시 (잘못된 초기값 노출 방지).
+        // 조회가 실패해도 그대로 둔다 — 서버 값을 모르는 채 토글하면 4개 값을 모두 기본값으로 덮어쓴다.
         var isLoaded: Bool = false
 
         var isAccountSecurityNotificationEnabled: Bool = true
@@ -29,12 +30,28 @@ public struct NotificationSettingFeature: Sendable {
         var isMarketingNotificationEnabled: Bool = false
 
         // 서버에 반영된 것으로 확인된 마지막 값. 저장 실패 시 토글을 이 값으로 되돌린다.
-        // 조회가 실패해 서버 값을 모르면 nil이고, 이때는 되돌리지 않는다.
         var lastSavedSetting: NoticeSetting?
 
         var toast: ToastState?
 
         public init() {}
+
+        /// 화면에는 바뀌었지만 아직 서버 반영이 확인되지 않은 값(디바운스 대기·응답 대기 중).
+        /// 화면이 닫히면 이 화면의 저장 요청도 취소되므로, 부모가 닫힐 때 이 값을 대신 저장한다.
+        var unsavedSetting: NoticeSetting? {
+            guard isLoaded else { return nil }
+            let current = currentSetting
+            return current == lastSavedSetting ? nil : current
+        }
+
+        fileprivate var currentSetting: NoticeSetting {
+            NoticeSetting(
+                securityEnabled: isAccountSecurityNotificationEnabled,
+                serviceEnabled: isServiceNoticeNotificationEnabled,
+                communityEnabled: isCommunityNotificationEnabled,
+                marketingEnabled: isMarketingNotificationEnabled
+            )
+        }
     }
 
     public enum Action: Sendable {
@@ -72,29 +89,29 @@ public struct NotificationSettingFeature: Sendable {
 
             case .view(.onAppear):
                 // 서버에서 카테고리별 수신 여부 초기값 로드
-                return .run { send in
-                    await send(.internal(.fetchSettingResponse(
-                        await TaskResult { try await noticeClient.fetchSetting() }
-                    )))
-                }
-                .cancellable(id: CancelID.fetchSetting, cancelInFlight: true)
+                return fetchSetting()
 
             case .view(.backButtonTapped):
                 return .run { _ in await self.dismiss() }
 
             case let .view(.accountSecurityNotificationToggled(isOn)):
+                // 조회 전·실패 시에는 스켈레톤이라 들어올 일이 없지만, 서버 값을 모르는 채 저장하지 않도록 막는다.
+                guard state.isLoaded else { return .none }
                 state.isAccountSecurityNotificationEnabled = isOn
                 return .send(.internal(.triggerUpdateSetting))
 
             case let .view(.serviceNoticeNotificationToggled(isOn)):
+                guard state.isLoaded else { return .none }
                 state.isServiceNoticeNotificationEnabled = isOn
                 return .send(.internal(.triggerUpdateSetting))
 
             case let .view(.communityNotificationToggled(isOn)):
+                guard state.isLoaded else { return .none }
                 state.isCommunityNotificationEnabled = isOn
                 return .send(.internal(.triggerUpdateSetting))
 
             case let .view(.marketingNotificationToggled(isOn)):
+                guard state.isLoaded else { return .none }
                 state.isMarketingNotificationEnabled = isOn
                 return .send(.internal(.triggerUpdateSetting))
 
@@ -102,12 +119,7 @@ public struct NotificationSettingFeature: Sendable {
 
             case .internal(.triggerUpdateSetting):
                 // 연속 토글 시 마지막 상태만 반영 (300ms debounce)
-                let setting = NoticeSetting(
-                    securityEnabled: state.isAccountSecurityNotificationEnabled,
-                    serviceEnabled: state.isServiceNoticeNotificationEnabled,
-                    communityEnabled: state.isCommunityNotificationEnabled,
-                    marketingEnabled: state.isMarketingNotificationEnabled
-                )
+                let setting = state.currentSetting
                 return .run { send in
                     try await self.clock.sleep(for: .milliseconds(300))
                     await send(.internal(.updateSettingResponse(
@@ -124,9 +136,11 @@ public struct NotificationSettingFeature: Sendable {
 
             case let .internal(.fetchSettingResponse(.failure(error))):
                 Log.trace("알림 설정 조회 실패: \(error)", category: .network, level: .error)
-                // 조회 실패 시에도 화면은 사용 가능하도록 공개 (기본값 노출 + 토스트 안내)
-                state.isLoaded = true
-                return handleError(error)
+                // 토글은 스켈레톤으로 둔 채 그 자리에서 다시 불러올 수 있게 한다.
+                return .send(.internal(.showToast(.init(
+                    message: "알림 설정을 불러오지 못했어요.",
+                    style: .action(title: "다시 시도", action: .done)
+                ))))
 
             case let .internal(.updateSettingResponse(.success(setting))):
                 state.lastSavedSetting = setting
@@ -155,9 +169,20 @@ public struct NotificationSettingFeature: Sendable {
                 return .cancel(id: CancelID.toast)
 
             case .view(.toastButtonTapped):
-                return .send(.internal(.toastDismissed))
+                // 버튼이 있는 토스트는 조회 실패 안내뿐이라, 아직 못 불러온 상태면 다시 조회한다.
+                guard !state.isLoaded else { return .send(.internal(.toastDismissed)) }
+                return .merge(.send(.internal(.toastDismissed)), fetchSetting())
             }
         }
+    }
+
+    private func fetchSetting() -> Effect<Action> {
+        .run { send in
+            await send(.internal(.fetchSettingResponse(
+                await TaskResult { try await noticeClient.fetchSetting() }
+            )))
+        }
+        .cancellable(id: CancelID.fetchSetting, cancelInFlight: true)
     }
 
     private func handleError(_ error: Error) -> Effect<Action> {
