@@ -153,14 +153,3 @@ public struct CommunityDetailView: View {
         .background(Color.component.background.default)
     }
 }
-
-// MARK: - 스와이프 백 차단
-
-/// 이 화면이 맨 위에 있는 동안 내비게이션 스와이프 백을 막는다. (`UINavigationController+SwipeBack` 참고)
-private struct InteractivePopBlocker: UIViewControllerRepresentable {
-    func makeUIViewController(context: Context) -> InteractivePopBlockingViewController {
-        InteractivePopBlockingViewController()
-    }
-
-    func updateUIViewController(_ uiViewController: InteractivePopBlockingViewController, context: Context) {}
-}

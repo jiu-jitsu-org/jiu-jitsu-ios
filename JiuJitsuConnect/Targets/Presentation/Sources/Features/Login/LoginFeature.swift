@@ -11,6 +11,8 @@ public struct LoginFeature: Sendable {
     // MARK: - State & Action
     @ObservableState
     public struct State: Equatable {
+        /// 서버 로그인 진행 중. 이 동안 들어온 다른 로그인·'둘러보기'는 무시한다(진행 중인 로그인이 토큰을 저장하므로).
+        /// SNS 화면이 떠 있는 단계는 포함하지 않는다 — 카카오톡에서 로그인 없이 돌아오면 SDK가 응답하지 않아 풀리지 않는다.
         public var isLoading = false
         public var toast: ToastState?
         
@@ -77,7 +79,7 @@ public struct LoginFeature: Sendable {
             switch action {
                 // MARK: - 로그인 버튼 탭
             case .view(.googleButtonTapped):
-                state.isLoading = true
+                guard !state.isLoading else { return .none }
                 return .run { send in
                     await send(.internal(.socialLoginResponse(
                         await TaskResult { try await authClient.loginWithGoogle() }
@@ -85,7 +87,7 @@ public struct LoginFeature: Sendable {
                 }
                 
             case .view(.appleButtonTapped):
-                state.isLoading = true
+                guard !state.isLoading else { return .none }
                 return .run { send in
                     await send(.internal(.socialLoginResponse(
                         await TaskResult { try await authClient.loginWithApple() }
@@ -93,7 +95,7 @@ public struct LoginFeature: Sendable {
                 }
                 
             case .view(.kakaoButtonTapped):
-                state.isLoading = true
+                guard !state.isLoading else { return .none }
                 return .run { send in
                     await send(.internal(.socialLoginResponse(
                         await TaskResult { try await authClient.loginWithKakao() }
@@ -105,7 +107,7 @@ public struct LoginFeature: Sendable {
             // SNS SDK를 우회하고 서버 sns-login에 kakao/kakaoTest로 바로 로그인한다.
             // 이후 흐름(신규→약관/닉네임, 기존→didLogin)은 기존 serverLogin 경로를 그대로 탄다.
             case .view(.testLoginTapped):
-                state.isLoading = true
+                guard !state.isLoading else { return .none }
                 return .send(.internal(.socialLoginResponse(.success(
                     SNSUser(accessToken: "kakaoTest", snsProvider: .kakao)
                 ))))
@@ -113,6 +115,7 @@ public struct LoginFeature: Sendable {
 
                 // MARK: - 로그인 결과 처리
             case let .internal(.socialLoginResponse(.success(user))):
+                state.isLoading = true
                 return .run { send in
                     await send(.internal(.serverLoginResponse(
                         await TaskResult { try await authClient.serverLogin(user) }
@@ -174,6 +177,12 @@ public struct LoginFeature: Sendable {
                     // 닉네임 설정 실패
                 case let .element(id: _, action: .nicknameSetting(.delegate(.signupFailed(message)))):
                     return .send(.internal(.showToast(.init(message: message, style: .info, bottomPadding: 72))))
+
+                    // 임시 토큰 만료 — 이 토큰으로는 가입할 수 없어 첫 화면으로 돌려 로그인부터 다시 하게 한다.
+                case .element(id: _, action: .nicknameSetting(.delegate(.signupSessionExpired))):
+                    state.tempToken = nil
+                    state.path.removeAll()
+                    return .send(.internal(.showToast(.init(message: "시간이 지나 가입이 중단됐어요. 다시 로그인해주세요.", style: .info))))
                     
                 default: return .none
                 }
@@ -199,6 +208,7 @@ public struct LoginFeature: Sendable {
                 
             // MARK: - 기타 액션
             case .view(.aroundButtonTapped):
+                guard !state.isLoading else { return .none }
                 return .send(.delegate(.skipLogin))
                 
             case .delegate, .view, .internal:
