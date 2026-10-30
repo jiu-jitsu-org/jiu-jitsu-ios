@@ -159,7 +159,7 @@ struct CompetitionDivisionView: View {
                 .padding(.leading, Metrics.unitBoundSpacing)
         }
         .frame(maxWidth: .infinity)
-        // 앱솔루트(무제한급)를 고르면 체급은 의미가 없어 흐리게 하고 입력을 막는다.
+        // 앱솔루트(무제한급)를 고르면 체급은 의미가 없어 흐리게 하고 입력을 막는다. 글자색은 그대로 두고 옅기는 여기 한 곳에서만 준다.
         .opacity(store.isAbsolute ? Metrics.absoluteDimmedOpacity : 1)
         .disabled(store.isAbsolute)
         // 앱솔루트인 동안은 칸을 비워 "–"로 보이고, 풀면 입력해 둔 숫자(store에 남겨 둔 값)를 다시 보인다.
@@ -167,14 +167,6 @@ struct CompetitionDivisionView: View {
             if isAbsolute { isWeightFocused = false }
             weightInput = isAbsolute ? "" : store.weightText
         }
-    }
-
-    private var weightTextColor: Color {
-        store.isAbsolute ? Color.semantic.text.disabled : Color.component.textfieldDisplay.focus.text
-    }
-
-    private var weightLabelColor: Color {
-        store.isAbsolute ? Color.semantic.text.disabled : Color.semantic.text.secondary
     }
 
     /// 숫자만 담은 칸 — 숫자 길이와 상관없이 폭을 고정해 칠 때 흔들리지 않게 한다.
@@ -186,7 +178,7 @@ struct CompetitionDivisionView: View {
             prompt: Text(store.isAbsolute ? "–" : "00").foregroundStyle(Color.semantic.text.tertiary)
         )
         .font(Self.weightFont)
-        .foregroundStyle(weightTextColor)
+        .foregroundStyle(Color.component.textfieldDisplay.focus.text)
         .tint(Color.component.textfieldDisplay.focus.text)
         .keyboardType(.decimalPad)
         .multilineTextAlignment(.center)
@@ -212,7 +204,7 @@ struct CompetitionDivisionView: View {
     private var weightUnit: some View {
         Text("kg")
             .font(Font.pretendard.custom(weight: .medium, size: 24))
-            .foregroundStyle(store.isAbsolute ? Color.semantic.text.disabled : Color.component.picker.unit)
+            .foregroundStyle(Color.component.picker.unit)
             .offset(y: Metrics.unitOpticalOffset)
     }
 
@@ -243,7 +235,7 @@ struct CompetitionDivisionView: View {
                     }
                 }
             }
-            .foregroundStyle(weightLabelColor)
+            .foregroundStyle(Color.semantic.text.secondary)
             .frame(height: Metrics.weightBoxHeight)
             .contentShape(Rectangle())
         }
