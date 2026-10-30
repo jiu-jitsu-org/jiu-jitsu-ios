@@ -44,12 +44,7 @@ struct JiuJitsuConnectApp: App {
                     $0.firebaseClient = firebaseClient
                     $0.authClient = DependencyContainer.shared.configureAuthClient()
                     $0.userClient = DependencyContainer.shared.configureUserClient()
-                    #if DEBUG || BETA
-                    // 대회 부문·고정 화면 확인용 더미(CompetitionDummyData.swift, API 연결 시 삭제)
-                    $0.communityClient = DependencyContainer.shared.configureCommunityClient().withCompetitionDummyFields()
-                    #else
                     $0.communityClient = DependencyContainer.shared.configureCommunityClient()
-                    #endif
                     $0.imageUploadClient = DependencyContainer.shared.configureImageUploadClient()
                     $0.imageClient = DependencyContainer.shared.configureImageClient()
                     $0.authSessionEventClient = DependencyContainer.shared.configureAuthSessionEventClient()
