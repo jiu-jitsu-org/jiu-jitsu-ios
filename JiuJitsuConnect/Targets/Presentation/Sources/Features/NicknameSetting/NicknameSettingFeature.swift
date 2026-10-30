@@ -96,6 +96,8 @@ public struct NicknameSettingFeature: Sendable {
         public enum DelegateAction: Sendable {
             case signupSuccessful(info: AuthInfo)
             case signupFailed(message: String)
+            /// 약관·닉네임에 시간이 걸려 임시 토큰이 만료됨 — 가입을 이어갈 수 없어 로그인부터 다시 해야 한다.
+            case signupSessionExpired
             case didUpdateNickname(String)  // 닉네임 수정 저장 완료 — 부모가 화면을 닫고 프로필 반영
             case cancel
         }
@@ -188,6 +190,8 @@ public struct NicknameSettingFeature: Sendable {
                             nickname: state.nickname,
                             isMarketingAgreed: isMarketingAgreed
                         )
+                        // 결과가 올 때까지 CTA를 막아 연타로 가입이 두 번 나가지 않게 한다.
+                        state.isCtaButtonEnabled = false
                         return .run { send in
                             await send(.internal(.signupResponse(
                                 await TaskResult { try await userClient.signup(info) }
@@ -225,6 +229,12 @@ public struct NicknameSettingFeature: Sendable {
                 return .send(.delegate(.signupSuccessful(info: info)))
                 
             case let .internal(.signupResponse(.failure(error))):
+                // 임시 토큰 만료(403 A0003)는 다시 눌러도 계속 실패하므로 재시도 대신 로그인부터 다시 안내한다.
+                if case .apiError(code: .expiredToken, message: _) = error as? DomainError {
+                    return .send(.delegate(.signupSessionExpired))
+                }
+                // 일시 오류면 다시 시도할 수 있게 CTA를 살린다(중복·형식 오류는 handleError가 다시 끈다).
+                state.isCtaButtonEnabled = true
                 return handleError(state: &state, error: error)
 
             case let .internal(.updateNicknameResponse(.success(nickname))):
