@@ -171,8 +171,16 @@ struct CompetitionDivisionView: View {
             store.send(.view(.weightBoundToggled))
         } label: {
             HStack(spacing: 4) {
-                Text(store.weightBound == .under ? "이하" : "초과")
-                    .font(Font.pretendard.bodyM)
+                // 위아래 꺾쇠처럼 글자도 위아래로 굴러 바뀐다 — 초과로 가면 아래에서 올라오고, 이하로 가면 위에서 내려온다.
+                ZStack {
+                    Text(store.weightBound == .under ? "이하" : "초과")
+                        .font(Font.pretendard.bodyM)
+                        .id(store.weightBound)
+                        // 떠나는 글자는 이전 상태의 전환을 쓰므로, 글자마다 자기 자리(초과는 아래, 이하는 위)로 들고 나게 한다.
+                        .transition(.move(edge: store.weightBound == .over ? .bottom : .top).combined(with: .opacity))
+                }
+                .clipped()
+                .animation(Self.expandAnimation, value: store.weightBound)
 
                 VStack(spacing: 0) {
                     ForEach([-90.0, 90.0], id: \.self) { degrees in
