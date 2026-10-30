@@ -419,6 +419,14 @@ final class WebPullToRefreshController {
             collapse()
             return
         }
+        // reload 때 WebKit이 이전 스크롤 위치를 되살리는데, 그 순간 웹은 로딩 스켈레톤이라
+        // 목록 중간에 멈춘다(#113). 로드 완료 시점에 맨 위(밴드가 보이는 자리)로 되돌린다.
+        if let scrollView, !scrollView.isTracking {
+            scrollView.setContentOffset(
+                CGPoint(x: 0, y: -scrollView.adjustedContentInset.top),
+                animated: false
+            )
+        }
         phase = .success
         band.update(phase: .success, progress: 1)
         collapseTask?.cancel()
