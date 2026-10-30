@@ -47,9 +47,11 @@ struct CompetitionDivisionView: View {
         static let titleHeight: CGFloat = 36
         static let titleMinGap: CGFloat = 40
         static let contentBottomPadding: CGFloat = 24
-        // 띠 칩이 펼쳐질 자리(줄 간격 12 + 칩 40)를 늘 비워 둔다. 펼쳐도 위 내용이 움직이지 않게 하고,
+        static let optionRowChipsSpacing: CGFloat = 12
+        static let beltChipHeight: CGFloat = 40
+        // 띠 칩이 펼쳐질 자리(줄 간격 + 칩)를 늘 비워 둔다. 펼쳐도 위 내용이 움직이지 않게 하고,
         // 같은 높이를 위에도 비워 보이는 묶음이 가운데에 오게 한다.
-        static let beltChipsReserve: CGFloat = 52
+        static let beltChipsReserve: CGFloat = optionRowChipsSpacing + beltChipHeight
         // 정가운데는 아래로 처져 보여, 남는 곳을 위 1 : 아래 2로 나눠 살짝 올린다.
         static let blockTopRatio: CGFloat = 1.0 / 3.0
     }
@@ -235,7 +237,7 @@ struct CompetitionDivisionView: View {
     /// 앱솔루트·출전 띠 — 같은 위계의 곁가지라 한 줄에 글자 크기로 나란히 둔다.
     /// 출전 띠를 누르면 그 아래로 띠 칩을 펼친다.
     private var optionSection: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Metrics.optionRowChipsSpacing) {
             HStack(spacing: 24) {
                 absoluteToggle
                 beltToggle
@@ -248,7 +250,7 @@ struct CompetitionDivisionView: View {
                     beltChips
                 }
             }
-            .frame(height: Metrics.beltChipsReserve - 12, alignment: .top)
+            .frame(height: Metrics.beltChipHeight, alignment: .top)
         }
     }
 
@@ -331,7 +333,7 @@ struct CompetitionDivisionView: View {
                         .minimumScaleFactor(0.8)
                         .frame(maxWidth: .infinity)
                 }
-                .appButtonStyle(store.belt == belt ? .primary : .neutral, size: .medium, height: 40, horizontalPadding: 4)
+                .appButtonStyle(store.belt == belt ? .primary : .neutral, size: .medium, height: Metrics.beltChipHeight, horizontalPadding: 4)
                 .accessibilityAddTraits(store.belt == belt ? .isSelected : [])
             }
         }
