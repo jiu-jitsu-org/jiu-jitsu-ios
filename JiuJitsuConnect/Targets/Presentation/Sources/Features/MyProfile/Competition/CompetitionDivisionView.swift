@@ -44,28 +44,26 @@ struct CompetitionDivisionView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 내용이 짧아 위에 몰리지 않게, 남는 높이 안에서 세로 가운데에 둔다.
-            GeometryReader { proxy in
-                ScrollView {
-                    VStack(spacing: 0) {
-                        titleSection
-                            .padding(.bottom, 40)
+            // 단계를 넘겨도 제목이 흔들리지 않게, 다른 단계처럼 위에서 같은 자리에 둔다.
+            ScrollView {
+                VStack(spacing: 0) {
+                    titleSection
+                        .padding(.top, 40)
+                        .padding(.bottom, 40)
 
-                        uniformSegment
-                            .padding(.bottom, 32)
+                    uniformSegment
+                        .padding(.bottom, 32)
 
-                        weightSection
-                            .padding(.bottom, 24)
+                    weightSection
+                        .padding(.bottom, 24)
 
-                        optionSection
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 24)
-                    .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+                    optionSection
                 }
-                .scrollBounceBehavior(.basedOnSize)
-                .scrollDismissesKeyboard(.interactively)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
             }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.interactively)
 
             buttonSection
         }

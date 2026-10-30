@@ -26,9 +26,6 @@ struct CompetitionNameView: View {
             // 목록이 있으면 버튼 위 남은 공간을 목록이 채우고, 없으면 빈 공간으로 버튼을 키보드 위에 붙인다.
             if store.suggestions.isEmpty {
                 Spacer()
-                // 목록이 떠 있으면 고르면 되고, 이 버튼까지 두면 키보드 위 좁은 자리에서 목록이 두 줄만 보인다.
-                // 그래서 맞는 대회가 없을 때(못 찾았을 때)만 보인다.
-                namelessButton
             } else {
                 suggestionSection
             }
@@ -47,11 +44,11 @@ struct CompetitionNameView: View {
             .font(Font.pretendard.display1)
             .foregroundStyle(Color.component.textfieldDisplay.focus.title)
             .frame(maxWidth: .infinity, alignment: .center)
-            .multilineTextAlignment(.center)
+            .frame(height: 36)
             .padding(.horizontal, 30)
-            // 자동완성 목록이 키보드 위에 보일 자리를 만들려고 다른 단계와 같은 상단 여백을 쓴다.
+            // 단계를 넘겨도 제목과 내용 자리가 흔들리지 않게 다른 단계와 같은 위·아래 여백을 쓴다.
             .padding(.top, 40)
-            .padding(.bottom, 8)
+            .padding(.bottom, 40)
     }
 
     private var textFieldSection: some View {
@@ -125,24 +122,6 @@ struct CompetitionNameView: View {
         .frame(maxHeight: .infinity, alignment: .top)
         .padding(.horizontal, 20)
         .padding(.top, 16)
-    }
-
-    // 자동완성으로도 못 찾은 사람이 기록을 포기하지 않게 이름 없이 넘어가는 길(#125).
-    // 이름 없는 기록은 대회명을 채우기 전까지 나만 보이므로, 그 사실은 완료 화면과 프로필에서 알려 준다.
-    private var namelessButton: some View {
-        Button {
-            store.send(.view(.namelessButtonTapped))
-        } label: {
-            Text("대회명이 기억나지 않아요")
-                .font(Font.pretendard.bodyS)
-                .foregroundStyle(Color.component.list.setting.subText)
-                .underline()
-                .frame(height: 44)
-                .padding(.horizontal, 16)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(.bottom, 4)
     }
 
     private var ctaButtonSection: some View {

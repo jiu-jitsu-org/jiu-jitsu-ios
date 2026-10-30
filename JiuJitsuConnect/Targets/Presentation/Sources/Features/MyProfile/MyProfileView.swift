@@ -241,11 +241,6 @@ public struct MyProfileView: View {
             competitions: store.communityProfile?.competitions,
             onAddCompetitionTapped: { store.send(.view(.addCompetitionButtonTapped)) },
             onCompetitionTapped: { entries in
-                // 대회명 없는 기록(#125)은 고정·부문 추가가 없어 바로 수정으로 들어간다.
-                if entries.count == 1, let entry = entries.first, entry.isNameless {
-                    store.send(.view(.competitionDetailTapped(entry)))
-                    return
-                }
                 // 이전 시트가 닫힘 신호 없이 사라졌을 때 남은 동작이 이번 시트를 닫을 때 실행되지 않게 비운다.
                 pendingCompetitionAction = nil
                 competitionSheet = CompetitionSheetTarget(entries: entries)
