@@ -12,9 +12,6 @@ import DesignSystem
 // MARK: - Competition Presentation Extensions
 
 extension Competition {
-    /// 대회명 없이 저장한 기록의 이름 자리 문구(#125)
-    static let namelessTitle = "대회명 없음"
-
     /// 대회 연도 표시 — 연도만 받으므로(#120) 월이 남아 있는 기존 기록도 연도만 보여 준다.
     var formattedYear: String {
         String(competitionYear)
@@ -46,14 +43,9 @@ extension Competition {
 
     /// 완료 화면 한 줄 — "2026 서울 오픈 · 도복 -76kg 은메달".
     /// 등록된 대회명에는 연도가 들어 있는 경우가 많아, 이름에 연도가 없을 때만 앞에 붙인다.
-    /// 대회명 없이 저장한 기록은 "2026 대회명 없음 · …".
     var completionSummary: String {
         let year = formattedYear
-        let title = if isNameless {
-            "\(year) \(Self.namelessTitle)"
-        } else {
-            competitionName.contains(year) ? competitionName : "\(year) \(competitionName)"
-        }
+        let title = competitionName.contains(year) ? competitionName : "\(year) \(competitionName)"
         guard let divisionText else { return "\(title) \(competitionRank.displayName)" }
         return "\(title) · \(divisionText) \(competitionRank.displayName)"
     }

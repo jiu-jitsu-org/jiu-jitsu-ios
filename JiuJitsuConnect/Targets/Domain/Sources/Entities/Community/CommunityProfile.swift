@@ -651,13 +651,6 @@ public struct Competition: Codable, Equatable, Sendable {
         competitionUniform != nil || competitionWeightLimit != nil || competitionAbsolute || competitionBelt != nil
     }
 
-    /// 대회명 없이 저장한 기록인지(#125).
-    /// 자동완성으로도 대회를 못 찾은 사람이 기록을 포기하지 않게 이름 없이도 저장하게 하되,
-    /// 어느 대회인지 모르는 메달이 프로필을 부풀리지 않도록 대회명을 채우기 전까지는 나만 본다(메달 합계에서도 뺀다).
-    public var isNameless: Bool {
-        competitionName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
     /// 고정 여부만 바꾼 사본
     public func settingPinned(_ isPinned: Bool) -> Competition {
         Competition(
