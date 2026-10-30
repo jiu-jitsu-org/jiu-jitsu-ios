@@ -47,11 +47,11 @@ struct CompetitionNameView: View {
             .font(Font.pretendard.display1)
             .foregroundStyle(Color.component.textfieldDisplay.focus.title)
             .frame(maxWidth: .infinity, alignment: .center)
-            .multilineTextAlignment(.center)
+            .frame(height: 36)
             .padding(.horizontal, 30)
-            // 자동완성 목록이 키보드 위에 보일 자리를 만들려고 다른 단계와 같은 상단 여백을 쓴다.
+            // 단계를 넘겨도 제목과 내용 자리가 흔들리지 않게 다른 단계와 같은 위·아래 여백을 쓴다.
             .padding(.top, 40)
-            .padding(.bottom, 8)
+            .padding(.bottom, 40)
     }
 
     private var textFieldSection: some View {
