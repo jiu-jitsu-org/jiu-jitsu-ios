@@ -18,7 +18,8 @@ public struct NicknameSettingFeature: Sendable {
     
     public init() {}
     
-    private enum CancelID { case apiCall }
+    // 중복 확인은 입력이 바뀌면 버려야 해서 가입·수정 저장(apiCall)과 따로 취소한다.
+    private enum CancelID { case apiCall, checkNickname }
     
     // 정규식 객체 재사용을 위한 Static 선언
     // 허용 문자는 한글(완성형)·영문·숫자만 — 공백·`_`·`.` 등 특수문자 불허(정책 2026-10-21, #67).
@@ -88,7 +89,8 @@ public struct NicknameSettingFeature: Sendable {
         }
         
         public enum InternalAction: Sendable {
-            case checkNicknameResponse(TaskResult<Bool>)
+            /// 응답이 늦게 와도 검사한 값에만 반영하도록 검사한 닉네임을 함께 싣는다.
+            case checkNicknameResponse(nickname: String, TaskResult<Bool>)
             case signupResponse(TaskResult<AuthInfo>)
             case updateNicknameResponse(TaskResult<String>)
         }
@@ -132,7 +134,8 @@ public struct NicknameSettingFeature: Sendable {
                     state.validationState = .idle
                     state.validatedNickname = nil
                 }
-                return .none
+                // 이전 입력값으로 보낸 중복 확인은 결과가 와도 지금 입력과 무관하다.
+                return .cancel(id: CancelID.checkNickname)
                 
             case .view(.doneButtonTapped):
                 guard state.isCtaButtonEnabled else { return .none }
@@ -212,17 +215,20 @@ public struct NicknameSettingFeature: Sendable {
                     .run { _ in await self.dismiss() }
                 )
                 
-            case let .internal(.checkNicknameResponse(.success(isAvailable))):
+            case let .internal(.checkNicknameResponse(nickname, .success(isAvailable))):
+                // 취소가 닿기 전에 도착한 이전 입력값의 응답은 버린다.
+                guard nickname == state.nickname else { return .none }
                 if isAvailable {
                     state.validationState = .available
-                    state.validatedNickname = state.nickname
+                    state.validatedNickname = nickname
                 } else {
                     state.validationState = .unavailable
                     state.isCtaButtonEnabled = false
                 }
                 return .none
                 
-            case let .internal(.checkNicknameResponse(.failure(error))):
+            case let .internal(.checkNicknameResponse(nickname, .failure(error))):
+                guard nickname == state.nickname else { return .none }
                 return handleError(state: &state, error: error)
                 
             case let .internal(.signupResponse(.success(info))):
@@ -258,10 +264,11 @@ public struct NicknameSettingFeature: Sendable {
     private func checkNickname(_ nickname: String) -> Effect<Action> {
         .run { send in
             await send(.internal(.checkNicknameResponse(
+                nickname: nickname,
                 await TaskResult { try await userClient.checkNickname(.init(nickname: nickname)) }
             )))
         }
-        .cancellable(id: CancelID.apiCall)
+        .cancellable(id: CancelID.checkNickname, cancelInFlight: true)
     }
 
     // 정규식 검사 최적화
