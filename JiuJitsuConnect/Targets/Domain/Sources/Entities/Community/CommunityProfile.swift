@@ -623,6 +623,10 @@ public struct Competition: Codable, Equatable, Sendable {
     /// 같은 대회의 여러 부문은 한 줄로 묶여 보이므로, 고정·해제는 묶인 항목 전부에 같은 값을 넣는다.
     public let isPinned: Bool
 
+    /// 자동완성(#121)에서 고른 등록 대회의 ID. 직접 입력한 기록은 nil.
+    /// 있으면 서버가 대회명·연도를 등록 대회 값으로 저장한다.
+    public let competitionId: Int?
+
     public init(
         competitionYear: Int,
         competitionMonth: Int? = nil,
@@ -632,7 +636,8 @@ public struct Competition: Codable, Equatable, Sendable {
         competitionWeightLimit: CompetitionWeightLimit? = nil,
         competitionAbsolute: Bool = false,
         competitionBelt: BeltRank? = nil,
-        isPinned: Bool = false
+        isPinned: Bool = false,
+        competitionId: Int? = nil
     ) {
         self.competitionYear = competitionYear
         self.competitionMonth = competitionMonth
@@ -643,6 +648,7 @@ public struct Competition: Codable, Equatable, Sendable {
         self.competitionAbsolute = competitionAbsolute
         self.competitionBelt = competitionBelt
         self.isPinned = isPinned
+        self.competitionId = competitionId
     }
 
     /// 출전 부문을 하나라도 입력했는지
@@ -661,7 +667,8 @@ public struct Competition: Codable, Equatable, Sendable {
             competitionWeightLimit: competitionWeightLimit,
             competitionAbsolute: competitionAbsolute,
             competitionBelt: competitionBelt,
-            isPinned: isPinned
+            isPinned: isPinned,
+            competitionId: competitionId
         )
     }
 }

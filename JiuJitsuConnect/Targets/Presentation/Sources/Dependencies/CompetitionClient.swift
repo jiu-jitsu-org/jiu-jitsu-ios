@@ -9,7 +9,7 @@ import ComposableArchitecture
 import Domain
 
 public struct CompetitionClient: Sendable {
-    /// 대회명 일부로 등록된 대회 검색 (GET `/api/competition?keyword=`)
+    /// 대회명 일부로 등록된 대회 검색 (GET `/api/community/competitions?keyword=`)
     public var searchCompetitions: @Sendable (String) async throws -> [RegisteredCompetition]
 
     public init(
@@ -20,14 +20,8 @@ public struct CompetitionClient: Sendable {
 }
 
 extension CompetitionClient: DependencyKey {
-    /// 등록 대회 검색 API(backend #165)가 개발 서버에 없어 서버에 연결하지 않고 빈 목록을 돌려준다.
-    /// 배포되면 다른 Client처럼 DependencyContainer에서 주입하고 `.unimplemented`로 되돌린다.
-    /// Debug·Beta는 화면 확인용 더미 목록을 쓴다(CompetitionDummyData.swift, API 연결 시 삭제).
-    #if DEBUG || BETA
-    public static let liveValue: Self = .dummyValue
-    #else
-    public static let liveValue: Self = Self(searchCompetitions: { _ in [] })
-    #endif
+    /// 실제 구현은 App의 DependencyContainer에서 주입한다.
+    public static let liveValue: Self = .unimplemented
 
     public static let testValue: Self = .unimplemented
 

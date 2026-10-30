@@ -66,6 +66,8 @@ struct CompetitionRequestDTO: Codable {
     let competitionYear: Int
     let competitionName: String
     let competitionPinned: Bool
+    // 자동완성에서 고른 등록 대회. 직접 입력이면 키를 보내지 않는다.
+    let competitionId: Int?
     let divisions: [CompetitionDivisionRequestDTO]
 
     /// 앱의 `Competition`(한 건 = 한 부문)을 같은 대회끼리 묶는다.
@@ -88,15 +90,22 @@ struct CompetitionRequestDTO: Codable {
                 groups.append([competition])
             }
         }
-        return groups.map(CompetitionRequestDTO.init(divisionsOf:))
+        // 같은 등록 대회 ID가 두 항목에 실리면 400(R0008)이라, 처음 나온 대회만 ID를 싣고 나머지는 직접 입력으로 보낸다.
+        // (연도를 모르는 등록 대회를 여러 해에 기록한 경우 등)
+        var usedIds = Set<Int>()
+        return groups.map { group in
+            let id = group.lazy.compactMap(\.competitionId).first.flatMap { usedIds.insert($0).inserted ? $0 : nil }
+            return CompetitionRequestDTO(divisionsOf: group, competitionId: id)
+        }
     }
 
-    private init(divisionsOf competitions: [Competition]) {
+    private init(divisionsOf competitions: [Competition], competitionId: Int?) {
         let first = competitions[0]
         self.competitionYear = first.competitionYear
         self.competitionName = first.competitionName.trimmingCharacters(in: .whitespaces)
         // 고정은 대회 단위 — 부문 중 하나라도 고정이면 대회를 고정한다.
         self.competitionPinned = competitions.contains(where: \.isPinned)
+        self.competitionId = competitionId
         self.divisions = competitions.map(CompetitionDivisionRequestDTO.init(from:))
     }
 }
