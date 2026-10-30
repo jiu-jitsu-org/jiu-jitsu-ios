@@ -98,6 +98,7 @@ public struct CompetitionInfoFeature: Sendable {
 
         // 자동완성에서 고른 등록 대회(#121). 저장할 때 ID를 같이 보내 같은 대회를 하나로 묶는다.
         // 고른 뒤 대회명을 고쳐 쓰면 직접 입력으로 보고 연결을 끊는다(남겨 두면 서버가 등록된 이름으로 되돌린다).
+        // 연도가 정해진 대회는 연도를 바꿔도 끊는다 — 서버가 등록 연도로 되돌리고, 같은 이름·연도의 다른 기록과 겹치면 거절한다.
         var linkedCompetition: LinkedCompetition?
 
         // 4단계: 출전 부문 — 건너뛸 수 있다. 출전 띠는 고른 칩을 다시 누르면 선택이 풀린다.
@@ -142,8 +143,9 @@ public struct CompetitionInfoFeature: Sendable {
                 self.preselectYear(original.competitionYear)
                 self.name = original.competitionName
                 self.result = original.competitionRank
+                // 저장된 연도는 서버가 등록 연도로 맞춘 값이라 그 연도에 묶는다.
                 self.linkedCompetition = original.competitionId.map {
-                    LinkedCompetition(id: $0, name: original.competitionName)
+                    LinkedCompetition(id: $0, name: original.competitionName, year: original.competitionYear)
                 }
                 // 수정은 저장된 값을 그대로 보여 준다. 부문 없이 저장된 기록에 기본값을 채우면
                 // 이름만 고치려던 사람이 모르는 사이 부문까지 저장하게 되므로 비워 둔다.
@@ -178,7 +180,9 @@ public struct CompetitionInfoFeature: Sendable {
             guard let last = entries.last else { return }
             self.savedRecords = entries
             self.name = last.competitionName
-            self.linkedCompetition = last.competitionId.map { LinkedCompetition(id: $0, name: last.competitionName) }
+            self.linkedCompetition = last.competitionId.map {
+                LinkedCompetition(id: $0, name: last.competitionName, year: last.competitionYear)
+            }
             self.preselectYear(last.competitionYear)
             // 같은 대회의 다른 부문은 보통 같은 복장·같은 띠라 마지막 기록을 따른다.
             self.uniform = last.competitionUniform ?? .gi
@@ -197,6 +201,8 @@ public struct CompetitionInfoFeature: Sendable {
     struct LinkedCompetition: Equatable, Sendable {
         let id: Int
         let name: String
+        /// 등록 대회의 연도. 날짜를 모르는 대회는 nil이라 어느 연도로 저장해도 된다.
+        let year: Int?
     }
 
     public enum Step: Equatable, Sendable {
@@ -387,6 +393,9 @@ public struct CompetitionInfoFeature: Sendable {
             case let .view(.yearOptionSelected(option)):
                 // 직접 고른 연도라 목록은 그대로 둔다(굴리는 중에 목록이 바뀌면 칸이 밀린다).
                 state.year = option.year
+                if let linked = state.linkedCompetition, let linkedYear = linked.year, linkedYear != option.year {
+                    state.linkedCompetition = nil
+                }
                 state.yearBeforeSuggestion = nil
                 return .none
 
@@ -456,7 +465,9 @@ public struct CompetitionInfoFeature: Sendable {
             case let .view(.suggestionTapped(competition)):
                 state.name = competition.name
                 state.suggestions = []
-                state.linkedCompetition = competition.id.map { LinkedCompetition(id: $0, name: competition.name) }
+                state.linkedCompetition = competition.id.map {
+                    LinkedCompetition(id: $0, name: competition.name, year: competition.year)
+                }
                 // 고르기 직전 입력으로 시작된 검색이 늦게 돌아와 목록을 다시 띄우지 않게 한다.
                 let cancelSearch: Effect<Action> = .cancel(id: CancelID.searchCompetitions)
                 // 공개 일정에서 온 대회는 열린 연도를 알므로, 다음 연도 단계에 그 연도를 골라 둔다(#126).
