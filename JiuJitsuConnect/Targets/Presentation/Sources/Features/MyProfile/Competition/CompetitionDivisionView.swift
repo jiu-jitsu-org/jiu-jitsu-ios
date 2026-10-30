@@ -50,7 +50,8 @@ struct CompetitionDivisionView: View {
         static let titleMinGap: CGFloat = 40
         static let contentBottomPadding: CGFloat = 24
         static let optionRowChipsSpacing: CGFloat = 12
-        static let beltChipHeight: CGFloat = 40
+        // BeltSelectButton 기본(.regular) 높이
+        static let beltChipHeight: CGFloat = 56
         // 띠 칩이 펼쳐질 자리(줄 간격 + 칩)를 늘 비워 둔다. 펼쳐도 위 내용이 움직이지 않게 하고,
         // 같은 높이를 위에도 비워 보이는 묶음이 가운데에 오게 한다.
         static let beltChipsReserve: CGFloat = optionRowChipsSpacing + beltChipHeight
@@ -65,6 +66,8 @@ struct CompetitionDivisionView: View {
 
     // 펼치고 접는 건 한 동작으로 본다(기본 500ms).
     private static let expandAnimation: Animation = .easeInOut(duration: 0.5)
+    // 출전 띠는 자주 열고 닫는 곁가지라 더 빠르게, 끝이 부드럽게 멈추도록 한다.
+    private static let beltAnimation: Animation = .smooth(duration: 0.3)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -258,10 +261,11 @@ struct CompetitionDivisionView: View {
             }
             .frame(maxWidth: .infinity)
 
-            // 펼칠 자리는 늘 잡아 두어, 칩이 나와도 위 내용이 밀리지 않는다.
+            // 펼칠 자리는 늘 잡아 두어, 칩이 나와도 위 내용이 밀리지 않는다. 칩만 줄 아래에서 살짝 내려오며 나타난다.
             ZStack(alignment: .top) {
                 if store.isBeltExpanded {
                     beltChips
+                        .transition(.opacity.combined(with: .offset(y: -8)))
                 }
             }
             .frame(height: Metrics.beltChipHeight, alignment: .top)
@@ -301,12 +305,12 @@ struct CompetitionDivisionView: View {
         .accessibilityAddTraits(store.isAbsolute ? .isSelected : [])
     }
 
-    /// 출전 띠는 지금 띠로 채워 두고 "출전 띠 블루 ›"로 접어 둔다. 누르면 아래로 펼쳐 고친다.
+    /// 출전 띠는 지금 띠로 채워 두고 "출전 띠 블루 ›"로 접어 둔다. 누르면 아래로 펼쳐 고치고, 다시 눌러야 접힌다.
     private var beltToggle: some View {
         Button {
             // 띠를 고르려는 것이니 키보드를 내려 펼친 칩이 가려지지 않게 한다.
             isWeightFocused = false
-            store.send(.view(.beltRowTapped), animation: Self.expandAnimation)
+            store.send(.view(.beltRowTapped), animation: Self.beltAnimation)
         } label: {
             HStack(spacing: 4) {
                 Text("출전 띠")
@@ -339,16 +343,13 @@ struct CompetitionDivisionView: View {
             spacing: Metrics.chipSpacing
         ) {
             ForEach(BeltRank.allCases) { belt in
-                Button {
-                    store.send(.view(.beltSelected(belt)), animation: Self.expandAnimation)
-                } label: {
-                    Text(belt.displayName)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .frame(maxWidth: .infinity)
+                BeltSelectButton(
+                    color: belt.selectButtonColor,
+                    title: belt.displayName,
+                    isSelected: store.belt == belt
+                ) {
+                    store.send(.view(.beltSelected(belt)), animation: Self.beltAnimation)
                 }
-                .appButtonStyle(store.belt == belt ? .primary : .neutral, size: .medium, height: Metrics.beltChipHeight, horizontalPadding: 4)
-                .accessibilityAddTraits(store.belt == belt ? .isSelected : [])
             }
         }
     }

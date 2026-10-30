@@ -28,6 +28,17 @@ extension BeltRank {
         }
     }
     
+    /// 공용 띠 고르기 버튼에 그릴 띠 색
+    var selectButtonColor: BeltSelectButton.BeltColor {
+        switch self {
+        case .white: return .white
+        case .blue: return .blue
+        case .purple: return .purple
+        case .brown: return .brown
+        case .black: return .black
+        }
+    }
+
     /// 벨트 등급에 따른 헤더 배경색
     var headerBackgroundColor: Color {
         switch self {

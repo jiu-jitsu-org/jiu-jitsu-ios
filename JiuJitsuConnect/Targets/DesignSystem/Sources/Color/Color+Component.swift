@@ -520,6 +520,43 @@ public struct ComponentColors {
         }
     }
 
+    // MARK: - Belt Select Button
+    public let beltSelectButton = BeltSelectButton()
+
+    public struct BeltSelectButton {
+        public let selected = Selected()
+        public let unselected = Unselected()
+        public let belt = Belt()
+
+        public struct Selected {
+            public let bg = Color.semantic.surface.primarySubtle
+            public let pressedBg = Color.semantic.surface.primarySubtlePressed
+            public let labelText = Color.semantic.interactive.primary
+        }
+
+        public struct Unselected {
+            public let bg = Color.semantic.surface.secondary
+            public let pressedBg = Color.semantic.surface.secondaryPressed
+            public let labelText = Color.semantic.text.primary
+        }
+
+        /// 띠 그림 색 — MY 헤더의 띠 색을 그대로 가져다 쓴다. 흰 띠만 바탕에 묻히지 않게 흰색 + 옅은 테두리로 그린다.
+        public struct Belt {
+            private let header = MyProfileHeader.Bg()
+            public let white = Color.primitive.bw.white
+            public let whiteEdge = Color.primitive.coolGray.cg200
+            public var blue: Color { header.blue }
+            public var purple: Color { header.purple }
+            public var brown: Color { header.brwon }
+            public var black: Color { header.black }
+            /// 단(그랄을 감는 자리) — 검은 띠만 빨강, 나머지는 검정
+            public var rankBar: Color { header.black }
+            public let blackRankBar = Color.primitive.red.r500
+            /// 그랄(단에 감는 흰 줄)
+            public let stripe = Color.primitive.bw.white
+        }
+    }
+
     // MARK: - Tab Bar
     public let tabBar = TabBar()
 

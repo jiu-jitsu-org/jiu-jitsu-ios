@@ -15,7 +15,7 @@ public enum SNSProvider: String, Codable, CaseIterable, Sendable {
     public var displayName: String {
         switch self {
         case .google: "구글"
-        case .apple: "에플"
+        case .apple: "애플"
         case .kakao: "카카오"
         }
     }

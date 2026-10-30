@@ -28,6 +28,9 @@ public struct CommunityDetailFeature: Sendable {
         var loadToken: UUID = UUID()
         var isLoading: Bool = true
         var hasError: Bool = false
+        // 스스로 닫기 시작함(뒤로가기·CLOSE_SUBVIEW). 닫힘 애니메이션 동안 살아 있는 웹뷰가
+        // 늦은 로딩 완료를 보내지 않도록 dismiss 전에 웹뷰를 먼저 멈춘다(#152).
+        var isClosing = false
 
         // 서브뷰 생성 시점의 access token. WEBVIEW_READY 핸드셰이크 때 초기 로그인 상태를 동기화한다.
         // (세션 연속성은 공유 쿠키가 보장하고, 토큰 주입은 웹 JS 상태 동기화용 보조 채널이다.)
@@ -114,6 +117,8 @@ public struct CommunityDetailFeature: Sendable {
         /// AUTH_TOKEN_REFRESH_REQUEST에 대한 갱신 성공 응답. `loggedIn`(수동 동기화)과 달리
         /// 토큰 값이 같아도 반드시 웹에 회신한다 — 요청한 웹뷰가 응답을 기다리고 있기 때문이다.
         case tokenRefreshed(accessToken: String)
+        /// 로그인 안내를 닫음. 상세 웹이 보관한 행위(좋아요 등)를 버리지 않으면 나중에 다른 곳에서 로그인할 때 실행된다.
+        case loginCancelled
         case loggedOut
         case sessionExpired
     }
@@ -130,6 +135,7 @@ public struct CommunityDetailFeature: Sendable {
                 return .none
 
             case .view(.backTapped):
+                state.isClosing = true
                 return .run { _ in await self.dismiss() }
 
             // MARK: - 브릿지 다이얼로그 결과 (→ 웹 회신)
@@ -215,6 +221,7 @@ public struct CommunityDetailFeature: Sendable {
 
                 case .closeSubview:
                     // 자기 자신(최상단 서브뷰)을 닫는다. 스택 push면 pop, 모달이면 dismiss된다.
+                    state.isClosing = true
                     return .run { _ in await self.dismiss() }
 
                 case let .showConfirmDialog(payload):
@@ -268,6 +275,8 @@ public struct CommunityDetailFeature: Sendable {
             state.accessToken = accessToken
             WebBridge.logEvent("토큰 갱신 완료 → AUTH_LOGIN_SUCCESS(갱신 후 토큰) 회신", source: .detail(state.url))
             enqueueLoginSuccess(accessToken: accessToken, into: &state)
+        case .loginCancelled:
+            enqueue(.authLoginCancelled, into: &state)
         case .loggedOut:
             state.accessToken = nil
             enqueue(.authLogout, into: &state)

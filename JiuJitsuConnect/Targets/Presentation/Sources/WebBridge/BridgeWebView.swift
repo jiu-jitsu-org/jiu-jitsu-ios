@@ -39,6 +39,9 @@ struct BridgeWebView: UIViewRepresentable {
     // 이 웹뷰를 소유한 Feature가 실제로 처리하는 '사전 확인형' 메시지. 처리하지 않는 웹뷰가 지원한다고
     // 알리면 웹이 요청을 보내 놓고 응답 없이 기다리므로, 처리하는 화면만 넘긴다.
     var capabilities: [WebBridgeCapability] = []
+    // false가 되면 로딩을 멈추고 이후 콜백을 보내지 않는다. 화면을 닫는 도중(상태는 이미 지워졌는데
+    // 웹뷰는 닫힘 애니메이션 동안 살아 있음) 늦게 온 로딩 완료가 없어진 화면으로 가지 않게 한다(#152).
+    var isActive: Bool = true
     let onLoadingStarted: () -> Void
     let onLoadingFinished: () -> Void
     let onLoadingFailed: () -> Void
@@ -135,6 +138,10 @@ struct BridgeWebView: UIViewRepresentable {
     }
 
     func updateUIView(_ container: UIView, context: Context) {
+        guard isActive else {
+            context.coordinator.deactivate()
+            return
+        }
         context.coordinator.update(
             onLoadingStarted: onLoadingStarted,
             onLoadingFinished: onLoadingFinished,
@@ -155,6 +162,8 @@ struct BridgeWebView: UIViewRepresentable {
     }
 
     static func dismantleUIView(_ container: UIView, coordinator: Coordinator) {
+        // 진행 중인 로딩의 콜백이 해제 뒤에 오지 않게 멈춘다(스와이프로 닫으면 isActive를 거치지 않는다).
+        coordinator.deactivate()
         // 핸들러를 정리해 WKUserContentController가 잔존 참조를 들고 있지 않도록 한다.
         coordinator.webView?.configuration.userContentController
             .removeScriptMessageHandler(forName: WebBridge.appBridgeHandlerName)
@@ -185,6 +194,8 @@ struct BridgeWebView: UIViewRepresentable {
         // 고정 셸(상세) 웹뷰에서 키보드가 메인 문서를 위로 스크롤해 헤더가 화면 밖으로 밀리는 것을
         // 막기 위해, 메인 스크롤뷰의 세로 오프셋을 0으로 고정할지 여부.
         private var locksDocumentScroll = false
+        // deactivate() 이후에는 웹뷰가 아직 살아 있어도 store로 아무것도 보내지 않는다.
+        private var isDeactivated = false
 
         init(
             source: WebBridgeSource,
@@ -216,8 +227,17 @@ struct BridgeWebView: UIViewRepresentable {
             self.onOutboundDelivered = onOutboundDelivered
         }
 
+        /// 화면이 닫히는 중이거나 해제될 때 — 로딩을 멈추고 이후 콜백을 끊는다. 여러 번 불려도 된다.
+        func deactivate() {
+            guard !isDeactivated else { return }
+            isDeactivated = true
+            webView?.stopLoading()
+            webView?.navigationDelegate = nil
+            webView?.uiDelegate = nil
+        }
+
         func load(url: URL, token: UUID) {
-            guard let webView else { return }
+            guard !isDeactivated, let webView else { return }
             // URL이 바뀌었거나 retry 토큰이 갱신된 경우에만 reload.
             guard lastLoadedURL != url || lastLoadToken != token else { return }
             lastLoadedURL = url
@@ -278,7 +298,7 @@ struct BridgeWebView: UIViewRepresentable {
 
         // 대기열의 아웃바운드 메시지를 순서대로 웹에 주입한다.
         func flushOutbox(_ outbox: [WebBridgeOutboundEnvelope]) {
-            guard let webView else { return }
+            guard !isDeactivated, let webView else { return }
             for envelope in outbox where !deliveredOutboundIDs.contains(envelope.id) {
                 guard let script = envelope.message.makeJavaScript() else {
                     // 직렬화 실패한 메시지는 영구히 막히지 않도록 전달 처리해 대기열에서 제거한다.
@@ -289,7 +309,7 @@ struct BridgeWebView: UIViewRepresentable {
                 deliveredOutboundIDs.insert(envelope.id)
                 WebBridge.logOutbound(envelope.message, source: source)
                 webView.evaluateJavaScript(script) { [weak self] _, error in
-                    guard let self else { return }
+                    guard let self, !self.isDeactivated else { return }
                     if let error {
                         Log.trace("WebBridge outbound 전달 실패: \(error)", category: .network, level: .error)
                     }
@@ -303,7 +323,7 @@ struct BridgeWebView: UIViewRepresentable {
             _ userContentController: WKUserContentController,
             didReceive message: WKScriptMessage
         ) {
-            guard message.name == WebBridge.appBridgeHandlerName else { return }
+            guard !isDeactivated, message.name == WebBridge.appBridgeHandlerName else { return }
             // 해석 결과와 별개로, 웹이 보낸 원본을 먼저 남긴다(파싱 실패·계약 위반도 추적 가능하도록).
             WebBridge.logInboundRaw(message.body, source: source)
             guard let inbound = WebBridgeInboundMessage.decode(from: message.body) else { return }

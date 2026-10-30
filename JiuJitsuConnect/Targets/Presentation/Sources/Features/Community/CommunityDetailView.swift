@@ -81,6 +81,7 @@ public struct CommunityDetailView: View {
                 locksDocumentScroll: true,
                 // 글쓰기·수정은 서브뷰로만 열리므로 사진 선택은 상세 웹뷰만 처리한다.
                 capabilities: [.pickPhotos],
+                isActive: !store.isClosing,
                 onLoadingStarted: { store.send(.internal(.loadingStarted)) },
                 onLoadingFinished: { store.send(.internal(.loadingFinished)) },
                 onLoadingFailed: { store.send(.internal(.loadingFailed)) },
@@ -151,15 +152,4 @@ public struct CommunityDetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.component.background.default)
     }
-}
-
-// MARK: - 스와이프 백 차단
-
-/// 이 화면이 맨 위에 있는 동안 내비게이션 스와이프 백을 막는다. (`UINavigationController+SwipeBack` 참고)
-private struct InteractivePopBlocker: UIViewControllerRepresentable {
-    func makeUIViewController(context: Context) -> InteractivePopBlockingViewController {
-        InteractivePopBlockingViewController()
-    }
-
-    func updateUIViewController(_ uiViewController: InteractivePopBlockingViewController, context: Context) {}
 }
