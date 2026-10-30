@@ -392,8 +392,7 @@ public struct CompetitionInfoFeature: Sendable {
             case let .view(.beltSelected(belt)):
                 state.belt = state.belt == belt ? nil : belt
                 state.didPickBelt = true
-                // 고르면 바로 접어 체급 화면으로 돌아간다.
-                state.isBeltExpanded = false
+                // 고른 뒤에도 펼친 채 둔다. 열었으면 닫는 것도 사용자가 정한다.
                 return .none
 
             case .view(.beltRowTapped):
