@@ -187,14 +187,14 @@ private extension SegmentControl.Size {
     var height: CGFloat {
         switch self {
         case .regular: return 67
-        case .compact: return 36
+        case .compact: return 44
         }
     }
 
     var cornerRadius: CGFloat {
         switch self {
         case .regular: return 28
-        case .compact: return 18
+        case .compact: return 22
         }
     }
 

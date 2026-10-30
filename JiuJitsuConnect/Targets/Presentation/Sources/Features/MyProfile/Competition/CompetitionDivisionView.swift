@@ -18,6 +18,11 @@ struct CompetitionDivisionView: View {
     @State private var weightInput = ""
     // '확인'으로 키보드를 내리는 동안 버튼이 곧바로 '완료'가 되어, 빠르게 두 번 누르면 가려진 줄을 보기 전에 저장될 수 있어 잠시 막는다.
     @State private var isKeyboardClosing = false
+    // 체급 묶음을 제목 아래 빈 곳에 맞춰 두려고 스크롤 영역과 묶음 높이를 잰다.
+    @State private var scrollHeight: CGFloat = 0
+    @State private var blockHeight: CGFloat = 0
+    // 숫자를 치기 시작할 때의 위 여백. '건너뛰기'가 숨어 잠깐 넓어진 공간 때문에 묶음이 내려갔다 올라가지 않게 그 이상 늘리지 않는다.
+    @State private var focusedTopPaddingCap: CGFloat?
 
     private enum Metrics {
         static let segmentWidth: CGFloat = 160
@@ -34,6 +39,26 @@ struct CompetitionDivisionView: View {
         static let unitBoundSpacing: CGFloat = 20
         // 칸 밖 24pt 'kg'는 g의 꼬리 때문에 처져 보여 숫자 칸 가운데에 맞게 올린다(시뮬레이터 실측).
         static let unitOpticalOffset: CGFloat = -2.7
+        // 앱솔루트로 꺼진 체급 줄 — 아직 안 쓴 빈칸(진한 칸 + 옅은 00)과 한눈에 갈리게 줄 전체를 옅게 한다.
+        static let absoluteDimmedOpacity: Double = 0.35
+        // 앱솔루트 체크 — 켜면 원이 채워지는 체크 표시. 버튼처럼 보이지 않게 글자 옆 작은 원으로만 둔다.
+        static let checkCircleSize: CGFloat = 20
+        static let checkMarkSize: CGFloat = 14
+        // 제목 위아래 여백과 제목 높이 — 이 아래 남은 곳에 체급 묶음을 둔다.
+        static let titleTopPadding: CGFloat = 40
+        static let titleHeight: CGFloat = 36
+        static let titleMinGap: CGFloat = 40
+        static let contentBottomPadding: CGFloat = 24
+        static let optionRowChipsSpacing: CGFloat = 12
+        // BeltSelectButton 기본(.regular) 높이
+        static let beltChipHeight: CGFloat = 56
+        // 띠 칩이 펼쳐질 자리(줄 간격 + 칩)를 늘 비워 둔다. 펼쳐도 위 내용이 움직이지 않게 하고,
+        // 같은 높이를 위에도 비워 보이는 묶음이 가운데에 오게 한다.
+        static let beltChipsReserve: CGFloat = optionRowChipsSpacing + beltChipHeight
+        // 키보드가 오르내려 남는 곳이 바뀔 때 묶음도 키보드와 비슷한 박자로 따라 움직인다.
+        static let keyboardFollowAnimation: Animation = .smooth(duration: 0.35)
+        // 정가운데는 아래로 처져 보여, 남는 곳을 위 1 : 아래 2로 나눠 살짝 올린다.
+        static let blockTopRatio: CGFloat = 1.0 / 3.0
     }
 
     // 체급 숫자가 화면에서 가장 위계가 높다 — 질문 제목(30pt)보다 크게.
@@ -47,22 +72,38 @@ struct CompetitionDivisionView: View {
     var body: some View {
         VStack(spacing: 0) {
             // 단계를 넘겨도 제목이 흔들리지 않게, 다른 단계처럼 위에서 같은 자리에 둔다.
+            // 체급 묶음은 제목과 아래 버튼 사이 빈 곳의 가운데보다 살짝 위에 둔다.
             ScrollView {
                 VStack(spacing: 0) {
                     titleSection
-                        .padding(.top, 40)
-                        .padding(.bottom, 40)
+                        .padding(.top, Metrics.titleTopPadding)
+                        .padding(.bottom, Metrics.titleMinGap)
 
-                    uniformSegment
-                        .padding(.bottom, 32)
+                    VStack(spacing: 0) {
+                        uniformSegment
+                            .padding(.bottom, 32)
 
-                    weightSection
-                        .padding(.bottom, 24)
+                        weightSection
+                            .padding(.bottom, 24)
 
-                    optionSection
+                        optionSection
+                    }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { blockHeight = $0 }
+                    .padding(.top, blockTopPadding)
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 24)
+                .padding(.bottom, Metrics.contentBottomPadding)
+            }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                // 처음 잴 때는 바로 그 자리에 두고, 이후(키보드 등) 바뀔 때만 움직임을 준다.
+                if scrollHeight == 0 {
+                    scrollHeight = height
+                } else {
+                    withAnimation(Metrics.keyboardFollowAnimation) { scrollHeight = height }
+                }
+            }
+            .onChange(of: isWeightFocused) { _, isFocused in
+                focusedTopPaddingCap = isFocused ? blockTopPadding : nil
             }
             .scrollBounceBehavior(.basedOnSize)
             .scrollDismissesKeyboard(.interactively)
@@ -71,13 +112,26 @@ struct CompetitionDivisionView: View {
         }
     }
 
+    /// 제목 아래 남은 높이. 묶음이 이보다 크면(작은 화면) 위 여백 없이 이어 붙고 스크롤된다.
+    private var centeredAreaHeight: CGFloat {
+        max(0, scrollHeight - Metrics.titleTopPadding - Metrics.titleHeight - Metrics.titleMinGap - Metrics.contentBottomPadding)
+    }
+
+    /// 띠 칩 자리만큼 위에도 비워 보이는 묶음을 맞추고, 남는 곳은 위 1 : 아래 2로 나눈다.
+    /// 키보드가 올라오거나 작은 화면이라 남는 곳이 없으면 위 여백을 줄여 체급 칸이 버튼에 가리지 않게 한다.
+    private var blockTopPadding: CGFloat {
+        let free = max(0, centeredAreaHeight - blockHeight)
+        let biased = Metrics.beltChipsReserve + max(0, free - Metrics.beltChipsReserve) * Metrics.blockTopRatio
+        return min(free, biased, focusedTopPaddingCap ?? .infinity)
+    }
+
     // MARK: - View Components
 
     private var titleSection: some View {
         Text("어떤 체급으로 나갔나요?")
             .font(Font.pretendard.display1)
             .foregroundStyle(Color.component.textfieldDisplay.focus.title)
-            .frame(height: 36)
+            .frame(height: Metrics.titleHeight)
             .frame(maxWidth: .infinity, alignment: .center)
     }
 
@@ -105,21 +159,14 @@ struct CompetitionDivisionView: View {
                 .padding(.leading, Metrics.unitBoundSpacing)
         }
         .frame(maxWidth: .infinity)
-        // 앱솔루트(무제한급)를 고르면 체급은 의미가 없어 흐리게 하고 입력을 막는다.
+        // 앱솔루트(무제한급)를 고르면 체급은 의미가 없어 흐리게 하고 입력을 막는다. 글자색은 그대로 두고 옅기는 여기 한 곳에서만 준다.
+        .opacity(store.isAbsolute ? Metrics.absoluteDimmedOpacity : 1)
         .disabled(store.isAbsolute)
-        // 앱솔루트인 동안은 칸을 비워 "00"으로 보이고, 풀면 입력해 둔 숫자(store에 남겨 둔 값)를 다시 보인다.
+        // 앱솔루트인 동안은 칸을 비워 "–"로 보이고, 풀면 입력해 둔 숫자(store에 남겨 둔 값)를 다시 보인다.
         .onChange(of: store.isAbsolute) { _, isAbsolute in
             if isAbsolute { isWeightFocused = false }
             weightInput = isAbsolute ? "" : store.weightText
         }
-    }
-
-    private var weightTextColor: Color {
-        store.isAbsolute ? Color.semantic.text.disabled : Color.component.textfieldDisplay.focus.text
-    }
-
-    private var weightLabelColor: Color {
-        store.isAbsolute ? Color.semantic.text.disabled : Color.semantic.text.secondary
     }
 
     /// 숫자만 담은 칸 — 숫자 길이와 상관없이 폭을 고정해 칠 때 흔들리지 않게 한다.
@@ -127,10 +174,11 @@ struct CompetitionDivisionView: View {
         TextField(
             "",
             text: $weightInput,
-            prompt: Text("00").foregroundStyle(Color.semantic.text.tertiary)
+            // 빈칸은 "00", 앱솔루트로 꺼진 칸은 "–" — 글자 모양으로도 두 상태를 가른다.
+            prompt: Text(store.isAbsolute ? "–" : "00").foregroundStyle(Color.semantic.text.tertiary)
         )
         .font(Self.weightFont)
-        .foregroundStyle(weightTextColor)
+        .foregroundStyle(Color.component.textfieldDisplay.focus.text)
         .tint(Color.component.textfieldDisplay.focus.text)
         .keyboardType(.decimalPad)
         .multilineTextAlignment(.center)
@@ -156,7 +204,7 @@ struct CompetitionDivisionView: View {
     private var weightUnit: some View {
         Text("kg")
             .font(Font.pretendard.custom(weight: .medium, size: 24))
-            .foregroundStyle(store.isAbsolute ? Color.semantic.text.disabled : Color.component.picker.unit)
+            .foregroundStyle(Color.component.picker.unit)
             .offset(y: Metrics.unitOpticalOffset)
     }
 
@@ -166,8 +214,16 @@ struct CompetitionDivisionView: View {
             store.send(.view(.weightBoundToggled))
         } label: {
             HStack(spacing: 4) {
-                Text(store.weightBound == .under ? "이하" : "초과")
-                    .font(Font.pretendard.bodyM)
+                // 위아래 꺾쇠처럼 글자도 위아래로 굴러 바뀐다 — 초과로 가면 아래에서 올라오고, 이하로 가면 위에서 내려온다.
+                ZStack {
+                    Text(store.weightBound == .under ? "이하" : "초과")
+                        .font(Font.pretendard.bodyM)
+                        .id(store.weightBound)
+                        // 떠나는 글자는 이전 상태의 전환을 쓰므로, 글자마다 자기 자리(초과는 아래, 이하는 위)로 들고 나게 한다.
+                        .transition(.move(edge: store.weightBound == .over ? .bottom : .top).combined(with: .opacity))
+                }
+                .clipped()
+                .animation(Self.expandAnimation, value: store.weightBound)
 
                 VStack(spacing: 0) {
                     ForEach([-90.0, 90.0], id: \.self) { degrees in
@@ -179,7 +235,7 @@ struct CompetitionDivisionView: View {
                     }
                 }
             }
-            .foregroundStyle(weightLabelColor)
+            .foregroundStyle(Color.semantic.text.secondary)
             .frame(height: Metrics.weightBoxHeight)
             .contentShape(Rectangle())
         }
@@ -190,18 +246,21 @@ struct CompetitionDivisionView: View {
     /// 앱솔루트·출전 띠 — 같은 위계의 곁가지라 한 줄에 글자 크기로 나란히 둔다.
     /// 출전 띠를 누르면 그 아래로 띠 칩을 펼친다.
     private var optionSection: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Metrics.optionRowChipsSpacing) {
             HStack(spacing: 24) {
                 absoluteToggle
                 beltToggle
             }
             .frame(maxWidth: .infinity)
 
-            if store.isBeltExpanded {
-                // 아래로만 자라는 영역이라 위 내용은 그대로 두고, 칩만 줄 아래에서 살짝 내려오며 나타난다.
-                beltChips
-                    .transition(.opacity.combined(with: .offset(y: -8)))
+            // 펼칠 자리는 늘 잡아 두어, 칩이 나와도 위 내용이 밀리지 않는다. 칩만 줄 아래에서 살짝 내려오며 나타난다.
+            ZStack(alignment: .top) {
+                if store.isBeltExpanded {
+                    beltChips
+                        .transition(.opacity.combined(with: .offset(y: -8)))
+                }
             }
+            .frame(height: Metrics.beltChipHeight, alignment: .top)
         }
     }
 
@@ -210,22 +269,24 @@ struct CompetitionDivisionView: View {
         Button {
             store.send(.view(.absoluteToggled), animation: Self.expandAnimation)
         } label: {
-            HStack(spacing: 4) {
-                Assets.Common.Icon.check.swiftUIImage
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: Metrics.iconSize, height: Metrics.iconSize)
-                    .foregroundStyle(
-                        store.isAbsolute
-                        ? Color.component.bottomSheet.selected.listItem.leadingIcon
-                        : Color.component.bottomSheet.unselected.listItem.leadingIcon
-                    )
+            // 체크 여부가 글자색만으로는 잘 안 보여, 켜면 체크가 파란 원 안에 들어가게 한다.
+            HStack(spacing: 6) {
+                ZStack {
+                    Circle()
+                        .fill(store.isAbsolute ? Color.semantic.interactive.primary : Color.semantic.surface.tertiary)
+                    Assets.Common.Icon.check.swiftUIImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: Metrics.checkMarkSize, height: Metrics.checkMarkSize)
+                        .foregroundStyle(store.isAbsolute ? Color.semantic.icon.onPrimary : Color.semantic.icon.tertiary)
+                }
+                .frame(width: Metrics.checkCircleSize, height: Metrics.checkCircleSize)
 
                 Text("앱솔루트")
                     .font(Font.pretendard.bodyS)
                     .foregroundStyle(
                         store.isAbsolute
-                        ? Color.component.bottomSheet.selected.listItem.label
+                        ? Color.semantic.text.primary
                         : Color.component.bottomSheet.unselected.listItem.label
                     )
             }
