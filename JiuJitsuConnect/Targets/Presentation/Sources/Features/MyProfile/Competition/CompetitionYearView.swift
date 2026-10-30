@@ -37,6 +37,7 @@ struct CompetitionYearView: View {
                 verticalOffset: CompetitionWheelPickerMetrics.verticalOffset,
                 minimumTopSpacing: CompetitionWheelPickerMetrics.minimumTopSpacing
             ),
+            style: CompetitionWheelPickerMetrics.style,
             onSelect: { option in
                 store.send(.view(.yearOptionSelected(option)))
             }

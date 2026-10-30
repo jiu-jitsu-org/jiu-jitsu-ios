@@ -39,6 +39,7 @@ struct CompetitionResultView: View {
                 verticalOffset: CompetitionWheelPickerMetrics.verticalOffset,
                 minimumTopSpacing: CompetitionWheelPickerMetrics.minimumTopSpacing
             ),
+            style: CompetitionWheelPickerMetrics.style,
             onSelect: { rank in
                 store.send(.view(.resultSelected(rank)))
             }
@@ -68,4 +69,6 @@ enum CompetitionWheelPickerMetrics {
     static let verticalOffset: CGFloat = -80
     // 작은 화면(SE)에서 위로 올린 휠이 제목에 붙지 않게 남기는 최소 간격
     static let minimumTopSpacing: CGFloat = 24
+    // 다섯 칸 + 멀수록 옅게 + 처음 한 번 살짝 굴러 휠임을 알린다 — 첫 값(금메달)에서 위가 비어 버튼처럼 보이던 문제.
+    static let style: SheetPickerStyle = .wheel
 }
