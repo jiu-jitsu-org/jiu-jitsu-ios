@@ -144,6 +144,9 @@ public struct AppTabView: View {
     ) -> some View {
         let isActive = store.selectedTab == tab
         content()
+            // 내 사진으로 MY에 갈 때 서서히 바꾸는데(#139), 한 장으로 묶지 않으면 반투명한 탭바 너머로
+            // 그 탭의 아래쪽 내용이 비친다.
+            .compositingGroup()
             .opacity(isActive ? 1 : 0)
             .allowsHitTesting(isActive)
     }
