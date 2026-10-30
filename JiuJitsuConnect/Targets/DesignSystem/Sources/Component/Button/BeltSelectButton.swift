@@ -31,7 +31,7 @@ public struct BeltSelectButton: View {
     // MARK: - Types
 
     /// 띠 색. 도메인의 띠 등급과 1:1로 맞춰 쓴다.
-    public enum BeltColor: CaseIterable, Sendable {
+    public enum BeltColor: Sendable {
         case white
         case blue
         case purple
