@@ -225,6 +225,8 @@ private struct CompetitionListView: View {
                     group: group,
                     onTapped: { onCompetitionTapped(group.entries) }
                 )
+                // 줄 높이를 내용만큼 고정한다 — 없으면 부문이 여러 줄인 대회가 다른 줄과 같은 높이로 눌려 위아래 줄과 겹친다(#140).
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(.vertical, 8)
