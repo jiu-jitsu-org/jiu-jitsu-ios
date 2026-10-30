@@ -41,6 +41,8 @@ struct CompetitionDivisionView: View {
 
     // 펼치고 접는 건 한 동작으로 본다(기본 500ms).
     private static let expandAnimation: Animation = .easeInOut(duration: 0.5)
+    // 출전 띠는 자주 열고 닫는 곁가지라 더 빠르게, 끝이 부드럽게 멈추도록 한다.
+    private static let beltAnimation: Animation = .smooth(duration: 0.3)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -196,7 +198,9 @@ struct CompetitionDivisionView: View {
             .frame(maxWidth: .infinity)
 
             if store.isBeltExpanded {
+                // 아래로만 자라는 영역이라 위 내용은 그대로 두고, 칩만 줄 아래에서 살짝 내려오며 나타난다.
                 beltChips
+                    .transition(.opacity.combined(with: .offset(y: -8)))
             }
         }
     }
@@ -232,12 +236,12 @@ struct CompetitionDivisionView: View {
         .accessibilityAddTraits(store.isAbsolute ? .isSelected : [])
     }
 
-    /// 출전 띠는 지금 띠로 채워 두고 "출전 띠 블루 ›"로 접어 둔다. 누르면 아래로 펼쳐 고친다.
+    /// 출전 띠는 지금 띠로 채워 두고 "출전 띠 블루 ›"로 접어 둔다. 누르면 아래로 펼쳐 고치고, 다시 눌러야 접힌다.
     private var beltToggle: some View {
         Button {
             // 띠를 고르려는 것이니 키보드를 내려 펼친 칩이 가려지지 않게 한다.
             isWeightFocused = false
-            store.send(.view(.beltRowTapped), animation: Self.expandAnimation)
+            store.send(.view(.beltRowTapped), animation: Self.beltAnimation)
         } label: {
             HStack(spacing: 4) {
                 Text("출전 띠")
@@ -275,7 +279,7 @@ struct CompetitionDivisionView: View {
                     title: belt.displayName,
                     isSelected: store.belt == belt
                 ) {
-                    store.send(.view(.beltSelected(belt)), animation: Self.expandAnimation)
+                    store.send(.view(.beltSelected(belt)), animation: Self.beltAnimation)
                 }
             }
         }
