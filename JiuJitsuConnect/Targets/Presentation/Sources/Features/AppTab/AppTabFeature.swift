@@ -282,8 +282,13 @@ public struct AppTabFeature: Sendable {
 
             case let .deepLink(link):
                 // 현재 딥링크 대상은 모두 커뮤니티 영역이라, 다른 탭에 있었다면 홈으로 되돌린 뒤 넘긴다.
+                // 탭바로 돌아올 때처럼 새 알림 점·내 사진도 다시 조회한다(탭 뷰가 유지돼 onAppear가 다시 오지 않음).
+                let isEnteringHome = state.selectedTab != .home
                 state.selectedTab = .home
-                return .send(.home(.deepLink(link)))
+                return .merge(
+                    isEnteringHome ? .send(.home(.view(.tabEntered))) : .none,
+                    .send(.home(.deepLink(link)))
+                )
 
             case .home, .myPage, .settings:
                 return .none
