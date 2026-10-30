@@ -100,7 +100,7 @@ public final class DefaultNetworkService: NetworkService {
         try await refreshCoordinator.refresh()
     }
 
-    /// - Parameter allowAuthRetry: 401 후 토큰 갱신·재시도를 허용할지. 재시도 호출은 false로 내려와
+    /// - Parameter allowAuthRetry: access 토큰 만료 응답 후 토큰 갱신·재시도를 허용할지. 재시도 호출은 false로 내려와
     ///   무한 재귀를 막는다.
     private func requestData(endpoint: Endpoint, allowAuthRetry: Bool) async throws -> Data {
         guard var urlRequest = endpoint.asURLRequest() else {
@@ -156,8 +156,11 @@ public final class DefaultNetworkService: NetworkService {
         NetworkLogger.log(response: httpResponse, data: data)
         #endif
 
-        // --- 3. 401 → 토큰 갱신 후 1회 재시도 (인터셉터) ---
-        if httpResponse.statusCode == 401, allowAuthRetry, endpoint.allowsAuthRetry {
+        // --- 3. access 토큰 만료 → 토큰 갱신 후 1회 재시도 (인터셉터) ---
+        // 저장된 access 토큰을 실어 보낸 요청만 대상이다. signup처럼 임시 토큰을 직접 싣는 요청이
+        // 만료 응답을 받아도 refresh 토큰과 무관하므로 갱신·세션 만료로 이어지면 안 된다.
+        if sentAccessToken != nil, allowAuthRetry, endpoint.allowsAuthRetry,
+           isAccessTokenRejected(httpResponse, data: data) {
             return try await retryAfterTokenRefresh(endpoint: endpoint, sentAccessToken: sentAccessToken)
         }
 
@@ -171,13 +174,28 @@ public final class DefaultNetworkService: NetworkService {
         return data
     }
 
-    /// 401을 받은 요청을 토큰 갱신 후 1회만 재시도한다. 갱신 성공 시 웹뷰 동기화 이벤트를,
-    /// 갱신 실패(세션 만료) 시 세션 만료 이벤트를 방송한다.
+    /// 서버가 access 토큰을 거절했는지. 서버는 만료 토큰에 401이 아니라 403 + A0003을 돌려주므로
+    /// 403은 만료 코드일 때만 갱신 대상으로 본다(권한 부족 등 다른 403은 그대로 실패).
+    private func isAccessTokenRejected(_ response: HTTPURLResponse, data: Data) -> Bool {
+        switch response.statusCode {
+        case 401:
+            return true
+        case 403:
+            let apiError = try? decoder.decode(APIErrorResponseDTO.self, from: data)
+            return apiError?.code == APIErrorCode.expiredToken.rawValue
+        default:
+            return false
+        }
+    }
+
+    /// 만료 응답을 받은 요청을 토큰 갱신 후 1회만 재시도한다. 갱신 성공 시 웹뷰 동기화 이벤트를,
+    /// refresh 토큰까지 무효(세션 만료)일 때만 세션 만료 이벤트를 방송한다.
+    /// 네트워크 오류·5xx 같은 일시적 갱신 실패는 이 요청만 실패시키고 세션은 유지한다.
     private func retryAfterTokenRefresh(endpoint: Endpoint, sentAccessToken: String?) async throws -> Data {
         let newAccessToken: String
         do {
             newAccessToken = try await refreshCoordinator.validAccessToken(replacing: sentAccessToken)
-        } catch {
+        } catch NetworkError.sessionExpired {
             sessionEventBroadcaster?.send(.sessionExpired)
             throw NetworkError.sessionExpired
         }
@@ -212,7 +230,15 @@ public final class DefaultNetworkService: NetworkService {
             #if DEBUG || BETA
             NetworkLogger.record(request: urlRequest, error: error)
             #endif
-            throw error
+            // 갱신 요청이 서버에 닿지 못한 것이라 refresh 토큰은 아직 유효하다 → 세션 만료가 아님.
+            switch (error as? URLError)?.code {
+            case .notConnectedToInternet?:
+                throw NetworkError.noConnection
+            case .timedOut?:
+                throw NetworkError.timeout
+            default:
+                throw NetworkError.unknown(error)
+            }
         }
 
         #if DEBUG || BETA
@@ -227,8 +253,9 @@ public final class DefaultNetworkService: NetworkService {
         NetworkLogger.log(response: httpResponse, data: data)
         #endif
 
-        guard (200...299).contains(httpResponse.statusCode) else {
-            // refresh 자체가 4xx/5xx → refresh 토큰 만료 등으로 세션 만료.
+        // refresh 토큰 만료(403 A0003)·무효(401 A0009)·유형 불일치(400 A0002) 등 4xx만 세션 만료다.
+        // 5xx는 서버 쪽 일시 장애라 refresh 토큰을 버리지 않는다.
+        if (400...499).contains(httpResponse.statusCode) {
             throw NetworkError.sessionExpired
         }
 
@@ -236,6 +263,12 @@ public final class DefaultNetworkService: NetworkService {
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         decoder.dateDecodingStrategy = .iso8601
 
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let apiError = try? decoder.decode(APIErrorResponseDTO.self, from: data)
+            throw NetworkError.statusCodeError(statusCode: httpResponse.statusCode, response: apiError)
+        }
+
+        // 2xx인데 토큰을 읽지 못하면 서버가 refresh 토큰을 이미 회전했을 수 있어 재사용할 수 없다.
         guard
             let decoded = try? decoder.decode(BaseResponseDTO<RefreshResponseDTO>.self, from: data),
             decoded.success,
