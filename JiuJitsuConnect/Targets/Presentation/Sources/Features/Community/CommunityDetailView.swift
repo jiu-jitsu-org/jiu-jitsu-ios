@@ -81,6 +81,7 @@ public struct CommunityDetailView: View {
                 locksDocumentScroll: true,
                 // 글쓰기·수정은 서브뷰로만 열리므로 사진 선택은 상세 웹뷰만 처리한다.
                 capabilities: [.pickPhotos],
+                isActive: !store.isClosing,
                 onLoadingStarted: { store.send(.internal(.loadingStarted)) },
                 onLoadingFinished: { store.send(.internal(.loadingFinished)) },
                 onLoadingFailed: { store.send(.internal(.loadingFailed)) },
