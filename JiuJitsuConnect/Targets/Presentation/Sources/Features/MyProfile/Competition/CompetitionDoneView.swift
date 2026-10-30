@@ -12,16 +12,13 @@ struct CompetitionDoneView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(spacing: 0) {
-                    resultSection
-                    addDivisionSection
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 24)
+                resultSection
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 24)
             }
             .scrollBounceBehavior(.basedOnSize)
 
-            confirmButton
+            buttonSection
         }
     }
 
@@ -63,36 +60,32 @@ struct CompetitionDoneView: View {
         .padding(.top, 56)
     }
 
-    private var addDivisionSection: some View {
+    // 부문 추가와 완료를 한 묶음으로 둔다(#146). 질문 바로 아래에 답인 '부문 추가'를 두고, '완료'는 다른 화면과 같은 맨 아래 자리에 둔다. 둘 다 색 면이라 붙어 보이지 않게 8pt를 둔다.
+    private var buttonSection: some View {
         VStack(spacing: 12) {
             // 바로 위에 방금 기록한 대회가 보이므로 '같은 대회에서'는 빼도 뜻이 남는다.
             Text("다른 부문도 나갔나요?")
                 .font(Font.pretendard.bodyS)
                 .foregroundStyle(Color.component.list.setting.subText)
 
-            Button {
-                store.send(.view(.addDivisionButtonTapped))
-            } label: {
-                AppButtonConfiguration(
+            VStack(spacing: 8) {
+                CTAButton(
                     title: "부문 추가",
+                    type: .tint,
                     leftIcon: Assets.Common.Icon.plus.swiftUIImage,
-                    size: .medium
+                    action: {
+                        store.send(.view(.addDivisionButtonTapped))
+                    }
+                )
+
+                CTAButton(
+                    title: "완료",
+                    action: {
+                        store.send(.view(.doneButtonTapped))
+                    }
                 )
             }
-            .appButtonStyle(.tint, size: .medium, height: 44)
         }
-        // 회색 면으로 감싸면 면 전체가 버튼처럼 보여, 문구와 버튼만 둔다.
-        .frame(maxWidth: .infinity)
-        .padding(.top, 48)
-    }
-
-    private var confirmButton: some View {
-        CTAButton(
-            title: "완료",
-            action: {
-                store.send(.view(.doneButtonTapped))
-            }
-        )
         .padding(.horizontal, 20)
         .padding(.bottom, 24)
     }
