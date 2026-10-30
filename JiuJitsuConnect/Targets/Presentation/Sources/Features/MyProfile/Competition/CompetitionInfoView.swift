@@ -14,10 +14,20 @@ private enum Style {
     static let backButtonSize: CGFloat = 36
     // 화면 폭을 다 채우면 막대가 눈을 끌어, 가운데에 짧게 둔다.
     static let progressBarWidth: CGFloat = 160
+    // 단계 사이 전환 — 한 동작(옆으로 밀기)으로, 기본 500ms.
+    static let stepAnimation: Animation = .easeInOut(duration: 0.5)
 }
 
 struct CompetitionInfoView: View {
     @Bindable var store: StoreOf<CompetitionInfoFeature>
+    // 지금 그리고 있는 단계와 그 단계로 온 방향. store.step보다 한 박자 늦게 따라간다(아래 onChange 참고).
+    @State private var shownStep: CompetitionInfoFeature.Step
+    @State private var isMovingBack = false
+
+    init(store: StoreOf<CompetitionInfoFeature>) {
+        self.store = store
+        _shownStep = State(initialValue: store.step)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -27,22 +37,41 @@ struct CompetitionInfoView: View {
                 progressBar
             }
 
-            Group {
-                switch store.step {
-                case .result:
-                    CompetitionResultView(store: store)
-                case .year:
-                    CompetitionYearView(store: store)
-                case .name:
-                    CompetitionNameView(store: store)
-                case .division:
-                    CompetitionDivisionView(store: store)
-                case .done:
-                    CompetitionDoneView(store: store)
+            // 전환 중에는 나가는 단계와 들어오는 단계가 함께 있어, 위아래로 나뉘지 않게 겹쳐 둔다.
+            ZStack {
+                Group {
+                    switch shownStep {
+                    case .result:
+                        CompetitionResultView(store: store)
+                    case .year:
+                        CompetitionYearView(store: store)
+                    case .name:
+                        CompetitionNameView(store: store)
+                    case .division:
+                        CompetitionDivisionView(store: store)
+                    case .done:
+                        CompetitionDoneView(store: store)
+                    }
                 }
+                // 나가는 단계는 0.5초 동안 남아 있다. 그 사이 '다음'을 또 눌러 다음 단계 동작이 실행되지 않게 막는다.
+                .allowsHitTesting(shownStep == store.step)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // 앞으로 가면 다음 단계가 오른쪽에서, 뒤로 가면 이전 단계가 왼쪽에서 들어온다.
+                .transition(
+                    isMovingBack
+                        ? .asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .trailing))
+                        : .asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading))
+                )
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .animation(.default, value: store.step)
+        }
+        .onChange(of: store.step) { _, newStep in
+            // 나가는 화면은 마지막으로 그려질 때 붙어 있던 전환으로 사라진다. 방향을 먼저 바꿔 한 번 그린 뒤
+            // 다음 차례에 단계를 바꿔야, 앞으로 가다 뒤로 갈 때도 나가는 화면이 맞는 쪽으로 빠진다.
+            isMovingBack = store.isMovingBack
+            Task { @MainActor in
+                withAnimation(Style.stepAnimation) { shownStep = newStep }
+            }
         }
         .background(Color.primitive.bw.white)
         .overlay(alignment: .bottom) {
