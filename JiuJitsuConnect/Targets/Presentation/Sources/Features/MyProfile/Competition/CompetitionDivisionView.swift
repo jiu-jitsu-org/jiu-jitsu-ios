@@ -34,6 +34,11 @@ struct CompetitionDivisionView: View {
         static let unitBoundSpacing: CGFloat = 20
         // 칸 밖 24pt 'kg'는 g의 꼬리 때문에 처져 보여 숫자 칸 가운데에 맞게 올린다(시뮬레이터 실측).
         static let unitOpticalOffset: CGFloat = -2.7
+        // 앱솔루트로 꺼진 체급 줄 — 아직 안 쓴 빈칸(진한 칸 + 옅은 00)과 한눈에 갈리게 줄 전체를 옅게 한다.
+        static let absoluteDimmedOpacity: Double = 0.35
+        // 앱솔루트 체크 — 켜면 원이 채워지는 체크 표시. 버튼처럼 보이지 않게 글자 옆 작은 원으로만 둔다.
+        static let checkCircleSize: CGFloat = 20
+        static let checkMarkSize: CGFloat = 14
     }
 
     // 체급 숫자가 화면에서 가장 위계가 높다 — 질문 제목(30pt)보다 크게.
@@ -104,8 +109,9 @@ struct CompetitionDivisionView: View {
         }
         .frame(maxWidth: .infinity)
         // 앱솔루트(무제한급)를 고르면 체급은 의미가 없어 흐리게 하고 입력을 막는다.
+        .opacity(store.isAbsolute ? Metrics.absoluteDimmedOpacity : 1)
         .disabled(store.isAbsolute)
-        // 앱솔루트인 동안은 칸을 비워 "00"으로 보이고, 풀면 입력해 둔 숫자(store에 남겨 둔 값)를 다시 보인다.
+        // 앱솔루트인 동안은 칸을 비워 "–"로 보이고, 풀면 입력해 둔 숫자(store에 남겨 둔 값)를 다시 보인다.
         .onChange(of: store.isAbsolute) { _, isAbsolute in
             if isAbsolute { isWeightFocused = false }
             weightInput = isAbsolute ? "" : store.weightText
@@ -125,7 +131,8 @@ struct CompetitionDivisionView: View {
         TextField(
             "",
             text: $weightInput,
-            prompt: Text("00").foregroundStyle(Color.semantic.text.tertiary)
+            // 빈칸은 "00", 앱솔루트로 꺼진 칸은 "–" — 글자 모양으로도 두 상태를 가른다.
+            prompt: Text(store.isAbsolute ? "–" : "00").foregroundStyle(Color.semantic.text.tertiary)
         )
         .font(Self.weightFont)
         .foregroundStyle(weightTextColor)
@@ -206,22 +213,24 @@ struct CompetitionDivisionView: View {
         Button {
             store.send(.view(.absoluteToggled), animation: Self.expandAnimation)
         } label: {
-            HStack(spacing: 4) {
-                Assets.Common.Icon.check.swiftUIImage
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: Metrics.iconSize, height: Metrics.iconSize)
-                    .foregroundStyle(
-                        store.isAbsolute
-                        ? Color.component.bottomSheet.selected.listItem.leadingIcon
-                        : Color.component.bottomSheet.unselected.listItem.leadingIcon
-                    )
+            // 체크 여부가 글자색만으로는 잘 안 보여, 켜면 체크가 파란 원 안에 들어가게 한다.
+            HStack(spacing: 6) {
+                ZStack {
+                    Circle()
+                        .fill(store.isAbsolute ? Color.semantic.interactive.primary : Color.semantic.surface.tertiary)
+                    Assets.Common.Icon.check.swiftUIImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: Metrics.checkMarkSize, height: Metrics.checkMarkSize)
+                        .foregroundStyle(store.isAbsolute ? Color.semantic.icon.onPrimary : Color.semantic.icon.tertiary)
+                }
+                .frame(width: Metrics.checkCircleSize, height: Metrics.checkCircleSize)
 
                 Text("앱솔루트")
                     .font(Font.pretendard.bodyS)
                     .foregroundStyle(
                         store.isAbsolute
-                        ? Color.component.bottomSheet.selected.listItem.label
+                        ? Color.semantic.text.primary
                         : Color.component.bottomSheet.unselected.listItem.label
                     )
             }
