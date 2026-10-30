@@ -63,6 +63,18 @@ public enum Assets {
     }
   }
   public enum Login {
+    public enum Belt {
+      public static let bodyBlack = ImageAsset(name: "Login/Belt/body-black")
+      public static let bodyBlue = ImageAsset(name: "Login/Belt/body-blue")
+      public static let bodyBrown = ImageAsset(name: "Login/Belt/body-brown")
+      public static let bodyPurple = ImageAsset(name: "Login/Belt/body-purple")
+      public static let bodyWhite = ImageAsset(name: "Login/Belt/body-white")
+      public static let eyesBig = ImageAsset(name: "Login/Belt/eyes-big")
+      public static let eyesCurious = ImageAsset(name: "Login/Belt/eyes-curious")
+      public static let eyesGlare = ImageAsset(name: "Login/Belt/eyes-glare")
+      public static let eyesLash = ImageAsset(name: "Login/Belt/eyes-lash")
+      public static let eyesSleepy = ImageAsset(name: "Login/Belt/eyes-sleepy")
+    }
     public enum Character {
       public static let bodyBlack = ImageAsset(name: "Login/Character/body-black")
       public static let bodyBlue = ImageAsset(name: "Login/Character/body-blue")
