@@ -159,8 +159,8 @@ enum BeltRise {
         let from = frames[index], to = frames[index + 1]
         var local = (progress - from.time) / (to.time - from.time)
         if index < curves.count { local = curves[index].value(at: local) }
-        // 시작은 시트 밑으로 드러난 높이보다 조금 더 내려간 자리
-        let hidden = visible + 8
+        // 시작은 가림 경계(시트 위 끝 + 28)보다 아래. 시트가 덜 올라온 순간에도 머리 끝이 비치지 않는다
+        let hidden = visible + 32
         let drop = { (value: CGFloat) in value == 1 ? hidden : value * visible }
         return Pose(
             lift: lerp(drop(from.drop), drop(to.drop), local),
