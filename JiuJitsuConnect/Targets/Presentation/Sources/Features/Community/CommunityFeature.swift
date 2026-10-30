@@ -460,7 +460,10 @@ public struct CommunityFeature: Sendable {
                 return .none
 
             case .session(.loginCancelled):
+                // 로그인 안내는 리스트·상세 어느 웹뷰에서 요청했는지 따로 기억하지 않으므로 모두에 알린다.
+                // 웹은 이 메시지에 보관한 행위만 비우므로, 요청하지 않은 웹뷰가 받아도 영향이 없다.
                 Self.enqueue(.authLoginCancelled, into: &state)
+                Self.broadcastToDetails(.loginCancelled, into: &state)
                 return .none
 
             case .session(.loggedOut):
@@ -616,7 +619,7 @@ public struct CommunityFeature: Sendable {
         }
     }
 
-    /// 세션 변화(토큰 갱신/로그아웃/만료)를 열려 있는 모든 상세 서브뷰(푸시 스택·모달 스택·모달 루트)에
+    /// 세션 변화(토큰 갱신/로그인 취소/로그아웃/만료)를 열려 있는 모든 상세 서브뷰(푸시 스택·모달 스택·모달 루트)에
     /// 전파한다. 상세는 리스트와 별개 WKWebView라 각자 토큰을 동기화해야 한다.
     private static func broadcastToDetails(_ update: CommunityDetailFeature.SessionUpdate, into state: inout State) {
         for id in state.path.ids {
