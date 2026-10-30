@@ -34,6 +34,7 @@ public struct ComponentColors {
         
         public struct Filled {
             public let defaultBg = Color.semantic.interactive.primary
+            public let pressedBg = Color.semantic.primary.pressed
             public let defaultText = Color.semantic.text.onPrimary
             public let pressedText = Color.semantic.text.onPrimary
             public let disabledBg = Color.semantic.interactive.disabled
@@ -42,6 +43,7 @@ public struct ComponentColors {
         
         public struct Tint {
             public let defaultBg = Color.semantic.surface.primarySubtle
+            public let pressedBg = Color.semantic.surface.primarySubtlePressed
             public let defaultText = Color.semantic.interactive.primary
             public let pressedText = Color.semantic.interactive.primary
             public let disabledBg = Color.semantic.surface.disabled
@@ -50,6 +52,7 @@ public struct ComponentColors {
         
         public struct Neutral {
             public let defaultBg = Color.semantic.surface.secondary
+            public let pressedBg = Color.semantic.surface.secondaryPressed
             public let defaultText = Color.semantic.text.primary
             public let pressedText = Color.semantic.text.primary
             public let disabledBg = Color.semantic.surface.disabled
@@ -58,6 +61,7 @@ public struct ComponentColors {
         
         public struct Text {
             public let defaultBg = Color.semantic.transparent.transparent
+            public let pressedBg = Color.semantic.surface.primarySubtle
             public let defaultText = Color.semantic.interactive.primary
             public let pressedText = Color.semantic.interactive.primary
             public let disabledBg = Color.semantic.transparent.transparent
@@ -67,6 +71,7 @@ public struct ComponentColors {
         public struct Inverted {
             public let defaultBg = Color.semantic.transparent.transparent
             public let defaultText = Color.semantic.primary.primary
+            public let pressedBg = Color.semantic.surface.onDarkPressedBg
             public let pressedText = Color.semantic.primary.onPrimary
             public let disabledBg = Color.semantic.transparent.transparent
             public let disabledText = Color.semantic.icon.disabledOnDark
@@ -92,6 +97,7 @@ public struct ComponentColors {
         public struct Dark {
             public let bg = Color.semantic.interactive.strong
             public let text = Color.semantic.text.onDark
+            public let pressedBg = Color.semantic.interactive.strongPressed
             public let disabledBg = Color.semantic.interactive.disabled
             public let disabledText = Color.semantic.text.disabled
         }
@@ -99,6 +105,7 @@ public struct ComponentColors {
         public struct Primary {
             public let bg = Color.semantic.interactive.primary
             public let text = Color.semantic.primary.onPrimary
+            public let pressedBg = Color.semantic.interactive.primaryPressed
             public let disabledBg = Color.semantic.interactive.disabled
             public let disabledText = Color.semantic.text.disabled
         }
@@ -106,6 +113,7 @@ public struct ComponentColors {
         public struct White {
             public let bg = Color.semantic.surface.container
             public let text = Color.semantic.text.primary
+            public let pressedBg = Color.semantic.surface.containerPressed
             public let disabledBg = Color.semantic.surface.containerDisabled
             public let disabledText = Color.semantic.text.disabled
         }
@@ -113,6 +121,7 @@ public struct ComponentColors {
         public struct TransparentText {
             public let bg = Color.semantic.transparent.transparent
             public let text = Color.semantic.interactive.primary
+            public let pressedBg = Color.semantic.surface.primarySubtle
             public let disabledBg = Color.semantic.transparent.transparent
             public let disabledText = Color.semantic.text.disabled
         }
@@ -521,11 +530,13 @@ public struct ComponentColors {
 
         public struct Selected {
             public let bg = Color.semantic.surface.primarySubtle
+            public let pressedBg = Color.semantic.surface.primarySubtlePressed
             public let labelText = Color.semantic.interactive.primary
         }
 
         public struct Unselected {
             public let bg = Color.semantic.surface.secondary
+            public let pressedBg = Color.semantic.surface.secondaryPressed
             public let labelText = Color.semantic.text.primary
         }
 

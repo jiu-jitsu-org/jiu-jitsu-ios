@@ -83,15 +83,8 @@ public struct BeltSelectButton: View {
                 .offset(y: size == .compact ? 0 : 1)
                 .frame(maxWidth: .infinity)
                 .frame(height: size.height)
-                .background(
-                    isSelected
-                    ? Color.component.beltSelectButton.selected.bg
-                    : Color.component.beltSelectButton.unselected.bg
-                )
-                .clipShape(RoundedRectangle(cornerRadius: size.cornerRadius))
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(BeltSelectButtonStyle(isSelected: isSelected, cornerRadius: size.cornerRadius))
         .accessibilityLabel(stripes > 0 ? "\(title) \(stripes)그랄" : title)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
@@ -123,6 +116,26 @@ public struct BeltSelectButton: View {
                 ? Color.component.beltSelectButton.selected.labelText
                 : Color.component.beltSelectButton.unselected.labelText
             )
+    }
+}
+
+// MARK: - Button Style (Private)
+
+/// 누르는 동안 바탕을 한 단계 진하게 — 다른 앱 버튼과 같은 눌림 반응.
+private struct BeltSelectButtonStyle: ButtonStyle {
+    let isSelected: Bool
+    let cornerRadius: CGFloat
+
+    func makeBody(configuration: Configuration) -> some View {
+        let colors = Color.component.beltSelectButton
+        configuration.label
+            .background(
+                isSelected
+                ? (configuration.isPressed ? colors.selected.pressedBg : colors.selected.bg)
+                : (configuration.isPressed ? colors.unselected.pressedBg : colors.unselected.bg)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .contentShape(Rectangle())
     }
 }
 
