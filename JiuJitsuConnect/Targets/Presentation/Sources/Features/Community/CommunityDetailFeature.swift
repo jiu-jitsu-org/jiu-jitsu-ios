@@ -123,6 +123,8 @@ public struct CommunityDetailFeature: Sendable {
             case logoutRequested
             // 웹뷰 토큰 만료 → 부모가 네이티브 refresh로 갱신 후 결과를 웹에 전파한다.
             case tokenRefreshRequested
+            // 내 글·댓글의 작성자 탭(OPEN_USER_PROFILE isMe) → 부모가 하단 탭을 MY로 바꾼다. (#116)
+            case myTabRequested
         }
     }
 
@@ -281,6 +283,14 @@ public struct CommunityDetailFeature: Sendable {
                     // 상세 웹뷰 토큰 만료 → 네이티브 갱신 위임. 결과는 부모가 SessionUpdate로 다시 내려준다.
                     // (갱신 성공은 `.tokenRefreshed`, 갱신 불가는 `.sessionExpired`로 이 웹뷰에도 전파된다)
                     return .send(.delegate(.tokenRefreshRequested))
+
+                case let .openUserProfile(payload):
+                    guard payload.isMe else {
+                        // 다른 회원 프로필 화면은 서버 API(jiu-jitsu-backend#172) 연결과 함께 붙인다(#116 ③).
+                        Log.trace("다른 회원 프로필 화면 미구현 — 무시: userId=\(payload.userId)", category: .network, level: .info)
+                        return .none
+                    }
+                    return .send(.delegate(.myTabRequested))
 
                 case let .unknown(type):
                     Log.trace("WebBridge 미지원 메시지 무시: \(type)", category: .network, level: .info)

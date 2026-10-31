@@ -141,6 +141,8 @@ private extension WebBridgeInboundMessage {
             return "SHOW_SELECT_SHEET  reqId=\(payload.requestId) options=\(payload.options.count)"
         case let .pickPhotos(payload):
             return "PICK_PHOTOS  reqId=\(payload.requestId) limit=\(payload.limit)"
+        case let .openUserProfile(payload):
+            return "OPEN_USER_PROFILE  userId=\(payload.userId) isMe=\(payload.isMe)"
         case let .unknown(type):
             return "\(type)  (unsupported)"
         }
@@ -215,6 +217,9 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 사진 선택 화면 표시 요청(글쓰기 '앨범에서 선택'). 웹뷰 file input은 iOS 시스템 메뉴를 한 번 더
     /// 띄우므로 네이티브가 PHPicker를 직접 연다. 결과는 requestId로 짝지어 PHOTOS_PICKED로 회신한다.
     case pickPhotos(PickPhotosPayload)
+    /// 글·댓글 작성자(사진·닉네임) 탭 → 회원 프로필 열기 요청(#116). 내 이름이면 MY 탭,
+    /// 남이면 다른 회원 프로필 화면으로 간다.
+    case openUserProfile(OpenUserProfilePayload)
     /// 계약에 없는 타입(상위 버전/오타 등) — 무시 대상.
     case unknown(type: String)
 
@@ -230,6 +235,7 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case showConfirmDialog = "SHOW_CONFIRM_DIALOG"
         case showSelectSheet = "SHOW_SELECT_SHEET"
         case pickPhotos = "PICK_PHOTOS"
+        case openUserProfile = "OPEN_USER_PROFILE"
     }
 
     /// `WKScriptMessage.body`를 파싱한다.
@@ -363,6 +369,15 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
                 return nil
             }
             return .pickPhotos(PickPhotosPayload(requestId: requestId, limit: limit))
+        case .openUserProfile:
+            guard
+                let userId = (payload?["userId"] as? NSNumber)?.intValue,
+                let isMe = payload?["isMe"] as? Bool
+            else {
+                Log.trace("OPEN_USER_PROFILE payload 필수 필드 누락", category: .network, level: .error)
+                return nil
+            }
+            return .openUserProfile(OpenUserProfilePayload(userId: userId, isMe: isMe))
         case .none:
             return .unknown(type: rawType)
         }
@@ -379,6 +394,20 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             return object
         }
         return nil
+    }
+}
+
+// MARK: - OPEN_USER_PROFILE Payload
+
+/// `OPEN_USER_PROFILE` 페이로드. `userId`는 글·댓글 응답의 `author.id`다.
+public struct OpenUserProfilePayload: Equatable, Sendable {
+    public let userId: Int
+    /// 웹이 판단한 "내 글·댓글" 여부. 남에게 보이는 모습이 아니라 내가 고칠 수 있는 MY로 보낼지 가른다.
+    public let isMe: Bool
+
+    public init(userId: Int, isMe: Bool) {
+        self.userId = userId
+        self.isMe = isMe
     }
 }
 
