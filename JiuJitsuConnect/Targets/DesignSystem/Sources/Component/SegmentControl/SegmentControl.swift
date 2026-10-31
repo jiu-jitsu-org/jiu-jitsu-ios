@@ -28,7 +28,7 @@ import SwiftUI
 /// ## 파라미터
 /// - `leftItem`: 왼쪽 세그먼트 아이템
 /// - `rightItem`: 오른쪽 세그먼트 아이템
-/// - `selectedSide`: 현재 선택된 쪽 (.left 또는 .right)
+/// - `selectedSide`: 현재 선택된 쪽 (.left 또는 .right, 아직 고르지 않았으면 nil)
 /// - `onSelectionChange`: 선택이 변경될 때 호출되는 클로저
 public struct SegmentControl: View {
     
@@ -39,12 +39,22 @@ public struct SegmentControl: View {
         case left
         case right
     }
+
+    /// 크기 — `regular`는 타이틀+서브타이틀 카드형, `compact`는 타이틀만 있는 한 줄형.
+    ///
+    /// `compact`는 화면의 주 질문이 따로 있을 때 그 조건을 고르는 용도로, 눈에 덜 띄게 작게 둔다.
+    /// 폭은 정해 두지 않으므로 쓰는 곳에서 `.frame(width:)`로 정한다.
+    public enum Size: Equatable, Hashable {
+        case regular
+        case compact
+    }
     
     // MARK: - Properties
     
     private let leftItem: SegmentItem
     private let rightItem: SegmentItem
-    private let selectedSide: Side
+    private let selectedSide: Side?
+    private let size: Size
     private let onSelectionChange: (Side) -> Void
 
     // MARK: - Initialization
@@ -53,17 +63,20 @@ public struct SegmentControl: View {
     /// - Parameters:
     ///   - leftItem: 왼쪽 세그먼트 아이템
     ///   - rightItem: 오른쪽 세그먼트 아이템
-    ///   - selectedSide: 현재 선택된 쪽
+    ///   - selectedSide: 현재 선택된 쪽. nil이면 어느 쪽도 선택되지 않은 모양으로 그린다.
+    ///   - size: 크기 (기본 `regular`)
     ///   - onSelectionChange: 선택 변경 시 호출되는 클로저
     public init(
         leftItem: SegmentItem,
         rightItem: SegmentItem,
-        selectedSide: Side,
+        selectedSide: Side?,
+        size: Size = .regular,
         onSelectionChange: @escaping (Side) -> Void
     ) {
         self.leftItem = leftItem
         self.rightItem = rightItem
         self.selectedSide = selectedSide
+        self.size = size
         self.onSelectionChange = onSelectionChange
     }
     
@@ -74,7 +87,8 @@ public struct SegmentControl: View {
             // 왼쪽 세그먼트
             SegmentButton(
                 item: leftItem,
-                isSelected: selectedSide == .left
+                isSelected: selectedSide == .left,
+                size: size
             ) {
                 onSelectionChange(.left)
             }
@@ -82,14 +96,15 @@ public struct SegmentControl: View {
             // 오른쪽 세그먼트
             SegmentButton(
                 item: rightItem,
-                isSelected: selectedSide == .right
+                isSelected: selectedSide == .right,
+                size: size
             ) {
                 onSelectionChange(.right)
             }
         }
-        .frame(width: 262, height: 67)
+        .frame(width: size.width, height: size.height)
         .background(Color.component.segment.container.bg)
-        .cornerRadius(28)
+        .cornerRadius(size.cornerRadius)
     }
 }
 
@@ -100,14 +115,14 @@ public struct SegmentItem: Equatable {
     /// 세그먼트의 주 제목
     public let title: String
     
-    /// 세그먼트의 부제목 (작은 글씨)
+    /// 세그먼트의 부제목 (작은 글씨). `compact`에서는 보이지 않는다.
     public let subtitle: String
     
     /// SegmentItem을 생성합니다.
     /// - Parameters:
     ///   - title: 주 제목
     ///   - subtitle: 부제목
-    public init(title: String, subtitle: String) {
+    public init(title: String, subtitle: String = "") {
         self.title = title
         self.subtitle = subtitle
     }
@@ -119,6 +134,7 @@ public struct SegmentItem: Equatable {
 private struct SegmentButton: View {
     let item: SegmentItem
     let isSelected: Bool
+    let size: SegmentControl.Size
     let action: () -> Void
 
     var body: some View {
@@ -126,7 +142,7 @@ private struct SegmentButton: View {
             VStack(alignment: .leading, spacing: 4) {
                 // 타이틀
                 Text(item.title)
-                    .font(.pretendard.custom(weight: .semiBold, size: 18))
+                    .font(.pretendard.custom(weight: .semiBold, size: size == .compact ? 14 : 18))
                     .foregroundColor(
                         isSelected
                             ? Color.component.segment.selected.titleText
@@ -134,26 +150,64 @@ private struct SegmentButton: View {
                     )
                 
                 // 서브타이틀
-                Text(item.subtitle)
-                    .font(.pretendard.labelM)
-                    .foregroundColor(
-                        isSelected
-                            ? Color.component.segment.selected.subText
-                            : Color.component.segment.unselected.subText
-                    )
+                if size == .regular {
+                    Text(item.subtitle)
+                        .font(.pretendard.labelM)
+                        .foregroundColor(
+                            isSelected
+                                ? Color.component.segment.selected.subText
+                                : Color.component.segment.unselected.subText
+                        )
+                }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 59)
+            .frame(height: size.buttonHeight)
             .background(
                 isSelected
                     ? Color.component.segment.selected.bg
                     : Color.component.segment.unselected.bg
             )
-            .cornerRadius(24)
-            .padding(4)
+            .cornerRadius(size.buttonCornerRadius)
+            .padding(size.inset)
         }
         .buttonStyle(.plain)
     }
+}
+
+// MARK: - Size Metrics
+
+private extension SegmentControl.Size {
+    var width: CGFloat? {
+        switch self {
+        case .regular: return 262
+        case .compact: return nil
+        }
+    }
+
+    var height: CGFloat {
+        switch self {
+        case .regular: return 67
+        case .compact: return 44
+        }
+    }
+
+    var cornerRadius: CGFloat {
+        switch self {
+        case .regular: return 28
+        case .compact: return 22
+        }
+    }
+
+    var inset: CGFloat {
+        switch self {
+        case .regular: return 4
+        case .compact: return 3
+        }
+    }
+
+    var buttonHeight: CGFloat { height - inset * 2 }
+
+    var buttonCornerRadius: CGFloat { cornerRadius - inset }
 }
 
 // MARK: - Preview

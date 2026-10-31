@@ -77,6 +77,8 @@ public struct SignupCompleteView: View {
         }
         .navigationBarBackButtonHidden(true)
         .navigationBarHidden(true)
+        // 가입이 끝난 뒤 닉네임 화면으로 돌아가면 이미 쓴 임시 토큰으로 가입을 다시 요청하게 된다.
+        .background { InteractivePopBlocker() }
     }
 }
 

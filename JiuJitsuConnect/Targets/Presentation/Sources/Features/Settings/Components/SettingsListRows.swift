@@ -13,6 +13,8 @@ enum SettingsListMetrics {
     static let sectionVerticalPadding: CGFloat = 8
     static let rowSpacing: CGFloat = 4
     static let rowHeight: CGFloat = 40
+    static let pressedCornerRadius: CGFloat = 10
+    static let pressedHorizontalInset: CGFloat = 8
 }
 
 // MARK: - Section Container
@@ -59,25 +61,40 @@ struct SettingsInteractiveRow: View {
     let action: () -> Void
 
     var body: some View {
-        HStack {
-            SettingsRowContent(asset: asset, text: text)
-            Spacer()
-            Button(action: action) {
-                ZStack {
-                    Assets.Common.Icon.chevronRight.swiftUIImage
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 18, height: 18)
-                        .foregroundStyle(Color.component.bottomSheet.unselected.listItem.followingIcon)
-                }
-                .frame(width: 34, height: 34)
-                .contentShape(Rectangle())
+        // 행 전체(라벨·빈 곳 포함)가 눌림 영역이다 (#112)
+        Button(action: action) {
+            HStack {
+                SettingsRowContent(asset: asset, text: text)
+                Spacer()
+                Assets.Common.Icon.chevronRight.swiftUIImage
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
+                    .foregroundStyle(Color.component.bottomSheet.unselected.listItem.followingIcon)
+                    .frame(width: 34, height: 34)
             }
-            .buttonStyle(.plain)
+            .frame(minHeight: SettingsListMetrics.rowHeight)
+            .padding(.leading, 16)
+            .padding(.trailing, 8)
+            .contentShape(Rectangle())
         }
-        .frame(minHeight: SettingsListMetrics.rowHeight)
-        .padding(.leading, 16)
-        .padding(.trailing, 8)
+        .buttonStyle(SettingsRowButtonStyle())
+    }
+}
+
+/// 터치 다운 동안에만 행 전체에 눌림 배경을 노출하는 버튼 스타일
+private struct SettingsRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: SettingsListMetrics.pressedCornerRadius)
+                    .fill(
+                        configuration.isPressed
+                            ? Color.component.list.setting.pressedBackground
+                            : Color.clear
+                    )
+                    .padding(.horizontal, SettingsListMetrics.pressedHorizontalInset)
+            )
     }
 }
 

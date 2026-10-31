@@ -93,6 +93,7 @@ public struct ComponentColors {
         public let primary = Primary()
         public let white = White()
         public let transparentText = TransparentText()
+        public let tint = Tint()
 
         public struct Dark {
             public let bg = Color.semantic.interactive.strong
@@ -123,6 +124,15 @@ public struct ComponentColors {
             public let text = Color.semantic.interactive.primary
             public let pressedBg = Color.semantic.surface.primarySubtle
             public let disabledBg = Color.semantic.transparent.transparent
+            public let disabledText = Color.semantic.text.disabled
+        }
+
+        /// 주 CTA 옆·아래에 두는 보조 CTA — 연한 파랑 면. 색은 일반 버튼의 tint와 같다.
+        public struct Tint {
+            public let bg = Color.semantic.surface.primarySubtle
+            public let text = Color.semantic.interactive.primary
+            public let pressedBg = Color.semantic.surface.primarySubtlePressed
+            public let disabledBg = Color.semantic.surface.disabled
             public let disabledText = Color.semantic.text.disabled
         }
     }
@@ -306,6 +316,7 @@ public struct ComponentColors {
         public struct Setting {
             public let text = Color.semantic.text.primary
             public let background = Color.semantic.surface.container
+            public let pressedBackground = Color.semantic.surface.containerPressed
             public let subText = Color.semantic.text.secondary
             public let icon = Color.semantic.icon.secondary
             public let leadingIcon = Color.semantic.icon.primary
@@ -516,6 +527,43 @@ public struct ComponentColors {
             public let bg = Color.semantic.transparent.transparent
             public let titleText = Color.semantic.text.secondary
             public let subText = Color.semantic.text.tertiary
+        }
+    }
+
+    // MARK: - Belt Select Button
+    public let beltSelectButton = BeltSelectButton()
+
+    public struct BeltSelectButton {
+        public let selected = Selected()
+        public let unselected = Unselected()
+        public let belt = Belt()
+
+        public struct Selected {
+            public let bg = Color.semantic.surface.primarySubtle
+            public let pressedBg = Color.semantic.surface.primarySubtlePressed
+            public let labelText = Color.semantic.interactive.primary
+        }
+
+        public struct Unselected {
+            public let bg = Color.semantic.surface.secondary
+            public let pressedBg = Color.semantic.surface.secondaryPressed
+            public let labelText = Color.semantic.text.primary
+        }
+
+        /// 띠 그림 색 — MY 헤더의 띠 색을 그대로 가져다 쓴다. 흰 띠만 바탕에 묻히지 않게 흰색 + 옅은 테두리로 그린다.
+        public struct Belt {
+            private let header = MyProfileHeader.Bg()
+            public let white = Color.primitive.bw.white
+            public let whiteEdge = Color.primitive.coolGray.cg200
+            public var blue: Color { header.blue }
+            public var purple: Color { header.purple }
+            public var brown: Color { header.brwon }
+            public var black: Color { header.black }
+            /// 단(그랄을 감는 자리) — 검은 띠만 빨강, 나머지는 검정
+            public var rankBar: Color { header.black }
+            public let blackRankBar = Color.primitive.red.r500
+            /// 그랄(단에 감는 흰 줄)
+            public let stripe = Color.primitive.bw.white
         }
     }
 

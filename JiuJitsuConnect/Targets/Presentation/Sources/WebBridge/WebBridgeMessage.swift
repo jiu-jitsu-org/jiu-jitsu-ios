@@ -139,6 +139,8 @@ private extension WebBridgeInboundMessage {
             return "SHOW_CONFIRM_DIALOG  reqId=\(payload.requestId) destructive=\(payload.destructive)"
         case let .showSelectSheet(payload):
             return "SHOW_SELECT_SHEET  reqId=\(payload.requestId) options=\(payload.options.count)"
+        case let .pickPhotos(payload):
+            return "PICK_PHOTOS  reqId=\(payload.requestId) limit=\(payload.limit)"
         case let .unknown(type):
             return "\(type)  (unsupported)"
         }
@@ -167,6 +169,10 @@ private extension WebBridgeOutboundMessage {
             case .dismiss:
                 return "SELECT_SHEET_RESULT  reqId=\(requestId) result=dismiss"
             }
+        case let .photosPicked(requestId, files):
+            // base64 원문은 장당 수백 KB라 로그에는 개수와 크기만 남긴다.
+            let sizes = files.map { "\($0.data.count / 1024)KB" }.joined(separator: ",")
+            return "PHOTOS_PICKED  reqId=\(requestId) files=\(files.count) base64=[\(sizes)]"
         }
     }
 }
@@ -206,6 +212,9 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 선택 바텀시트 표시 요청(신고 사유 등). 항목을 웹이 넘기므로 사유가 늘어도 앱을 건드리지 않는다.
     /// 결과(submit+선택값 / dismiss)는 requestId로 짝지어 SELECT_SHEET_RESULT로 회신한다.
     case showSelectSheet(SelectSheetPayload)
+    /// 사진 선택 화면 표시 요청(글쓰기 '앨범에서 선택'). 웹뷰 file input은 iOS 시스템 메뉴를 한 번 더
+    /// 띄우므로 네이티브가 PHPicker를 직접 연다. 결과는 requestId로 짝지어 PHOTOS_PICKED로 회신한다.
+    case pickPhotos(PickPhotosPayload)
     /// 계약에 없는 타입(상위 버전/오타 등) — 무시 대상.
     case unknown(type: String)
 
@@ -220,6 +229,7 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case setLeaveGuard = "SET_LEAVE_GUARD"
         case showConfirmDialog = "SHOW_CONFIRM_DIALOG"
         case showSelectSheet = "SHOW_SELECT_SHEET"
+        case pickPhotos = "PICK_PHOTOS"
     }
 
     /// `WKScriptMessage.body`를 파싱한다.
@@ -342,6 +352,17 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
                     submitText: submitText
                 )
             )
+        case .pickPhotos:
+            // limit은 남은 첨부 자리라 0 이하가 올 수도 있다. 디코드는 그대로 두고 판단은 Feature가 한다
+            // (requestId가 있으면 빈 결과라도 회신해야 웹이 5분 타임아웃까지 기다리지 않는다).
+            guard
+                let requestId = payload?["requestId"] as? String, !requestId.isEmpty,
+                let limit = (payload?["limit"] as? NSNumber)?.intValue
+            else {
+                Log.trace("PICK_PHOTOS payload 필수 필드 누락", category: .network, level: .error)
+                return nil
+            }
+            return .pickPhotos(PickPhotosPayload(requestId: requestId, limit: limit))
         case .none:
             return .unknown(type: rawType)
         }
@@ -502,6 +523,54 @@ public enum SelectSheetOutcome: Equatable, Sendable {
     case dismiss
 }
 
+// MARK: - Photo Picker (PICK_PHOTOS / PHOTOS_PICKED)
+
+/// `PICK_PHOTOS` 페이로드 — 네이티브가 열 사진 선택 화면.
+public struct PickPhotosPayload: Equatable, Sendable {
+    public let requestId: String
+    /// 고를 수 있는 최대 장수(웹의 남은 첨부 자리, 1~3) → PHPicker `selectionLimit`.
+    public let limit: Int
+
+    public init(requestId: String, limit: Int) {
+        self.requestId = requestId
+        self.limit = limit
+    }
+}
+
+/// `PHOTOS_PICKED`에 실어 보내는 사진 1장. 네이티브가 JPEG·긴 변 2400px 이내로 줄여 담는다.
+public struct PickedPhoto: Equatable, Sendable {
+    /// 확장자 포함 파일 이름(예: "IMG_0012.jpg").
+    public let name: String
+    public let mimeType: String
+    /// 바이트의 base64 문자열(`data:` 접두사 없이).
+    public let data: String
+
+    public init(name: String, mimeType: String, data: String) {
+        self.name = name
+        self.mimeType = mimeType
+        self.data = data
+    }
+}
+
+// MARK: - Capabilities (window.AppBridgeCapabilities)
+
+/// 웹이 **보내기 전에** 앱의 지원 여부를 알아야 하는 웹 → 네이티브 메시지.
+/// PICK_PHOTOS는 탭 직후 file input을 열지 네이티브에 맡길지 정해야 해서(사용자 제스처 제약),
+/// "보내 보고 응답 없으면 폴백"이 불가능하다. 그래서 페이지 스크립트보다 먼저 목록을 주입한다.
+/// 목록이 없는 웹뷰(구버전 앱·리스트)에서 웹은 기존 file input을 쓴다.
+enum WebBridgeCapability: String, Sendable {
+    case pickPhotos = "PICK_PHOTOS"
+
+    /// `window.AppBridgeCapabilities = [...]`를 정의하는 스크립트 소스. 직렬화 실패 시 nil.
+    static func injectionScriptSource(for capabilities: [WebBridgeCapability]) -> String? {
+        guard
+            let data = try? JSONSerialization.data(withJSONObject: capabilities.map(\.rawValue)),
+            let list = String(data: data, encoding: .utf8)
+        else { return nil }
+        return "window.AppBridgeCapabilities = \(list);"
+    }
+}
+
 // MARK: - Origin 검사
 
 /// 서브뷰로 열려는 URL이 호스트 웹뷰와 동일 origin(scheme+host+port)인지 검사한다.
@@ -550,6 +619,8 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
     case confirmDialogResult(requestId: String, outcome: ConfirmDialogOutcome)
     /// SHOW_SELECT_SHEET의 결과. submit이면 선택값(+자유 입력)을 함께 싣는다.
     case selectSheetResult(requestId: String, outcome: SelectSheetOutcome)
+    /// PICK_PHOTOS의 결과. 고른 순서대로이며, 취소면 빈 배열이다.
+    case photosPicked(requestId: String, files: [PickedPhoto])
 
     private var type: String {
         switch self {
@@ -560,6 +631,7 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         case .backPressed: return "BACK_PRESSED"
         case .confirmDialogResult: return "CONFIRM_DIALOG_RESULT"
         case .selectSheetResult: return "SELECT_SHEET_RESULT"
+        case .photosPicked: return "PHOTOS_PICKED"
         }
     }
 
@@ -581,6 +653,11 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
             case .dismiss:
                 return ["requestId": requestId, "result": "dismiss"]
             }
+        case let .photosPicked(requestId, files):
+            return [
+                "requestId": requestId,
+                "files": files.map { ["name": $0.name, "mimeType": $0.mimeType, "data": $0.data] }
+            ]
         }
     }
 

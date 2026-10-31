@@ -30,6 +30,9 @@ public struct CommunityDetailFeature: Sendable {
         var loadToken: UUID = UUID()
         var isLoading: Bool = true
         var hasError: Bool = false
+        // 스스로 닫기 시작함(뒤로가기·CLOSE_SUBVIEW). 닫힘 애니메이션 동안 살아 있는 웹뷰가
+        // 늦은 로딩 완료를 보내지 않도록 dismiss 전에 웹뷰를 먼저 멈춘다(#152).
+        var isClosing = false
 
         // 서브뷰 생성 시점의 access token. WEBVIEW_READY 핸드셰이크 때 초기 로그인 상태를 동기화한다.
         // (세션 연속성은 공유 쿠키가 보장하고, 토큰 주입은 웹 JS 상태 동기화용 보조 채널이다.)
@@ -41,6 +44,10 @@ public struct CommunityDetailFeature: Sendable {
         // CommunityDetailView가 로컬로 그려도 GNB·탭바까지 덮인다. 한 번에 하나만 표시한다.
         var pendingConfirmDialog: ConfirmDialogPayload?
         var pendingSelectSheet: SelectSheetPayload?
+        // 웹이 요청한 사진 선택(글쓰기 '앨범에서 선택'). 피커가 닫힌 뒤에도 사진 변환을 마치고
+        // 회신할 때까지 남아 있어, 그 사이에 온 다른 다이얼로그 요청을 막는다.
+        var pendingPhotoPick: PickPhotosPayload?
+        var isPhotoPickerPresented = false
 
         // 웹이 '지금 스와이프 백으로 바로 닫으면 안 됨'을 알린 상태(SET_LEAVE_GUARD로 토글, #115).
         // 글쓰기·수정은 웹이 알리기 전까지 true로 둔다 — 이 메시지를 안 보내는 구 웹에서도
@@ -89,6 +96,11 @@ public struct CommunityDetailFeature: Sendable {
             case confirmDialogDismissed
             case selectSheetSubmitted(value: String, customText: String?)
             case selectSheetDismissed
+            // 피커에서 선택(또는 취소)을 마쳐 피커를 닫는다. 결과는 변환 후 photosPicked로 온다.
+            case photoPickerFinished
+            case photosPicked([PickedPhoto])
+            // 피커가 선택 없이 닫힘(아래로 쓸어내리기 등).
+            case photoPickerDismissed
         }
 
         public enum InternalAction: Sendable {
@@ -121,6 +133,8 @@ public struct CommunityDetailFeature: Sendable {
         /// AUTH_TOKEN_REFRESH_REQUEST에 대한 갱신 성공 응답. `loggedIn`(수동 동기화)과 달리
         /// 토큰 값이 같아도 반드시 웹에 회신한다 — 요청한 웹뷰가 응답을 기다리고 있기 때문이다.
         case tokenRefreshed(accessToken: String)
+        /// 로그인 안내를 닫음. 상세 웹이 보관한 행위(좋아요 등)를 버리지 않으면 나중에 다른 곳에서 로그인할 때 실행된다.
+        case loginCancelled
         case loggedOut
         case sessionExpired
     }
@@ -137,6 +151,7 @@ public struct CommunityDetailFeature: Sendable {
                 return .none
 
             case .view(.backTapped):
+                state.isClosing = true
                 return .run { _ in await self.dismiss() }
 
             case .view(.swipeBackBlocked):
@@ -179,6 +194,25 @@ public struct CommunityDetailFeature: Sendable {
                 Self.enqueue(.selectSheetResult(requestId: pending.requestId, outcome: .dismiss), into: &state)
                 return .none
 
+            case .view(.photoPickerFinished):
+                state.isPhotoPickerPresented = false
+                return .none
+
+            case let .view(.photosPicked(files)):
+                guard let pending = state.pendingPhotoPick else { return .none }
+                state.pendingPhotoPick = nil
+                state.isPhotoPickerPresented = false
+                Self.enqueue(.photosPicked(requestId: pending.requestId, files: files), into: &state)
+                return .none
+
+            case .view(.photoPickerDismissed):
+                // 피커가 선택을 마치며 스스로 닫힌 경우(photoPickerFinished 이후)는 결과가 곧 오므로 무시한다.
+                guard state.isPhotoPickerPresented, let pending = state.pendingPhotoPick else { return .none }
+                state.pendingPhotoPick = nil
+                state.isPhotoPickerPresented = false
+                Self.enqueue(.photosPicked(requestId: pending.requestId, files: []), into: &state)
+                return .none
+
             case .internal(.loadingStarted):
                 state.isLoading = true
                 state.hasError = false
@@ -218,6 +252,7 @@ public struct CommunityDetailFeature: Sendable {
 
                 case .closeSubview:
                     // 자기 자신(최상단 서브뷰)을 닫는다. 스택 push면 pop, 모달이면 dismiss된다.
+                    state.isClosing = true
                     return .run { _ in await self.dismiss() }
 
                 case let .setLeaveGuard(enabled):
@@ -229,6 +264,9 @@ public struct CommunityDetailFeature: Sendable {
 
                 case let .showSelectSheet(payload):
                     return Self.presentSelectSheet(payload, into: &state)
+
+                case let .pickPhotos(payload):
+                    return Self.presentPhotoPicker(payload, into: &state)
 
                 case let .authLoginPrompt(reason):
                     return .send(.delegate(.loginPromptRequested(reason: reason)))
@@ -272,6 +310,8 @@ public struct CommunityDetailFeature: Sendable {
             state.accessToken = accessToken
             WebBridge.logEvent("토큰 갱신 완료 → AUTH_LOGIN_SUCCESS(갱신 후 토큰) 회신", source: .detail(state.url))
             enqueueLoginSuccess(accessToken: accessToken, into: &state)
+        case .loginCancelled:
+            enqueue(.authLoginCancelled, into: &state)
         case .loggedOut:
             state.accessToken = nil
             enqueue(.authLogout, into: &state)
@@ -281,9 +321,14 @@ public struct CommunityDetailFeature: Sendable {
         }
     }
 
+    /// 웹 요청으로 띄운 네이티브 표면(알럿·시트·사진 피커)이 있는지. 한 번에 하나만 띄운다.
+    private static func hasPendingBridgeSurface(_ state: State) -> Bool {
+        state.pendingConfirmDialog != nil || state.pendingSelectSheet != nil || state.pendingPhotoPick != nil
+    }
+
     /// 확인 알럿 표시 요청 처리. 이미 다이얼로그가 떠 있으면 새 요청은 즉시 dismiss로 회신한다.
     private static func presentConfirmDialog(_ payload: ConfirmDialogPayload, into state: inout State) -> Effect<Action> {
-        guard state.pendingConfirmDialog == nil, state.pendingSelectSheet == nil else {
+        guard !hasPendingBridgeSurface(state) else {
             enqueue(.confirmDialogResult(requestId: payload.requestId, outcome: .dismiss), into: &state)
             return .none
         }
@@ -293,11 +338,23 @@ public struct CommunityDetailFeature: Sendable {
 
     /// 선택 시트 표시 요청 처리(동시 표시 방지는 presentConfirmDialog와 동일).
     private static func presentSelectSheet(_ payload: SelectSheetPayload, into state: inout State) -> Effect<Action> {
-        guard state.pendingConfirmDialog == nil, state.pendingSelectSheet == nil else {
+        guard !hasPendingBridgeSurface(state) else {
             enqueue(.selectSheetResult(requestId: payload.requestId, outcome: .dismiss), into: &state)
             return .none
         }
         state.pendingSelectSheet = payload
+        return .none
+    }
+
+    /// 사진 피커 표시 요청 처리. 띄울 수 없으면(다른 표면 표시 중·남은 자리 없음) 빈 결과로 바로 회신한다.
+    /// limit이 0이면 PHPicker는 '무제한'으로 해석하므로 그대로 열면 안 된다.
+    private static func presentPhotoPicker(_ payload: PickPhotosPayload, into state: inout State) -> Effect<Action> {
+        guard !hasPendingBridgeSurface(state), payload.limit > 0 else {
+            enqueue(.photosPicked(requestId: payload.requestId, files: []), into: &state)
+            return .none
+        }
+        state.pendingPhotoPick = payload
+        state.isPhotoPickerPresented = true
         return .none
     }
 
