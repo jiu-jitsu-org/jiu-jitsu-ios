@@ -64,7 +64,9 @@ struct OwnerVerificationDTO: Decodable {
             status: status.flatMap(OwnerVerification.Status.init(rawValue:)) ?? .notRequested,
             // 미제출 placeholder("defaultImage" 등)도 도메인에는 노출하지 않도록 nil 정규화
             documentImageUrl: Self.normalizeDocumentImage(documentImage?.imageUrl),
-            rejectReason: rejectReason.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+            rejectReason: rejectReason
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .flatMap { $0.isEmpty ? nil : $0 }
         )
     }
 
