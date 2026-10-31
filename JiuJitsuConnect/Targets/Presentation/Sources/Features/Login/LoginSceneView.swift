@@ -172,50 +172,6 @@ struct LoginSceneView<Sheet: View>: View {
     }
 }
 
-// MARK: - 인사 장면 출연진
-
-/// 로그인한 사람이 앱을 열 때 나오는 인사 장면(GreetingSceneView)의 캐릭터 한 명.
-/// 값은 393pt 폭 기준이고, `show`는 화면 아래 끝 위로 드러나는 몸 비율이다.
-struct LoginCastMember {
-    let body: ImageAsset
-    let width: CGFloat
-    let centerX: CGFloat
-    let rotation: Double
-    let zIndex: Double
-    let show: CGFloat
-    var mirror = false
-    var eyes: ImageAsset = Assets.Login.Character.eyesMeh
-    /// 눈만 따로 기울이고(도), 보는 방향을 뒤집고, 같은 배율로 키운다. 다섯이 같은 눈으로 보이지 않게
-    var eyeTilt: Double = 0
-    var eyeFlip = false
-    var eyeScale: CGFloat = 1
-    /// 밴드 아래 곧은 부분을 같은 굵기로 이어 붙인 몸통(`bodyExt*`). 어깨가 드러나지 않고 화면 아래로 이어진다
-    var isExtended = false
-}
-
-enum LoginCast {
-    /// 몸통·눈 그림 캔버스(800×1260)의 세로/가로 비율
-    static let aspect: CGFloat = 1260 / 800
-    /// 이어 붙인 몸통 그림은 원래 캔버스(360×567)를 왼쪽으로 100, 아래로 567 넓혔다(460×1134)
-    static let extendedSize = CGSize(width: 460.0 / 360, height: 2)
-    static let extendedLeft: CGFloat = 100.0 / 360
-
-    /// 출연진 전체를 처음 시안보다 이만큼 줄여 그린다(#111). 다섯이 화면 양옆을 꽉 채워 답답해 보여서,
-    /// 무리 전체를 화면 가운데·아래 기준선을 축으로 한꺼번에 줄여 서로 겹치는 모양은 그대로 두고 양옆과 머리 위 여백만 늘린다
-    static let groupScale: CGFloat = 0.78
-    /// 시안 화면 폭(393pt)의 가운데. 출연진 `centerX`가 이 점에서 떨어진 거리를 `groupScale`만큼 줄인다
-    private static let designCenterX: CGFloat = 393.0 / 2
-
-    /// 아래 끝을 `baseline`보다 `1 - show`만큼 내려 세운 자리. 인사 장면이 화면 아래 끝을 기준으로 쓴다
-    static func frame(of member: LoginCastMember, scale: CGFloat, screenWidth: CGFloat, baseline: CGFloat) -> CGRect {
-        let width = member.width * scale * groupScale
-        let height = width * aspect
-        let centerX = screenWidth / 2 + (member.centerX - designCenterX) * scale * groupScale
-        let bottom = baseline + height * (1 - member.show)
-        return CGRect(x: centerX - width / 2, y: bottom - height, width: width, height: height)
-    }
-}
-
 /// 이웃끼리 연달아 말하지 않도록 정해둔 순서를 돈다.
 private struct TalkSpeaker {
     private static let order = BeltCast.speakers
@@ -368,93 +324,8 @@ struct CubicBezier {
     }
 }
 
-/// 몸의 절반쯤 아래에서 나타나 살짝 지나쳐 올라갔다가 제자리에 앉는다. 로그인·인사 장면이 같은 움직임을 쓴다.
-func castEntranceOffset(_ progress: Double, height: CGFloat, scale: CGFloat) -> CGFloat {
-    let overshoot = -8 * scale
-    switch progress {
-    case ..<0.2: return lerp(height * 0.5, height * 0.38, progress / 0.2)
-    case ..<0.75: return lerp(height * 0.38, overshoot, (progress - 0.2) / 0.55)
-    default: return lerp(overshoot, 0, (progress - 0.75) / 0.25)
-    }
-}
-
 func lerp(_ from: CGFloat, _ to: CGFloat, _ progress: Double) -> CGFloat {
     from + (to - from) * progress
-}
-
-// MARK: - 캐릭터
-
-/// 몸통과 눈 두 장을 겹쳐 그린다. 다 모인 뒤에는 숨쉬기와 눈 깜빡임을 잔잔하게 이어간다.
-struct LoginCharacterView: View {
-    let member: LoginCastMember
-    let isIdle: Bool
-    let hop: Int
-
-    @State private var isBreathing = false
-    @State private var isBlinking = false
-
-    private static let eyeCenter = UnitPoint(x: 0.435, y: 0.443)
-
-    /// 이어 붙인 몸통은 캔버스보다 왼쪽·아래로 넓어 머리·밴드 자리를 맞춰 그린다
-    @ViewBuilder
-    private var bodyImage: some View {
-        if member.isExtended {
-            GeometryReader { proxy in
-                member.body.swiftUIImage
-                    .resizable()
-                    .frame(
-                        width: proxy.size.width * LoginCast.extendedSize.width,
-                        height: proxy.size.height * LoginCast.extendedSize.height
-                    )
-                    .offset(x: -proxy.size.width * LoginCast.extendedLeft)
-            }
-        } else {
-            member.body.swiftUIImage
-                .resizable()
-        }
-    }
-
-    var body: some View {
-        ZStack {
-            bodyImage
-            member.eyes.swiftUIImage
-                .resizable()
-                // 눈 그림의 가운데(캔버스 43.5%, 44.3%)를 기준으로 감고, 기울이고, 뒤집는다
-                .scaleEffect(x: 1, y: isBlinking ? 0.08 : 1, anchor: Self.eyeCenter)
-                .rotationEffect(.degrees(member.eyeTilt), anchor: Self.eyeCenter)
-                .scaleEffect(x: (member.eyeFlip ? -1 : 1) * member.eyeScale, y: member.eyeScale, anchor: Self.eyeCenter)
-        }
-        .scaleEffect(x: isBreathing ? 1.006 : 1, y: isBreathing ? 1.018 : 1, anchor: .bottom)
-        // 말할 때 한 번 들썩인다
-        .keyframeAnimator(initialValue: 0, trigger: hop) { content, lift in
-            content.offset(y: lift)
-        } keyframes: { _ in
-            CubicKeyframe(-4, duration: 0.19)
-            CubicKeyframe(0, duration: 0.19)
-        }
-        .rotationEffect(.degrees(member.rotation), anchor: .bottom)
-        .scaleEffect(x: member.mirror ? -1 : 1, y: 1)
-        .task(id: isIdle) {
-            // 다른 화면에 갔다 오면 task가 다시 돈다. 값을 되돌려 둬야 반복 움직임이 다시 걸리고, 감긴 눈도 뜬다
-            isBreathing = false
-            isBlinking = false
-            guard isIdle else { return }
-            withAnimation(
-                .easeInOut(duration: .random(in: 2.4...3.0))
-                .repeatForever(autoreverses: true)
-                .delay(.random(in: 0...0.9))
-            ) {
-                isBreathing = true
-            }
-            try? await Task.sleep(for: .seconds(.random(in: 0.6...3.0)))
-            while !Task.isCancelled {
-                withAnimation(.easeInOut(duration: 0.075)) { isBlinking = true }
-                try? await Task.sleep(for: .seconds(0.075))
-                withAnimation(.easeInOut(duration: 0.095)) { isBlinking = false }
-                try? await Task.sleep(for: .seconds(.random(in: 2.6...5.6)))
-            }
-        }
-    }
 }
 
 #Preview("Login Scene") {

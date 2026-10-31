@@ -4,7 +4,7 @@ import DesignSystem
 /// 이미 로그인한 사람이 앱을 열 때 스플래시와 홈 사이에 보여주는 인사 장면.
 ///
 /// 스플래시가 끝난 모습에서 시작해 문구·OSS 글자는 위로 올라가고, 둥근 그래픽은 조금만 가라앉아 캐릭터 뒤에 남는다.
-/// 띠 캐릭터 다섯이 화면 아래에서 올라와 다 같이 깡충 뛰고, 한 명이 오늘 요일 인사를 건넨다.
+/// 로그인 화면과 같은 띠 캐릭터 다섯이 화면 아래 끝에서 띠용 올라와 다 같이 깡충 뛰고, 한 명이 오늘 요일 인사를 건넨다.
 /// 이어서 `onCover`로 홈이 아래에서 올라와 덮기 시작하고, 다 덮으면 `onFinish`를 부른다.
 /// 시안 기준 화면은 393×852이며, 캐릭터 크기·위치는 화면 폭에 비례해 맞춘다.
 struct GreetingSceneView: View {
@@ -56,23 +56,21 @@ struct GreetingSceneView: View {
 
             // 캐릭터끼리의 앞뒤(zIndex)가 그래픽·글자까지 넘어가지 않도록 한 겹으로 묶는다
             ZStack(alignment: .topLeading) {
-                ForEach(Array(GreetingCast.members.enumerated()), id: \.offset) { index, member in
-                    let frame = layout.frame(of: member)
-                    let entrance = Timing.entrance(of: index).progress(at: elapsed)
+                ForEach(Array(BeltCast.members.enumerated()), id: \.offset) { index, member in
+                    let placement = layout.placement(of: member)
+                    let rise = BeltRise.pose(elapsed: elapsed - member.start, speed: member.speed, visible: placement.visible)
                     let jump = Jump(at: elapsed - Timing.jumpStart(of: index))
-                    LoginCharacterView(
+                    BeltCharacterView(
                         member: member,
+                        placement: placement,
+                        rise: jump.applied(to: rise ?? BeltRise.Pose(), scale: layout.scale),
                         isIdle: elapsed >= Timing.idle,
                         // 인사를 건넬 때 한 번 들썩인다
                         hop: index == greeting.speaker && elapsed >= Timing.say ? 1 : 0
                     )
-                    .frame(width: frame.width, height: frame.height)
-                    .scaleEffect(x: jump.scaleX, y: jump.scaleY, anchor: .bottom)
-                    .offset(
-                        x: frame.minX,
-                        y: frame.minY + castEntranceOffset(entrance, height: frame.height, scale: layout.scale) + jump.lift * layout.scale
-                    )
-                    .opacity(entrance < 0.2 ? entrance / 0.2 : 1)
+                    .frame(width: placement.frame.width, height: placement.frame.height)
+                    .offset(x: placement.frame.minX, y: placement.frame.minY)
+                    .opacity(rise == nil ? 0 : 1)
                     .zIndex(member.zIndex)
                 }
             }
@@ -98,24 +96,22 @@ struct GreetingSceneView: View {
     // MARK: - 요일 인사
 
     /// 말하는 캐릭터 머리 위에 띄우고, 화면 밖으로 나가지 않게 민다. 꼬리는 늘 머리 쪽에 붙는다.
+    /// 로그인 화면의 `···` 말풍선처럼 꼬리 쪽에서 튀어나와 둥실 떠 있다가, 위로 떠오르며 작아진다.
     @ViewBuilder
     private func sayBubble(layout: GreetingLayout, elapsed: TimeInterval) -> some View {
-        let pop = Timing.sayPop.progress(at: elapsed)
-        let fade = Timing.sayFade.progress(at: elapsed)
-        if elapsed >= Timing.say, fade < 1 {
-            let member = GreetingCast.members[greeting.speaker]
-            let frame = layout.frame(of: member)
-            let headX = frame.midX + (member.mirror ? -1 : 1) * frame.width * 0.1
-            let left = min(max(headX - bubbleWidth * (member.mirror ? 0.7 : 0.3), 14), layout.width - 14 - bubbleWidth)
-            let tailX = min(max(headX - left, 20), max(bubbleWidth - 20, 20))
-            // 작게 튀어나와 살짝 지나쳤다가 제자리, 사라질 때는 줄어들며 흐려진다
-            let grow = pop < 0.65 ? lerp(0.4, 1.06, pop / 0.65) : lerp(1.06, 1, (pop - 0.65) / 0.35)
+        let leave = Timing.sayLeave.progress(at: elapsed)
+        if elapsed >= Timing.say, leave < 1 {
+            let head = layout.placement(of: BeltCast.members[greeting.speaker]).head
+            // 머리가 화면 오른쪽에 있으면 말풍선을 왼쪽으로 펼친다
+            let opensLeft = head.x > layout.width / 2
+            let left = min(max(head.x - bubbleWidth * (opensLeft ? 0.7 : 0.3), 14), layout.width - 14 - bubbleWidth)
+            let tailX = min(max(head.x - left, 20), max(bubbleWidth - 20, 20))
+            let anchor = UnitPoint(x: bubbleWidth > 0 ? tailX / bubbleWidth : 0.5, y: 1.2)
 
-            SayBubble(text: greeting.line, tailX: tailX, tailLean: member.mirror ? 4 : -4)
+            SayBubble(text: greeting.line, tailX: tailX, tailLean: opensLeft ? 4 : -4, anchor: anchor)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { bubbleWidth = $0 }
-                .scaleEffect(grow * lerp(1, 0.85, fade), anchor: UnitPoint(x: bubbleWidth > 0 ? tailX / bubbleWidth : 0.5, y: 1.2))
-                .opacity(min(pop / 0.65, 1) * (1 - fade))
-                .offset(x: left, y: frame.minY + frame.height * 0.02 - SayBubble.height - 14)
+                .modifier(BubbleLeave(progress: leave, anchor: anchor))
+                .offset(x: left, y: head.y - SayBubble.height - 14)
                 .accessibilityLabel(greeting.line)
         }
     }
@@ -123,26 +119,6 @@ struct GreetingSceneView: View {
     private func pause(_ seconds: Double) async -> Bool {
         (try? await Task.sleep(for: .seconds(seconds))) != nil
     }
-}
-
-// MARK: - 출연진
-
-/// 앞줄(흰·보라·검정)은 화면 아래 끝에 걸쳐 서고, 뒷줄(파랑·갈색)은 앞사람 머리 위로 눈을 내민다.
-/// 뒷줄도 앞줄과 같은 크기로 보이게 폭을 맞추고, 어깨가 드러나지 않게 밴드 아래를 이어 붙인 몸통을 쓴다.
-/// 값은 393pt 폭 기준이고, `show`는 화면 아래 끝 위로 드러나는 몸 비율이다. 순서는 흰·파랑·보라·갈색·검정.
-enum GreetingCast {
-    static let members: [LoginCastMember] = [
-        .init(body: Assets.Login.Character.bodyWhite, width: 182, centerX: 78, rotation: 4, zIndex: 3, show: 0.80, mirror: true,
-              eyeTilt: -6),
-        .init(body: Assets.Login.Character.bodyExtBlue, width: 181, centerX: 89, rotation: -3, zIndex: 1, show: 1.32, mirror: true,
-              eyeTilt: 8, eyeFlip: true, eyeScale: 0.94, isExtended: true),
-        .init(body: Assets.Login.Character.bodyPurple, width: 196, centerX: 200, rotation: 1, zIndex: 5, show: 0.78, mirror: true,
-              eyeTilt: 3, eyeScale: 1.04),
-        .init(body: Assets.Login.Character.bodyExtBrown, width: 181, centerX: 295, rotation: 4, zIndex: 1, show: 1.333,
-              eyes: Assets.Login.Character.eyesSad, eyeTilt: -9, eyeScale: 0.96, isExtended: true),
-        .init(body: Assets.Login.Character.bodyBlack, width: 176, centerX: 330, rotation: -5, zIndex: 4, show: 0.80,
-              eyeTilt: 6, eyeFlip: true)
-    ]
 }
 
 /// 오늘 요일에 맞는 인사. 요일마다 말하는 캐릭터와 두 안 중 하나를 무작위로 고른다.
@@ -167,8 +143,9 @@ private struct DayGreeting {
         ["불금이니까 주짓수 고고?", "불금엔 술 대신 롤링"],
         ["오늘은 오픈매트?", "주말 롤링 한 판 고?"]
     ]
-    /// 일 흰 / 월 보라 / 화 검정 / 수 흰 / 목 파랑 / 금 보라 / 토 검정 (출연진 순서의 번호)
-    private static let speakers = [0, 2, 4, 0, 1, 2, 4]
+    /// 일 갈색 / 월 보라 / 화 검정 / 수 갈색 / 목 검정 / 금 보라 / 토 검정 (BeltCast 순서의 번호).
+    /// 로그인 화면처럼 머리가 높은 셋만 말한다. 작은 둘 머리 위에 띄우면 옆 캐릭터 눈을 가린다
+    private static let speakers = [0, 4, 2, 0, 2, 4, 2]
 }
 
 // MARK: - 배치
@@ -193,9 +170,9 @@ private struct GreetingLayout {
     /// 그래픽이 가라앉아 멈추는 자리. 시안에서 120pt 내린 만큼을 화면 폭에 맞춘다
     var patternRestTop: CGFloat { splash.patternTop + 120 * scale }
 
-    /// 아래 끝은 화면 아래 끝에 맞추고, `show`만큼만 화면 위로 드러낸다
-    func frame(of member: LoginCastMember) -> CGRect {
-        LoginCast.frame(of: member, scale: scale, screenWidth: width, baseline: height)
+    /// 시트가 없으니 화면 아래 끝을 로그인 화면의 시트 위 끝 삼아 세운다. 몸통 아래쪽은 화면 밖으로 나간다
+    func placement(of member: BeltMember) -> BeltPlacement {
+        BeltCast.placement(of: member, scale: scale, screenWidth: width, sheetTop: height)
     }
 }
 
@@ -205,26 +182,19 @@ private struct GreetingLayout {
 private enum Timing {
     static let brand = SceneSegment(delay: 0.45, duration: 0.76, curve: .init(0.6, 0, 0.2, 1))
     static let pattern = SceneSegment(delay: 0.6, duration: 1.1, curve: .init(0.55, 0, 0.3, 1))
-    /// 보라 → 파랑 → 검정 → 흰 → 갈색 순으로, 박자를 살짝 엇갈려 올라온다 (로그인 화면과 같다)
-    private static let entranceOrder = [2, 1, 4, 0, 3]
-    static let idle: Double = 1.8
-    /// 다 같이 깡충. 가운데(보라)부터 바깥으로 0.05초씩 늦게 뛴다
+    /// 캐릭터 등장은 BeltCast 각자의 시작·속도를 따른다(로그인 화면과 같다). 마지막(보라)이 약 2.03초에 앉는다
+    static let idle: Double = 2.1
+    /// 다 같이 깡충. 가운데(검정)부터 바깥으로 0.05초씩 늦게 뛴다
     static let jump: Double = 2.15
     static let jumpDuration: Double = 0.44
     static let jumpCurve = CubicBezier(0, 0, 0.58, 1)
     static let say: Double = jump + 0.48
     static let sayLife: Double = 1.3
-    static let sayPop = SceneSegment(delay: say, duration: 0.32, curve: .init(0.3, 0.7, 0.4, 1))
-    static let sayFade = SceneSegment(delay: say + sayLife, duration: 0.22, curve: .init(0.42, 0, 1, 1))
+    /// 로그인 화면의 말풍선이 사라지는 움직임(easeIn 0.28초)과 같다
+    static let sayLeave = SceneSegment(delay: say + sayLife, duration: 0.28, curve: .init(0.42, 0, 1, 1))
     /// 읽을 시간을 두고 홈이 덮기 시작한다
     static let cover: Double = 3.95
     static let coverDuration: Double = 0.52
-
-    static func entrance(of member: Int) -> SceneSegment {
-        let turn = entranceOrder.firstIndex(of: member) ?? 0
-        let stagger = Double(turn) * 0.09 + (turn % 2 == 1 ? 0.04 : 0)
-        return SceneSegment(delay: 1.0 + stagger, duration: 0.72, curve: .init(0.3, 0.7, 0.4, 1))
-    }
 
     static func jumpStart(of member: Int) -> Double {
         jump + Double(abs(member - 2)) * 0.05
@@ -252,6 +222,11 @@ private struct Jump {
         Key(time: 1, lift: 0, scaleX: 1, scaleY: 1)
     ]
 
+    /// 띠용 등장 모습 위에 얹는다. 깡충은 다 앉은 뒤라 겹치지 않는다
+    func applied(to pose: BeltRise.Pose, scale: CGFloat) -> BeltRise.Pose {
+        BeltRise.Pose(lift: pose.lift + lift * scale, scaleX: pose.scaleX * scaleX, scaleY: pose.scaleY * scaleY)
+    }
+
     init(at time: TimeInterval) {
         let progress = Timing.jumpCurve.value(at: time / Timing.jumpDuration)
         guard progress > 0, progress < 1 else { return }
@@ -267,14 +242,19 @@ private struct Jump {
 
 // MARK: - 말풍선
 
-/// 글 한 줄을 담은 흰 말풍선. 꼬리는 작은 원 두 개로, `tailX` 자리에서 아래로 떨어진다.
+/// 글 한 줄을 담은 흰 말풍선. 로그인 화면 `···` 말풍선과 같은 말랑한 몸통을 글 길이만큼 늘이고,
+/// 꼬리는 작은 원 두 개로 `tailX` 자리에서 아래로 떨어진다.
 private struct SayBubble: View {
     let text: String
     let tailX: CGFloat
     /// 작은 원을 머리 쪽으로 살짝 기울인다
     let tailLean: CGFloat
+    /// 꼬리 쪽에서 튀어나온다
+    let anchor: UnitPoint
 
     static let height: CGFloat = 40
+
+    @State private var hasAppeared = false
 
     var body: some View {
         Text(text)
@@ -285,13 +265,9 @@ private struct SayBubble: View {
             .fixedSize()
             .padding(.horizontal, 16)
             .frame(height: Self.height)
-            .background(
-                Capsule()
-                    .fill(Color.primitive.bw.trueWhite)
-                    .shadow(color: Color.primitive.blue.b900.opacity(0.22), radius: 11, y: 8)
-            )
-            .overlay(alignment: .bottomLeading) {
+            .background(alignment: .bottomLeading) {
                 ZStack(alignment: .bottomLeading) {
+                    PuffShape(hasTail: false)
                     Circle()
                         .frame(width: 12, height: 12)
                         .offset(x: tailX - 6, y: 6)
@@ -300,7 +276,11 @@ private struct SayBubble: View {
                         .offset(x: tailX - 3 + tailLean, y: 14)
                 }
                 .foregroundStyle(Color.primitive.bw.trueWhite)
+                .compositingGroup()
+                .shadow(color: Color.primitive.blue.b900.opacity(0.09), radius: 4, y: 4.8)
             }
+            .modifier(BubbleEntrance(anchor: anchor, isStatic: false, trigger: hasAppeared))
+            .onAppear { hasAppeared = true }
     }
 }
 
