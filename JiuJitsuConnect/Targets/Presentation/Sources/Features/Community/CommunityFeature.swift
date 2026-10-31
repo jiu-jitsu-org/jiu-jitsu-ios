@@ -189,7 +189,7 @@ public struct CommunityFeature: Sendable {
             case logoutRequested
             // 웹뷰 토큰 만료 → 부모가 네이티브 refresh로 갱신 후 결과를 웹에 주입한다.
             case tokenRefreshRequested
-            // 헤더의 내 사진 버튼 → 부모가 하단 탭을 MY로 바꾼다. (#128)
+            // 헤더의 내 사진 버튼(#128)·웹에서 내 이름 탭(#116) → 부모가 하단 탭을 MY로 바꾼다.
             case myTabRequested
         }
 
@@ -410,6 +410,14 @@ public struct CommunityFeature: Sendable {
                     Self.enqueue(.photosPicked(requestId: payload.requestId, files: []), into: &state)
                     return .none
 
+                case let .openUserProfile(payload):
+                    guard payload.isMe else {
+                        // 다른 회원 프로필 화면은 서버 API(jiu-jitsu-backend#172) 연결과 함께 붙인다(#116 ③).
+                        Log.trace("다른 회원 프로필 화면 미구현 — 무시: userId=\(payload.userId)", category: .network, level: .info)
+                        return .none
+                    }
+                    return .send(.delegate(.myTabRequested))
+
                 case let .unknown(type):
                     // 계약에 없는 타입 — 한쪽만 먼저 배포된 경우를 대비해 무시한다.
                     Log.trace("WebBridge 미지원 메시지 무시: \(type)", category: .network, level: .info)
@@ -620,6 +628,8 @@ public struct CommunityFeature: Sendable {
             return .send(.delegate(.logoutRequested))
         case .tokenRefreshRequested:
             return .send(.delegate(.tokenRefreshRequested))
+        case .myTabRequested:
+            return .send(.delegate(.myTabRequested))
         }
     }
 
