@@ -440,7 +440,8 @@ private extension View {
                     .presentationDragIndicator(.hidden)
                     .presentationDetents([
                         .height(InstructorVerificationView.contentHeight(
-                            hasImage: instructorVerificationStore.existingImageUrl != nil
+                            hasImage: instructorVerificationStore.existingImageUrl != nil,
+                            isRejected: instructorVerificationStore.isRejected
                         ))
                     ])
                     .presentationBackground(

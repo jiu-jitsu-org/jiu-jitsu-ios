@@ -33,7 +33,7 @@ public struct MyProfileFeature: Sendable {
         // isLoadingProfile과 분리해, 재조회 중에도 기존 화면을 깜빡임 없이 유지한다.
         var isRefreshingProfile: Bool = false
 
-        // user-level 프로필 — 관장사범 인증 상태(ownerRequested)·제출 이미지(ownerRequestImageUrl) 등.
+        // user-level 프로필 — 관장사범 인증 신청 상태(ownerVerification) 등.
         // 닉네임/프로필이미지 등 community와 겹치는 필드는 표시에 쓰지 않는다(단일 소스는 communityProfile).
         var userProfile: UserProfile?
         
@@ -169,7 +169,7 @@ public struct MyProfileFeature: Sendable {
         public enum InternalAction: Sendable {
             case loadProfile
             case profileResponse(TaskResult<CommunityProfile>)
-            // user-level 프로필(GET /api/user/profile) 응답 — 관장사범 인증 상태(ownerRequested) 등.
+            // user-level 프로필(GET /api/user/profile) 응답 — 관장사범 인증 신청 상태(ownerVerification) 등.
             // community 프로필과 독립적으로 처리해 한쪽 실패가 다른 쪽을 막지 않게 한다.
             case userProfileResponse(TaskResult<UserProfile>)
             case refreshProfile
@@ -999,12 +999,10 @@ public struct MyProfileFeature: Sendable {
             case .view(.instructorVerificationMenuTapped):
                 state.isMoreMenuPresented = false
                 guard !state.isUploadingInstructorVerification else { return .none }
-                // 이미 인증 사진을 제출한 상태(ownerRequested=true & 이미지 존재)면 시트에 미리보기로 노출.
-                let existingImageUrl = state.userProfile?.ownerRequested == true
-                    ? state.userProfile?.ownerRequestImageUrl
-                    : nil
                 state.sheet = .instructorVerification(
-                    InstructorVerificationFeature.State(existingImageUrl: existingImageUrl)
+                    InstructorVerificationFeature.State(
+                        verification: state.userProfile?.ownerVerification ?? .notRequested
+                    )
                 )
                 return .none
 
@@ -1239,23 +1237,12 @@ public struct MyProfileFeature: Sendable {
                 state.isUploadingInstructorVerification = false
                 // 인증 요청 접수 완료. 검수는 비동기이므로 "업로드했어요" 안내가 정확하다.
                 Log.trace("관장 사범 인증 - 인증 요청 완료", category: .network, level: .info)
-                // Optimistic — BE 응답을 기다리지 않고 ownerRequested + 방금 업로드한 이미지 URL을
-                // 즉시 반영해 MY 탭 뱃지/시트 재진입 시 최신 상태가 보이도록 한다.
+                // Optimistic — BE 응답을 기다리지 않고 심사 중 + 방금 업로드한 이미지 URL을
+                // 즉시 반영해 시트 재진입 시 최신 상태가 보이도록 한다.
                 // 다음 MY 진입 시 loadProfile이 실제값으로 덮어쓰므로 드리프트가 남지 않는다.
-                state.userProfile = state.userProfile.map {
-                    UserProfile(
-                        userId: $0.userId,
-                        email: $0.email,
-                        nickname: $0.nickname,
-                        profileImageUrl: $0.profileImageUrl,
-                        profileImageFileId: $0.profileImageFileId,
-                        snsProvider: $0.snsProvider,
-                        ownerRequested: true,
-                        ownerRequestImageUrl: uploadedImageUrl,
-                        role: $0.role,
-                        status: $0.status
-                    )
-                }
+                state.userProfile = state.userProfile?.updatingOwnerVerification(
+                    OwnerVerification(status: .pending, documentImageUrl: uploadedImageUrl)
+                )
                 return .send(.internal(.showToast(.init(
                     message: "업로드 완료! 관리자 검토 후 결과를 알려드릴게요.", style: .info
                 ))))

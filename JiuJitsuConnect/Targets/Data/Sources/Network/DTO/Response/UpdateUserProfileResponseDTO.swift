@@ -22,5 +22,4 @@ struct UpdateUserProfileResponseDTO: Decodable {
     let snsProvider: String?
     let status: String?
     let role: String?
-    let ownerRequested: Bool?
 }
