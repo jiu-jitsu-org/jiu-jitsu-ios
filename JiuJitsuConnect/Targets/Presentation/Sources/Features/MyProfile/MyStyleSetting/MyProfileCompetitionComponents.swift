@@ -11,7 +11,7 @@ import Domain
 
 // MARK: - MyProfileCompetitionSection
 
-/// 대회 정보 섹션
+/// 대회 기록 섹션
 public struct MyProfileCompetitionSection: View {
     let competitions: [Competition]?
     let onAddCompetitionTapped: () -> Void
@@ -22,7 +22,7 @@ public struct MyProfileCompetitionSection: View {
         VStack(alignment: .leading, spacing: 8) {
             // 섹션 타이틀 + 메달 합계 + 추가 버튼
             HStack(spacing: 8) {
-                Text("대회 정보")
+                Text("대회 기록")
                     .font(.pretendard.title3)
                     .foregroundStyle(Color.component.sectionHeader.title)
 
