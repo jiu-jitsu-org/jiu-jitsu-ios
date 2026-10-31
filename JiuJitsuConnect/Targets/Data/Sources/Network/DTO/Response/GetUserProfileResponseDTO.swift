@@ -20,9 +20,8 @@ struct GetUserProfileResponseDTO: Decodable {
     /// 프로필 이미지 — 서버 등록 파일 id + URL을 담은 객체. 미설정 시 `nil`.
     let profileImage: ImageRefDTO?
     let snsProvider: String?
-    let ownerRequested: Bool?
-    /// 관장/사범 인증 제출 이미지 — 파일 id + URL 객체. 미제출 시 `nil`.
-    let ownerRequestImage: ImageRefDTO?
+    /// 관장/사범 인증 신청 상태. 누락 시 미신청으로 본다.
+    let ownerVerification: OwnerVerificationDTO?
     let role: String?
     let status: String?
 
@@ -37,9 +36,7 @@ struct GetUserProfileResponseDTO: Decodable {
             // URL이 유효할 때만 삭제용 파일 id를 노출 (미설정 객체의 id 0 등은 무시)
             profileImageFileId: Self.validFileId(profileImage),
             snsProvider: snsProvider,
-            ownerRequested: ownerRequested ?? false,
-            // 미제출 placeholder("defaultImage" 등)도 도메인에는 노출하지 않도록 nil 정규화
-            ownerRequestImageUrl: Self.normalizeOwnerImage(ownerRequestImage?.imageUrl),
+            ownerVerification: ownerVerification?.toDomain() ?? .notRequested,
             role: role,
             status: status
         )
@@ -52,9 +49,27 @@ struct GetUserProfileResponseDTO: Decodable {
               let id = ref.id, id > 0 else { return nil }
         return id
     }
+}
+
+/// `ownerVerification` — 관장/사범 인증 신청 상태 (`UserProfileResponse` 공통).
+struct OwnerVerificationDTO: Decodable {
+    let status: String?
+    /// 제출한 인증 서류 — 파일 id + URL 객체. 미제출 시 `nil`.
+    let documentImage: ImageRefDTO?
+    let rejectReason: String?
+
+    func toDomain() -> OwnerVerification {
+        OwnerVerification(
+            // 모르는 상태값은 미신청으로 둬서 시트가 신청 화면으로 열리게 한다
+            status: status.flatMap(OwnerVerification.Status.init(rawValue:)) ?? .notRequested,
+            // 미제출 placeholder("defaultImage" 등)도 도메인에는 노출하지 않도록 nil 정규화
+            documentImageUrl: Self.normalizeDocumentImage(documentImage?.imageUrl),
+            rejectReason: rejectReason.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        )
+    }
 
     /// 인증 이미지 sentinel 정규화. 빈 문자열/기본 placeholder는 "미제출"을 뜻하므로 `nil`.
-    private static func normalizeOwnerImage(_ raw: String?) -> String? {
+    private static func normalizeDocumentImage(_ raw: String?) -> String? {
         guard let raw, !raw.isEmpty, raw != "default", raw != "defaultImage" else { return nil }
         return raw
     }

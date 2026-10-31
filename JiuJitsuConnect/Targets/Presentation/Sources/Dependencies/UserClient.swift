@@ -14,7 +14,7 @@ public struct UserClient {
     public var signup: @Sendable (Domain.SignupInfo) async throws -> Domain.AuthInfo // 회원 가입
     public var checkNickname: @Sendable (Domain.CheckNicknameInfo) async throws -> Bool // 닉네임 중복 체크
     public var withdrawal: @Sendable () async throws -> Bool // 회원 탈퇴
-    /// 사용자 프로필 조회 (GET `/api/user/profile`) — 관장사범 인증 상태(ownerRequested) 등 포함
+    /// 사용자 프로필 조회 (GET `/api/user/profile`) — 관장사범 인증 신청 상태(ownerVerification) 등 포함
     public var fetchUserProfile: @Sendable () async throws -> UserProfile
     /// 회원 앱 정보 등록 (`/api/user/appInfo`)
     public var registerAppInfo: @Sendable (AppInfo) async throws -> Void
@@ -80,8 +80,6 @@ extension UserClient: DependencyKey {
                 nickname: "홍길동",
                 profileImageUrl: nil,
                 snsProvider: "KAKAO",
-                ownerRequested: false,
-                ownerRequestImageUrl: nil,
                 role: "USER",
                 status: "ACTIVE"
             )

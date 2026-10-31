@@ -139,7 +139,7 @@ public final class UserRepositoryImpl: UserRepository {
 
     public func requestOwnerVerification(imageFileId: Int64) async throws -> Bool {
         do {
-            // 응답은 갱신된 user 객체(ownerRequested 등). 호출부는 성공 여부만 사용하므로
+            // 응답은 갱신된 user 객체(ownerVerification 등). 호출부는 성공 여부만 사용하므로
             // 닉네임/이미지 갱신과 동일하게 디코딩만 검증하고 결과 본문은 사용하지 않는다.
             let endpoint = UserEndpoint.requestOwnerVerification(imageFileId: imageFileId)
             let _: UpdateUserProfileResponseDTO = try await networkService.request(endpoint: endpoint)

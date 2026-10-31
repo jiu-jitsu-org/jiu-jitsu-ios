@@ -8,6 +8,7 @@
 import SwiftUI
 import ComposableArchitecture
 import DesignSystem
+import Domain
 
 /// 관장 사범 인증 안내 + 사진 업로드 진입을 제공하는 바텀 시트.
 /// 레이아웃은 `ProfileImageEditView` (handle / title / CTA)를 따른다.
@@ -20,8 +21,9 @@ public struct InstructorVerificationView: View {
     /// Figma 디자인 가이드 기준 전체 바텀 시트 높이 = 409
     /// (본문 내재 369 + iOS 26 Liquid Glass partial sheet 내부 inset 보정 ~40)
     /// - 기존 인증 사진 미리보기가 있으면 이미지 블록(top 16 + 80) 만큼 더 높게 잡는다.
-    public static func contentHeight(hasImage: Bool) -> CGFloat {
-        hasImage ? 505 : 409
+    /// - 거절 상태는 경고 줄에 사유가 들어가 두 줄까지 늘 수 있어 한 줄(21)만큼 더 잡는다.
+    public static func contentHeight(hasImage: Bool, isRejected: Bool) -> CGFloat {
+        (hasImage ? 505 : 409) + (isRejected ? 21 : 0)
     }
 
     public init(store: StoreOf<InstructorVerificationFeature>) {
@@ -118,19 +120,22 @@ public struct InstructorVerificationView: View {
 
     private var noticeBox: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 4) {
+            HStack(alignment: .top, spacing: 4) {
                 // SF Symbol — 디자인 시스템에 경고 아이콘 에셋이 없어 시스템 심볼로 대체
                 Assets.MyProfile.Icon.triangleAlert.swiftUIImage
                     .resizable()
                     .scaledToFit()
                     .frame(width: 18, height: 18)
+                    .frame(height: 21)
                     .foregroundStyle(Color.semantic.error.error)
 
-                Text("인증 가능한 사진을 업로드해주세요.")
+                Text(warningText)
                     .font(Font.pretendard.bodyS)
                     .foregroundStyle(Color.semantic.error.error)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(height: 21)
+            .frame(minHeight: 21)
 
             Text(
                 """
@@ -150,6 +155,16 @@ public struct InstructorVerificationView: View {
                 .fill(Color.primitive.coolGray.cg25)
         )
         .padding(.horizontal, Metrics.horizontalPadding)
+    }
+
+    /// 거절됐으면 왜 다시 올려야 하는지를, 아니면 올릴 사진의 조건을 알린다.
+    private var warningText: String {
+        let verification = store.verification
+        guard verification.status == .rejected else { return "인증 가능한 사진을 업로드해주세요." }
+        if let reason = verification.rejectReason {
+            return "반려 사유: \(reason)"
+        }
+        return "인증이 반려됐어요. 사진을 다시 올려주세요."
     }
 
     private var ctaSection: some View {
@@ -203,11 +218,26 @@ public struct InstructorVerificationView: View {
     )
 }
 
-#Preview("관장 사범 인증 - 사진 제출됨") {
+#Preview("관장 사범 인증 - 심사 중") {
     InstructorVerificationView(
         store: Store(
             initialState: InstructorVerificationFeature.State(
-                existingImageUrl: "https://ik.imagekit.io/preview/verification_preview.jpg"
+                verification: OwnerVerification(
+                    status: .pending,
+                    documentImageUrl: "https://ik.imagekit.io/preview/verification_preview.jpg"
+                )
+            )
+        ) {
+            InstructorVerificationFeature()
+        }
+    )
+}
+
+#Preview("관장 사범 인증 - 거절됨") {
+    InstructorVerificationView(
+        store: Store(
+            initialState: InstructorVerificationFeature.State(
+                verification: OwnerVerification(status: .rejected, rejectReason: "도장명과 이름이 함께 보이는 사진이 필요해요.")
             )
         ) {
             InstructorVerificationFeature()
