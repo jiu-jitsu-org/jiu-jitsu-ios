@@ -100,6 +100,7 @@ public struct MyProfileFeature: Sendable {
     @Reducer
     public enum Path {
         case communityDetail(CommunityDetailFeature)
+        case userProfile(UserProfileFeature)
     }
 
     @Reducer
@@ -123,6 +124,8 @@ public struct MyProfileFeature: Sendable {
         case imageCropCover(PresentationAction<ProfileImageCropFeature.Action>)
         // 웹 서브뷰 스택 액션
         case path(StackAction<Path.State, Path.Action>)
+        /// 다른 회원 프로필 열기 — 커뮤니티 활동 웹에서 작성자를 누름(#116)
+        case openUserProfile(userId: Int)
         // 부모(AppTabFeature)가 세션 변화(토큰 갱신 등)를 웹 서브뷰에 전파하는 통로.
         case session(CommunityDetailFeature.SessionUpdate)
 
@@ -827,6 +830,10 @@ public struct MyProfileFeature: Sendable {
 
             case let .path(.element(id: _, action: .communityDetail(.delegate(delegate)))):
                 return .send(.delegate(.webSubview(delegate)))
+
+            case let .openUserProfile(userId):
+                state.path.append(.userProfile(.init(userId: userId)))
+                return .none
 
             case let .session(update):
                 for id in state.path.ids {

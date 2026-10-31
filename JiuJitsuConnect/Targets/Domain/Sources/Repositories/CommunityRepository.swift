@@ -19,4 +19,10 @@ public protocol CommunityRepository: Sendable {
     /// - Returns: 업데이트된 프로필 정보
     /// - Throws: DomainError
     func updateProfile(_ profile: CommunityProfile, section: ProfileSection) async throws -> CommunityProfile
+
+    /// 다른 회원의 공개 프로필을 가져옵니다
+    /// - Parameter userId: 글·댓글 작성자 ID
+    /// - Returns: 공개 프로필 (체급·성별·특기 제외)
+    /// - Throws: DomainError — 없는 회원·탈퇴한 회원은 `apiError(.userNotFound)`
+    func fetchPublicProfile(userId: Int) async throws -> CommunityPublicProfile
 }

@@ -163,6 +163,9 @@ public final class DependencyContainer {
             },
             updateProfile: { profile, section in
                 try await self.communityRepository.updateProfile(profile, section: section)
+            },
+            fetchPublicProfile: { userId in
+                try await self.communityRepository.fetchPublicProfile(userId: userId)
             }
         )
     }

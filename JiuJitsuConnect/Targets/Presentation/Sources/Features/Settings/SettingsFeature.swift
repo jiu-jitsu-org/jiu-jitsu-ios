@@ -71,6 +71,7 @@ public struct SettingsFeature: Sendable {
     @Reducer
     public enum Path {
         case communityDetail(CommunityDetailFeature)
+        case userProfile(UserProfileFeature)
     }
 
     public enum Action: Sendable {
@@ -80,6 +81,8 @@ public struct SettingsFeature: Sendable {
         case destination(PresentationAction<Destination.Action>)
         case termsWebCover(PresentationAction<TermsWebViewFeature.Action>)
         case path(StackAction<Path.State, Path.Action>)
+        /// 다른 회원 프로필 열기 — 차단 목록 웹에서 회원을 누름(#116). 차단 관계와 무관하게 열린다.
+        case openUserProfile(userId: Int)
         // 부모(AppTab)가 토큰 갱신·만료를 서브뷰 웹뷰에도 전파한다.
         case session(CommunityDetailFeature.SessionUpdate)
 
@@ -177,6 +180,10 @@ public struct SettingsFeature: Sendable {
 
             case let .path(.element(id: _, action: .communityDetail(.delegate(delegate)))):
                 return .send(.delegate(.webSubview(delegate)))
+
+            case let .openUserProfile(userId):
+                state.path.append(.userProfile(.init(userId: userId)))
+                return .none
 
             case let .session(update):
                 for id in state.path.ids {
