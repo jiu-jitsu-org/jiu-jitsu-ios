@@ -56,6 +56,9 @@ public struct CommunityProfile: Codable, Equatable, Sendable {
     
     /// 프로필 소유자 여부 (본인 프로필인지)
     public let isOwner: Bool
+
+    /// 금·은·동 메달 개수 합계. 서버가 공개되는 기록(대회명 있는 기록) 기준으로 센다.
+    public let medalCount: MedalCount
     
     /// 지도 철학 (코치/관장용)
     public let teachingPhilosophy: String?
@@ -83,6 +86,7 @@ public struct CommunityProfile: Codable, Equatable, Sendable {
         favoritePosition: PositionType? = nil,
         isWeightHidden: Bool = false,
         isOwner: Bool = false,
+        medalCount: MedalCount = .zero,
         teachingPhilosophy: String? = nil,
         teachingStartDate: String? = nil,
         teachingDetail: String? = nil
@@ -103,6 +107,7 @@ public struct CommunityProfile: Codable, Equatable, Sendable {
         self.favoritePosition = favoritePosition
         self.isWeightHidden = isWeightHidden
         self.isOwner = isOwner
+        self.medalCount = medalCount
         self.teachingPhilosophy = teachingPhilosophy
         self.teachingStartDate = teachingStartDate
         self.teachingDetail = teachingDetail
@@ -170,6 +175,7 @@ extension CommunityProfile {
             favoritePosition: favoritePosition,
             isWeightHidden: isWeightHidden,
             isOwner: isOwner,
+            medalCount: medalCount,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
             teachingDetail: teachingDetail
@@ -195,6 +201,7 @@ extension CommunityProfile {
             favoritePosition: favoritePosition,
             isWeightHidden: isWeightHidden,
             isOwner: isOwner,
+            medalCount: medalCount,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
             teachingDetail: teachingDetail
@@ -220,6 +227,7 @@ extension CommunityProfile {
             favoritePosition: favoritePosition,
             isWeightHidden: isWeightHidden,
             isOwner: isOwner,
+            medalCount: medalCount,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
             teachingDetail: teachingDetail
@@ -245,6 +253,7 @@ extension CommunityProfile {
             favoritePosition: favoritePosition,
             isWeightHidden: isWeightHidden,
             isOwner: isOwner,
+            medalCount: medalCount,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
             teachingDetail: teachingDetail
@@ -270,6 +279,7 @@ extension CommunityProfile {
             favoritePosition: favoritePosition,
             isWeightHidden: isWeightHidden,
             isOwner: isOwner,
+            medalCount: medalCount,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
             teachingDetail: teachingDetail
@@ -301,6 +311,7 @@ extension CommunityProfile {
             favoritePosition: favoritePosition,
             isWeightHidden: isWeightHidden,
             isOwner: isOwner,
+            medalCount: medalCount,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
             teachingDetail: teachingDetail
@@ -326,6 +337,7 @@ extension CommunityProfile {
             favoritePosition: favoritePosition,
             isWeightHidden: !isWeightHidden,
             isOwner: isOwner,
+            medalCount: medalCount,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
             teachingDetail: teachingDetail
@@ -351,6 +363,7 @@ extension CommunityProfile {
             favoritePosition: favorite,
             isWeightHidden: isWeightHidden,
             isOwner: isOwner,
+            medalCount: medalCount,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
             teachingDetail: teachingDetail
@@ -376,6 +389,7 @@ extension CommunityProfile {
             favoritePosition: favoritePosition,
             isWeightHidden: isWeightHidden,
             isOwner: isOwner,
+            medalCount: medalCount,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
             teachingDetail: teachingDetail
@@ -401,6 +415,7 @@ extension CommunityProfile {
             favoritePosition: favoritePosition,
             isWeightHidden: isWeightHidden,
             isOwner: isOwner,
+            medalCount: medalCount,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
             teachingDetail: teachingDetail
@@ -699,4 +714,19 @@ public enum CompetitionRank: String, Codable, Equatable, Sendable, CaseIterable,
         case .participation: return "🎖️"
         }
     }
+}
+
+/// 프로필의 메달 개수 합계 (`medalCount`)
+public struct MedalCount: Codable, Equatable, Sendable {
+    public let gold: Int
+    public let silver: Int
+    public let bronze: Int
+
+    public init(gold: Int, silver: Int, bronze: Int) {
+        self.gold = gold
+        self.silver = silver
+        self.bronze = bronze
+    }
+
+    public static let zero = MedalCount(gold: 0, silver: 0, bronze: 0)
 }

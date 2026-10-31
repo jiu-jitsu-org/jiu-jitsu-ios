@@ -236,6 +236,7 @@ public struct MyProfileView: View {
     private var competitionSection: some View {
         MyProfileCompetitionSection(
             competitions: store.communityProfile?.competitions,
+            medalCount: store.communityProfile?.medalCount ?? .zero,
             onAddCompetitionTapped: { store.send(.view(.addCompetitionButtonTapped)) },
             onCompetitionTapped: { entries in
                 // 이전 시트가 닫힘 신호 없이 사라졌을 때 남은 동작이 이번 시트를 닫을 때 실행되지 않게 비운다.
