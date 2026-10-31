@@ -42,6 +42,7 @@ public enum Assets {
       public static let logOut = ImageAsset(name: "Common/Icon/log-out")
       public static let pencilLine = ImageAsset(name: "Common/Icon/pencil-line")
       public static let pencil = ImageAsset(name: "Common/Icon/pencil")
+      public static let pin = ImageAsset(name: "Common/Icon/pin")
       public static let plus = ImageAsset(name: "Common/Icon/plus")
       public static let profile = ImageAsset(name: "Common/Icon/profile")
       public static let radioOff = ImageAsset(name: "Common/Icon/radio-off")
@@ -49,6 +50,7 @@ public enum Assets {
       public static let refresh = ImageAsset(name: "Common/Icon/refresh")
       public static let search = ImageAsset(name: "Common/Icon/search")
       public static let secession = ImageAsset(name: "Common/Icon/secession")
+      public static let trash = ImageAsset(name: "Common/Icon/trash")
       public static let version = ImageAsset(name: "Common/Icon/version")
     }
     public enum Shaka {
@@ -61,6 +63,18 @@ public enum Assets {
     }
   }
   public enum Login {
+    public enum Belt {
+      public static let bodyBlack = ImageAsset(name: "Login/Belt/body-black")
+      public static let bodyBlue = ImageAsset(name: "Login/Belt/body-blue")
+      public static let bodyBrown = ImageAsset(name: "Login/Belt/body-brown")
+      public static let bodyPurple = ImageAsset(name: "Login/Belt/body-purple")
+      public static let bodyWhite = ImageAsset(name: "Login/Belt/body-white")
+      public static let eyesBig = ImageAsset(name: "Login/Belt/eyes-big")
+      public static let eyesCurious = ImageAsset(name: "Login/Belt/eyes-curious")
+      public static let eyesGlare = ImageAsset(name: "Login/Belt/eyes-glare")
+      public static let eyesLash = ImageAsset(name: "Login/Belt/eyes-lash")
+      public static let eyesSleepy = ImageAsset(name: "Login/Belt/eyes-sleepy")
+    }
     public enum Character {
       public static let bodyBlack = ImageAsset(name: "Login/Character/body-black")
       public static let bodyBlue = ImageAsset(name: "Login/Character/body-blue")

@@ -24,7 +24,14 @@ private enum Metrics {
 
 public struct MyProfileView: View {
     @Bindable var store: StoreOf<MyProfileFeature>
-    
+
+    // 대회 줄(⋯)을 눌렀을 때 띄우는 시트(부문 수정 / 부문 추가 / 삭제). 화면 표시용 일시 상태라 Feature로 올리지 않고,
+    // 고른 동작은 시트가 다 닫힌 뒤 한다 — 닫히는 중에 입력 화면을 push하거나 알럿을 띄우면 전환이 겹친다.
+    @State private var competitionSheet: CompetitionSheetTarget?
+    @State private var pendingCompetitionAction: (() -> Void)?
+    // 삭제 확인 알럿에 띄울 대회(부문별 기록)
+    @State private var competitionPendingDelete: [Competition]?
+
     public init(store: StoreOf<MyProfileFeature>) {
         self.store = store
     }
@@ -125,6 +132,36 @@ public struct MyProfileView: View {
             // (iOS는 한 presenter에서 sheet + fullScreenCover 동시 제시를 막으므로
             //  picker가 시트 위에 stacking되려면 시트 자체가 presenter여야 한다)
             .sheetPresentation(store: $store)
+            .sheet(item: $competitionSheet, onDismiss: sendPendingCompetitionAction) { target in
+                CompetitionActionSheetView(
+                    entries: target.entries,
+                    onPinToggled: {
+                        closeCompetitionSheet { store.send(.view(.competitionPinToggled(target.entries))) }
+                    },
+                    onDivisionTapped: { entry in
+                        closeCompetitionSheet { store.send(.view(.competitionDetailTapped(entry))) }
+                    },
+                    onAddDivisionTapped: {
+                        closeCompetitionSheet { store.send(.view(.addDivisionTapped(target.entries))) }
+                    },
+                    onDeleteTapped: {
+                        closeCompetitionSheet { competitionPendingDelete = target.entries }
+                    },
+                    onCancelTapped: { competitionSheet = nil }
+                )
+                .presentationDragIndicator(.hidden)
+                .presentationDetents([
+                    .height(CompetitionActionSheetView.contentHeight(divisionCount: target.entries.count))
+                ])
+                .presentationBackground(Color.component.bottomSheet.selected.container.background)
+            }
+            .appAlert(
+                isPresented: Binding(
+                    get: { competitionPendingDelete != nil },
+                    set: { if !$0 { competitionPendingDelete = nil } }
+                ),
+                configuration: competitionDeleteAlertConfiguration
+            )
             .imageCropPresentation(store: $store)
         }
     }
@@ -203,9 +240,45 @@ public struct MyProfileView: View {
         MyProfileCompetitionSection(
             competitions: store.communityProfile?.competitions,
             onAddCompetitionTapped: { store.send(.view(.addCompetitionButtonTapped)) },
-            onCompetitionDetailTapped: { competition in
-                store.send(.view(.competitionDetailTapped(competition)))
+            onCompetitionTapped: { entries in
+                // 이전 시트가 닫힘 신호 없이 사라졌을 때 남은 동작이 이번 시트를 닫을 때 실행되지 않게 비운다.
+                pendingCompetitionAction = nil
+                competitionSheet = CompetitionSheetTarget(entries: entries)
             }
+        )
+    }
+
+    private func closeCompetitionSheet(then action: @escaping () -> Void) {
+        pendingCompetitionAction = action
+        competitionSheet = nil
+    }
+
+    private func sendPendingCompetitionAction() {
+        guard let action = pendingCompetitionAction else { return }
+        pendingCompetitionAction = nil
+        action()
+    }
+
+    /// 대회 삭제 확인 — 여러 부문이면 부문까지 함께 지워진다는 걸 알린다.
+    private var competitionDeleteAlertConfiguration: AppAlertConfiguration {
+        let entries = competitionPendingDelete ?? []
+        let title = CompetitionGroup.grouped(entries).first?.titleWithYear ?? ""
+        return AppAlertConfiguration(
+            title: "대회 기록을 삭제할까요?",
+            message: entries.count > 1 ? "\(title)의 부문 \(entries.count)개가 함께 삭제돼요." : "\(title) 기록이 삭제돼요.",
+            primaryButton: .init(
+                title: "삭제",
+                style: .destructive,
+                action: {
+                    competitionPendingDelete = nil
+                    store.send(.view(.deleteCompetitionConfirmed(entries)))
+                }
+            ),
+            secondaryButton: .init(
+                title: "취소",
+                style: .neutral,
+                action: { competitionPendingDelete = nil }
+            )
         )
     }
     
@@ -587,4 +660,12 @@ private extension View {
             MyProfileFeature()
         }
     )
+}
+
+// MARK: - CompetitionSheetTarget
+
+/// 대회 시트에 띄울 대회(부문별 기록) — sheet(item:)용 식별자를 붙인다.
+private struct CompetitionSheetTarget: Identifiable {
+    let id = UUID()
+    let entries: [Competition]
 }

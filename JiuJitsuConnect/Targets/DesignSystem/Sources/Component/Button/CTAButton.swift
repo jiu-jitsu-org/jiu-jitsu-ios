@@ -10,13 +10,15 @@ import SwiftUI
 /// 앱 전반에서 사용될 공통 CTA 버튼입니다.
 /// - Parameters:
 ///   - title: 버튼에 표시될 텍스트
-///   - type: 버튼의 색상 타입 (.dark, .blue, .text). 기본값은 .blue.
+///   - type: 버튼의 색상 타입 (.dark, .blue, .tint, .text). 기본값은 .blue.
+///   - leftIcon: 제목 왼쪽에 둘 아이콘(24pt, 글자색). 기본값은 없음.
 ///   - style: 버튼의 모서리 스타일 (.rounded, .keypad). 기본값은 .rounded.
 ///   - height: 버튼의 높이. 기본값은 52.
 ///   - action: 버튼을 탭했을 때 실행될 클로저.
 public struct CTAButton: View {
     let title: String
     let type: ButtonType
+    let leftIcon: Image?
     let style: Style
     let height: CGFloat
     let action: () -> Void
@@ -24,6 +26,7 @@ public struct CTAButton: View {
     public enum ButtonType {
         case dark
         case blue
+        case tint   // 주 CTA와 함께 두는 보조 CTA (연한 파랑 면)
         case text
     }
     
@@ -35,12 +38,14 @@ public struct CTAButton: View {
     public init(
         title: String,
         type: ButtonType = .blue,
+        leftIcon: Image? = nil,
         style: Style = .rounded,
         height: CGFloat = 51,
         action: @escaping () -> Void
     ) {
         self.title = title
         self.type = type
+        self.leftIcon = leftIcon
         self.style = style
         self.height = height
         self.action = action
@@ -48,12 +53,28 @@ public struct CTAButton: View {
     
     public var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(.pretendard.buttonM)
-                .id(title)
-                .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+            if let leftIcon {
+                HStack(spacing: 4) {
+                    leftIcon
+                        .renderingMode(.template)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 24, height: 24)
+                        .accessibilityHidden(true)
+                    titleText
+                }
+            } else {
+                titleText
+            }
         }
         .buttonStyle(CTAButtonStyle(type: type, style: style, height: height))
+    }
+
+    private var titleText: some View {
+        Text(title)
+            .font(.pretendard.buttonM)
+            .id(title)
+            .transition(.opacity.animation(.easeInOut(duration: 0.2)))
     }
 }
 
@@ -108,6 +129,14 @@ private struct CTAButtonStyle: ButtonStyle {
             } else {
                 return (Color.component.cta.primary.bg, Color.component.cta.primary.text)
             }
+        case .tint:
+            if isPressed {
+                return (Color.component.cta.tint.pressedBg, Color.component.cta.tint.text)
+            } else if !isEnabled {
+                return (Color.component.cta.tint.disabledBg, Color.component.cta.tint.disabledText)
+            } else {
+                return (Color.component.cta.tint.bg, Color.component.cta.tint.text)
+            }
         case .text:
             if isPressed {
                 return (Color.component.cta.transparentText.pressedBg, Color.component.cta.transparentText.text)
@@ -126,6 +155,7 @@ private struct CTAButtonStyle: ButtonStyle {
         // --- Rounded (기본) ---
         CTAButton(title: "라운드 버튼 (기본 높이)", type: .blue, action: {})
         CTAButton(title: "라운드 버튼 (높이 56)", type: .dark, height: 56, action: {})
+        CTAButton(title: "보조 버튼 (tint)", type: .tint, leftIcon: Image(systemName: "plus"), action: {})
         
         // --- Keypad (새로운 스타일) ---
         CTAButton(title: "키패드 버튼 (기본 높이)", type: .blue, style: .keypad, action: {})

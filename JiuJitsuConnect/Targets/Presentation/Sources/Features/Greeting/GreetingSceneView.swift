@@ -52,7 +52,7 @@ struct GreetingSceneView: View {
             Color.primitive.blue.b500p
 
             // 시트가 없으니 다 가라앉히지 않고 조금만 내려 캐릭터 뒤 빈 곳에 연하게 남긴다
-            centered(Assets.Login.pattern, width: layout.width, top: lerp(layout.patternTop, layout.patternRestTop, sink), in: layout)
+            centered(Assets.Login.pattern, width: layout.splash.patternWidth, top: lerp(layout.splash.patternTop, layout.patternRestTop, sink), in: layout)
 
             // 캐릭터끼리의 앞뒤(zIndex)가 그래픽·글자까지 넘어가지 않도록 한 겹으로 묶는다
             ZStack(alignment: .topLeading) {
@@ -78,8 +78,8 @@ struct GreetingSceneView: View {
             }
             .accessibilityHidden(true)
 
-            centered(Assets.Splash.tagline, width: lerp(layout.splashTaglineWidth, 150, brand), top: lerp(layout.splashTaglineTop, layout.brandTop, brand), in: layout)
-            centered(Assets.Splash.logo, width: lerp(layout.splashLogoWidth, 116, brand), top: lerp(layout.splashLogoTop, layout.brandTop + 24, brand), in: layout)
+            centered(Assets.Splash.tagline, width: lerp(layout.splash.taglineWidth, 150, brand), top: lerp(layout.splash.taglineTop, layout.brandTop, brand), in: layout)
+            centered(Assets.Splash.logo, width: lerp(layout.splash.logoWidth, 116, brand), top: lerp(layout.splash.logoTop, layout.brandTop + 24, brand), in: layout)
 
             sayBubble(layout: layout, elapsed: elapsed)
         }
@@ -178,11 +178,8 @@ private struct GreetingLayout {
     let height: CGFloat
     let scale: CGFloat
     let brandTop: CGFloat
-    let patternTop: CGFloat
-    let splashTaglineWidth: CGFloat
-    let splashTaglineTop: CGFloat
-    let splashLogoWidth: CGFloat
-    let splashLogoTop: CGFloat
+    /// 장면이 시작하는 모습. SplashView와 같은 배치여야 스플래시에서 넘어오는 순간 그림이 튀지 않는다
+    let splash: SplashLayout
 
     init(size: CGSize, safeArea: EdgeInsets) {
         width = size.width
@@ -190,26 +187,15 @@ private struct GreetingLayout {
         scale = size.width / 393
         // 시안(852 높이, 위 안전 영역 59)에서 문구 묶음의 위 끝이 118이 되도록 안전 영역에서 59만큼 띄운다
         brandTop = safeArea.top + 59
-
-        // SplashView와 같은 계산이어야 스플래시에서 넘어오는 순간 그림이 튀지 않는다
-        let frameHeight = size.width * 1200 / 555
-        let frameTop = (size.height - frameHeight) / 2
-        patternTop = frameTop + frameHeight * 0.1775
-        splashTaglineWidth = size.width * 0.477477
-        splashTaglineTop = frameTop + frameHeight * 0.429167
-        splashLogoWidth = size.width * 0.488288
-        splashLogoTop = frameTop + frameHeight * 0.465
+        splash = SplashLayout(size: size)
     }
 
     /// 그래픽이 가라앉아 멈추는 자리. 시안에서 120pt 내린 만큼을 화면 폭에 맞춘다
-    var patternRestTop: CGFloat { patternTop + 120 * scale }
+    var patternRestTop: CGFloat { splash.patternTop + 120 * scale }
 
     /// 아래 끝은 화면 아래 끝에 맞추고, `show`만큼만 화면 위로 드러낸다
     func frame(of member: LoginCastMember) -> CGRect {
-        let width = member.width * scale
-        let height = width * LoginCast.aspect
-        let bottom = self.height + height * (1 - member.show)
-        return CGRect(x: member.centerX * scale - width / 2, y: bottom - height, width: width, height: height)
+        LoginCast.frame(of: member, scale: scale, screenWidth: width, baseline: height)
     }
 }
 

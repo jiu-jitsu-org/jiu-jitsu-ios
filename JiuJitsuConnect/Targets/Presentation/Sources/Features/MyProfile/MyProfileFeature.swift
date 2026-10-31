@@ -152,6 +152,9 @@ public struct MyProfileFeature: Sendable {
             case toastButtonTapped(ToastState.Action)
             case addCompetitionButtonTapped  // 대회 정보 추가 버튼 탭
             case competitionDetailTapped(Competition)  // 대회 정보 행 탭
+            case addDivisionTapped([Competition])     // 저장한 대회에 부문 추가 (그 대회의 기록들)
+            case deleteCompetitionConfirmed([Competition])  // 대회 시트에서 삭제 확인 (그 대회의 부문 전부)
+            case competitionPinToggled([Competition])  // 대회 줄 ⋯ 메뉴 '맨 위에 고정'/'고정 해제' — 묶인 부문 전부 (#124)
             case moreButtonTapped                   // 우측 상단 "..." 버튼 탭 (토글)
             case instructorVerificationMenuTapped   // "관장 사범 인증" 메뉴 항목 탭
             case imagePicked(Data)                  // 카메라/앨범 픽커에서 이미지 선택됨
@@ -184,9 +187,11 @@ public struct MyProfileFeature: Sendable {
             case positionSaved(CommunityProfile)    // 포지션 저장 → register 시 기술 단계로
             case submissionSaved(CommunityProfile)  // 서브미션 저장 → 프로필 화면으로 복귀
             case techniqueSaved(CommunityProfile)   // 기술 저장 → register 시 서브미션 단계로
-            case competitionAdded(CommunityProfile)   // 대회 정보 추가 저장 완료
+            case competitionAdded(CommunityProfile, Competition)   // 대회 정보 추가 저장 완료
+            case competitionAddFailed                              // 대회 정보 추가 저장 실패
             case competitionUpdated(CommunityProfile) // 대회 정보 수정 저장 완료
             case competitionDeleted(CommunityProfile) // 대회 정보 삭제 저장 완료
+            case competitionPinUpdated(CommunityProfile, isPinned: Bool) // 대회 고정/해제 저장 완료
             
             case showToast(ToastState)
             case toastDismissed
@@ -834,7 +839,10 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case .view(.addCompetitionButtonTapped):
-                state.destination = .competitionInfo(CompetitionInfoFeature.State())
+                // 출전 띠는 지금 띠로 미리 골라 둔다(#122).
+                state.destination = .competitionInfo(
+                    CompetitionInfoFeature.State(mode: .add, currentBelt: state.communityProfile?.beltRank)
+                )
                 return .none
 
             case let .destination(.presented(.competitionInfo(.delegate(.didFinishAdding(competition))))):
@@ -843,12 +851,12 @@ public struct MyProfileFeature: Sendable {
                     return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
                 }
                 Log.trace(
-                    "대회 추가 요청: \(competition.competitionYear)/\(competition.competitionMonth) \(competition.competitionName) \(competition.competitionRank.displayName)",
+                    "대회 추가 요청: \(competition.competitionYear) \(competition.competitionName) \(competition.competitionRank.displayName)",
                     category: .debug,
                     level: .info
                 )
                 let updatedProfile = profile.addingCompetition(competition)
-                state.destination = nil
+                // 저장 결과를 보고 완료 화면('부문 추가')으로 넘어가야 하므로 입력 화면은 닫지 않는다(#123).
                 state.isLoadingProfile = true
                 return .run { send in
                     let result = await TaskResult {
@@ -856,9 +864,10 @@ public struct MyProfileFeature: Sendable {
                     }
                     switch result {
                     case .success(let saved):
-                        await send(.internal(.competitionAdded(saved)))
+                        await send(.internal(.competitionAdded(saved, competition)))
                     case .failure(let error):
-                        await send(.internal(.updateProfileResponse(.failure(error))))
+                        Log.trace("Failed to add competition: \(error)", category: .network, level: .error)
+                        await send(.internal(.competitionAddFailed))
                     }
                 }
 
@@ -892,26 +901,33 @@ public struct MyProfileFeature: Sendable {
                     state.destination = nil
                     return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
                 }
-                Log.trace("대회 삭제 요청: \(competition.competitionName)", category: .debug, level: .info)
-                let updatedProfile = profile.removingCompetition(competition)
                 state.destination = nil
-                state.isLoadingProfile = true
-                return .run { send in
-                    let result = await TaskResult {
-                        try await communityClient.updateProfile(updatedProfile, .competition)
-                    }
-                    switch result {
-                    case .success(let saved):
-                        await send(.internal(.competitionDeleted(saved)))
-                    case .failure(let error):
-                        await send(.internal(.updateProfileResponse(.failure(error))))
-                    }
-                }
+                return deleteCompetitions([competition], from: profile, state: &state)
 
-            case let .internal(.competitionAdded(profile)):
+            case let .view(.deleteCompetitionConfirmed(entries)):
+                // 앞선 저장이 끝나기 전에 목록 전체를 다시 저장하면 그 저장을 덮어쓴다.
+                guard !state.isLoadingProfile else { return .none }
+                guard let profile = state.communityProfile else {
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                }
+                return deleteCompetitions(entries, from: profile, state: &state)
+
+            case let .internal(.competitionAdded(profile, competition)):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
-                return .send(.internal(.showToast(.init(message: "대회 정보를 추가했어요", style: .info))))
+                // 입력 화면이 완료 화면을 대신 보여 준다. 저장 중 화면이 닫혔으면(예외적) 토스트로 알린다.
+                guard case .competitionInfo? = state.destination else {
+                    return .send(.internal(.showToast(.init(message: "대회 정보를 추가했어요", style: .info))))
+                }
+                return .send(.destination(.presented(.competitionInfo(.saveFinished(.succeeded(competition))))))
+
+            case .internal(.competitionAddFailed):
+                state.isLoadingProfile = false
+                // MY 화면 토스트는 입력 화면에 가려지므로 입력 화면이 실패를 안내하고, 입력값을 지켜 다시 저장하게 한다.
+                guard case .competitionInfo? = state.destination else {
+                    return .send(.internal(.showToast(.init(message: "저장에 실패했어요. 다시 시도해주세요", style: .info))))
+                }
+                return .send(.destination(.presented(.competitionInfo(.saveFinished(.failed)))))
 
             case let .internal(.competitionUpdated(profile)):
                 state.isLoadingProfile = false
@@ -922,6 +938,47 @@ public struct MyProfileFeature: Sendable {
                 state.isLoadingProfile = false
                 state.communityProfile = profile
                 return .send(.internal(.showToast(.init(message: "대회 정보를 삭제했어요", style: .info))))
+
+            case let .view(.addDivisionTapped(entries)):
+                guard !state.isLoadingProfile else { return .none }
+                state.destination = .competitionInfo(
+                    CompetitionInfoFeature.State(addingDivisionTo: entries, currentBelt: state.communityProfile?.beltRank)
+                )
+                return .none
+
+            case let .view(.competitionPinToggled(entries)):
+                // 저장 중에 또 누르면 저장 전 목록 기준으로 한 번 더 저장해 앞의 변경을 덮으므로 막는다.
+                guard let profile = state.communityProfile, !entries.isEmpty, !state.isLoadingProfile else { return .none }
+                // 묶인 줄은 부문 하나라도 고정돼 있으면 고정으로 보이므로(CompetitionGroup.isPinned) 같은 기준으로 푼다.
+                let isPinning = !entries.contains(where: \.isPinned)
+                if isPinning {
+                    let pinnedCount = CompetitionGroup.grouped(profile.competitions).filter(\.isPinned).count
+                    guard pinnedCount < CompetitionGroup.maxPinnedCount else {
+                        return .send(.internal(.showToast(.init(
+                            message: "대표 기록은 \(CompetitionGroup.maxPinnedCount)개까지 고정할 수 있어요",
+                            style: .info
+                        ))))
+                    }
+                }
+                let updatedProfile = profile.settingCompetitionsPinned(entries, isPinned: isPinning)
+                state.isLoadingProfile = true
+                return .run { send in
+                    let result = await TaskResult {
+                        try await communityClient.updateProfile(updatedProfile, .competition)
+                    }
+                    switch result {
+                    case .success(let saved):
+                        await send(.internal(.competitionPinUpdated(saved, isPinned: isPinning)))
+                    case .failure(let error):
+                        await send(.internal(.updateProfileResponse(.failure(error))))
+                    }
+                }
+
+            case let .internal(.competitionPinUpdated(profile, isPinned)):
+                state.isLoadingProfile = false
+                state.communityProfile = profile
+                let message = isPinned ? "맨 위에 고정했어요" : "고정을 해제했어요"
+                return .send(.internal(.showToast(.init(message: message, style: .info))))
 
             case let .view(.competitionDetailTapped(competition)):
                 state.destination = .competitionInfo(
@@ -1249,6 +1306,32 @@ public struct MyProfileFeature: Sendable {
             ProfileImageCropFeature()
         }
         .forEach(\.path, action: \.path)
+    }
+
+    /// 대회 기록을 지우고 프로필을 저장한다 — 수정 화면의 '삭제'(부문 하나)와 대회 시트의 '삭제'(그 대회 부문 전부)가 함께 쓴다.
+    private func deleteCompetitions(
+        _ entries: [Competition],
+        from profile: CommunityProfile,
+        state: inout State
+    ) -> Effect<Action> {
+        Log.trace("대회 삭제 요청: \(entries.map(\.competitionName))", category: .debug, level: .info)
+        let updatedProfile = entries.reduce(profile) { $0.removingCompetition($1) }
+        // 지울 기록을 못 찾았으면(그사이 프로필이 바뀜) 저장하지 않는다 — 성공 토스트가 거짓이 된다.
+        guard updatedProfile.competitions.count < profile.competitions.count else {
+            return .send(.internal(.showToast(.init(message: "삭제하지 못했어요. 다시 시도해주세요", style: .info))))
+        }
+        state.isLoadingProfile = true
+        return .run { send in
+            let result = await TaskResult {
+                try await communityClient.updateProfile(updatedProfile, .competition)
+            }
+            switch result {
+            case .success(let saved):
+                await send(.internal(.competitionDeleted(saved)))
+            case .failure(let error):
+                await send(.internal(.updateProfileResponse(.failure(error))))
+            }
+        }
     }
 }
 // MARK: - Sendable Conformances

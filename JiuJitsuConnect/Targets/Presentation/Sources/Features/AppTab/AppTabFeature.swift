@@ -95,6 +95,8 @@ public struct AppTabFeature: Sendable {
             case sessionEvent(AuthSessionEvent)
             // 웹뷰 위임 토큰 갱신 성공 → 새 토큰을 웹에 주입.
             case tokenRefreshSucceeded(accessToken: String)
+            // 웹뷰 위임 토큰 갱신이 네트워크·서버 오류로 일시 실패 → 세션은 유지한다.
+            case tokenRefreshFailed
             // 토큰 갱신 불가(세션 만료) → 게스트로 전환 + 웹 세션 정리.
             case handleSessionExpired
         }
@@ -205,6 +207,14 @@ public struct AppTabFeature: Sendable {
                 Log.trace("커뮤니티 로그인 모달 요청: reason=\(reason ?? "-")", category: .view, level: .info)
                 return .send(.internal(.showLoginModal))
 
+            // 헤더의 내 사진 버튼(#128). 탭바에서 MY를 누른 것과 같은 경로라 프로필 재조회·게스트 처리도 그대로 따른다.
+            // 내 사진은 내 프로필을 뜻하므로, MY에 열어 둔 하위 화면(커뮤니티 활동 등)은 닫고 프로필 첫 화면으로 보낸다.
+            case .home(.delegate(.myTabRequested)):
+                if !state.authInfo.isGuest {
+                    state.myPage.path.removeAll()
+                }
+                return .send(.view(.tabSelected(.myPage)))
+
             case .home(.delegate(.logoutRequested)),
                  .myPage(.delegate(.webSubview(.logoutRequested))),
                  .settings(.delegate(.webSubview(.logoutRequested))):
@@ -221,9 +231,13 @@ public struct AppTabFeature: Sendable {
                     do {
                         let accessToken = try await authClient.refreshSession()
                         await send(.internal(.tokenRefreshSucceeded(accessToken: accessToken)))
-                    } catch {
-                        Log.trace("웹뷰 위임 토큰 갱신 실패 → 세션 만료 처리: \(error)", category: .network, level: .error)
+                    } catch DomainError.apiError(code: .invalidRefreshToken, message: _) {
+                        // refresh 토큰까지 무효일 때만 세션을 끝낸다(네트워크 레이어가 세션 만료를 이 코드로 매핑).
+                        Log.trace("웹뷰 위임 토큰 갱신 실패 → 세션 만료 처리", category: .network, level: .error)
                         await send(.internal(.handleSessionExpired))
+                    } catch {
+                        Log.trace("웹뷰 위임 토큰 갱신 일시 실패 → 세션 유지: \(error)", category: .network, level: .error)
+                        await send(.internal(.tokenRefreshFailed))
                     }
                 }
 
@@ -268,8 +282,13 @@ public struct AppTabFeature: Sendable {
 
             case let .deepLink(link):
                 // 현재 딥링크 대상은 모두 커뮤니티 영역이라, 다른 탭에 있었다면 홈으로 되돌린 뒤 넘긴다.
+                // 탭바로 돌아올 때처럼 새 알림 점·내 사진도 다시 조회한다(탭 뷰가 유지돼 onAppear가 다시 오지 않음).
+                let isEnteringHome = state.selectedTab != .home
                 state.selectedTab = .home
-                return .send(.home(.deepLink(link)))
+                return .merge(
+                    isEnteringHome ? .send(.home(.view(.tabEntered))) : .none,
+                    .send(.home(.deepLink(link)))
+                )
 
             case .home, .myPage, .settings:
                 return .none
@@ -322,6 +341,12 @@ public struct AppTabFeature: Sendable {
                     .send(.myPage(.session(.tokenRefreshed(accessToken: accessToken)))),
                     .send(.settings(.session(.tokenRefreshed(accessToken: accessToken))))
                 )
+
+            case .internal(.tokenRefreshFailed):
+                // 웹에 보낼 "일시 실패" 메시지가 없어, 요청한 웹뷰는 자체 타임아웃으로 그 호출만 실패 처리한다.
+                // 다음 만료 감지 때 다시 갱신할 수 있도록 진행 표시만 푼다.
+                state.isRefreshingWebToken = false
+                return .none
 
             case .internal(.handleSessionExpired):
                 state.isRefreshingWebToken = false
