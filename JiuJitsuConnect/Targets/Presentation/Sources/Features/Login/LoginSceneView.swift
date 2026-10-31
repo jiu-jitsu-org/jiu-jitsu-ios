@@ -77,7 +77,8 @@ struct LoginSceneView<Sheet: View>: View {
             }
             .frame(width: layout.width, height: layout.height, alignment: .topLeading)
             .mask(alignment: .topLeading) {
-                Rectangle().frame(width: layout.width, height: layout.sheetTop + 28)
+                // 첫 레이아웃에서 크기가 0으로 들어오면 sheetTop이 음수가 되어 frame 경고가 난다
+                Rectangle().frame(width: layout.width, height: max(layout.sheetTop + 28, 0))
             }
             .accessibilityHidden(true)
 
