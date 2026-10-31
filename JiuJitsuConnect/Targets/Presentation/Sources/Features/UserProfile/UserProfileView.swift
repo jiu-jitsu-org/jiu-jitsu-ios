@@ -56,6 +56,8 @@ public struct UserProfileView: View {
         .animation(.default, value: store.toast)
         .sheet(item: $store.scope(state: \.beltPrompt, action: \.beltPrompt)) { promptStore in
             BeltPromptView(store: promptStore)
+                // 저장 중에 내려 닫으면 저장이 끊기고 '나중에'로 7일 미뤄진다 — 저장이 끝날 때까지 막는다
+                .interactiveDismissDisabled(promptStore.isSaving)
                 .presentationDragIndicator(.hidden)
                 .presentationDetents([.height(BeltPromptView.contentHeight)])
                 .presentationBackground(Color.component.bottomSheet.selected.container.background)
