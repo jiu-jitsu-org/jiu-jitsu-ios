@@ -75,17 +75,6 @@ public enum Assets {
       public static let eyesLash = ImageAsset(name: "Login/Belt/eyes-lash")
       public static let eyesSleepy = ImageAsset(name: "Login/Belt/eyes-sleepy")
     }
-    public enum Character {
-      public static let bodyBlack = ImageAsset(name: "Login/Character/body-black")
-      public static let bodyBlue = ImageAsset(name: "Login/Character/body-blue")
-      public static let bodyBrown = ImageAsset(name: "Login/Character/body-brown")
-      public static let bodyExtBlue = ImageAsset(name: "Login/Character/body-ext-blue")
-      public static let bodyExtBrown = ImageAsset(name: "Login/Character/body-ext-brown")
-      public static let bodyPurple = ImageAsset(name: "Login/Character/body-purple")
-      public static let bodyWhite = ImageAsset(name: "Login/Character/body-white")
-      public static let eyesMeh = ImageAsset(name: "Login/Character/eyes-meh")
-      public static let eyesSad = ImageAsset(name: "Login/Character/eyes-sad")
-    }
     public enum Logo {
       public static let apple = ImageAsset(name: "Login/Logo/apple")
       public static let google = ImageAsset(name: "Login/Logo/google")
