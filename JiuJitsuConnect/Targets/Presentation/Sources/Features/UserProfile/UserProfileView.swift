@@ -42,6 +42,24 @@ public struct UserProfileView: View {
                 .padding(.leading, 8)
                 .padding(.top, 2)
         }
+        .overlay(alignment: .bottom) {
+            if let toast = store.toast {
+                ToastView(
+                    state: toast,
+                    onSwipe: { store.send(.view(.toastDismissed), animation: .default) },
+                    onButtonTapped: { _ in store.send(.view(.toastDismissed), animation: .default) }
+                )
+                .padding(.horizontal, 20)
+                .padding(.bottom, toast.bottomPadding)
+            }
+        }
+        .animation(.default, value: store.toast)
+        .sheet(item: $store.scope(state: \.beltPrompt, action: \.beltPrompt)) { promptStore in
+            BeltPromptView(store: promptStore)
+                .presentationDragIndicator(.hidden)
+                .presentationDetents([.height(BeltPromptView.contentHeight)])
+                .presentationBackground(Color.component.bottomSheet.selected.container.background)
+        }
         .background(Color.component.background.default)
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)

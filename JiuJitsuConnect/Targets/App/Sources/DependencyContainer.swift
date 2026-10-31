@@ -37,6 +37,7 @@ public final class DependencyContainer {
     private let authSessionEventBroadcaster = AuthSessionEventBroadcaster()
     /// AppDelegate가 받은 푸시 탭을 Presentation(딥링크 라우팅)으로 전달하는 채널.
     private let pushNotificationTapRelay = PushNotificationTapRelay()
+    private let beltPromptStorage = BeltPromptStorage()
     private lazy var sharedNetworkService: NetworkService = DefaultNetworkService(
         tokenStorage: sharedTokenStorage,
         sessionEventBroadcaster: authSessionEventBroadcaster
@@ -167,6 +168,14 @@ public final class DependencyContainer {
             fetchPublicProfile: { userId in
                 try await self.communityRepository.fetchPublicProfile(userId: userId)
             }
+        )
+    }
+
+    public func configureBeltPromptClient() -> BeltPromptClient {
+        BeltPromptClient(
+            canCheck: { self.beltPromptStorage.canCheck(now: $0) },
+            markChecked: { self.beltPromptStorage.markChecked(now: $0) },
+            snooze: { self.beltPromptStorage.snooze(now: $0) }
         )
     }
 

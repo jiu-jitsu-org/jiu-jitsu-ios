@@ -618,7 +618,7 @@ public struct MyProfileFeature: Sendable {
                 case .academy:
                     updatedProfile = profile.updatingAcademy(value)
 
-                case .beltWeight, .position, .submission, .technique, .competition, .instructorInfo:
+                case .beltWeight, .belt, .position, .submission, .technique, .competition, .instructorInfo:
                     // TODO: 다른 섹션 업데이트 구현
                     return .none
                 }

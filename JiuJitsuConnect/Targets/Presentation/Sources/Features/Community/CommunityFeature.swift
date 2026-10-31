@@ -505,7 +505,8 @@ public struct CommunityFeature: Sendable {
 
             case let .openUserProfile(userId):
                 // 상세 모달이 떠 있으면 모달 안 스택에 쌓는다(모달을 닫으며 push하면 전환이 튄다)
-                let profile = UserProfileFeature.State(userId: userId)
+                // 게스트에게는 띠를 묻지 않는다(#130)
+                let profile = UserProfileFeature.State(userId: userId, canPromptBelt: state.accessToken != nil)
                 if state.detailCover != nil {
                     state.coverPath.append(.userProfile(profile))
                 } else {
