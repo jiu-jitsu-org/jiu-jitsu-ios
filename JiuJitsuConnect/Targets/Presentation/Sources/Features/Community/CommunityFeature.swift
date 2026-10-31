@@ -393,6 +393,10 @@ public struct CommunityFeature: Sendable {
                     Log.trace("리스트 웹뷰 CLOSE_SUBVIEW 수신 — 무시", category: .network, level: .info)
                     return .none
 
+                case .setLeaveGuard:
+                    // 이탈 가드는 스와이프 백으로 닫히는 서브뷰 전용 — 탭 루트인 리스트는 스와이프 백이 없어 무시한다.
+                    return .none
+
                 case let .showConfirmDialog(payload):
                     return Self.presentConfirmDialog(payload, into: &state)
 

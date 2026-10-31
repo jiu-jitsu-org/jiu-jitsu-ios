@@ -38,9 +38,12 @@ public struct CommunityDetailView: View {
         // chromeless: 네이티브 내비게이션 바를 숨겨 웹 자체 헤더만 보이게 한다.
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
+        // 웹이 이탈 가드를 켠 동안(작성 중 등)만 스와이프 백을 막고, 막힌 스와이프는 웹 뒤로가기로 넘긴다(#115).
         .background {
             if store.blocksSwipeBack {
-                InteractivePopBlocker()
+                InteractivePopBlocker {
+                    store.send(.view(.swipeBackBlocked))
+                }
             }
         }
         // 상세는 이미 풀스크린이라 확인 알럿·선택 시트를 로컬에서 그려도 화면 전체가 덮인다.

@@ -6,6 +6,8 @@
 //  웹이 자체 헤더(뒤로가기/알림/메뉴)를 그리므로 네이티브 크롬 없이 웹뷰만 렌더한다.
 //  뒤로가기 소유권은 웹에 있다 — 이탈 가드(작성 취소 확인 등)는 웹이 끝내고 CLOSE_SUBVIEW를
 //  보내며, 네이티브는 웹이 응답할 수 없는 로딩/에러 상태의 탈출구만 담당한다(#37).
+//  스와이프 백은 네이티브 제스처라, 웹이 SET_LEAVE_GUARD로 '지금 닫으면 안 됨'을 알린 동안에는
+//  화면을 닫지 않고 BACK_PRESSED로 웹에 넘긴다(#115).
 //  CLOSE_SUBVIEW는 @Dependency(\.dismiss)로 자기 자신을 닫고,
 //  중첩 OPEN_SUBVIEW·로그인 유도·로그아웃은 부모(CommunityFeature)에 위임한다.
 //
@@ -47,20 +49,32 @@ public struct CommunityDetailFeature: Sendable {
         var pendingPhotoPick: PickPhotosPayload?
         var isPhotoPickerPresented = false
 
+        // 웹이 '지금 스와이프 백으로 바로 닫으면 안 됨'을 알린 상태(SET_LEAVE_GUARD로 토글, #115).
+        // 글쓰기·수정은 웹이 알리기 전까지 true로 둔다 — 이 메시지를 안 보내는 구 웹에서도
+        // 스와이프가 이탈 확인을 우회해 작성 내용을 잃지 않게 하려는 것(#82와 같은 동작).
+        var leaveGuardEnabled: Bool
+
         public init(url: URL, title: String? = nil, accessToken: String? = nil) {
             self.url = url
             self.title = title
             self.accessToken = accessToken
+            self.leaveGuardEnabled = Self.isWriteOrEditScreen(url)
         }
 
         /// 글쓰기(`/community/write`)·글 수정(`/community/{id}/edit`) 화면인지.
-        /// 웹이 이탈 확인('작성 취소'/'수정 취소') 후 CLOSE_SUBVIEW로 닫으므로, 이 화면에서는
-        /// 스와이프 백이 확인을 우회해 작성 내용을 잃지 않도록 막는다(#82).
-        var blocksSwipeBack: Bool {
+        /// 웹이 이탈 확인('작성 취소'/'수정 취소') 후 CLOSE_SUBVIEW로 닫는 화면이라 가드 기본값을 켠다.
+        static func isWriteOrEditScreen(_ url: URL) -> Bool {
             let segments = url.pathComponents.filter { $0 != "/" }
             guard segments.first == "community" else { return false }
             return segments == ["community", "write"]
                 || (segments.count == 3 && segments[2] == "edit")
+        }
+
+        /// 스와이프 백을 막고 BACK_PRESSED로 넘길지.
+        /// 로딩/에러 중엔 오버레이가 웹을 덮어 작성 내용이 있을 수 없고 웹이 BACK_PRESSED에 응답하지도
+        /// 못하므로, 가드와 무관하게 스와이프로 닫히게 둔다(오버레이 뒤로가기 `backTapped`와 같은 기준).
+        var blocksSwipeBack: Bool {
+            leaveGuardEnabled && !isLoading && !hasError
         }
     }
 
@@ -74,6 +88,8 @@ public struct CommunityDetailFeature: Sendable {
             // 로딩/에러 오버레이의 뒤로가기 탭. 웹이 응답할 수 없는 상태에서만 노출되므로
             // 가드를 묻지 않고 직접 닫는다(정상 화면의 뒤로가기는 웹 헤더가 CLOSE_SUBVIEW로 처리).
             case backTapped
+            // 가드 중 스와이프 백 시도 — 제스처는 막혔고, 웹에 BACK_PRESSED를 넘긴다(#115).
+            case swipeBackBlocked
 
             // MARK: 브릿지 다이얼로그 결과
             case confirmDialogButtonTapped(ConfirmDialogOutcome)
@@ -138,6 +154,17 @@ public struct CommunityDetailFeature: Sendable {
                 state.isClosing = true
                 return .run { _ in await self.dismiss() }
 
+            case .view(.swipeBackBlocked):
+                // 확인 알럿·선택 시트가 이미 떠 있으면 웹은 그 응답을 기다리는 중이다. 여기서 또 넘기면
+                // 웹이 이탈 확인을 다시 요청해 중복 요청(즉시 dismiss 회신)만 쌓이므로 보내지 않는다.
+                guard
+                    state.blocksSwipeBack,
+                    state.pendingConfirmDialog == nil,
+                    state.pendingSelectSheet == nil
+                else { return .none }
+                Self.enqueue(.backPressed, into: &state)
+                return .none
+
             // MARK: - 브릿지 다이얼로그 결과 (→ 웹 회신)
 
             case let .view(.confirmDialogButtonTapped(outcome)):
@@ -189,6 +216,10 @@ public struct CommunityDetailFeature: Sendable {
             case .internal(.loadingStarted):
                 state.isLoading = true
                 state.hasError = false
+                // 문서를 새로 불러오면 직전 페이지의 가드는 의미가 없다. 웹은 언마운트 때 false를 보내지만
+                // 페이지 자체가 교체될 땐 그 정리가 돌지 않아, 남은 true가 BACK_PRESSED에 답하지 않는 페이지의
+                // 스와이프를 계속 막을 수 있다. 새 페이지가 다시 알려 줄 때까지 처음 열 때의 기본값으로 되돌린다.
+                state.leaveGuardEnabled = State.isWriteOrEditScreen(state.url)
                 return .none
 
             case .internal(.loadingFinished):
@@ -223,6 +254,10 @@ public struct CommunityDetailFeature: Sendable {
                     // 자기 자신(최상단 서브뷰)을 닫는다. 스택 push면 pop, 모달이면 dismiss된다.
                     state.isClosing = true
                     return .run { _ in await self.dismiss() }
+
+                case let .setLeaveGuard(enabled):
+                    state.leaveGuardEnabled = enabled
+                    return .none
 
                 case let .showConfirmDialog(payload):
                     return Self.presentConfirmDialog(payload, into: &state)
