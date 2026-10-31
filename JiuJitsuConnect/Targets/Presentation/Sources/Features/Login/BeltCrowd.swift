@@ -327,10 +327,17 @@ struct PuffBubble: View {
 }
 
 /// 70×42 그림 기준 좌표로 그린 몸통 + 꼬리 동그라미 둘. 꼬리는 그림 밖(왼쪽 아래)으로 나간다.
-private struct PuffShape: Shape {
+/// 높이에 맞춰 키우고, 그림보다 넓으면 가운데만 늘려 양 끝 둥근 모양은 그대로 둔다(인사 장면의 글 말풍선).
+struct PuffShape: Shape {
+    /// 꼬리를 따로 다는 글 말풍선은 끈다
+    var hasTail = true
+
     func path(in rect: CGRect) -> Path {
-        let scaleX = rect.width / 70, scaleY = rect.height / 42
-        let point = { (x: CGFloat, y: CGFloat) in CGPoint(x: rect.minX + x * scaleX, y: rect.minY + y * scaleY) }
+        let scale = rect.height / 42
+        let stretch = max(rect.width / scale - 70, 0)
+        let point = { (x: CGFloat, y: CGFloat) in
+            CGPoint(x: rect.minX + (x < 35 ? x : x + stretch) * scale, y: rect.minY + y * scale)
+        }
         var path = Path()
         path.move(to: point(22, 1.5))
         path.addCurve(to: point(50, 1.5), control1: point(30, 0), control2: point(42, 0))
@@ -340,16 +347,17 @@ private struct PuffShape: Shape {
         path.addCurve(to: point(1, 21), control1: point(9, 39.5), control2: point(1, 33))
         path.addCurve(to: point(22, 1.5), control1: point(1, 9.5), control2: point(10, 3))
         path.closeSubpath()
+        guard hasTail else { return path }
         for (x, y, radius) in [(CGFloat(7.5), CGFloat(46.5), CGFloat(5.6)), (0.5, 55, 3)] {
             let center = point(x, y)
-            path.addEllipse(in: CGRect(x: center.x - radius * scaleX, y: center.y - radius * scaleY, width: radius * 2 * scaleX, height: radius * 2 * scaleY))
+            path.addEllipse(in: CGRect(x: center.x - radius * scale, y: center.y - radius * scale, width: radius * 2 * scale, height: radius * 2 * scale))
         }
         return path
     }
 }
 
 /// 꼬리 쪽에서 쭉 늘며 튀어나왔다 눌리고 자리 잡은 뒤, 살짝 둥실 떠 있는다.
-private struct BubbleEntrance: ViewModifier {
+struct BubbleEntrance: ViewModifier {
     let anchor: UnitPoint
     let isStatic: Bool
     /// 나타날 때 한 번 바뀌어 튀어나오는 움직임을 재생한다
