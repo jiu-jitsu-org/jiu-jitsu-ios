@@ -11,9 +11,10 @@ import Domain
 
 // MARK: - MyProfileCompetitionSection
 
-/// 대회 정보 섹션
+/// 대회 기록 섹션
 public struct MyProfileCompetitionSection: View {
     let competitions: [Competition]?
+    var medalCount: MedalCount = .zero
     let onAddCompetitionTapped: () -> Void
     /// 대회 한 줄을 누름 — 그 대회의 부문별 기록을 넘긴다(고칠 부문 / 부문 추가를 고르는 시트를 띄움).
     let onCompetitionTapped: ([Competition]) -> Void
@@ -22,11 +23,11 @@ public struct MyProfileCompetitionSection: View {
         VStack(alignment: .leading, spacing: 8) {
             // 섹션 타이틀 + 메달 합계 + 추가 버튼
             HStack(spacing: 8) {
-                Text("대회 정보")
+                Text("대회 기록")
                     .font(.pretendard.title3)
                     .foregroundStyle(Color.component.sectionHeader.title)
 
-                CompetitionMedalSummaryView(competitions: competitions ?? [])
+                CompetitionMedalSummaryView(medalCount: medalCount)
 
                 Spacer()
 
@@ -180,12 +181,19 @@ struct CompetitionGroup {
 // MARK: - CompetitionMedalSummaryView
 
 /// 섹션 머리 메달 합계 — 메달 아이콘 + 개수. 이모지는 앱 글꼴에서 깨져 보여 목록과 같은 메달 아이콘을 쓴다.
+/// 개수는 서버 합계(`medalCount`)를 쓴다 — 남이 보는 프로필과 같은 기준(대회명 없는 기록 제외)이어야 해서. 0개는 뺀다.
 private struct CompetitionMedalSummaryView: View {
-    let competitions: [Competition]
+    let medalCount: MedalCount
+
+    private var items: [(rank: CompetitionRank, count: Int)] {
+        [(CompetitionRank.gold, medalCount.gold), (.silver, medalCount.silver), (.bronze, medalCount.bronze)]
+            .filter { $0.1 > 0 }
+            .map { (rank: $0.0, count: $0.1) }
+    }
 
     var body: some View {
         HStack(spacing: 8) {
-            ForEach(CompetitionGroup.medalCounts(of: competitions), id: \.rank) { item in
+            ForEach(items, id: \.rank) { item in
                 HStack(spacing: 2) {
                     item.rank.medalImage
                         .resizable()
@@ -420,6 +428,7 @@ private struct EmptyCompetitionView: View {
                 competitionRank: .participation
             )
         ],
+        medalCount: MedalCount(gold: 1, silver: 2, bronze: 1),
         onAddCompetitionTapped: { },
         onCompetitionTapped: { _ in }
     )
@@ -435,6 +444,7 @@ private struct EmptyCompetitionView: View {
             Competition(competitionYear: 2022, competitionName: "2022 아시안 오픈", competitionRank: .gold, isPinned: true),
             Competition(competitionYear: 2024, competitionName: "2024 부산 오픈", competitionRank: .bronze)
         ],
+        medalCount: MedalCount(gold: 1, silver: 1, bronze: 1),
         onAddCompetitionTapped: { },
         onCompetitionTapped: { _ in }
     )

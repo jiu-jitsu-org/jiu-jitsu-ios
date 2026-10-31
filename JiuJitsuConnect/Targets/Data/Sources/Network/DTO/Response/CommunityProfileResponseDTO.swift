@@ -26,6 +26,8 @@ struct CommunityProfileResponseDTO: Codable {
     let favoritePosition: String?
     let isWeightHidden: Bool?
     let isOwner: Bool?
+    /// 공개되는 기록(대회명 있는 기록) 기준 메달 합계
+    let medalCount: MedalCountDTO?
     let teachingPhilosophy: String?
     let teachingStartDate: String?
     let teachingDetail: String?
@@ -52,10 +54,21 @@ struct CommunityProfileResponseDTO: Codable {
             favoritePosition: favoritePosition.flatMap { PositionType(rawValue: $0) },
             isWeightHidden: isWeightHidden ?? false,
             isOwner: isOwner ?? false,
+            medalCount: medalCount?.toDomain() ?? .zero,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
             teachingDetail: teachingDetail
         )
+    }
+}
+
+struct MedalCountDTO: Codable {
+    let gold: Int?
+    let silver: Int?
+    let bronze: Int?
+
+    func toDomain() -> MedalCount {
+        MedalCount(gold: gold ?? 0, silver: silver ?? 0, bronze: bronze ?? 0)
     }
 }
 
