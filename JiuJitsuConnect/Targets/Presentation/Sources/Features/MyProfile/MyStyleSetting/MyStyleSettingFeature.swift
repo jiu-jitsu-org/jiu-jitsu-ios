@@ -326,18 +326,6 @@ public struct MyStyleSettingFeature: Sendable {
         case edit
     }
     
-    public enum SelectionTab: String, CaseIterable, Equatable, Sendable {
-        case best
-        case favorite
-        
-        public var displayName: String {
-            switch self {
-            case .best: return "특기"
-            case .favorite: return "최애"
-            }
-        }
-    }
-    
     @ObservableState
     public struct State: Equatable, Sendable {
         // 진입 모드 (register: 순차 등록 플로우, edit: 개별 수정)
@@ -346,8 +334,8 @@ public struct MyStyleSettingFeature: Sendable {
         // 설정 타입 (포지션/서브미션/기술)
         var settingType: MyStyleSettingType
         
-        // 탭 선택 (특기/최애)
-        var selectedTab: SelectionTab = .best
+        // 특기(best*)는 화면에서 고르지 않는다(#118). 저장할 때 키가 빠지면 서버의 기존 특기가
+        // 지워질 수 있어, 받은 값을 그대로 들고 있다가 다시 보낸다.
         
         // 포지션 선택
         var selectedBestPosition: PositionType?
@@ -364,7 +352,6 @@ public struct MyStyleSettingFeature: Sendable {
         public init(
             settingType: MyStyleSettingType,
             mode: Mode = .register,
-            initialTab: SelectionTab = .best,
             bestPosition: PositionType? = nil,
             favoritePosition: PositionType? = nil,
             bestSubmission: SubmissionType? = nil,
@@ -374,7 +361,6 @@ public struct MyStyleSettingFeature: Sendable {
         ) {
             self.mode = mode
             self.settingType = settingType
-            self.selectedTab = initialTab
             self.selectedBestPosition = bestPosition
             self.selectedFavoritePosition = favoritePosition
             self.selectedBestSubmission = bestSubmission
@@ -383,7 +369,7 @@ public struct MyStyleSettingFeature: Sendable {
             self.selectedFavoriteTechnique = favoriteTechnique
         }
         
-        // 현재 타입의 모든 스타일 목록 (특기/최애 탭 모두 동일)
+        // 현재 타입의 모든 스타일 목록
         var availableStyles: [any StyleSelectable] {
             switch settingType {
             case .position:
@@ -413,14 +399,6 @@ public struct MyStyleSettingFeature: Sendable {
             }
         }
         
-        // 현재 탭에서 선택된 스타일
-        var currentSelectedStyle: (any StyleSelectable)? {
-            switch selectedTab {
-            case .best: return selectedBestStyle
-            case .favorite: return selectedFavoriteStyle
-            }
-        }
-        
         // 완료 버튼 활성화 조건
         // "없음"도 유효한 선택이므로 항상 활성화
         var canComplete: Bool {
@@ -430,23 +408,17 @@ public struct MyStyleSettingFeature: Sendable {
     
     public enum Action: Sendable {
         case view(ViewAction)
-        case `internal`(InternalAction)
         case delegate(DelegateAction)
         
         public enum ViewAction: Sendable {
-            case tabSelected(SelectionTab)
             case styleCardTapped(any StyleSelectable)
             case completeButtonTapped
             case backButtonTapped
             case resetButtonTapped
         }
         
-        public enum InternalAction: Sendable {
-            case switchToFavoriteTab  // 특기 완료 후 최애 탭으로 전환
-        }
-        
         public enum DelegateAction: Sendable {
-            /// 특기/최애를 한 번에 저장 요청
+            /// 최애 저장 요청 (특기는 받은 값 그대로 함께 보낸다)
             /// - register 모드: 다음 스타일 단계로 진행
             /// - edit 모드: 화면 닫기
             case didConfirmStyle(type: MyStyleSettingType, best: String?, favorite: String?)
@@ -457,82 +429,25 @@ public struct MyStyleSettingFeature: Sendable {
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
-            case let .view(.tabSelected(tab)):
-                state.selectedTab = tab
-                return .none
-                
             case let .view(.styleCardTapped(style)):
-                // 현재 탭에 따라 적절한 저장소에 저장
+                // 같은 카드를 다시 누르면 선택 해제
                 switch state.settingType {
                 case .position:
-                    if let positionStyle = style as? PositionType {
-                        switch state.selectedTab {
-                        case .best:
-                            // 특기 선택/해제
-                            if state.selectedBestPosition == positionStyle {
-                                state.selectedBestPosition = nil
-                            } else {
-                                state.selectedBestPosition = positionStyle
-                            }
-                        case .favorite:
-                            // 최애 선택/해제
-                            if state.selectedFavoritePosition == positionStyle {
-                                state.selectedFavoritePosition = nil
-                            } else {
-                                state.selectedFavoritePosition = positionStyle
-                            }
-                        }
-                    }
-                    
+                    guard let position = style as? PositionType else { return .none }
+                    state.selectedFavoritePosition = state.selectedFavoritePosition == position ? nil : position
                 case .submission:
-                    if let submissionStyle = style as? SubmissionType {
-                        switch state.selectedTab {
-                        case .best:
-                            if state.selectedBestSubmission == submissionStyle {
-                                state.selectedBestSubmission = nil
-                            } else {
-                                state.selectedBestSubmission = submissionStyle
-                            }
-                        case .favorite:
-                            if state.selectedFavoriteSubmission == submissionStyle {
-                                state.selectedFavoriteSubmission = nil
-                            } else {
-                                state.selectedFavoriteSubmission = submissionStyle
-                            }
-                        }
-                    }
-                    
+                    guard let submission = style as? SubmissionType else { return .none }
+                    state.selectedFavoriteSubmission = state.selectedFavoriteSubmission == submission ? nil : submission
                 case .technique:
-                    if let techniqueStyle = style as? TechniqueType {
-                        switch state.selectedTab {
-                        case .best:
-                            if state.selectedBestTechnique == techniqueStyle {
-                                state.selectedBestTechnique = nil
-                            } else {
-                                state.selectedBestTechnique = techniqueStyle
-                            }
-                        case .favorite:
-                            if state.selectedFavoriteTechnique == techniqueStyle {
-                                state.selectedFavoriteTechnique = nil
-                            } else {
-                                state.selectedFavoriteTechnique = techniqueStyle
-                            }
-                        }
-                    }
+                    guard let technique = style as? TechniqueType else { return .none }
+                    state.selectedFavoriteTechnique = state.selectedFavoriteTechnique == technique ? nil : technique
                 }
                 return .none
                 
             case .view(.completeButtonTapped):
                 guard state.canComplete else { return .none }
 
-                // 특기 탭이면서 최애가 아직 설정되지 않았으면 저장 없이 최애 탭으로 전환
-                // (mode와 무관 — 최애 입력을 먼저 유도)
-                if state.selectedTab == .best, state.selectedFavoriteStyle == nil {
-                    return .send(.internal(.switchToFavoriteTab))
-                }
-
-                // 그 외 → 특기/최애를 한 번에 저장
-                // (register 모드면 부모가 다음 스타일 단계로, edit 모드면 화면을 닫음)
+                // register 모드면 부모가 다음 스타일 단계로, edit 모드면 화면을 닫음
                 let bestKey = state.selectedBestStyle?.rawValue
                 let favoriteKey = state.selectedFavoriteStyle?.rawValue
                 return .send(.delegate(.didConfirmStyle(
@@ -541,18 +456,13 @@ public struct MyStyleSettingFeature: Sendable {
                     favorite: favoriteKey
                 )))
                 
-            case .internal(.switchToFavoriteTab):
-                // 최애 탭으로 전환
-                state.selectedTab = .favorite
-                return .none
-                
             case .view(.backButtonTapped):
                 return .send(.delegate(.cancel))
                 
             case .view(.resetButtonTapped):
                 return .send(.delegate(.cancel))
                 
-            case .delegate, .internal:
+            case .delegate:
                 return .none
             }
         }

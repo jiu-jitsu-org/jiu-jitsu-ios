@@ -126,6 +126,8 @@ public struct CommunityFeature: Sendable {
         case session(SessionAction)
         // 부모(AppTabFeature)가 딥링크(공유 링크·푸시 탭)를 주입해 상세로 보내는 통로.
         case deepLink(DeepLink)
+        /// 다른 회원 프로필 열기 — 웹의 작성자 탭(`OPEN_USER_PROFILE`, isMe=false)이 보낸다(#116)
+        case openUserProfile(userId: Int)
         // 부모(AppTabFeature)가 MY에서 바뀐 내 사진(삭제 시 nil)을 주입하는 통로.
         case myProfileImageChanged(URL?)
 
@@ -208,6 +210,7 @@ public struct CommunityFeature: Sendable {
     @Reducer
     public enum Path: Sendable {
         case detail(CommunityDetailFeature)
+        case userProfile(UserProfileFeature)
     }
 
     /// 중첩 서브뷰가 어느 컨테이너(푸시 스택 / 모달 내부 스택)에서 올라왔는지 구분한다.
@@ -499,6 +502,17 @@ public struct CommunityFeature: Sendable {
 
             case let .deepLink(link):
                 return Self.openDeepLink(link, into: &state)
+
+            case let .openUserProfile(userId):
+                // 상세 모달이 떠 있으면 모달 안 스택에 쌓는다(모달을 닫으며 push하면 전환이 튄다)
+                // 게스트에게는 띠를 묻지 않는다(#130)
+                let profile = UserProfileFeature.State(userId: userId, canPromptBelt: state.accessToken != nil)
+                if state.detailCover != nil {
+                    state.coverPath.append(.userProfile(profile))
+                } else {
+                    state.path.append(.userProfile(profile))
+                }
+                return .none
 
             // MARK: - Subview Delegates (상세 서브뷰 → 부모)
 

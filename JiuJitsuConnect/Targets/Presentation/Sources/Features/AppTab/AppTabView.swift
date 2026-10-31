@@ -42,6 +42,8 @@ public struct AppTabView: View {
                     switch destinationStore.case {
                     case let .detail(detailStore):
                         CommunityDetailView(store: detailStore)
+                    case let .userProfile(profileStore):
+                        UserProfileView(store: profileStore)
                     }
                 }
             }
@@ -55,6 +57,8 @@ public struct AppTabView: View {
                     switch destinationStore.case {
                     case let .communityDetail(detailStore):
                         CommunityDetailView(store: detailStore)
+                    case let .userProfile(profileStore):
+                        UserProfileView(store: profileStore)
                     }
                 }
             }
@@ -68,6 +72,8 @@ public struct AppTabView: View {
                     switch destinationStore.case {
                     case let .communityDetail(detailStore):
                         CommunityDetailView(store: detailStore)
+                    case let .userProfile(profileStore):
+                        UserProfileView(store: profileStore)
                     }
                 }
             }
@@ -92,6 +98,8 @@ public struct AppTabView: View {
                 switch destinationStore.case {
                 case let .detail(detailStore):
                     CommunityDetailView(store: detailStore)
+                case let .userProfile(profileStore):
+                    UserProfileView(store: profileStore)
                 }
             }
         }

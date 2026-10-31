@@ -38,13 +38,11 @@ public struct MyProfileView: View {
     
     // MARK: - Computed Properties
     
+    /// 화면에는 최애만 보이므로(#118) 특기만 있는 회원은 스타일이 없는 것으로 본다.
     private var hasStyleInfo: Bool {
         let profile = store.communityProfile
-        return profile?.bestPosition != nil ||
-               profile?.favoritePosition != nil ||
-               profile?.bestSubmission != nil ||
+        return profile?.favoritePosition != nil ||
                profile?.favoriteSubmission != nil ||
-               profile?.bestTechnique != nil ||
                profile?.favoriteTechnique != nil
     }
 
@@ -225,13 +223,10 @@ public struct MyProfileView: View {
     /// 스타일 섹션
     private var styleSection: some View {
         MyProfileStyleSectionView(
-            bestPosition: store.communityProfile?.bestPosition,
             favoritePosition: store.communityProfile?.favoritePosition,
-            bestTechnique: store.communityProfile?.bestTechnique,
             favoriteTechnique: store.communityProfile?.favoriteTechnique,
-            bestSubmission: store.communityProfile?.bestSubmission,
             favoriteSubmission: store.communityProfile?.favoriteSubmission,
-            onStyleCardTapped: { type, tab in store.send(.view(.styleCardEditTapped(type, tab))) }
+            onStyleCardTapped: { store.send(.view(.styleCardEditTapped($0))) }
         )
     }
     

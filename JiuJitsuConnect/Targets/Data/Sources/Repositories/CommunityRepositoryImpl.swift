@@ -29,6 +29,18 @@ public final class CommunityRepositoryImpl: CommunityRepository {
         }
     }
     
+    public func fetchPublicProfile(userId: Int) async throws -> CommunityPublicProfile {
+        do {
+            let endpoint = CommunityEndpoint.getPublicProfile(userId: userId)
+            let responseDTO: CommunityPublicProfileResponseDTO = try await networkService.request(endpoint: endpoint)
+            return responseDTO.toDomain()
+        } catch let error as NetworkError {
+            throw error.toDomainError()
+        } catch {
+            throw DomainError.unknown(error.localizedDescription)
+        }
+    }
+
     public func updateProfile(_ profile: CommunityProfile, section: ProfileSection = .academy) async throws -> CommunityProfile {
         do {
             let requestDTO = PostCommunityProfileRequestDTO(from: profile, section: section)

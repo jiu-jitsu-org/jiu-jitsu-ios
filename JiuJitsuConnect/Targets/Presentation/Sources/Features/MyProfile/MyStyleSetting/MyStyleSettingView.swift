@@ -81,7 +81,8 @@ public struct MyStyleSettingView: View {
             completeButton
         }
         .background(Color.component.background.default)
-        .navigationTitle(store.settingType.navigationTitle)
+        // 특기/최애 탭이 없어져(#118) 무엇을 고르는 화면인지 제목에서 알린다
+        .navigationTitle("최애 \(store.settingType.title)")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .tabBar)
@@ -101,23 +102,22 @@ public struct MyStyleSettingView: View {
     // MARK: - Main Content Views
     
     private var mainScrollView: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                // 탭 (특기/최애)
-                HStack {
-                    Spacer()
-                    tabView
-                    Spacer()
+        GeometryReader { proxy in
+            ScrollView {
+                // 특기/최애 탭이 빠져(#118) 남는 높이는 카드 위아래로 나눠, 고르는 줄은
+                // 탭이 있던 때처럼 완료 버튼 바로 위에 붙인다.
+                VStack(spacing: 0) {
+                    Spacer(minLength: 26)
+
+                    // 메인 카드
+                    styleCardsView
+
+                    Spacer(minLength: 29)
+
+                    // 선택 가능한 스타일 미리보기 (스크롤뷰 내부)
+                    selectedStylesPreview
                 }
-                .padding(.top, 26)
-                
-                // 메인 카드
-                styleCardsView
-                    .padding(.top, 26)
-                
-                // 선택 가능한 스타일 미리보기 (스크롤뷰 내부)
-                selectedStylesPreview
-                    .padding(.top, 29)
+                .frame(minHeight: proxy.size.height)
             }
         }
         .background(Color.component.background.default)
@@ -126,8 +126,7 @@ public struct MyStyleSettingView: View {
     }
     
     private var styleCardsView: some View {
-        // 현재 탭에서 선택된 스타일
-        let currentStyle = store.currentSelectedStyle
+        let currentStyle = store.selectedFavoriteStyle
         
         return HStack {
             Spacer()
@@ -152,7 +151,7 @@ public struct MyStyleSettingView: View {
     private var completeButton: some View {
         VStack(spacing: 0) {
             CTAButton(
-                title: completeButtonTitle,
+                title: "\(store.settingType.title) 설정 완료",
                 type: .blue,
                 style: .rounded,
                 height: 51,
@@ -163,15 +162,6 @@ public struct MyStyleSettingView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 8)
         }
-    }
-    
-    private var completeButtonTitle: String {
-        // 특기 탭이면서 최애가 비어있으면 다음 단계(최애 입력)로 유도
-        if store.selectedTab == .best, store.selectedFavoriteStyle == nil {
-            return "특기 설정 완료"
-        }
-        // 그 외 → 현재 타입 전체 저장 의미 ("포지션 설정 완료" 등)
-        return "\(store.settingType.title) 설정 완료"
     }
     
     private var backButton: some View {
@@ -207,43 +197,6 @@ public struct MyStyleSettingView: View {
         .buttonStyle(.plain)
     }
     
-    // MARK: - Tab View
-    
-    private var tabView: some View {
-        SegmentControl(
-            leftItem: SegmentItem(
-                title: "특기",
-                subtitle: subtitleForBest
-            ),
-            rightItem: SegmentItem(
-                title: "최애",
-                subtitle: subtitleForFavorite
-            ),
-            selectedSide: store.selectedTab == .best ? .left : .right
-        ) { newSide in
-            let newTab: MyStyleSettingFeature.SelectionTab = newSide == .left ? .best : .favorite
-            store.send(.view(.tabSelected(newTab)))
-        }
-    }
-    
-    /// 특기 탭의 subtitle
-    private var subtitleForBest: String {
-        if let bestStyle = store.selectedBestStyle {
-            return bestStyle.tabTitle
-        } else {
-            return "입력해주세요"
-        }
-    }
-    
-    /// 최애 탭의 subtitle
-    private var subtitleForFavorite: String {
-        if let favoriteStyle = store.selectedFavoriteStyle {
-            return favoriteStyle.tabTitle
-        } else {
-            return "입력해주세요"
-        }
-    }
-
     // MARK: - Selected Styles Preview
     
     private var selectedStylesPreview: some View {
@@ -256,10 +209,10 @@ public struct MyStyleSettingView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(alignment: .bottom, spacing: CardMetrics.Spacing.horizontal) {
                             // "없음" 카드 (첫 번째)
-                            NoneStyleCard(isSelected: store.currentSelectedStyle == nil)
+                            NoneStyleCard(isSelected: store.selectedFavoriteStyle == nil)
                                 .onTapGesture {
-                                    // 현재 탭의 선택을 해제
-                                    if let currentStyle = store.currentSelectedStyle {
+                                    // 고른 것을 해제
+                                    if let currentStyle = store.selectedFavoriteStyle {
                                         store.send(.view(.styleCardTapped(currentStyle)))
                                     }
                                 }
@@ -283,10 +236,10 @@ public struct MyStyleSettingView: View {
                     // 스크롤이 필요 없는 경우: 가운데 정렬된 HStack
                     HStack(alignment: .bottom, spacing: CardMetrics.Spacing.horizontal) {
                         // "없음" 카드 (첫 번째)
-                        NoneStyleCard(isSelected: store.currentSelectedStyle == nil)
+                        NoneStyleCard(isSelected: store.selectedFavoriteStyle == nil)
                             .onTapGesture {
-                                // 현재 탭의 선택을 해제
-                                if let currentStyle = store.currentSelectedStyle {
+                                // 고른 것을 해제
+                                if let currentStyle = store.selectedFavoriteStyle {
                                     store.send(.view(.styleCardTapped(currentStyle)))
                                 }
                             }
@@ -329,8 +282,7 @@ public struct MyStyleSettingView: View {
     }
     
     private func isStyleSelected(_ style: any StyleSelectable) -> Bool {
-        // 현재 탭에서 선택된 스타일과 비교
-        return store.currentSelectedStyle?.id == style.id
+        store.selectedFavoriteStyle?.id == style.id
     }
 }
 

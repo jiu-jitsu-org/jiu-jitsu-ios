@@ -18,6 +18,9 @@ public enum APIErrorCode: String, Equatable {
     case wrongParameter = "R0002" // 잘못된 요청 데이터
     case nicknameDuplicated = "R0003" // 이미 사용중인 닉네임
     case invalidNickname = "R0004" // 잘못된 닉네임 형식
+
+    // MARK: - User (U0000)
+    case userNotFound = "U0011" // 존재하지 않는 회원 (탈퇴 유예 중인 작성자 포함)
         
     /// 클라이언트에서 알 수 없는 새로운 에러 코드를 처리하기 위한 케이스
     case unknown

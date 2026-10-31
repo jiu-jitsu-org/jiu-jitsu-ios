@@ -420,6 +420,9 @@ public enum ProfileSection: String, Codable, Sendable, CaseIterable, Equatable {
     
     /// 벨트/체급 정보 (beltRank, beltStripe, gender, weightKg)
     case beltWeight = "BELT_WEIGHT"
+
+    /// 띠·그랄만 (성별·체급·체급 숨기기는 그대로 둔다) — 띠 묻기 시트(#130)
+    case belt = "BELT"
     
     /// 포지션 (bestPosition + favoritePosition)
     case position = "POSITION"
@@ -446,6 +449,8 @@ public enum ProfileSection: String, Codable, Sendable, CaseIterable, Equatable {
             return "도장 정보"
         case .beltWeight:
             return "벨트/체급"
+        case .belt:
+            return "벨트"
         case .position:
             return "포지션"
         case .submission:

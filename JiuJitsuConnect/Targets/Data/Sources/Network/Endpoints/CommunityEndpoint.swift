@@ -10,6 +10,7 @@ import Foundation
 enum CommunityEndpoint {
     case getProfile
     case postProfile(PostCommunityProfileRequestDTO)
+    case getPublicProfile(userId: Int)
 }
 
 extension CommunityEndpoint: Endpoint {
@@ -24,12 +25,14 @@ extension CommunityEndpoint: Endpoint {
         switch self {
         case .getProfile, .postProfile:
             return "/api/community/profile"
+        case let .getPublicProfile(userId):
+            return "/api/community/profile/\(userId)"
         }
     }
     
     var method: HTTPMethod {
         switch self {
-        case .getProfile:
+        case .getProfile, .getPublicProfile:
             return .get
         case .postProfile:
             return .post
@@ -46,7 +49,7 @@ extension CommunityEndpoint: Endpoint {
     
     var body: Data? {
         switch self {
-        case .getProfile:
+        case .getProfile, .getPublicProfile:
             return nil
         case .postProfile(let request):
             return try? JSONEncoder().encode(request)

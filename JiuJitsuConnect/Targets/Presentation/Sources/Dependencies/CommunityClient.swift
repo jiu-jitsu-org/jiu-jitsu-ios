@@ -17,13 +17,18 @@ public struct CommunityClient: Sendable {
     ///   - profile: 업데이트할 프로필 정보
     ///   - section: 업데이트할 섹션 (기본값: .academy)
     public var updateProfile: @Sendable (CommunityProfile, ProfileSection) async throws -> CommunityProfile
+
+    /// 다른 회원의 공개 프로필을 가져오는 클로저 (#116)
+    public var fetchPublicProfile: @Sendable (Int) async throws -> CommunityPublicProfile
     
     public init(
         fetchProfile: @Sendable @escaping () async throws -> CommunityProfile,
-        updateProfile: @Sendable @escaping (CommunityProfile, ProfileSection) async throws -> CommunityProfile
+        updateProfile: @Sendable @escaping (CommunityProfile, ProfileSection) async throws -> CommunityProfile,
+        fetchPublicProfile: @Sendable @escaping (Int) async throws -> CommunityPublicProfile
     ) {
         self.fetchProfile = fetchProfile
         self.updateProfile = updateProfile
+        self.fetchPublicProfile = fetchPublicProfile
     }
 }
 
@@ -72,7 +77,8 @@ extension CommunityClient: DependencyKey {
         },
         updateProfile: { update, _ in
             update
-        }
+        },
+        fetchPublicProfile: { _ in .preview }
     )
     /// Preview 구현 (SwiftUI 프리뷰용)
     public static let previewValue: CommunityClient = CommunityClient(
@@ -116,7 +122,8 @@ extension CommunityClient: DependencyKey {
         updateProfile: { profile, _ in
             // 프리뷰에서는 그대로 반환
             profile
-        }
+        },
+        fetchPublicProfile: { _ in .preview }
     )
 }
 
@@ -138,6 +145,28 @@ extension CommunityClient {
         },
         updateProfile: { _, _ in
             fatalError("CommunityClient.updateProfile is not implemented")
+        },
+        fetchPublicProfile: { _ in
+            fatalError("CommunityClient.fetchPublicProfile is not implemented")
         }
+    )
+}
+
+extension CommunityPublicProfile {
+    /// 프리뷰·테스트용 공개 프로필
+    static let preview = CommunityPublicProfile(
+        userId: 101,
+        nickname: "암바장인곰",
+        academyName: "OSS 주짓수 강남",
+        beltRank: .black,
+        beltStripe: .two,
+        isOwner: true,
+        favoritePosition: .guard,
+        favoriteTechnique: .sweeps,
+        favoriteSubmission: .chokes,
+        competitions: [
+            Competition(competitionYear: 2026, competitionName: "서울 오픈", competitionRank: .silver, competitionBelt: .black),
+            Competition(competitionYear: 2025, competitionName: "전국 주짓수 선수권", competitionRank: .gold, competitionBelt: .brown)
+        ]
     )
 }

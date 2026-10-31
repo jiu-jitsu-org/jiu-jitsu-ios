@@ -11,161 +11,122 @@ import Domain
 
 // MARK: - MyProfileStyleSectionView
 
-/// 스타일 섹션 (포지션 + 기술 + 서브미션)
+/// 최애 스타일 섹션 (포지션 · 기술 · 서브미션 최애 한 칸씩)
+///
+/// 포지션·서브미션은 '기술'에 들지 않아, 셋을 아우르는 이름으로 앱이 이미 쓰는 '스타일'을 쓴다.
+///
+/// 특기는 자기 평가라 입력 부담이 커서 최애만 보여 준다(#118). 남이 보는 프로필도 같은 모양을 쓴다.
 public struct MyProfileStyleSectionView: View {
-    let bestPosition: (any StyleSelectable)?
     let favoritePosition: (any StyleSelectable)?
-    let bestTechnique: (any StyleSelectable)?
     let favoriteTechnique: (any StyleSelectable)?
-    let bestSubmission: (any StyleSelectable)?
     let favoriteSubmission: (any StyleSelectable)?
-    
-    let onStyleCardTapped: (MyStyleSettingType, MyStyleSettingFeature.SelectionTab) -> Void
+
+    /// 카드를 눌러 수정한다. `nil`이면 읽기 전용(남이 보는 프로필)이라 빈 칸에 고르라는 말 대신 안 골랐다고 적는다.
+    let onStyleCardTapped: ((MyStyleSettingType) -> Void)?
+
+    public init(
+        favoritePosition: (any StyleSelectable)?,
+        favoriteTechnique: (any StyleSelectable)?,
+        favoriteSubmission: (any StyleSelectable)?,
+        onStyleCardTapped: ((MyStyleSettingType) -> Void)?
+    ) {
+        self.favoritePosition = favoritePosition
+        self.favoriteTechnique = favoriteTechnique
+        self.favoriteSubmission = favoriteSubmission
+        self.onStyleCardTapped = onStyleCardTapped
+    }
+
+    private struct Item {
+        let type: MyStyleSettingType
+        let style: (any StyleSelectable)?
+    }
+
+    private var items: [Item] {
+        [
+            Item(type: .position, style: favoritePosition),
+            Item(type: .technique, style: favoriteTechnique),
+            Item(type: .submission, style: favoriteSubmission)
+        ]
+    }
+
+    private func tapAction(for type: MyStyleSettingType) -> (() -> Void)? {
+        guard let onStyleCardTapped else { return nil }
+        return { onStyleCardTapped(type) }
+    }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 36) {
-            // 포지션 섹션
-            StyleCategorySection(
-                title: "포지션",
-                bestStyle: bestPosition,
-                favoriteStyle: favoritePosition,
-                onBestCardTapped: { onStyleCardTapped(.position, .best) },
-                onFavoriteCardTapped: { onStyleCardTapped(.position, .favorite) }
-            )
-
-            // 기술 섹션
-            StyleCategorySection(
-                title: "기술",
-                bestStyle: bestTechnique,
-                favoriteStyle: favoriteTechnique,
-                onBestCardTapped: { onStyleCardTapped(.technique, .best) },
-                onFavoriteCardTapped: { onStyleCardTapped(.technique, .favorite) }
-            )
-
-            // 서브미션 섹션
-            StyleCategorySection(
-                title: "서브미션",
-                bestStyle: bestSubmission,
-                favoriteStyle: favoriteSubmission,
-                onBestCardTapped: { onStyleCardTapped(.submission, .best) },
-                onFavoriteCardTapped: { onStyleCardTapped(.submission, .favorite) }
-            )
-        }
-    }
-}
-
-// MARK: - StyleCategorySection
-
-/// 개별 스타일 카테고리 섹션 (포지션/기술/서브미션)
-private struct StyleCategorySection: View {
-    let title: String
-    let bestStyle: (any StyleSelectable)?
-    let favoriteStyle: (any StyleSelectable)?
-    let onBestCardTapped: () -> Void
-    let onFavoriteCardTapped: () -> Void
-
-    var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // 섹션 타이틀
-            Text(title)
+            Text("최애 스타일")
                 .font(.pretendard.title3)
                 .foregroundStyle(Color.component.sectionHeader.title)
 
-            // 카드 그리드 (2열)
-            HStack(spacing: 8) {
-                // 왼쪽: 특기 카드
-                if let bestStyle = bestStyle {
-                    FilledStyleCardItem(label: "특기", style: bestStyle, onTapped: onBestCardTapped)
-                } else {
-                    EmptyStyleCardItem(label: "특기", onTapped: onBestCardTapped)
-                }
-
-                // 오른쪽: 최애 카드
-                if let favoriteStyle = favoriteStyle {
-                    FilledStyleCardItem(label: "최애", style: favoriteStyle, onTapped: onFavoriteCardTapped)
-                } else {
-                    EmptyStyleCardItem(label: "최애", onTapped: onFavoriteCardTapped)
+            HStack(alignment: .top, spacing: 8) {
+                ForEach(items, id: \.type.title) { item in
+                    FavoriteStyleCardItem(
+                        category: item.type.title,
+                        style: item.style,
+                        emptyText: onStyleCardTapped == nil ? "아직 안 골랐어요" : "지정해주세요",
+                        onTapped: tapAction(for: item.type)
+                    )
                 }
             }
+            // 이름이 두 줄로 넘어가는 칸이 있어도 세 칸 높이를 맞춘다
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
 
-// MARK: - FilledStyleCardItem
+// MARK: - FavoriteStyleCardItem
 
-/// 스타일 정보가 있는 카드 아이템
-private struct FilledStyleCardItem: View {
-    let label: String
-    let style: any StyleSelectable
-    let onTapped: () -> Void
+/// 최애 한 칸 — 아이콘 · 분류(포지션/기술/서브미션) · 이름
+private struct FavoriteStyleCardItem: View {
+    let category: String
+    let style: (any StyleSelectable)?
+    let emptyText: String
+    let onTapped: (() -> Void)?
 
     var body: some View {
-        Button {
-            onTapped()
-        } label: {
-            VStack(alignment: .leading, spacing: 16) {
-                // 아이콘
+        if let onTapped {
+            Button(action: onTapped) { content }
+                .buttonStyle(.plain)
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let style {
                 style.iconImage.swiftUIImage
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 40, height: 40)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    // 라벨 (특기/최애)
-                    Text(label)
-                        .font(Font.pretendard.labelM)
-                        .foregroundStyle(Color.component.skillCard.default.labelText)
-                    
-                    // 스타일 이름
-                    Text(style.tabTitle)
-                        .font(Font.pretendard.title3)
-                        .foregroundStyle(Color.component.skillCard.default.titleTextFilled)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
-            .background(Color.component.skillCard.default.bg)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-// MARK: - EmptyStyleCardItem
-
-/// 스타일 정보가 없는 빈 카드 아이템
-private struct EmptyStyleCardItem: View {
-    let label: String
-    let onTapped: () -> Void
-
-    var body: some View {
-        Button {
-            onTapped()
-        } label: {
-            VStack(alignment: .leading, spacing: 16) {
-                // 빈 아이콘 배경
-                RoundedRectangle(cornerRadius: 14)
+                    .frame(width: 32, height: 32)
+            } else {
+                RoundedRectangle(cornerRadius: 11)
                     .fill(Color.primitive.coolGray.cg50)
-                    .frame(width: 40, height: 40)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    // 라벨 (특기/최애)
-                    Text(label)
-                        .font(Font.pretendard.labelM)
-                        .foregroundStyle(Color.component.skillCard.default.labelText)
-                    
-                    // 안내 텍스트
-                    Text("지정해주세요")
-                        .font(Font.pretendard.title3)
-                        .foregroundStyle(Color.component.skillCard.default.titleTextEmpty)
-                }
+                    .frame(width: 32, height: 32)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
-            .background(Color.component.skillCard.default.bg)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(category)
+                    .font(Font.pretendard.labelM)
+                    .foregroundStyle(Color.component.skillCard.default.labelText)
+
+                Text(style?.tabTitle ?? emptyText)
+                    .font(.pretendard.custom(weight: .semiBold, size: 14))
+                    .foregroundStyle(
+                        style == nil
+                            ? Color.component.skillCard.default.titleTextEmpty
+                            : Color.component.skillCard.default.titleTextFilled
+                    )
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(14)
+        .background(Color.component.skillCard.default.bg)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 }
 
@@ -182,7 +143,7 @@ public struct EmptyStyleView: View {
                 .foregroundStyle(Color.component.sectionHeader.title)
                 .padding(.bottom, 8)
 
-            Text("특기와 최애 포지션, 기술 등을 등록해보세요.")
+            Text("최애 포지션, 기술 등을 등록해보세요.")
                 .font(Font.pretendard.bodyM)
                 .foregroundStyle(Color.component.sectionHeader.subTitle)
 
@@ -289,13 +250,10 @@ private struct DecorativeCardConfig {
 
 #Preview("MyProfileStyleSectionView - 정보 있음") {
     MyProfileStyleSectionView(
-        bestPosition: PositionType.top,
         favoritePosition: PositionType.guard,
-        bestTechnique: TechniqueType.sweeps,
         favoriteTechnique: TechniqueType.escapes,
-        bestSubmission: SubmissionType.chokes,
         favoriteSubmission: SubmissionType.armLocks,
-        onStyleCardTapped: { _, _ in }
+        onStyleCardTapped: { _ in }
     )
     .padding()
     .background(Color.component.background.default)
@@ -303,13 +261,10 @@ private struct DecorativeCardConfig {
 
 #Preview("MyProfileStyleSectionView - 일부 정보만") {
     MyProfileStyleSectionView(
-        bestPosition: PositionType.top,
         favoritePosition: nil,
-        bestTechnique: nil,
         favoriteTechnique: TechniqueType.escapes,
-        bestSubmission: SubmissionType.chokes,
         favoriteSubmission: nil,
-        onStyleCardTapped: { _, _ in }
+        onStyleCardTapped: { _ in }
     )
     .padding()
     .background(Color.component.background.default)
