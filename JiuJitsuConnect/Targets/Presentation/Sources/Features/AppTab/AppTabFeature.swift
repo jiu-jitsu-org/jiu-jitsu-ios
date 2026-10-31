@@ -209,11 +209,14 @@ public struct AppTabFeature: Sendable {
 
             // 헤더의 내 사진 버튼(#128)·웹에서 내 이름 탭(#116). 탭바에서 MY를 누른 것과 같은 경로라 프로필 재조회·게스트 처리도 그대로 따른다.
             // 내 사진은 내 프로필을 뜻하므로, MY에 열어 둔 하위 화면(커뮤니티 활동 등)은 닫고 프로필 첫 화면으로 보낸다.
+            // 홈의 모달 상세는 탭 전체를 덮어서, 닫지 않으면 MY로 바뀌어도 화면에 아무 변화가 없다.
             case .home(.delegate(.myTabRequested)),
                  .myPage(.delegate(.webSubview(.myTabRequested))),
                  .settings(.delegate(.webSubview(.myTabRequested))):
                 if !state.authInfo.isGuest {
                     state.myPage.path.removeAll()
+                    state.home.detailCover = nil
+                    state.home.coverPath.removeAll()
                 }
                 return .send(.view(.tabSelected(.myPage)))
 
