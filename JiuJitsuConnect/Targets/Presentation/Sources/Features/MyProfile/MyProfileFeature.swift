@@ -147,7 +147,7 @@ public struct MyProfileFeature: Sendable {
             case beltTapped             // 이미 등록된 벨트 영역 탭 → 수정 모드로 시트 노출
             case weightClassTapped      // 이미 등록된 체급 영역 탭 → 체급 수정 시트 노출
             case registerStyleButtonTapped
-            case styleCardEditTapped(MyStyleSettingType, MyStyleSettingFeature.SelectionTab)  // 프로필 스타일 카드 탭 → 해당 타입 수정 모드 진입
+            case styleCardEditTapped(MyStyleSettingType)  // 프로필 스타일 카드 탭 → 해당 타입 수정 모드 진입
             case weightVisibilityToggleButtonTapped
             case toastButtonTapped(ToastState.Action)
             case addCompetitionButtonTapped  // 대회 정보 추가 버튼 탭
@@ -397,13 +397,12 @@ public struct MyProfileFeature: Sendable {
                 )
                 return .none
                 
-            case let .view(.styleCardEditTapped(type, tab)):
+            case let .view(.styleCardEditTapped(type)):
                 // 프로필 카드 탭 → 해당 타입만 수정하는 edit 모드로 진입
                 state.destination = .myStyleSetting(
                     MyStyleSettingFeature.State(
                         settingType: type,
                         mode: .edit,
-                        initialTab: tab,
                         bestPosition: state.communityProfile?.bestPosition,
                         favoritePosition: state.communityProfile?.favoritePosition,
                         bestSubmission: state.communityProfile?.bestSubmission,
@@ -447,7 +446,7 @@ public struct MyProfileFeature: Sendable {
                 return .none
                 
             case let .destination(.presented(.myStyleSetting(.delegate(.didConfirmStyle(type, bestKey, favoriteKey))))):
-                // 스타일 저장 (특기 + 최애 한 번에) → register 시 다음 단계, edit 시 화면 닫기
+                // 스타일 저장 (최애 + 받아 둔 특기) → register 시 다음 단계, edit 시 화면 닫기
                 switch type {
                 case .position:
                     let best = bestKey.flatMap { PositionType(rawValue: $0) }
