@@ -112,6 +112,8 @@ public struct CompetitionInfoFeature: Sendable {
         // 가장 무거운 체급은 경계 무게 대신 '무제한'으로 고른다(#190).
         var weightText: String = ""
         var isUnlimited = false
+        // 수정 중인 예전 무제한 기록('+100.5kg')의 무게. 무제한 그대로 저장하면 같이 보내 서버 값을 지키지 않는다.
+        var legacyUnlimitedKg: Double?
 
         // 앱솔루트는 체급 제한이 없는 무차별급이라, 체크하면 체급은 저장하지 않는다(부문 하나 = 체급 또는 앱솔루트).
         // 무제한과 앱솔루트는 둘 중 하나만 고른다. 입력해 둔 숫자는 지우지 않아 체크를 풀면 그대로 돌아온다.
@@ -120,7 +122,7 @@ public struct CompetitionInfoFeature: Sendable {
         /// 입력한 체급 — 앱솔루트이거나, 숫자로 읽히지 않거나 0 이하면 체급 없음.
         var weightLimit: CompetitionWeightLimit? {
             guard !isAbsolute else { return nil }
-            guard !isUnlimited else { return .unlimited }
+            guard !isUnlimited else { return .unlimited(legacyKg: legacyUnlimitedKg) }
             let normalized = weightText.replacingOccurrences(of: ",", with: ".")
             guard let kg = Double(normalized), kg > 0 else { return nil }
             return .under(kg: kg)
@@ -161,6 +163,9 @@ public struct CompetitionInfoFeature: Sendable {
                 // 이름만 고치려던 사람이 모르는 사이 부문까지 저장하게 되므로 비워 둔다.
                 self.uniform = original.competitionUniform
                 self.applyWeightLimit(original.competitionWeightLimit)
+                if case let .unlimited(legacyKg) = original.competitionWeightLimit {
+                    self.legacyUnlimitedKg = legacyKg
+                }
                 self.isAbsolute = original.competitionAbsolute
                 self.belt = original.competitionBelt
             }
@@ -175,7 +180,7 @@ public struct CompetitionInfoFeature: Sendable {
         /// 체급 칸을 이 체급으로 채운다. 앱솔루트는 따로 두므로 건드리지 않는다.
         mutating func applyWeightLimit(_ weightLimit: CompetitionWeightLimit?) {
             weightText = weightLimit?.kgText ?? ""
-            isUnlimited = weightLimit == .unlimited
+            isUnlimited = weightLimit?.isUnlimited ?? false
         }
 
         /// 추천 대회로 바꾼 연도를 되돌린다.

@@ -33,7 +33,9 @@ public enum CompetitionWeightLimit: Codable, Equatable, Sendable, Hashable {
     /// 이하 — 표기 "-76kg"
     case under(kg: Double)
     /// 무제한 — 가장 무거운 체급. 경계 무게는 대회마다 달라 받지 않는다.
-    case unlimited
+    /// #190 전에 '+100.5kg'처럼 무게와 함께 저장된 기록은 그 무게를 `legacyKg`로 들고 있다가 그대로 다시 보낸다
+    /// (대회 저장은 목록 전체를 보내므로, 버리면 손대지 않은 기록의 무게까지 서버에서 지워진다).
+    case unlimited(legacyKg: Double? = nil)
 
     /// 서버가 주고받는 이하/초과 값. 무제한은 '초과'로 보낸다.
     public enum Bound: String, Codable, Equatable, Sendable, CaseIterable, Hashable {
@@ -48,11 +50,16 @@ public enum CompetitionWeightLimit: Codable, Equatable, Sendable, Hashable {
         }
     }
 
-    /// 경계 무게 — 무제한은 nil
+    /// 서버에 보낼 경계 무게 — 무제한은 예전 기록의 무게가 있을 때만
     public var kg: Double? {
         switch self {
         case let .under(kg): return kg
-        case .unlimited: return nil
+        case let .unlimited(legacyKg): return legacyKg
         }
+    }
+
+    public var isUnlimited: Bool {
+        if case .unlimited = self { return true }
+        return false
     }
 }
