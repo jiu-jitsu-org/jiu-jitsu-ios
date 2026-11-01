@@ -22,6 +22,7 @@ public struct AppTabView: View {
     }
 
     @Environment(\.scenePhase) private var scenePhase
+    @State private var myProfileReveal = MyProfileReveal()
 
     public var body: some View {
         ZStack {
@@ -79,6 +80,7 @@ public struct AppTabView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .environment(myProfileReveal)
         .background(Color.component.navibar.container.background)
         .fullScreenCover(
             item: $store.scope(state: \.loginCover, action: \.loginCover)
@@ -151,11 +153,18 @@ public struct AppTabView: View {
         @ViewBuilder content: () -> Content
     ) -> some View {
         let isActive = store.selectedTab == tab
+        // 내 사진에서 MY를 펼치는 동안에는 홈을 MY 뒤에 그대로 둔다(#189).
+        let staysUnderReveal = tab == .home && myProfileReveal.isRevealing
         content()
-            // 내 사진으로 MY에 갈 때 서서히 바꾸는데(#139), 한 장으로 묶지 않으면 반투명한 탭바 너머로
-            // 그 탭의 아래쪽 내용이 비친다.
-            .compositingGroup()
-            .opacity(isActive ? 1 : 0)
+            // 탭은 바로 보이고 사라진다. 내 사진으로 갈 때 움직이는 건 아래 원 하나뿐이다.
+            .animation(nil) { $0.opacity(isActive || staysUnderReveal ? 1 : 0) }
+            .modifier(
+                MyProfileRevealMask(
+                    isEnabled: tab == .myPage,
+                    isOpen: isActive,
+                    center: myProfileReveal.avatarCenter
+                )
+            )
             .allowsHitTesting(isActive)
     }
 
@@ -240,4 +249,68 @@ public struct AppTabView: View {
             AppTabFeature()
         }
     )
+}
+
+// MARK: - 내 사진에서 MY 펼치기 (#189)
+
+/// 홈 오른쪽 위 내 사진을 누르면 그 사진 자리에서 MY가 동그랗게 퍼져 화면을 덮는다.
+/// 사진은 홈(CommunityView) 안에 있고 펼치는 건 탭을 겹쳐 둔 AppTabView라, 사진 자리와 시작 신호를 환경으로 잇는다.
+/// 탭 바로 바꿀 때는 애니메이션 없이 바로 바뀐다.
+@MainActor
+@Observable
+final class MyProfileReveal {
+    /// 펼치는 움직임 — 누른 곳에서 빠르게 퍼지고 끝은 부드럽게 멈춘다.
+    static let animation: Animation = .smooth(duration: 0.45)
+    private static let duration: Duration = .milliseconds(450)
+
+    /// 홈 내 사진의 가운데(화면 좌표). 원이 여기서 퍼진다.
+    var avatarCenter: CGPoint?
+    /// 펼치는 중인지 — 이동안 홈을 MY 뒤에 남겨 원 밖이 비지 않게 한다.
+    private(set) var isRevealing = false
+    @ObservationIgnored private var endTask: Task<Void, Never>?
+
+    /// 내 사진을 눌러 MY로 가기 직전에 부른다.
+    func begin() {
+        isRevealing = true
+        endTask?.cancel()
+        endTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.duration)
+            guard !Task.isCancelled else { return }
+            self?.isRevealing = false
+        }
+    }
+}
+
+/// MY 탭을 내 사진 자리의 원으로 가린다. 열리면 원이 화면의 가장 먼 모서리까지 커진다.
+private struct MyProfileRevealMask: ViewModifier {
+    let isEnabled: Bool
+    let isOpen: Bool
+    let center: CGPoint?
+
+    // 닫힌 원은 GNB 내 사진(28pt)과 같은 크기라, 사진이 그대로 커지는 것처럼 보인다.
+    private static let closedDiameter: CGFloat = 28
+
+    func body(content: Content) -> some View {
+        if isEnabled, let center {
+            content.mask {
+                GeometryReader { proxy in
+                    let frame = proxy.frame(in: .global)
+                    let local = CGPoint(x: center.x - frame.minX, y: center.y - frame.minY)
+                    let farthest = max(
+                        hypot(local.x, local.y),
+                        hypot(frame.width - local.x, local.y),
+                        hypot(local.x, frame.height - local.y),
+                        hypot(frame.width - local.x, frame.height - local.y)
+                    )
+                    let diameter = isOpen ? farthest * 2 : Self.closedDiameter
+                    Circle()
+                        .frame(width: diameter, height: diameter)
+                        .position(local)
+                }
+                .ignoresSafeArea()
+            }
+        } else {
+            content
+        }
+    }
 }
