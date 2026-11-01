@@ -261,7 +261,9 @@ public struct AppTabView: View {
 final class MyProfileReveal {
     /// 펼치는 움직임 — 누른 곳에서 빠르게 퍼지고 끝은 부드럽게 멈춘다.
     static let animation: Animation = .smooth(duration: 0.45)
-    private static let duration: Duration = .milliseconds(450)
+    // 홈을 MY 뒤에 남겨 두는 시간. 원이 다 퍼지기 전에 홈이 먼저 사라지면 모서리가 잠깐 비어 보여,
+    // 움직임(0.45초)보다 조금 넉넉히 둔다. 그동안 홈은 MY에 덮여 보이지 않는다.
+    private static let coverDuration: Duration = .milliseconds(600)
 
     /// 홈 내 사진의 가운데(화면 좌표). 원이 여기서 퍼진다.
     var avatarCenter: CGPoint?
@@ -274,7 +276,7 @@ final class MyProfileReveal {
         isRevealing = true
         endTask?.cancel()
         endTask = Task { [weak self] in
-            try? await Task.sleep(for: Self.duration)
+            try? await Task.sleep(for: Self.coverDuration)
             guard !Task.isCancelled else { return }
             self?.isRevealing = false
         }
@@ -291,11 +293,14 @@ private struct MyProfileRevealMask: ViewModifier {
     private static let closedDiameter: CGFloat = 28
 
     func body(content: Content) -> some View {
-        if isEnabled, let center {
+        // 사진 자리를 아직 모를 때도 같은 가림막을 씌운다. 자리를 알게 되는 순간 가림막을 새로 붙이면
+        // MY 화면이 통째로 다시 만들어져(로그인 직후 MY가 떠 있을 때 등) 열어 둔 시트·상태가 사라진다.
+        if isEnabled {
             content.mask {
                 GeometryReader { proxy in
                     let frame = proxy.frame(in: .global)
-                    let local = CGPoint(x: center.x - frame.minX, y: center.y - frame.minY)
+                    let local = center.map { CGPoint(x: $0.x - frame.minX, y: $0.y - frame.minY) }
+                        ?? CGPoint(x: frame.width / 2, y: frame.height / 2)
                     let farthest = max(
                         hypot(local.x, local.y),
                         hypot(frame.width - local.x, local.y),
