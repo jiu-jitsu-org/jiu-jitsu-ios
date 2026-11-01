@@ -13,6 +13,8 @@ import CoreKit
 public struct CommunityView: View {
     let store: StoreOf<CommunityFeature>
     @Environment(\.scenePhase) private var scenePhase
+    // 내 사진에서 MY를 펼치는 전환(#189). 탭 화면(AppTabView) 밖에서 띄운 미리보기 등에는 없다.
+    @Environment(MyProfileReveal.self) private var myProfileReveal: MyProfileReveal?
 
     public init(store: StoreOf<CommunityFeature>) {
         self.store = store
@@ -137,11 +139,18 @@ public struct CommunityView: View {
 
                     if store.isMyProfileButtonVisible {
                         Button {
-                            // 탭바와 달리 화면 안 버튼으로 MY에 가는 길이라, 바로 바뀌면 끊겨 보여 MY가 서서히 드러나게 한다(#139).
+                            // 탭바와 달리 화면 안 버튼으로 MY에 가는 길이라, 누른 사진 자리에서 MY가 퍼져 열리게 한다(#139, #189).
                             // 탭 전환은 부모가 같은 차례에 처리하므로 이 애니메이션이 그대로 이어진다.
-                            store.send(.view(.myProfileTapped), animation: .easeInOut(duration: 0.5))
+                            myProfileReveal?.begin()
+                            store.send(.view(.myProfileTapped), animation: MyProfileReveal.animation)
                         } label: {
                             myAvatar
+                                .onGeometryChange(for: CGPoint.self) { proxy in
+                                    let frame = proxy.frame(in: .global)
+                                    return CGPoint(x: frame.midX, y: frame.midY)
+                                } action: { center in
+                                    myProfileReveal?.avatarCenter = center
+                                }
                                 .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
                                 .contentShape(Rectangle())
                         }
