@@ -23,24 +23,43 @@ public enum CompetitionUniform: String, Codable, Equatable, Sendable, CaseIterab
     }
 }
 
-/// 출전 체급 — 체급 경계 무게와 그 이하/초과.
+/// 출전 체급 — "76kg 이하" 같은 체급, 또는 가장 무거운 무제한 체급.
 ///
 /// 체급표는 단체·대회·성별·복장마다 달라 표에서 고르지 않고 숫자로 받는다(예: 76kg 이하).
 /// 숫자로 남겨야 어느 단체 체급이든 그대로 기록되고, 나중에 체급별 통계·필터를 만들 수 있다.
+/// 대회 체급은 가장 무거운 체급만 빼고 모두 '이하'라, 그 하나는 경계 무게 대신 '무제한'으로 받는다(#190).
 /// 앱솔루트(무차별급)는 체급 제한이 없는 부문이라 `Competition.competitionAbsolute`로 따로 두고, 앱솔루트면 체급은 비운다.
-public struct CompetitionWeightLimit: Codable, Equatable, Sendable, Hashable {
+public enum CompetitionWeightLimit: Codable, Equatable, Sendable, Hashable {
+    /// 이하 — 표기 "-76kg"
+    case under(kg: Double)
+    /// 무제한 — 가장 무거운 체급. 경계 무게는 대회마다 달라 받지 않는다.
+    /// #190 전에 '+100.5kg'처럼 무게와 함께 저장된 기록은 그 무게를 `legacyKg`로 들고 있다가 그대로 다시 보낸다
+    /// (대회 저장은 목록 전체를 보내므로, 버리면 손대지 않은 기록의 무게까지 서버에서 지워진다).
+    case unlimited(legacyKg: Double? = nil)
+
+    /// 서버가 주고받는 이하/초과 값. 무제한은 '초과'로 보낸다.
     public enum Bound: String, Codable, Equatable, Sendable, CaseIterable, Hashable {
-        /// 이하 — 표기 "-76kg"
         case under = "UNDER"
-        /// 초과 — 표기 "+100.5kg"
         case over = "OVER"
     }
 
-    public let kg: Double
-    public let bound: Bound
+    public var bound: Bound {
+        switch self {
+        case .under: return .under
+        case .unlimited: return .over
+        }
+    }
 
-    public init(kg: Double, bound: Bound) {
-        self.kg = kg
-        self.bound = bound
+    /// 서버에 보낼 경계 무게 — 무제한은 예전 기록의 무게가 있을 때만
+    public var kg: Double? {
+        switch self {
+        case let .under(kg): return kg
+        case let .unlimited(legacyKg): return legacyKg
+        }
+    }
+
+    public var isUnlimited: Bool {
+        if case .unlimited = self { return true }
+        return false
     }
 }

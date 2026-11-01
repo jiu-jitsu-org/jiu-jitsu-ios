@@ -119,6 +119,23 @@ public struct BeltSelectButton: View {
     }
 }
 
+// MARK: - Belt Icon
+
+/// 띠 칩의 띠 그림만 따로 — 휠 같은 다른 부품의 아이콘 자리에서 칩과 같은 띠 모양을 쓴다.
+public struct BeltIcon: View {
+    private let color: BeltSelectButton.BeltColor
+    private let size: BeltSelectButton.Size
+
+    public init(color: BeltSelectButton.BeltColor, size: BeltSelectButton.Size = .regular) {
+        self.color = color
+        self.size = size
+    }
+
+    public var body: some View {
+        BeltShape(color: color, stripes: 0, size: size)
+    }
+}
+
 // MARK: - Button Style (Private)
 
 /// 누르는 동안 바탕을 한 단계 진하게 — 다른 앱 버튼과 같은 눌림 반응.

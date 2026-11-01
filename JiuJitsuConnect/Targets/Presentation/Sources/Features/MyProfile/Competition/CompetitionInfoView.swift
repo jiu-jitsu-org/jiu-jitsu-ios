@@ -14,8 +14,9 @@ private enum Style {
     static let backButtonSize: CGFloat = 36
     // 화면 폭을 다 채우면 막대가 눈을 끌어, 가운데에 짧게 둔다.
     static let progressBarWidth: CGFloat = 160
-    // 단계 사이 전환 — 한 동작(옆으로 밀기)으로, 기본 500ms.
-    static let stepAnimation: Animation = .easeInOut(duration: 0.5)
+    // 단계 사이 전환 — 한 동작(옆으로 밀기). 500ms는 '다음'을 누를 때마다 기다리는 느낌이라
+    // 시스템 화면 넘김과 비슷한 빠르기로, 끝은 부드럽게 멈추게 한다(#190).
+    static let stepAnimation: Animation = .smooth(duration: 0.3)
 }
 
 struct CompetitionInfoView: View {
@@ -53,7 +54,7 @@ struct CompetitionInfoView: View {
                         CompetitionDoneView(store: store)
                     }
                 }
-                // 나가는 단계는 0.5초 동안 남아 있다. 그 사이 '다음'을 또 눌러 다음 단계 동작이 실행되지 않게 막는다.
+                // 나가는 단계는 전환 동안 남아 있다. 그 사이 '다음'을 또 눌러 다음 단계 동작이 실행되지 않게 막는다.
                 .allowsHitTesting(shownStep == store.step)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 // 앞으로 가면 다음 단계가 오른쪽에서, 뒤로 가면 이전 단계가 왼쪽에서 들어온다.
@@ -74,6 +75,15 @@ struct CompetitionInfoView: View {
             }
         }
         .background(Color.primitive.bw.white)
+        // 휠이 열린 동안 뒤 화면은 보이스오버에서도 가린다.
+        .accessibilityHidden(store.isBeltPickerPresented)
+        // 출전 띠 휠은 머리줄·진행 막대까지 흐리게 덮는다.
+        .overlay {
+            if store.isBeltPickerPresented {
+                CompetitionBeltPickerOverlay(store: store)
+                    .transition(.opacity)
+            }
+        }
         .overlay(alignment: .bottom) {
             if let toast = store.toast {
                 ToastView(

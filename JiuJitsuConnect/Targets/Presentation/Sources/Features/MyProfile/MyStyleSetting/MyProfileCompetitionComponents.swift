@@ -397,7 +397,7 @@ private struct EmptyCompetitionView: View {
                 competitionName: "2025 서울 오픈 챔피언십",
                 competitionRank: .silver,
                 competitionUniform: .gi,
-                competitionWeightLimit: CompetitionWeightLimit(kg: 76, bound: .under),
+                competitionWeightLimit: .under(kg: 76),
                 competitionBelt: .brown
             ),
             // 같은 대회의 다른 부문 — 위 항목과 한 줄로 묶인다.

@@ -184,7 +184,7 @@ struct CompetitionActionSheetView: View {
     CompetitionActionSheetView(
         entries: [
             Competition(competitionYear: 2026, competitionName: "서울 오픈", competitionRank: .silver,
-                        competitionUniform: .gi, competitionWeightLimit: CompetitionWeightLimit(kg: 76, bound: .under),
+                        competitionUniform: .gi, competitionWeightLimit: .under(kg: 76),
                         competitionBelt: .brown),
             Competition(competitionYear: 2026, competitionName: "서울 오픈", competitionRank: .gold,
                         competitionUniform: .gi, competitionAbsolute: true, competitionBelt: .brown)

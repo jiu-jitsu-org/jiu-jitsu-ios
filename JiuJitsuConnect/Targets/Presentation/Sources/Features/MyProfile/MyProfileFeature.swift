@@ -850,9 +850,13 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case .view(.addCompetitionButtonTapped):
-                // 출전 띠는 지금 띠로 미리 골라 둔다(#122).
+                // 출전 띠는 지금 띠로(#122), 체급은 지난 기록의 체급으로 미리 골라 둔다(#190).
                 state.destination = .competitionInfo(
-                    CompetitionInfoFeature.State(mode: .add, currentBelt: state.communityProfile?.beltRank)
+                    CompetitionInfoFeature.State(
+                        mode: .add,
+                        currentBelt: state.communityProfile?.beltRank,
+                        recentWeightLimit: state.communityProfile?.competitions.recentWeightLimit
+                    )
                 )
                 return .none
 
@@ -953,7 +957,11 @@ public struct MyProfileFeature: Sendable {
             case let .view(.addDivisionTapped(entries)):
                 guard !state.isLoadingProfile else { return .none }
                 state.destination = .competitionInfo(
-                    CompetitionInfoFeature.State(addingDivisionTo: entries, currentBelt: state.communityProfile?.beltRank)
+                    CompetitionInfoFeature.State(
+                        addingDivisionTo: entries,
+                        currentBelt: state.communityProfile?.beltRank,
+                        recentWeightLimit: entries.recentWeightLimit ?? state.communityProfile?.competitions.recentWeightLimit
+                    )
                 )
                 return .none
 

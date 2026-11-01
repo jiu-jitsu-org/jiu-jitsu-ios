@@ -630,7 +630,7 @@ public struct Competition: Codable, Equatable, Sendable {
     /// 출전 복장 (도복 / 노기)
     public let competitionUniform: CompetitionUniform?
 
-    /// 출전 체급 (경계 무게와 이하/초과)
+    /// 출전 체급 ("76kg 이하" 또는 무제한)
     public let competitionWeightLimit: CompetitionWeightLimit?
 
     /// 앱솔루트(무차별급) 부문 — 한 부문은 체급 또는 앱솔루트 중 하나라, true면 체급은 비어 있다.
