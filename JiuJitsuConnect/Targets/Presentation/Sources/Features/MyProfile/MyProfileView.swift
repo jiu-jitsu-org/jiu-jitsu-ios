@@ -439,7 +439,9 @@ private extension View {
                     .presentationDetents([
                         .height(InstructorVerificationView.contentHeight(
                             hasImage: instructorVerificationStore.existingImageUrl != nil,
-                            isRejected: instructorVerificationStore.isRejected
+                            isRejected: instructorVerificationStore.isRejected,
+                            isApproved: instructorVerificationStore.isApproved,
+                            hasContact: instructorVerificationStore.contactEmail != nil
                         ))
                     ])
                     .presentationBackground(

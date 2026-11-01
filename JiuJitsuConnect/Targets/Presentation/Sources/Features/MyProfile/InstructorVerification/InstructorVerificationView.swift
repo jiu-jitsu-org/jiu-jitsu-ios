@@ -22,8 +22,11 @@ public struct InstructorVerificationView: View {
     /// (본문 내재 369 + iOS 26 Liquid Glass partial sheet 내부 inset 보정 ~40)
     /// - 기존 인증 사진 미리보기가 있으면 이미지 블록(top 16 + 80) 만큼 더 높게 잡는다.
     /// - 거절 상태는 경고 줄에 사유가 들어가 두 줄까지 늘 수 있어 한 줄(21)만큼 더 잡는다.
-    public static func contentHeight(hasImage: Bool, isRejected: Bool) -> CGFloat {
-        (hasImage ? 505 : 409) + (isRejected ? 21 : 0)
+    /// - 승인 상태는 안내박스 없이 닉네임 미리보기와 확인 버튼만 있다 — 본문 내재 248(24 + 69 + 16 + 64 + 75) + 여백 56.
+    ///   업로드 시트의 안내박스~CTA 간격(~60)과 맞춘 값이다. 문의처가 있으면 문의 버튼(4 + 51)이 붙는다.
+    public static func contentHeight(hasImage: Bool, isRejected: Bool, isApproved: Bool, hasContact: Bool) -> CGFloat {
+        if isApproved { return 304 + (hasContact ? 55 : 0) }
+        return (hasImage ? 505 : 409) + (isRejected ? 21 : 0)
     }
 
     public init(store: StoreOf<InstructorVerificationFeature>) {
@@ -43,10 +46,19 @@ public struct InstructorVerificationView: View {
 
     // MARK: - Body
 
+    @ViewBuilder
     public var body: some View {
+        if store.isApproved {
+            approvedBody
+        } else {
+            uploadBody
+        }
+    }
+
+    private var uploadBody: some View {
         VStack(spacing: 0) {
             handleBar
-            titleSection
+            titleSection(title: "관장 사범 인증하기", subtitle: "인증 가능한 사진을 업로드해주세요.")
             VStack(spacing: 0) {
                 // 이미 제출한 인증 사진이 있으면 타이틀과 안내박스 사이에 미리보기로 노출
                 existingImageSection
@@ -76,15 +88,61 @@ public struct InstructorVerificationView: View {
         .frame(height: 24)
     }
 
-    private var titleSection: some View {
+    /// 승인된 회원 — 다시 올릴 서류가 없으니 인증이 어떻게 보이는지만 보여 주고 닫는다.
+    private var approvedBody: some View {
+        VStack(spacing: 0) {
+            handleBar
+            titleSection(title: "관장 사범 인증 완료", subtitle: "닉네임 옆에 인증 표시가 보여요.")
+            nicknamePreview
+                .padding(.top, 16)
+            Spacer(minLength: 0)
+            VStack(spacing: 4) {
+                CTAButton(title: "확인", action: { store.send(.view(.cancelTapped)) })
+
+                if store.contactEmail != nil {
+                    CTAButton(title: "인증 정보 변경 문의하기", type: .text) {
+                        store.send(.view(.contactTapped))
+                    }
+                }
+            }
+            .padding(.top, 8)
+            .padding(.horizontal, Metrics.horizontalPadding)
+            .padding(.bottom, 16)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    /// MY 헤더·커뮤니티 글과 같은 뱃지 + 닉네임 — 인증이 실제로 어떻게 붙는지 그대로 보여 준다.
+    private var nicknamePreview: some View {
+        HStack(spacing: 5) {
+            Assets.MyProfile.Icon.badgeCheckLight.swiftUIImage
+                .resizable()
+                .scaledToFit()
+                .frame(width: 24, height: 24)
+
+            Text(store.nickname)
+                .font(Font.pretendard.title3)
+                .foregroundStyle(Color.component.sectionHeader.title)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Metrics.horizontalPadding)
+        .background(
+            RoundedRectangle(cornerRadius: Metrics.noticeCornerRadius)
+                .fill(Color.primitive.coolGray.cg25)
+        )
+        .padding(.horizontal, Metrics.horizontalPadding)
+    }
+
+    private func titleSection(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Spacer()
-            Text("관장 사범 인증하기")
+            Text(title)
                 .font(Font.pretendard.title2)
                 .foregroundStyle(Color.component.sectionHeader.title)
                 .frame(minHeight: 24)
 
-            Text("인증 가능한 사진을 업로드해주세요.")
+            Text(subtitle)
                 .font(Font.pretendard.labelM)
                 .foregroundStyle(Color.component.sectionHeader.subTitle)
                 .frame(minHeight: 17)
@@ -226,6 +284,20 @@ public struct InstructorVerificationView: View {
                     status: .pending,
                     documentImageUrl: "https://ik.imagekit.io/preview/verification_preview.jpg"
                 )
+            )
+        ) {
+            InstructorVerificationFeature()
+        }
+    )
+}
+
+#Preview("관장 사범 인증 - 승인됨") {
+    InstructorVerificationView(
+        store: Store(
+            initialState: InstructorVerificationFeature.State(
+                verification: OwnerVerification(status: .approved),
+                nickname: "암바장인곰",
+                contactEmail: "support@example.com"
             )
         ) {
             InstructorVerificationFeature()
