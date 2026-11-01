@@ -101,44 +101,54 @@ public struct CompetitionInfoFeature: Sendable {
         // 연도가 정해진 대회는 연도를 바꿔도 끊는다 — 서버가 등록 연도로 되돌리고, 같은 이름·연도의 다른 기록과 겹치면 거절한다.
         var linkedCompetition: LinkedCompetition?
 
-        // 4단계: 출전 부문 — 건너뛸 수 있다. 출전 띠는 고른 칩을 다시 누르면 선택이 풀린다.
-        // 도복 대회가 더 흔해 새 기록은 도복으로, 출전 띠는 지금 띠로 미리 골라 둔다(대부분 그대로 '완료'만 누르게).
+        // 4단계: 출전 부문 — 건너뛸 수 있다.
+        // 도복 대회가 더 흔해 새 기록은 도복으로, 출전 띠는 지금 띠로, 체급은 지난 기록의 체급으로 미리 골라 둔다
+        // (대부분 그대로 '완료'만 누르게, #190).
         var uniform: CompetitionUniform? = .gi
         var belt: BeltRank?
 
         // 체급은 단체·대회마다 표가 달라 숫자로 받는다(TextField 직접 바인딩, 소수점 허용).
-        // 대부분 '이하' 체급이라 이하를 기본으로 두고, 가장 무거운 체급만 '초과'로 바꾼다.
+        // 대회 체급은 가장 무거운 체급만 빼고 모두 '이하'라 숫자는 늘 '이하'로 받고,
+        // 가장 무거운 체급은 경계 무게 대신 '무제한'으로 고른다(#190).
         var weightText: String = ""
-        var weightBound: CompetitionWeightLimit.Bound = .under
+        var isUnlimited = false
 
-        // 앱솔루트는 체급 제한이 없는 무제한급이라, 체크하면 체급은 저장하지 않는다(부문 하나 = 체급 또는 앱솔루트).
-        // 입력해 둔 숫자는 지우지 않아 체크를 풀면 그대로 돌아온다.
+        // 앱솔루트는 체급 제한이 없는 무차별급이라, 체크하면 체급은 저장하지 않는다(부문 하나 = 체급 또는 앱솔루트).
+        // 무제한과 앱솔루트는 둘 중 하나만 고른다. 입력해 둔 숫자는 지우지 않아 체크를 풀면 그대로 돌아온다.
         var isAbsolute = false
 
         /// 입력한 체급 — 앱솔루트이거나, 숫자로 읽히지 않거나 0 이하면 체급 없음.
         var weightLimit: CompetitionWeightLimit? {
             guard !isAbsolute else { return nil }
+            guard !isUnlimited else { return .unlimited }
             let normalized = weightText.replacingOccurrences(of: ",", with: ".")
             guard let kg = Double(normalized), kg > 0 else { return nil }
-            return CompetitionWeightLimit(kg: kg, bound: weightBound)
+            return .under(kg: kg)
         }
 
+        // 지난 기록에서 가져온 체급. 새 기록과 '부문 추가'의 체급 기본값이다.
+        var recentWeightLimit: CompetitionWeightLimit?
+
         // 미리 골라 둔 값과 사람이 직접 고른 값을 '건너뛰기'에서 구분하려고 둔다.
-        // 체급·앱솔루트는 미리 채우지 않으므로 값이 있으면 직접 고른 것이다.
         var didPickUniform = false
         var didPickBelt = false
+        var didPickWeight = false
 
-        // 출전 띠는 대부분 지금 띠 그대로라 접어 두고, 줄을 누르면 펼친다.
-        var isBeltExpanded = false
+        // 출전 띠 휠 — 띠 버튼을 누르면 화면 전체를 흐리게 덮고 띠를 휠로 고른다(#190).
+        var isBeltPickerPresented = false
 
         public init() {}
 
-        /// - Parameter currentBelt: 지금 프로필 띠. 새 기록의 출전 띠 기본값으로 쓴다.
-        public init(mode: Mode, currentBelt: BeltRank? = nil) {
+        /// - Parameters:
+        ///   - currentBelt: 지금 프로필 띠. 새 기록의 출전 띠 기본값으로 쓴다.
+        ///   - recentWeightLimit: 지난 기록의 체급. 새 기록의 체급 기본값으로 쓴다.
+        public init(mode: Mode, currentBelt: BeltRank? = nil, recentWeightLimit: CompetitionWeightLimit? = nil) {
             self.mode = mode
             switch mode {
             case .add:
                 self.belt = currentBelt
+                self.recentWeightLimit = recentWeightLimit
+                self.applyWeightLimit(recentWeightLimit)
             case let .edit(original):
                 self.preselectYear(original.competitionYear)
                 self.name = original.competitionName
@@ -150,10 +160,7 @@ public struct CompetitionInfoFeature: Sendable {
                 // 수정은 저장된 값을 그대로 보여 준다. 부문 없이 저장된 기록에 기본값을 채우면
                 // 이름만 고치려던 사람이 모르는 사이 부문까지 저장하게 되므로 비워 둔다.
                 self.uniform = original.competitionUniform
-                if let weightLimit = original.competitionWeightLimit {
-                    self.weightText = weightLimit.kgText
-                    self.weightBound = weightLimit.bound
-                }
+                self.applyWeightLimit(original.competitionWeightLimit)
                 self.isAbsolute = original.competitionAbsolute
                 self.belt = original.competitionBelt
             }
@@ -163,6 +170,12 @@ public struct CompetitionInfoFeature: Sendable {
         mutating func preselectYear(_ year: Int) {
             self.year = year
             yearOptions = YearOption.options(currentYear: currentYear, including: year)
+        }
+
+        /// 체급 칸을 이 체급으로 채운다. 앱솔루트는 따로 두므로 건드리지 않는다.
+        mutating func applyWeightLimit(_ weightLimit: CompetitionWeightLimit?) {
+            weightText = weightLimit?.kgText ?? ""
+            isUnlimited = weightLimit == .unlimited
         }
 
         /// 추천 대회로 바꾼 연도를 되돌린다.
@@ -175,8 +188,12 @@ public struct CompetitionInfoFeature: Sendable {
         /// 이미 저장한 대회에 부문을 더한다(프로필에서 진입).
         /// 저장해 둔 기록을 이번 흐름의 기록으로 넣어 두면 '부문 추가' 흐름(메달 → 부문)이 되고,
         /// 완료 화면에는 이 대회의 기존 부문까지 한 줄씩 보인다.
-        public init(addingDivisionTo entries: [Competition], currentBelt: BeltRank? = nil) {
-            self.init(mode: .add, currentBelt: currentBelt)
+        public init(
+            addingDivisionTo entries: [Competition],
+            currentBelt: BeltRank? = nil,
+            recentWeightLimit: CompetitionWeightLimit? = nil
+        ) {
+            self.init(mode: .add, currentBelt: currentBelt, recentWeightLimit: recentWeightLimit)
             guard let last = entries.last else { return }
             self.savedRecords = entries
             self.name = last.competitionName
@@ -258,10 +275,11 @@ public struct CompetitionInfoFeature: Sendable {
             case resultSelected(CompetitionRank)
             case suggestionTapped(RegisteredCompetition)
             case uniformSelected(CompetitionUniform)
-            case weightBoundToggled
+            case unlimitedToggled
             case absoluteToggled
+            case beltButtonTapped
             case beltSelected(BeltRank)
-            case beltRowTapped
+            case beltPickerDismissed
             case skipButtonTapped
             case addDivisionButtonTapped
             case doneButtonTapped
@@ -310,29 +328,40 @@ public struct CompetitionInfoFeature: Sendable {
                     state.step = .division
                     return .none
                 case .division:
-                    return save(&state, uniform: state.uniform, belt: state.belt)
+                    return save(
+                        &state,
+                        uniform: state.uniform,
+                        belt: state.belt,
+                        weightLimit: state.weightLimit,
+                        isAbsolute: state.isAbsolute
+                    )
                 case .done:
                     return .none
                 }
 
             case .view(.skipButtonTapped):
                 guard state.step == .division, !state.isSaving else { return .none }
-                // 미리 채워 둔 도복·띠는 본인이 고른 값이 아니라 버리고, 직접 누른 칩만 남긴다.
-                // 체급·앱솔루트는 미리 채우지 않으므로 입력했으면 저장한다.
+                // 미리 채워 둔 도복·띠·체급은 본인이 고른 값이 아니라 버리고, 직접 고친 값만 남긴다.
                 return save(
                     &state,
                     uniform: state.didPickUniform ? state.uniform : nil,
-                    belt: state.didPickBelt ? state.belt : nil
+                    belt: state.didPickBelt ? state.belt : nil,
+                    weightLimit: state.didPickWeight ? state.weightLimit : nil,
+                    isAbsolute: state.didPickWeight && state.isAbsolute
                 )
 
             case .view(.addDivisionButtonTapped):
                 // 같은 대회의 다른 부문은 보통 같은 복장·같은 띠라 그대로 두고, 체급과 메달만 다시 고르게 한다.
+                // 체급은 방금 저장한 체급(없으면 지난 기록의 체급)으로 다시 채워 둔다 — 도복·노기로 같은 체급에 나가는 일이 많다.
                 state.isMovingBack = false
                 state.step = .result
                 state.result = .gold
-                state.weightText = ""
-                state.weightBound = .under
+                if let saved = state.savedRecords.last?.competitionWeightLimit {
+                    state.recentWeightLimit = saved
+                }
+                state.applyWeightLimit(state.recentWeightLimit)
                 state.isAbsolute = false
+                state.didPickWeight = false
                 return .none
 
             case .view(.doneButtonTapped):
@@ -409,22 +438,32 @@ public struct CompetitionInfoFeature: Sendable {
                 state.didPickUniform = true
                 return .none
 
-            case .view(.weightBoundToggled):
-                state.weightBound = state.weightBound == .under ? .over : .under
+            case .view(.unlimitedToggled):
+                state.isUnlimited.toggle()
+                if state.isUnlimited { state.isAbsolute = false }
+                state.didPickWeight = true
                 return .none
 
             case .view(.absoluteToggled):
                 state.isAbsolute.toggle()
+                if state.isAbsolute { state.isUnlimited = false }
+                state.didPickWeight = true
+                return .none
+
+            case .view(.beltButtonTapped):
+                state.isBeltPickerPresented = true
                 return .none
 
             case let .view(.beltSelected(belt)):
-                state.belt = state.belt == belt ? nil : belt
+                // 휠의 '확인'으로 고른 띠. 휠은 닫는다.
+                state.belt = belt
                 state.didPickBelt = true
-                // 고른 뒤에도 펼친 채 둔다. 열었으면 닫는 것도 사용자가 정한다.
+                state.isBeltPickerPresented = false
                 return .none
 
-            case .view(.beltRowTapped):
-                state.isBeltExpanded.toggle()
+            case .view(.beltPickerDismissed):
+                // 흐린 바깥을 누르면 고르지 않고 닫는다.
+                state.isBeltPickerPresented = false
                 return .none
 
             case .binding(\.weightText):
@@ -433,6 +472,9 @@ public struct CompetitionInfoFeature: Sendable {
                 if sanitized != state.weightText {
                     state.weightText = sanitized
                 }
+                // 숫자를 치면 그 숫자 체급으로 나간 것이라 무제한은 푼다.
+                state.isUnlimited = false
+                state.didPickWeight = true
                 return .none
 
             case .binding(\.name):
@@ -536,7 +578,15 @@ public struct CompetitionInfoFeature: Sendable {
     /// - Parameters:
     ///   - uniform: 저장할 도복/노기. '건너뛰기'면 직접 고른 경우에만 넘긴다.
     ///   - belt: 저장할 출전 띠. '건너뛰기'면 직접 고른 경우에만 넘긴다.
-    private func save(_ state: inout State, uniform: CompetitionUniform?, belt: BeltRank?) -> Effect<Action> {
+    ///   - weightLimit: 저장할 체급. '건너뛰기'면 직접 고친 경우에만 넘긴다.
+    ///   - isAbsolute: 앱솔루트 부문인지. '건너뛰기'면 직접 고친 경우에만 넘긴다.
+    private func save(
+        _ state: inout State,
+        uniform: CompetitionUniform?,
+        belt: BeltRank?,
+        weightLimit: CompetitionWeightLimit?,
+        isAbsolute: Bool
+    ) -> Effect<Action> {
         // 새 기록은 월 없이 저장하고, 월이 있던 기존 기록은 수정해도 원래 월·고정 여부를 유지한다.
         let original: Competition? = if case let .edit(original) = state.mode { original } else { nil }
         let competition = Competition(
@@ -545,8 +595,8 @@ public struct CompetitionInfoFeature: Sendable {
             competitionName: state.name,
             competitionRank: state.result,
             competitionUniform: uniform,
-            competitionWeightLimit: state.weightLimit,
-            competitionAbsolute: state.isAbsolute,
+            competitionWeightLimit: weightLimit,
+            competitionAbsolute: isAbsolute,
             competitionBelt: belt,
             isPinned: original?.isPinned ?? false,
             competitionId: state.linkedCompetition?.id

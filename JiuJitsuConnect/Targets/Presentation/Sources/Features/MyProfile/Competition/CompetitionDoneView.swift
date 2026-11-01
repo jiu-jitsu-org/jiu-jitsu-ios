@@ -103,7 +103,7 @@ struct CompetitionDoneView: View {
             competitionName: "2026 서울 오픈",
             competitionRank: .silver,
             competitionUniform: .gi,
-            competitionWeightLimit: CompetitionWeightLimit(kg: 76, bound: .under),
+            competitionWeightLimit: .under(kg: 76),
             competitionBelt: .brown
         )
     ]

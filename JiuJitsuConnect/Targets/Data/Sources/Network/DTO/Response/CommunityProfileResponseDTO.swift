@@ -103,13 +103,17 @@ struct CompetitionDivisionDTO: Codable {
     let competitionWeightBound: String?
     let competitionAbsolute: Bool?
 
-    /// 무게와 이하/초과가 모두 있어야 체급으로 본다.
+    /// 이하는 무게가 있어야 체급으로 본다. 초과는 무제한 체급이라 무게와 상관없이 무제한으로 본다
+    /// (#190 전에 '+100.5kg'처럼 무게와 함께 저장된 기록도 무제한으로 보인다).
     private var weightLimit: CompetitionWeightLimit? {
-        guard let competitionWeightLimit,
-              let bound = competitionWeightBound.flatMap(CompetitionWeightLimit.Bound.init(rawValue:)) else {
+        switch competitionWeightBound.flatMap(CompetitionWeightLimit.Bound.init(rawValue:)) {
+        case .under:
+            return competitionWeightLimit.map { .under(kg: $0) }
+        case .over:
+            return .unlimited
+        case nil:
             return nil
         }
-        return CompetitionWeightLimit(kg: competitionWeightLimit, bound: bound)
     }
 
     func toDomain(year: Int, name: String, isPinned: Bool, competitionId: Int?) -> Competition {

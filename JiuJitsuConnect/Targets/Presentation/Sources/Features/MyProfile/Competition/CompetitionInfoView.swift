@@ -75,6 +75,13 @@ struct CompetitionInfoView: View {
             }
         }
         .background(Color.primitive.bw.white)
+        // 출전 띠 휠은 머리줄·진행 막대까지 흐리게 덮는다.
+        .overlay {
+            if store.isBeltPickerPresented {
+                CompetitionBeltPickerOverlay(store: store)
+                    .transition(.opacity)
+            }
+        }
         .overlay(alignment: .bottom) {
             if let toast = store.toast {
                 ToastView(

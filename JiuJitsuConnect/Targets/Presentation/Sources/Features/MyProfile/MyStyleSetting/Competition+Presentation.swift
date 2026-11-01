@@ -51,17 +51,32 @@ extension Competition {
     }
 }
 
+// MARK: - [Competition] Helpers
+
+extension [Competition] {
+    /// 가장 최근 대회의 체급 — 새 기록의 체급 기본값(#190). 같은 해면 나중에 저장한 기록을 쓰고, 체급 없는 기록은 건너뛴다.
+    var recentWeightLimit: CompetitionWeightLimit? {
+        enumerated()
+            .filter { $0.element.competitionWeightLimit != nil }
+            .max { ($0.element.competitionYear, $0.offset) < ($1.element.competitionYear, $1.offset) }?
+            .element.competitionWeightLimit
+    }
+}
+
 // MARK: - CompetitionWeightLimit Presentation Extensions
 
 extension CompetitionWeightLimit {
-    /// 무게 숫자만 — "76", "82.3". 소수점이 없으면 정수로 보이고 입력란에도 그대로 쓴다.
-    var kgText: String {
-        kg.formatted(.number.precision(.fractionLength(0...1)).grouping(.never))
+    /// 무게 숫자만 — "76", "82.3". 소수점이 없으면 정수로 보이고 입력란에도 그대로 쓴다. 무제한은 nil.
+    var kgText: String? {
+        kg.map { $0.formatted(.number.precision(.fractionLength(0...1)).grouping(.never)) }
     }
 
-    /// 대회에서 쓰는 체급 표기 — 이하는 "-76kg", 초과는 "+100.5kg".
+    /// 대회에서 쓰는 체급 표기 — 이하는 "-76kg", 가장 무거운 체급은 "무제한".
     var displayText: String {
-        "\(bound == .under ? "-" : "+")\(kgText)kg"
+        switch self {
+        case .under: return "-\(kgText ?? "")kg"
+        case .unlimited: return "무제한"
+        }
     }
 }
 
