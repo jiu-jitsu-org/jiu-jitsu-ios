@@ -75,6 +75,8 @@ struct CompetitionInfoView: View {
             }
         }
         .background(Color.primitive.bw.white)
+        // 휠이 열린 동안 뒤 화면은 보이스오버에서도 가린다.
+        .accessibilityHidden(store.isBeltPickerPresented)
         // 출전 띠 휠은 머리줄·진행 막대까지 흐리게 덮는다.
         .overlay {
             if store.isBeltPickerPresented {

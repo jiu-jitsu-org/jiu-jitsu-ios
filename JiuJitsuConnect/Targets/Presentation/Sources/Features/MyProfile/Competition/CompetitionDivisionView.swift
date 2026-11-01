@@ -277,12 +277,16 @@ struct CompetitionDivisionView: View {
                     }
                 }
                 .foregroundStyle(Color.component.bottomSheet.unselected.listItem.followingIcon)
+                .accessibilityHidden(true)
             }
             .font(Font.pretendard.bodyS)
             .frame(height: Metrics.optionRowHeight)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("출전 띠")
+        .accessibilityValue(store.belt?.displayName ?? "선택 안 함")
+        .accessibilityHint("휠에서 고르기")
         .frame(maxWidth: .infinity)
     }
 
@@ -350,8 +354,12 @@ struct CompetitionBeltPickerOverlay: View {
 
     private enum Metrics {
         static let titlePickerSpacing: CGFloat = 24
-        // 확인 버튼을 아래 '완료' 버튼과 같은 자리에 둔다(건너뛰기 높이 44 + 간격 4 + 아래 여백 8).
+        // 확인 버튼을 아래 '완료' 버튼과 같은 자리에 둔다 — 새 기록은 건너뛰기(44) + 간격 4 + 아래 여백 8,
+        // 수정은 건너뛰기 없이 아래 여백 24(buttonSection과 같은 값).
         static let confirmBottomPadding: CGFloat = 56
+        static let editConfirmBottomPadding: CGFloat = 24
+        // BeltIcon .regular 폭
+        static let beltIconSlotWidth: CGFloat = 32
     }
 
     init(store: StoreOf<CompetitionInfoFeature>) {
@@ -386,7 +394,11 @@ struct CompetitionBeltPickerOverlay: View {
                     selectedItem: pickedBelt,
                     displayText: { $0.displayName },
                     iconView: { belt, isSelected in
-                        AnyView(BeltIcon(color: belt.selectButtonColor, size: isSelected ? .regular : .compact))
+                        // 띠 그림 폭이 칸마다 달라도 글자가 옆으로 흔들리지 않게 자리를 가장 큰 띠 폭으로 고정한다.
+                        AnyView(
+                            BeltIcon(color: belt.selectButtonColor, size: isSelected ? .regular : .compact)
+                                .frame(width: Metrics.beltIconSlotWidth)
+                        )
                     },
                     width: CompetitionWheelPickerMetrics.width,
                     itemHeight: CompetitionWheelPickerMetrics.itemHeight,
@@ -400,8 +412,10 @@ struct CompetitionBeltPickerOverlay: View {
                     store.send(.view(.beltSelected(pickedBelt)), animation: .smooth(duration: 0.3))
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, Metrics.confirmBottomPadding)
+                .padding(.bottom, store.mode.isEdit ? Metrics.editConfirmBottomPadding : Metrics.confirmBottomPadding)
             }
         }
+        // 휠이 열린 동안 보이스오버가 뒤 화면(숨긴 완료·건너뛰기 등)으로 가지 않게 이 덮개 안에만 머문다.
+        .accessibilityAddTraits(.isModal)
     }
 }
