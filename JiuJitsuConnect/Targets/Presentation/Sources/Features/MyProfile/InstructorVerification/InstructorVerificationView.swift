@@ -22,7 +22,8 @@ public struct InstructorVerificationView: View {
     /// (본문 내재 369 + iOS 26 Liquid Glass partial sheet 내부 inset 보정 ~40)
     /// - 기존 인증 사진 미리보기가 있으면 이미지 블록(top 16 + 80) 만큼 더 높게 잡는다.
     /// - 거절 상태는 경고 줄에 사유가 들어가 두 줄까지 늘 수 있어 한 줄(21)만큼 더 잡는다.
-    /// - 승인 상태는 안내박스 없이 닉네임 미리보기와 확인 버튼만 있고, 문의처가 있으면 문의 버튼(4 + 51)이 붙는다.
+    /// - 승인 상태는 안내박스 없이 닉네임 미리보기와 확인 버튼만 있다 — 본문 내재 248(24 + 69 + 16 + 64 + 75) + 여백 56.
+    ///   업로드 시트의 안내박스~CTA 간격(~60)과 맞춘 값이다. 문의처가 있으면 문의 버튼(4 + 51)이 붙는다.
     public static func contentHeight(hasImage: Bool, isRejected: Bool, isApproved: Bool, hasContact: Bool) -> CGFloat {
         if isApproved { return 304 + (hasContact ? 55 : 0) }
         return (hasImage ? 505 : 409) + (isRejected ? 21 : 0)
@@ -99,7 +100,6 @@ public struct InstructorVerificationView: View {
                 CTAButton(title: "확인", action: { store.send(.view(.cancelTapped)) })
 
                 if store.contactEmail != nil {
-                    // 인증을 풀거나 바꾸는 일은 관리자만 할 수 있어 문의로 받는다
                     CTAButton(title: "인증 정보 변경 문의하기", type: .text) {
                         store.send(.view(.contactTapped))
                     }

@@ -25,7 +25,6 @@ public struct InstructorVerificationFeature: Sendable {
     @ObservableState
     public struct State: Equatable, Sendable {
         public let verification: OwnerVerification
-        /// 승인 화면에서 닉네임 옆 인증 표시를 그대로 보여 주는 데 쓴다.
         public let nickname: String
         /// 승인 화면의 '변경 문의' 받는 곳. 없으면 문의 버튼을 숨긴다.
         public let contactEmail: String?
@@ -86,11 +85,20 @@ public struct InstructorVerificationFeature: Sendable {
 
             case .view(.contactTapped):
                 // 인증 해제·변경은 관리자만 할 수 있어, 승인된 회원은 운영팀에 메일로 알린다.
-                guard
-                    let email = state.contactEmail,
-                    let url = URL(string: "mailto:\(email)?subject=\("관장 사범 인증 정보 변경 문의".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")
-                else { return .none }
-                return .run { _ in await openURL(url) }
+                guard let email = state.contactEmail else { return .none }
+                var components = URLComponents()
+                components.scheme = "mailto"
+                components.path = email
+                components.queryItems = [URLQueryItem(name: "subject", value: "관장 사범 인증 정보 변경 문의")]
+                guard let url = components.url else {
+                    Log.trace("관장 사범 인증 문의 메일 주소를 만들지 못함: \(email)", category: .view, level: .error)
+                    return .none
+                }
+                return .run { _ in
+                    if await !openURL(url) {
+                        Log.trace("관장 사범 인증 문의 메일을 열지 못함(메일 계정 없음 등)", category: .view, level: .error)
+                    }
+                }
 
             case .delegate:
                 return .none
