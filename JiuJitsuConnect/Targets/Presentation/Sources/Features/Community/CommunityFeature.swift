@@ -512,6 +512,9 @@ public struct CommunityFeature: Sendable {
             case let .openUserProfile(userId):
                 // 상세 모달이 떠 있으면 모달 안 스택에 쌓는다(모달을 닫으며 push하면 전환이 튄다)
                 // 게스트에게는 띠를 묻지 않는다(#130)
+                // 연타·중복 전달로 같은 프로필이 겹쳐 쌓이지 않게 한다(딥링크의 isTopDetail과 같은 이유)
+                let top = state.detailCover != nil ? state.coverPath.last : state.path.last
+                if case let .userProfile(current)? = top, current.userId == userId { return .none }
                 let profile = UserProfileFeature.State(userId: userId, canPromptBelt: state.accessToken != nil)
                 if state.detailCover != nil {
                     state.coverPath.append(.userProfile(profile))
