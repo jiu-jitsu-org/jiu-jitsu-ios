@@ -999,9 +999,14 @@ public struct MyProfileFeature: Sendable {
             case .view(.instructorVerificationMenuTapped):
                 state.isMoreMenuPresented = false
                 guard !state.isUploadingInstructorVerification else { return .none }
+                // 역할이 OWNER인데 신청 기록이 없는 회원(승인 API 이전에 권한을 받은 경우)도 완료로 본다.
+                let verification = state.userProfile?.userRole == .owner
+                    ? OwnerVerification(status: .approved)
+                    : state.userProfile?.ownerVerification ?? .notRequested
                 state.sheet = .instructorVerification(
                     InstructorVerificationFeature.State(
-                        verification: state.userProfile?.ownerVerification ?? .notRequested
+                        verification: verification,
+                        nickname: state.communityProfile?.nickname ?? state.authInfo.userInfo?.nickname ?? ""
                     )
                 )
                 return .none
