@@ -828,10 +828,15 @@ public struct MyProfileFeature: Sendable {
                 )))
                 return .none
 
+            case let .path(.element(id: _, action: .communityDetail(.delegate(.userProfileRequested(userId))))):
+                return .send(.openUserProfile(userId: userId))
+
             case let .path(.element(id: _, action: .communityDetail(.delegate(delegate)))):
                 return .send(.delegate(.webSubview(delegate)))
 
             case let .openUserProfile(userId):
+                // 연타·중복 전달로 같은 프로필이 겹쳐 쌓이지 않게 한다
+                if case let .userProfile(current)? = state.path.last, current.userId == userId { return .none }
                 state.path.append(.userProfile(.init(userId: userId)))
                 return .none
 
