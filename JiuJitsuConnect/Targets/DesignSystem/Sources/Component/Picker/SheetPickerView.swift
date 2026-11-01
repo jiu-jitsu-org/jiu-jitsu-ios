@@ -61,6 +61,7 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
     let selectedItem: Item
     let displayText: (Item) -> String
     let icon: ((Item) -> Image)?
+    let iconView: ((Item, Bool) -> AnyView)?
     let onSelect: (Item) -> Void
     let width: CGFloat
     let itemHeight: CGFloat
@@ -77,6 +78,7 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
     ///   - selectedItem: 현재 선택된 항목
     ///   - displayText: 각 항목의 표시 텍스트를 반환하는 클로저
     ///   - icon: 텍스트 왼쪽에 붙일 아이콘 (기본값: nil)
+    ///   - iconView: 그림 파일이 아니라 그려서 만든 아이콘(예: 띠 그림). 두 번째 값은 가운데 칸인지. 있으면 `icon` 대신 쓴다.
     ///   - width: 피커의 너비 (기본값: 130)
     ///   - itemHeight: 각 항목의 높이 (기본값: 45)
     ///   - itemSpacing: 항목 간 간격 (기본값: 8)
@@ -88,6 +90,7 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
         selectedItem: Item,
         displayText: @escaping (Item) -> String,
         icon: ((Item) -> Image)? = nil,
+        iconView: ((Item, _ isSelected: Bool) -> AnyView)? = nil,
         width: CGFloat = 130,
         itemHeight: CGFloat = 45,
         itemSpacing: CGFloat = 8,
@@ -99,6 +102,7 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
         self.selectedItem = selectedItem
         self.displayText = displayText
         self.icon = icon
+        self.iconView = iconView
         self.width = width
         self.itemHeight = itemHeight
         self.itemSpacing = itemSpacing
@@ -142,6 +146,7 @@ public struct SheetPickerView<Item: Identifiable & Hashable>: View {
             selectedItem: selectedItem,
             displayText: displayText,
             icon: icon,
+            iconView: iconView,
             width: width,
             itemHeight: itemHeight,
             itemSpacing: itemSpacing,
@@ -164,6 +169,7 @@ private struct SheetPickerWheel<Item: Identifiable & Hashable>: View {
     let selectedItem: Item
     let displayText: (Item) -> String
     let icon: ((Item) -> Image)?
+    let iconView: ((Item, Bool) -> AnyView)?
     let onSelect: (Item) -> Void
     let width: CGFloat
     let itemHeight: CGFloat
@@ -208,6 +214,7 @@ private struct SheetPickerWheel<Item: Identifiable & Hashable>: View {
         selectedItem: Item,
         displayText: @escaping (Item) -> String,
         icon: ((Item) -> Image)?,
+        iconView: ((Item, Bool) -> AnyView)?,
         width: CGFloat,
         itemHeight: CGFloat,
         itemSpacing: CGFloat,
@@ -222,6 +229,7 @@ private struct SheetPickerWheel<Item: Identifiable & Hashable>: View {
         self.selectedItem = selectedItem
         self.displayText = displayText
         self.icon = icon
+        self.iconView = iconView
         self.width = width
         self.itemHeight = itemHeight
         self.itemSpacing = itemSpacing
@@ -395,8 +403,10 @@ private struct SheetPickerWheel<Item: Identifiable & Hashable>: View {
             }
         } label: {
             HStack(spacing: 8) {
-                if let icon {
-                    // 스크롤 중에도 항목을 글자보다 먼저 알아보도록 선택 여부와 상관없이 아이콘을 보여 준다
+                // 스크롤 중에도 항목을 글자보다 먼저 알아보도록 선택 여부와 상관없이 아이콘을 보여 준다
+                if let iconView {
+                    iconView(item, isSelected)
+                } else if let icon {
                     icon(item)
                         .resizable()
                         .scaledToFit()
