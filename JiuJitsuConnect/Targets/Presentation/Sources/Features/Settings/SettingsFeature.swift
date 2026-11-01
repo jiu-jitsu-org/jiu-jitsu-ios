@@ -178,6 +178,9 @@ public struct SettingsFeature: Sendable {
                 )))
                 return .none
 
+            case let .path(.element(id: _, action: .communityDetail(.delegate(.userProfileRequested(userId))))):
+                return .send(.openUserProfile(userId: userId))
+
             case let .path(.element(id: _, action: .communityDetail(.delegate(delegate)))):
                 return .send(.delegate(.webSubview(delegate)))
 

@@ -125,6 +125,8 @@ public struct CommunityDetailFeature: Sendable {
             case tokenRefreshRequested
             // 내 글·댓글의 작성자 탭(OPEN_USER_PROFILE isMe) → 부모가 하단 탭을 MY로 바꾼다. (#116)
             case myTabRequested
+            // 다른 회원의 작성자 탭(OPEN_USER_PROFILE, isMe=false) → 부모가 그 회원의 프로필을 같은 스택에 쌓는다. (#116)
+            case userProfileRequested(userId: Int)
         }
     }
 
@@ -286,9 +288,7 @@ public struct CommunityDetailFeature: Sendable {
 
                 case let .openUserProfile(payload):
                     guard payload.isMe else {
-                        // 다른 회원 프로필 화면은 서버 API(jiu-jitsu-backend#172) 연결과 함께 붙인다(#116 ③).
-                        Log.trace("다른 회원 프로필 화면 미구현 — 무시: userId=\(payload.userId)", category: .network, level: .info)
-                        return .none
+                        return .send(.delegate(.userProfileRequested(userId: payload.userId)))
                     }
                     return .send(.delegate(.myTabRequested))
 

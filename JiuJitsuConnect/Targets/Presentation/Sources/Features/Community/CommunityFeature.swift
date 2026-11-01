@@ -415,9 +415,7 @@ public struct CommunityFeature: Sendable {
 
                 case let .openUserProfile(payload):
                     guard payload.isMe else {
-                        // 다른 회원 프로필 화면은 서버 API(jiu-jitsu-backend#172) 연결과 함께 붙인다(#116 ③).
-                        Log.trace("다른 회원 프로필 화면 미구현 — 무시: userId=\(payload.userId)", category: .network, level: .info)
-                        return .none
+                        return .send(.openUserProfile(userId: payload.userId))
                     }
                     return .send(.delegate(.myTabRequested))
 
@@ -644,6 +642,9 @@ public struct CommunityFeature: Sendable {
             return .send(.delegate(.tokenRefreshRequested))
         case .myTabRequested:
             return .send(.delegate(.myTabRequested))
+        case let .userProfileRequested(userId):
+            // 모달 안이면 openUserProfile이 모달 스택에 쌓는다
+            return .send(.openUserProfile(userId: userId))
         }
     }
 
