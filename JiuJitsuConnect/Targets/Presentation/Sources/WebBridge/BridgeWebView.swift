@@ -134,6 +134,8 @@ struct BridgeWebView: UIViewRepresentable {
             await WebSessionCookie.sync(accessToken: token, for: url, into: cookieStore)
             coordinator.load(url: url, token: loadToken)
         }
+        // 실제 웹뷰가 생겼으니 스플래시에서 미리 띄운 웹뷰는 더 붙잡을 이유가 없다
+        WebViewPrewarmer.release()
         return container
     }
 

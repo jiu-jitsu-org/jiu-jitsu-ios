@@ -12,6 +12,7 @@ struct LoginSceneView<Sheet: View>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var introStart: Date?
     @State private var isIntroFinished = false
+    @State private var isSheetRaised = false
     @State private var bubbles: [TalkBubble] = []
     @State private var hops = Array(repeating: 0, count: BeltCast.members.count)
 
@@ -22,21 +23,31 @@ struct LoginSceneView<Sheet: View>: View {
             GeometryReader { full in
                 let layout = SceneLayout(size: full.size, safeArea: safe.safeAreaInsets)
 
-                TimelineView(.animation(paused: isIntroFinished)) { timeline in
-                    let elapsed = isIntroFinished ? .infinity : timeline.date.timeIntervalSince(introStart ?? timeline.date)
-                    scene(layout: layout, elapsed: elapsed)
+                ZStack(alignment: .topLeading) {
+                    TimelineView(.animation(paused: isIntroFinished)) { timeline in
+                        let elapsed = isIntroFinished ? .infinity : timeline.date.timeIntervalSince(introStart ?? timeline.date)
+                        scene(layout: layout, elapsed: elapsed)
+                    }
+
+                    // 시트는 매 프레임 다시 그리는 장면 밖에 둔다. 위치만 움직이는데 안의 버튼까지 프레임마다 다시 계산하지 않도록(#207)
+                    sheetContainer(layout: layout)
+                        .offset(y: layout.sheetTop + (isSheetRaised ? 0 : layout.sheetHeight))
                 }
             }
             .ignoresSafeArea()
         }
         .onAppear {
-            // 닉네임 설정 화면에서 돌아왔을 때는 처음부터 다시 틀지 않는다
-            guard introStart == nil else { return }
-            introStart = .now
-            if reduceMotion { isIntroFinished = true }
+            guard reduceMotion, introStart == nil else { return }
+            isIntroFinished = true
+            isSheetRaised = true
         }
         .task {
-            guard !isIntroFinished else { return }
+            // 닉네임 설정 화면에서 돌아왔을 때는 처음부터 다시 틀지 않는다
+            guard introStart == nil, !isIntroFinished else { return }
+            // 첫 그리기가 실제로 끝난 뒤부터 잰다. 느린 기기에서 첫 프레임이 늦게 떠도 글자·그래픽이 중간부터 튀어 나오지 않는다(#207)
+            await DisplayFrame.next()
+            introStart = .now
+            withAnimation(Timing.sheet) { isSheetRaised = true }
             try? await Task.sleep(for: .seconds(Timing.introEnd))
             isIntroFinished = true
         }
@@ -51,7 +62,6 @@ struct LoginSceneView<Sheet: View>: View {
     private func scene(layout: SceneLayout, elapsed: TimeInterval) -> some View {
         let brand = Timing.brand.progress(at: elapsed)
         let sink = Timing.pattern.progress(at: elapsed)
-        let rise = Timing.sheet.progress(at: elapsed)
 
         return ZStack(alignment: .topLeading) {
             Color.primitive.blue.b500p
@@ -100,9 +110,6 @@ struct LoginSceneView<Sheet: View>: View {
                         )
                     )
             }
-
-            sheetContainer(layout: layout)
-                .offset(y: layout.sheetTop + (1 - rise) * layout.sheetHeight)
         }
     }
 
@@ -274,7 +281,7 @@ private enum Timing {
     static let brand = Segment(delay: 0.45, duration: 0.76, curve: .init(0.6, 0, 0.2, 1))
     static let pattern = Segment(delay: 0.6, duration: 1.1, curve: .init(0.55, 0, 0.3, 1))
     /// 캐릭터(0.87초~)보다 먼저 올라와, 띠가 나올 때는 시트가 거의 다 올라와 있다
-    static let sheet = Segment(delay: 0.6, duration: 0.6, curve: .init(0.2, 0.8, 0.2, 1))
+    static let sheet = Animation.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.6).delay(0.6)
     /// 캐릭터 등장은 BeltCast 각자의 시작·속도를 따른다. 마지막(보라)이 약 2.03초에 앉는다
     static let introEnd: Double = 2.1
     static let talkStart: Double = 2.95
@@ -321,6 +328,35 @@ struct CubicBezier {
     private static func point(_ param: Double, _ first: Double, _ second: Double) -> Double {
         let inv = 1 - param
         return 3 * inv * inv * param * first + 3 * inv * param * param * second + param * param * param
+    }
+}
+
+/// 다음 화면 갱신까지 기다린다. 메인 스레드가 무거운 첫 그리기로 막혀 있으면 그 그리기가 끝난 뒤에 돌아온다.
+///
+/// 장면 시계를 `.now`로 바로 걸면, 홈·웹뷰를 함께 만드느라 첫 프레임이 늦게 뜰 때 그동안 흐른 시간만큼 움직임을 건너뛴다.
+@MainActor
+enum DisplayFrame {
+    static func next() async {
+        await withCheckedContinuation { continuation in
+            let waiter = Waiter(continuation: continuation)
+            CADisplayLink(target: waiter, selector: #selector(Waiter.tick(_:))).add(to: .main, forMode: .common)
+        }
+    }
+
+    /// CADisplayLink가 target을 강하게 잡으므로, 한 번 불리면 스스로 끊어 놓아준다
+    @MainActor
+    private final class Waiter: NSObject {
+        private var continuation: CheckedContinuation<Void, Never>?
+
+        init(continuation: CheckedContinuation<Void, Never>) {
+            self.continuation = continuation
+        }
+
+        @objc func tick(_ link: CADisplayLink) {
+            link.invalidate()
+            continuation?.resume()
+            continuation = nil
+        }
     }
 }
 
