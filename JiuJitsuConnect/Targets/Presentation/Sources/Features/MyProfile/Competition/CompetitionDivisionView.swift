@@ -347,19 +347,24 @@ struct CompetitionDivisionView: View {
 // MARK: - 출전 띠 휠
 
 /// 출전 띠 휠 — 뒤 화면을 흐리게 덮고 MY 벨트 시트와 같은 휠로 띠를 고른다.
-/// 굴리는 동안은 화면 값이 바뀌지 않고 '확인'을 눌러야 고른 띠가 된다. 흐린 바깥을 누르면 그대로 닫힌다.
+/// 굴리는 동안은 화면 값이 바뀌지 않고 '확인'을 눌러야 고른 띠가 된다.
+/// 메달·연도 휠처럼 확인 버튼 위 빈 곳 어디를 끌어도 휠이 돈다(#198). 닫기는 '확인'으로 한다.
 struct CompetitionBeltPickerOverlay: View {
     let store: StoreOf<CompetitionInfoFeature>
     @State private var pickedBelt: BeltRank
 
     private enum Metrics {
         static let titlePickerSpacing: CGFloat = 24
+        // 제목 한 줄 높이(title2 20pt의 줄 높이)
+        static let titleHeight: CGFloat = 24
         // 확인 버튼을 아래 '완료' 버튼과 같은 자리에 둔다 — 새 기록은 건너뛰기(44) + 간격 4 + 아래 여백 8,
         // 수정은 건너뛰기 없이 아래 여백 24(buttonSection과 같은 값).
         static let confirmBottomPadding: CGFloat = 56
         static let editConfirmBottomPadding: CGFloat = 24
         // BeltIcon .regular 폭
         static let beltIconSlotWidth: CGFloat = 32
+        // 다섯 칸 휠의 보이는 높이 — SheetPickerView의 칸 높이 × 5 + 기본 칸 간격(8) × 4
+        static let wheelViewportHeight: CGFloat = CompetitionWheelPickerMetrics.itemHeight * 5 + 8 * 4
     }
 
     init(store: StoreOf<CompetitionInfoFeature>) {
@@ -369,53 +374,75 @@ struct CompetitionBeltPickerOverlay: View {
     }
 
     var body: some View {
-        ZStack {
+        VStack(spacing: 0) {
+            GeometryReader { proxy in
+                // 예전처럼 '제목 + 간격 + 휠 칸' 묶음을 확인 버튼 위 공간의 세로 가운데에 둔다.
+                let safeTop = proxy.safeAreaInsets.top
+                let groupHeight = Metrics.titleHeight + Metrics.titlePickerSpacing + Metrics.wheelViewportHeight
+                let topSpace = max(0, (proxy.size.height - groupHeight) / 2)
+                ZStack(alignment: .top) {
+                    // 끌기 영역은 화면 맨 위(상태 막대)부터 확인 버튼 위까지다.
+                    // 상태 막대 영역까지 덮도록 safe area를 무시해야 휠이 상태 막대 높이만큼 여백을 더 받지 않는다
+                    // (더 받으면 가운데 칸이 한 칸 어긋나 다른 띠가 강조된다). 그래서 휠 칸 자리는 화면 맨 위부터 잰다.
+                    beltPicker(
+                        viewportTop: safeTop + topSpace + Metrics.titleHeight + Metrics.titlePickerSpacing
+                    )
+                    .ignoresSafeArea(.container, edges: .top)
+
+                    // 제목은 얹기만 하고, 제목 위를 끌어도 휠이 돌게 눌림은 아래로 넘긴다.
+                    titleText
+                        .frame(height: Metrics.titleHeight)
+                        .padding(.top, topSpace)
+                        .allowsHitTesting(false)
+                }
+            }
+
+            CTAButton(title: "확인") {
+                store.send(.view(.beltSelected(pickedBelt)), animation: .smooth(duration: 0.3))
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, store.mode.isEdit ? Metrics.editConfirmBottomPadding : Metrics.confirmBottomPadding)
+        }
+        .background {
             Rectangle()
                 .fill(.ultraThinMaterial)
                 .ignoresSafeArea()
-                .onTapGesture {
-                    store.send(.view(.beltPickerDismissed), animation: .smooth(duration: 0.3))
-                }
-                .accessibilityLabel("닫기")
-                .accessibilityAddTraits(.isButton)
-
-            VStack(spacing: 0) {
-                Spacer()
-
-                Text("출전 띠")
-                    .font(Font.pretendard.title2)
-                    .foregroundStyle(Color.component.sectionHeader.title)
-                    .padding(.bottom, Metrics.titlePickerSpacing)
-
-                // MY 벨트 시트와 같은 순서(블랙이 위, 화이트가 아래).
-                // 메달 휠처럼 글자 왼쪽에 띠 그림을 붙이고(띠 칩과 같은 모양), 칸 크기도 메달·연도 휠과 맞춘다.
-                SheetPickerView(
-                    items: Array(BeltRank.allCases.reversed()),
-                    selectedItem: pickedBelt,
-                    displayText: { $0.displayName },
-                    iconView: { belt, isSelected in
-                        // 띠 그림 폭이 칸마다 달라도 글자가 옆으로 흔들리지 않게 자리를 가장 큰 띠 폭으로 고정한다.
-                        AnyView(
-                            BeltIcon(color: belt.selectButtonColor, size: isSelected ? .regular : .compact)
-                                .frame(width: Metrics.beltIconSlotWidth)
-                        )
-                    },
-                    width: CompetitionWheelPickerMetrics.width,
-                    itemHeight: CompetitionWheelPickerMetrics.itemHeight,
-                    style: CompetitionWheelPickerMetrics.style,
-                    onSelect: { pickedBelt = $0 }
-                )
-
-                Spacer()
-
-                CTAButton(title: "확인") {
-                    store.send(.view(.beltSelected(pickedBelt)), animation: .smooth(duration: 0.3))
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, store.mode.isEdit ? Metrics.editConfirmBottomPadding : Metrics.confirmBottomPadding)
-            }
+        }
+        // 화면을 누르는 닫기는 없지만, 보이스오버는 두 손가락 문지르기(escape)로 닫을 수 있게 둔다.
+        .accessibilityAction(.escape) {
+            store.send(.view(.beltPickerDismissed), animation: .smooth(duration: 0.3))
         }
         // 휠이 열린 동안 보이스오버가 뒤 화면(숨긴 완료·건너뛰기 등)으로 가지 않게 이 덮개 안에만 머문다.
         .accessibilityAddTraits(.isModal)
+    }
+
+    private var titleText: some View {
+        Text("출전 띠")
+            .font(Font.pretendard.title2)
+            .foregroundStyle(Color.component.sectionHeader.title)
+    }
+
+    // MY 벨트 시트와 같은 순서(블랙이 위, 화이트가 아래).
+    // 메달 휠처럼 글자 왼쪽에 띠 그림을 붙이고(띠 칩과 같은 모양), 칸 크기도 메달·연도 휠과 맞춘다.
+    /// - Parameter viewportTop: 끌기 영역 위 끝(화면 맨 위)에서 휠 칸 위 끝까지의 거리
+    private func beltPicker(viewportTop: CGFloat) -> some View {
+        SheetPickerView(
+            items: Array(BeltRank.allCases.reversed()),
+            selectedItem: pickedBelt,
+            displayText: { $0.displayName },
+            iconView: { belt, isSelected in
+                // 띠 그림 폭이 칸마다 달라도 글자가 옆으로 흔들리지 않게 자리를 가장 큰 띠 폭으로 고정한다.
+                AnyView(
+                    BeltIcon(color: belt.selectButtonColor, size: isSelected ? .regular : .compact)
+                        .frame(width: Metrics.beltIconSlotWidth)
+                )
+            },
+            width: CompetitionWheelPickerMetrics.width,
+            itemHeight: CompetitionWheelPickerMetrics.itemHeight,
+            // 가운데로 보내지 않고 위 끝에서 viewportTop만큼 띄운다 — 위로 끝까지 올리면 최소 간격에서 멈춘다.
+            dragArea: .fill(verticalOffset: -.infinity, minimumTopSpacing: viewportTop),
+            style: CompetitionWheelPickerMetrics.style,
+            onSelect: { pickedBelt = $0 }
+        )
     }
 }
