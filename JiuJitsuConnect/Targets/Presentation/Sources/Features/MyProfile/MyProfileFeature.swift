@@ -40,9 +40,6 @@ public struct MyProfileFeature: Sendable {
         // 토스트 메시지 상태
         var toast: ToastState?
         
-        // 벨트 설정 임시 저장 (최초 설정 시 벨트 정보를 체급 설정으로 전달하기 위해)
-        var tempBeltInfo: TempBeltInfo?
-
         // 우측 상단 "..." 메뉴 노출 여부 (관장 사범 인증 메뉴)
         var isMoreMenuPresented: Bool = false
 
@@ -92,12 +89,6 @@ public struct MyProfileFeature: Sendable {
             state.isPushed = true
             return state
         }
-        
-        // 임시 벨트 정보를 담는 구조체
-        public struct TempBeltInfo: Equatable, Sendable {
-            let rank: BeltRank
-            let stripe: BeltStripe
-        }
     }
     
     @Reducer
@@ -117,7 +108,6 @@ public struct MyProfileFeature: Sendable {
     @Reducer
     public enum Sheet {
         case beltSetting(BeltSettingFeature)
-        case weightClassSetting(WeightClassSettingFeature)
         case profileImageEdit(ProfileImageEditFeature)
         case instructorVerification(InstructorVerificationFeature)
     }
@@ -160,11 +150,9 @@ public struct MyProfileFeature: Sendable {
             case gymInfoButtonTapped
             case nicknameEditButtonTapped
             case registerBeltButtonTapped
-            case beltTapped             // 이미 등록된 벨트 영역 탭 → 수정 모드로 시트 노출
-            case weightClassTapped      // 이미 등록된 체급 영역 탭 → 체급 수정 시트 노출
+            case beltTapped             // 이미 등록된 벨트 영역 탭 → 벨트 시트 노출
             case registerStyleButtonTapped
             case styleCardEditTapped(MyStyleSettingType)  // 프로필 스타일 카드 탭 → 해당 타입 수정 모드 진입
-            case weightVisibilityToggleButtonTapped
             case toastButtonTapped(ToastState.Action)
             case addCompetitionButtonTapped  // 대회 정보 추가 버튼 탭
             case competitionDetailTapped(Competition)  // 대회 정보 행 탭
@@ -190,10 +178,7 @@ public struct MyProfileFeature: Sendable {
             case refreshProfileResponse(TaskResult<CommunityProfile>)
             case refreshUserProfileResponse(TaskResult<UserProfile>)
             case updateProfileSection(ProfileSection, String?)
-            case saveBeltAndWeightInfo(rank: BeltRank, stripe: BeltStripe, gender: Gender, weightKg: Double, isWeightHidden: Bool)
             case saveBeltInfoOnly(rank: BeltRank, stripe: BeltStripe)
-            case saveWeightInfoOnly(gender: Gender, weightKg: Double, isWeightHidden: Bool)
-            case toggleWeightVisibility
             // 스타일 저장 (특기 + 최애 한 번에)
             case savePosition(best: PositionType?, favorite: PositionType?)
             case saveSubmission(best: SubmissionType?, favorite: SubmissionType?)
@@ -362,50 +347,12 @@ public struct MyProfileFeature: Sendable {
                 )
                 return .none
                 
-            case .view(.registerBeltButtonTapped):
-                // 벨트/체급 등록 화면을 시트로 노출 (최초 설정 모드)
-                let currentRank = state.communityProfile?.beltRank ?? .white
-                let currentStripe = state.communityProfile?.beltStripe ?? .none
-                // 최초 설정인지 확인 (벨트 정보가 없으면 최초 설정)
-                let isInitialSetup = state.communityProfile?.beltRank == nil
-                // 이전 최초 설정을 체급 시트에서 닫아 버렸다면 임시 벨트 값이 남아 있으므로 새 흐름 전에 버린다(#60).
-                state.tempBeltInfo = nil
+            case .view(.registerBeltButtonTapped), .view(.beltTapped):
+                // 벨트 시트 노출. 등록·수정 모두 벨트만 받고 바로 저장한다(프로필 체급은 받지 않음, #188)
                 state.sheet = .beltSetting(
                     BeltSettingFeature.State(
-                        selectedRank: currentRank,
-                        selectedStripe: currentStripe,
-                        isInitialSetup: isInitialSetup
-                    )
-                )
-                return .none
-                
-            case .view(.beltTapped):
-                // 이미 등록된 벨트 영역 탭 → 수정 모드(isInitialSetup: false)로 시트 노출
-                let currentRank = state.communityProfile?.beltRank ?? .white
-                let currentStripe = state.communityProfile?.beltStripe ?? .none
-                state.tempBeltInfo = nil
-                state.sheet = .beltSetting(
-                    BeltSettingFeature.State(
-                        selectedRank: currentRank,
-                        selectedStripe: currentStripe,
-                        isInitialSetup: false
-                    )
-                )
-                return .none
-                
-            case .view(.weightClassTapped):
-                // 이미 등록된 체급 영역 탭 → 체급 수정 시트 노출
-                let currentGender = state.communityProfile?.gender ?? .male
-                let currentWeight = state.communityProfile?.weightKg ?? 60.0
-                let isWeightHidden = state.communityProfile?.isWeightHidden ?? false
-                // 체급만 수정하는 흐름. 남은 임시 벨트 값이 있으면 확인 시 최초 설정으로 오인해 함께 저장하므로 버린다(#60).
-                state.tempBeltInfo = nil
-                
-                state.sheet = .weightClassSetting(
-                    WeightClassSettingFeature.State(
-                        selectedGender: currentGender,
-                        selectedWeightKg: currentWeight,
-                        isWeightHidden: isWeightHidden
+                        selectedRank: state.communityProfile?.beltRank ?? .white,
+                        selectedStripe: state.communityProfile?.beltStripe ?? .none
                     )
                 )
                 return .none
@@ -441,10 +388,6 @@ public struct MyProfileFeature: Sendable {
                     )
                 )
                 return .none
-                
-            case .view(.weightVisibilityToggleButtonTapped):
-                // 체급 숨김/보기 토글
-                return .send(.internal(.toggleWeightVisibility))
                 
             // MARK: - Delegate 처리 (자식 Feature로부터)
 
@@ -500,73 +443,11 @@ public struct MyProfileFeature: Sendable {
                 
             // MARK: - Sheet Delegate 처리
                 
-            case let .sheet(.presented(.beltSetting(.delegate(.proceedToWeightClassSetting(rank, stripe))))):
-                // 최초 설정: 벨트 정보를 임시 저장하고 체급 설정 화면으로 이동
-                state.tempBeltInfo = State.TempBeltInfo(rank: rank, stripe: stripe)
-                let currentGender = state.communityProfile?.gender ?? .male
-                let currentWeight = state.communityProfile?.weightKg ?? 60.0
-                let isWeightHidden = state.communityProfile?.isWeightHidden ?? false
-                
-                state.sheet = .weightClassSetting(
-                    WeightClassSettingFeature.State(
-                        selectedGender: currentGender,
-                        selectedWeightKg: currentWeight,
-                        isWeightHidden: isWeightHidden
-                    )
-                )
-                return .none
-                
             case let .sheet(.presented(.beltSetting(.delegate(.didConfirmBelt(rank, stripe))))):
-                // 벨트 수정: API 호출하고 토스트 표시
+                // 벨트 등록·수정: API 호출하고 토스트 표시
                 Log.trace("벨트 수정 확인됨 - rank: \(rank.displayName), stripe: \(stripe.displayName)", category: .debug, level: .info)
                 state.sheet = nil
                 return .send(.internal(.saveBeltInfoOnly(rank: rank, stripe: stripe)))
-                
-            case let .sheet(.presented(.weightClassSetting(.delegate(.didConfirmWeightClass(gender, weightKg, isWeightHidden))))):
-                // 체급 설정 완료: 벨트 정보와 함께 API 호출
-                guard let beltInfo = state.tempBeltInfo else {
-                    // 벨트 정보가 없는 경우 = 체급만 수정하는 경우
-                    state.sheet = nil
-                    return .send(.internal(.saveWeightInfoOnly(gender: gender, weightKg: weightKg, isWeightHidden: isWeightHidden)))
-                }
-                
-                // 벨트 정보가 있는 경우 = 최초 설정 (벨트 + 체급 함께 저장)
-                state.sheet = nil
-                state.tempBeltInfo = nil
-                return .send(.internal(.saveBeltAndWeightInfo(
-                    rank: beltInfo.rank,
-                    stripe: beltInfo.stripe,
-                    gender: gender,
-                    weightKg: weightKg,
-                    isWeightHidden: isWeightHidden
-                )))
-                
-            // MARK: - API 호출: 벨트/체급 정보 저장
-                
-            case let .internal(.saveBeltAndWeightInfo(rank, stripe, gender, weightKg, isWeightHidden)):
-                guard let profile = state.communityProfile else {
-                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
-                }
-                
-                // 체중을 소수점 첫째 자리로 반올림하고 벨트와 체급 정보 업데이트
-                let roundedWeight = round(weightKg * 10) / 10.0
-                let updatedProfile = profile.updatingBeltAndWeight(
-                    rank: rank,
-                    stripe: stripe,
-                    gender: gender,
-                    weightKg: roundedWeight,
-                    isWeightHidden: isWeightHidden
-                )
-                
-                state.isLoadingProfile = true
-                
-                return .run { send in
-                    await send(.internal(.updateProfileResponse(
-                        await TaskResult {
-                            try await communityClient.updateProfile(updatedProfile, .beltWeight)
-                        }
-                    )))
-                }
                 
             case let .internal(.saveBeltInfoOnly(rank, stripe)):
                 guard let profile = state.communityProfile else {
@@ -585,48 +466,8 @@ public struct MyProfileFeature: Sendable {
                 return .run { send in
                     await send(.internal(.updateProfileResponse(
                         await TaskResult {
-                            try await communityClient.updateProfile(updatedProfile, .beltWeight)
-                        }
-                    )))
-                }
-                
-            case let .internal(.saveWeightInfoOnly(gender, weightKg, isWeightHidden)):
-                guard let profile = state.communityProfile else {
-                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
-                }
-                
-                // 체중을 소수점 첫째 자리로 반올림
-                let roundedWeight = round(weightKg * 10) / 10.0
-                
-                Log.trace("체급 수정 - 기존: \(profile.gender?.displayName ?? "없음") \(profile.weightKg ?? 0)kg (숨김: \(profile.isWeightHidden)), 새로운: \(gender.displayName) \(roundedWeight)kg (숨김: \(isWeightHidden))", category: .debug, level: .info)
-                
-                // 체급 정보만 업데이트
-                let updatedProfile = profile.updatingWeight(gender: gender, weightKg: roundedWeight, isWeightHidden: isWeightHidden)
-                
-                state.isLoadingProfile = true
-                
-                return .run { send in
-                    await send(.internal(.updateProfileResponse(
-                        await TaskResult {
-                            try await communityClient.updateProfile(updatedProfile, .beltWeight)
-                        }
-                    )))
-                }
-                
-            case .internal(.toggleWeightVisibility):
-                guard let profile = state.communityProfile else {
-                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
-                }
-                
-                // 체급 가시성만 토글
-                let updatedProfile = profile.togglingWeightVisibility()
-                
-                state.isLoadingProfile = true
-                
-                return .run { send in
-                    await send(.internal(.updateProfileResponse(
-                        await TaskResult {
-                            try await communityClient.updateProfile(updatedProfile, .beltWeight)
+                            // 띠·그랄만 바꾸고 성별·체급은 서버 값을 그대로 둔다(#188, jiu-jitsu-backend#172)
+                            try await communityClient.updateProfile(updatedProfile, .belt)
                         }
                     )))
                 }
@@ -644,7 +485,7 @@ public struct MyProfileFeature: Sendable {
                 case .academy:
                     updatedProfile = profile.updatingAcademy(value)
 
-                case .beltWeight, .belt, .position, .submission, .technique, .competition, .instructorInfo:
+                case .belt, .position, .submission, .technique, .competition, .instructorInfo:
                     // TODO: 다른 섹션 업데이트 구현
                     return .none
                 }
@@ -787,8 +628,8 @@ public struct MyProfileFeature: Sendable {
                 // 어떤 섹션이 업데이트되었는지에 따라 다른 메시지 표시
                 let message: String
                 if previousProfile?.beltRank == nil && updatedProfile.beltRank != nil {
-                    // 최초 벨트/체급 설정
-                    message = "벨트와 체급 정보 입력을 완료했어요"
+                    // 최초 벨트 설정
+                    message = "벨트 정보 입력을 완료했어요"
                 } else if previousProfile?.academyName == nil && updatedProfile.academyName != nil {
                     // 도장 정보 추가
                     message = "도장 정보 입력을 완료했어요"
@@ -799,15 +640,6 @@ public struct MyProfileFeature: Sendable {
                          previousProfile?.beltStripe != updatedProfile.beltStripe {
                     // 벨트 정보 수정
                     message = "벨트 정보 수정을 완료했어요"
-                } else if previousProfile?.gender != updatedProfile.gender ||
-                         previousProfile?.weightKg != updatedProfile.weightKg ||
-                         (previousProfile?.isWeightHidden == updatedProfile.isWeightHidden &&
-                          (previousProfile?.gender != updatedProfile.gender || previousProfile?.weightKg != updatedProfile.weightKg)) {
-                    // 체급 정보 수정 (성별, 체중 변경)
-                    message = "체급 정보 수정을 완료했어요"
-                } else if previousProfile?.isWeightHidden != updatedProfile.isWeightHidden {
-                    // 체급 가시성 변경
-                    message = updatedProfile.isWeightHidden ? "체급을 숨겼어요" : "체급을 공개했어요"
                 } else {
                     // 기타
                     message = "프로필 수정을 완료했어요"

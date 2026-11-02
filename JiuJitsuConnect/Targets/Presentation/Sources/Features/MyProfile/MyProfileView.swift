@@ -433,19 +433,6 @@ private extension View {
             }
             .sheet(
                 item: store.scope(
-                    state: \.sheet?.weightClassSetting,
-                    action: \.sheet.weightClassSetting
-                )
-            ) { weightClassSettingStore in
-                WeightClassSettingView(store: weightClassSettingStore)
-                    .presentationDragIndicator(.hidden)
-                    .presentationDetents([.height(WeightClassSettingView.contentHeight)])
-                    .presentationBackground(
-                        Color.component.bottomSheet.selected.container.background
-                    )
-            }
-            .sheet(
-                item: store.scope(
                     state: \.sheet?.profileImageEdit,
                     action: \.sheet.profileImageEdit
                 )

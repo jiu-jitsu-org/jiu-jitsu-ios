@@ -18,17 +18,13 @@ public struct BeltSettingFeature: Sendable {
     public struct State: Equatable, Sendable {
         var selectedRank: BeltRank
         var selectedStripe: BeltStripe
-        /// 최초 벨트 설정인지 여부 (true면 체급 설정으로 연결, false면 바로 저장)
-        var isInitialSetup: Bool
         
         public init(
             selectedRank: BeltRank = .white,
-            selectedStripe: BeltStripe = .none,
-            isInitialSetup: Bool = false
+            selectedStripe: BeltStripe = .none
         ) {
             self.selectedRank = selectedRank
             self.selectedStripe = selectedStripe
-            self.isInitialSetup = isInitialSetup
         }
     }
     
@@ -43,9 +39,7 @@ public struct BeltSettingFeature: Sendable {
         }
         
         public enum DelegateAction: Sendable {
-            /// 최초 설정 시: 벨트 정보를 전달하고 체급 설정 화면으로 이동
-            case proceedToWeightClassSetting(rank: BeltRank, stripe: BeltStripe)
-            /// 수정 시: 벨트 정보를 저장하고 완료
+            /// 등록·수정 모두 벨트 정보를 저장하고 완료 (프로필 체급은 받지 않는다, #188)
             case didConfirmBelt(rank: BeltRank, stripe: BeltStripe)
         }
     }
@@ -68,20 +62,11 @@ public struct BeltSettingFeature: Sendable {
                 return .none
                 
             case .view(.confirmButtonTapped):
-                Log.trace("확인 버튼 탭됨 - isInitialSetup: \(state.isInitialSetup), selectedRank: \(state.selectedRank.displayName), selectedStripe: \(state.selectedStripe.displayName)", category: .debug, level: .info)
-                if state.isInitialSetup {
-                    // 최초 설정: 체급 설정 화면으로 이동
-                    return .send(.delegate(.proceedToWeightClassSetting(
-                        rank: state.selectedRank,
-                        stripe: state.selectedStripe
-                    )))
-                } else {
-                    // 수정: 바로 저장
-                    return .send(.delegate(.didConfirmBelt(
-                        rank: state.selectedRank,
-                        stripe: state.selectedStripe
-                    )))
-                }
+                Log.trace("확인 버튼 탭됨 - selectedRank: \(state.selectedRank.displayName), selectedStripe: \(state.selectedStripe.displayName)", category: .debug, level: .info)
+                return .send(.delegate(.didConfirmBelt(
+                    rank: state.selectedRank,
+                    stripe: state.selectedStripe
+                )))
                 
             case .delegate:
                 return .none

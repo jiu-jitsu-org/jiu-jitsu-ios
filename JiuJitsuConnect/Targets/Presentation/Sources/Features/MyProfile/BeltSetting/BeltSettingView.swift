@@ -100,7 +100,7 @@ public struct BeltSettingView: View {
     
     private var confirmButton: some View {
         CTAButton(
-            title: store.isInitialSetup ? "체급도 입력하기" : "확인",
+            title: "확인",
             action: {
                 store.send(.view(.confirmButtonTapped))
             }
