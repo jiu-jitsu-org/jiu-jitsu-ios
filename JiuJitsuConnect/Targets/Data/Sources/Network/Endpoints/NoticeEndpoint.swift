@@ -6,8 +6,8 @@
 import Foundation
 
 enum NoticeEndpoint {
-    /// 알림 목록 조회 (GET `/api/notice`)
-    case getList
+    /// 안 읽은 알림 수 조회 (GET `/api/notice/unread-count`)
+    case getUnreadCount
     /// 알림 수신 설정 조회 (GET `/api/notice/setting`)
     case getSetting
     /// 알림 수신 설정 변경 (POST `/api/notice/setting`)
@@ -24,21 +24,21 @@ extension NoticeEndpoint: Endpoint {
 
     var path: String {
         switch self {
-        case .getList: return "/api/notice"
+        case .getUnreadCount: return "/api/notice/unread-count"
         case .getSetting, .updateSetting: return "/api/notice/setting"
         }
     }
 
     var method: HTTPMethod {
         switch self {
-        case .getList, .getSetting: return .get
+        case .getUnreadCount, .getSetting: return .get
         case .updateSetting: return .post
         }
     }
 
     var body: Data? {
         switch self {
-        case .getList, .getSetting: return nil
+        case .getUnreadCount, .getSetting: return nil
         case .updateSetting(let request): return try? JSONEncoder().encode(request)
         }
     }
