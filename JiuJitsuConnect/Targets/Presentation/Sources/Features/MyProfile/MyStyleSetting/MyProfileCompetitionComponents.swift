@@ -244,9 +244,9 @@ private struct CompetitionRowView: View {
     let onTapped: () -> Void
 
     private enum Metrics {
-        static let medalSize: CGFloat = 18
+        static let medalSize: CGFloat = 22
         // 여러 줄일 때 메달을 대회 이름 줄 가운데에 맞춘다.
-        static let titleLineHeight: CGFloat = 20
+        static let titleLineHeight: CGFloat = 22
     }
 
     private var hasDivisions: Bool { group.entries.count > 1 }
@@ -270,7 +270,7 @@ private struct CompetitionRowView: View {
                             .frame(minHeight: Metrics.titleLineHeight)
 
                         Text(group.detailText)
-                            .font(.pretendard.labelM)
+                            .font(.pretendard.bodyS)
                             .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
                             .fixedSize(horizontal: false, vertical: true)
 
@@ -279,7 +279,7 @@ private struct CompetitionRowView: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 ForEach(Array(group.entries.enumerated()), id: \.offset) { _, entry in
                                     Text(group.divisionMedalText(of: entry))
-                                        .font(.pretendard.labelM)
+                                        .font(.pretendard.bodyS)
                                         .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
@@ -304,7 +304,7 @@ private struct CompetitionRowView: View {
     private var title: some View {
         HStack(spacing: 4) {
             Text(group.name)
-                .font(.pretendard.custom(weight: .semiBold, size: 14))
+                .font(.pretendard.custom(weight: .semiBold, size: 16))
                 .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
                 .lineLimit(1)
 

@@ -302,8 +302,8 @@ private struct UserProfileCompetitionSection: View {
     let competitions: [Competition]
 
     private enum RowMetrics {
-        static let medalSize: CGFloat = 18
-        static let titleLineHeight: CGFloat = 20
+        static let medalSize: CGFloat = 22
+        static let titleLineHeight: CGFloat = 22
     }
 
     var body: some View {
@@ -363,13 +363,13 @@ private struct UserProfileCompetitionSection: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(group.name)
-                    .font(.pretendard.custom(weight: .semiBold, size: 14))
+                    .font(.pretendard.custom(weight: .semiBold, size: 16))
                     .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
                     .lineLimit(1)
                     .frame(minHeight: RowMetrics.titleLineHeight)
 
                 Text(group.detailText)
-                    .font(.pretendard.labelM)
+                    .font(.pretendard.bodyS)
                     .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -377,7 +377,7 @@ private struct UserProfileCompetitionSection: View {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(Array(group.entries.enumerated()), id: \.offset) { _, entry in
                             Text(group.divisionMedalText(of: entry))
-                                .font(.pretendard.labelM)
+                                .font(.pretendard.bodyS)
                                 .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
