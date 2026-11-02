@@ -293,90 +293,6 @@ extension CommunityProfile {
         )
     }
     
-    /// 체급 정보 업데이트
-    public func updatingWeight(gender: Gender, weightKg: Double, isWeightHidden: Bool) -> CommunityProfile {
-        CommunityProfile(
-            nickname: nickname,
-            profileImageUrl: profileImageUrl,
-            beltRank: beltRank,
-            beltStripe: beltStripe,
-            gender: gender,
-            weightKg: weightKg,
-            academyName: academyName,
-            competitions: competitions,
-            bestSubmission: bestSubmission,
-            favoriteSubmission: favoriteSubmission,
-            bestTechnique: bestTechnique,
-            favoriteTechnique: favoriteTechnique,
-            bestPosition: bestPosition,
-            favoritePosition: favoritePosition,
-            isWeightHidden: isWeightHidden,
-            isOwner: isOwner,
-            medalCount: medalCount,
-            teachingPhilosophy: teachingPhilosophy,
-            teachingStartDate: teachingStartDate,
-            teachingDetail: teachingDetail
-        )
-    }
-    
-    /// 벨트와 체급 정보 함께 업데이트
-    public func updatingBeltAndWeight(
-        rank: BeltRank,
-        stripe: BeltStripe,
-        gender: Gender,
-        weightKg: Double,
-        isWeightHidden: Bool
-    ) -> CommunityProfile {
-        CommunityProfile(
-            nickname: nickname,
-            profileImageUrl: profileImageUrl,
-            beltRank: rank,
-            beltStripe: stripe,
-            gender: gender,
-            weightKg: weightKg,
-            academyName: academyName,
-            competitions: competitions,
-            bestSubmission: bestSubmission,
-            favoriteSubmission: favoriteSubmission,
-            bestTechnique: bestTechnique,
-            favoriteTechnique: favoriteTechnique,
-            bestPosition: bestPosition,
-            favoritePosition: favoritePosition,
-            isWeightHidden: isWeightHidden,
-            isOwner: isOwner,
-            medalCount: medalCount,
-            teachingPhilosophy: teachingPhilosophy,
-            teachingStartDate: teachingStartDate,
-            teachingDetail: teachingDetail
-        )
-    }
-    
-    /// 체급 가시성 토글
-    public func togglingWeightVisibility() -> CommunityProfile {
-        CommunityProfile(
-            nickname: nickname,
-            profileImageUrl: profileImageUrl,
-            beltRank: beltRank,
-            beltStripe: beltStripe,
-            gender: gender,
-            weightKg: weightKg,
-            academyName: academyName,
-            competitions: competitions,
-            bestSubmission: bestSubmission,
-            favoriteSubmission: favoriteSubmission,
-            bestTechnique: bestTechnique,
-            favoriteTechnique: favoriteTechnique,
-            bestPosition: bestPosition,
-            favoritePosition: favoritePosition,
-            isWeightHidden: !isWeightHidden,
-            isOwner: isOwner,
-            medalCount: medalCount,
-            teachingPhilosophy: teachingPhilosophy,
-            teachingStartDate: teachingStartDate,
-            teachingDetail: teachingDetail
-        )
-    }
-    
     /// 포지션 정보 업데이트 (특기 + 최애)
     public func updatingPosition(best: PositionType?, favorite: PositionType?) -> CommunityProfile {
         CommunityProfile(
@@ -466,10 +382,8 @@ public enum ProfileSection: String, Codable, Sendable, CaseIterable, Equatable {
     /// 도장 정보 (academyName)
     case academy = "ACADEMY"
     
-    /// 벨트/체급 정보 (beltRank, beltStripe, gender, weightKg)
-    case beltWeight = "BELT_WEIGHT"
-
-    /// 띠·그랄만 (성별·체급·체급 숨기기는 그대로 둔다) — 띠 묻기 시트(#130)
+    /// 띠·그랄만 (성별·체급·체급 숨기기는 그대로 둔다) — 띠 묻기 시트(#130)·MY 벨트 시트.
+    /// 프로필 체급은 더 받지 않아 BELT_WEIGHT는 쓰지 않는다(#188).
     case belt = "BELT"
     
     /// 포지션 (bestPosition + favoritePosition)
@@ -495,8 +409,6 @@ public enum ProfileSection: String, Codable, Sendable, CaseIterable, Equatable {
         switch self {
         case .academy:
             return "도장 정보"
-        case .beltWeight:
-            return "벨트/체급"
         case .belt:
             return "벨트"
         case .position:
