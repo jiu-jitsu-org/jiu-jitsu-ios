@@ -77,9 +77,20 @@ public struct MyProfileFeature: Sendable {
             case photoLibrary
         }
 
+        /// 커뮤니티에서 내 사진을 눌러 스택에 쌓은 MY인지(#197). 탭 화면이 아니라 왼쪽 위에 뒤로가기가 붙고 탭바가 없다.
+        var isPushed: Bool = false
+
         public init(authInfo: AuthInfo, communityProfile: CommunityProfile? = nil) {
             self.authInfo = authInfo
             self.communityProfile = communityProfile
+        }
+
+        /// 커뮤니티에 쌓을 MY(#197). 탭의 MY가 이미 불러온 프로필을 그대로 받아 바로 그린다.
+        public static func pushed(from tab: State) -> State {
+            var state = State(authInfo: tab.authInfo, communityProfile: tab.communityProfile)
+            state.userProfile = tab.userProfile
+            state.isPushed = true
+            return state
         }
         
         // 임시 벨트 정보를 담는 구조체
@@ -140,6 +151,8 @@ public struct MyProfileFeature: Sendable {
 
         public enum ViewAction: Sendable {
             case onAppear
+            /// 커뮤니티에서 연 MY의 뒤로가기(#197)
+            case backTapped
             // 다른 탭에서 MY로 전환 (탭 뷰가 유지돼 onAppear가 다시 오지 않으므로 AppTab이 보낸다)
             case tabEntered
             // MY 탭을 보는 중 앱이 포그라운드로 복귀
@@ -226,6 +239,7 @@ public struct MyProfileFeature: Sendable {
     @Dependency(\.imageUploadClient) var imageUploadClient
     @Dependency(\.imageClient) var imageClient
     @Dependency(\.userClient) var userClient
+    @Dependency(\.dismiss) var dismiss
 
 
     public var body: some ReducerOf<Self> {
@@ -236,10 +250,19 @@ public struct MyProfileFeature: Sendable {
                 // AppTabView가 모든 탭을 미리 마운트하므로 게스트일 때도 onAppear가 발화한다.
                 guard !state.authInfo.isGuest else { return .none }
                 guard !state.isLoadingProfile else { return .none }
+                // 커뮤니티에 쌓은 MY는 탭의 MY가 불러 둔 값으로 바로 그린 뒤 조용히 다시 불러온다(#197).
+                // 뜰 때마다 부른다 — 이 MY 위에 쌓은 다른 MY(글 상세 → 내 댓글)에서 바꾼 값도 뒤로 돌아왔을 때 맞게 보인다.
+                // 이미 불러오는 중이면 refreshProfile이 건너뛴다.
+                if state.isPushed, state.communityProfile != nil {
+                    return .send(.internal(.refreshProfile))
+                }
                 // 이미 프로필 데이터가 있으면 불필요한 재로드 방지
                 // (toast dismiss 등 state 변화로 onAppear가 재트리거되는 경우 차단)
                 guard state.communityProfile == nil else { return .none }
                 return .send(.internal(.loadProfile))
+
+            case .view(.backTapped):
+                return .run { _ in await self.dismiss() }
 
             case .view(.tabEntered), .view(.sceneBecameActive):
                 // 웹·다른 기기에서 바꾼 내용, 관장 사범 인증 승인 등을 반영한다(#69).

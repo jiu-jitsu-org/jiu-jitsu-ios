@@ -22,7 +22,6 @@ public struct AppTabView: View {
     }
 
     @Environment(\.scenePhase) private var scenePhase
-    @State private var myProfileReveal = MyProfileReveal()
 
     public var body: some View {
         ZStack {
@@ -45,6 +44,8 @@ public struct AppTabView: View {
                         CommunityDetailView(store: detailStore)
                     case let .userProfile(profileStore):
                         UserProfileView(store: profileStore)
+                    case let .myProfile(myStore):
+                        MyProfileView(store: myStore)
                     }
                 }
             }
@@ -80,7 +81,6 @@ public struct AppTabView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .environment(myProfileReveal)
         .background(Color.component.navibar.container.background)
         .fullScreenCover(
             item: $store.scope(state: \.loginCover, action: \.loginCover)
@@ -102,6 +102,8 @@ public struct AppTabView: View {
                     CommunityDetailView(store: detailStore)
                 case let .userProfile(profileStore):
                     UserProfileView(store: profileStore)
+                case let .myProfile(myStore):
+                    MyProfileView(store: myStore)
                 }
             }
         }
@@ -153,18 +155,9 @@ public struct AppTabView: View {
         @ViewBuilder content: () -> Content
     ) -> some View {
         let isActive = store.selectedTab == tab
-        // 내 사진에서 MY를 펼치는 동안에는 홈을 MY 뒤에 그대로 둔다(#189).
-        let staysUnderReveal = tab == .home && myProfileReveal.isRevealing
         content()
-            // 탭은 바로 보이고 사라진다. 내 사진으로 갈 때 움직이는 건 아래 원 하나뿐이다.
-            .animation(nil) { $0.opacity(isActive || staysUnderReveal ? 1 : 0) }
-            .modifier(
-                MyProfileRevealMask(
-                    isEnabled: tab == .myPage,
-                    isOpen: isActive,
-                    center: myProfileReveal.avatarCenter
-                )
-            )
+            // 탭은 바로 보이고 사라진다.
+            .animation(nil) { $0.opacity(isActive ? 1 : 0) }
             .allowsHitTesting(isActive)
     }
 
@@ -249,73 +242,4 @@ public struct AppTabView: View {
             AppTabFeature()
         }
     )
-}
-
-// MARK: - 내 사진에서 MY 펼치기 (#189)
-
-/// 홈 오른쪽 위 내 사진을 누르면 그 사진 자리에서 MY가 동그랗게 퍼져 화면을 덮는다.
-/// 사진은 홈(CommunityView) 안에 있고 펼치는 건 탭을 겹쳐 둔 AppTabView라, 사진 자리와 시작 신호를 환경으로 잇는다.
-/// 탭 바로 바꿀 때는 애니메이션 없이 바로 바뀐다.
-@MainActor
-@Observable
-final class MyProfileReveal {
-    /// 펼치는 움직임 — 누른 곳에서 빠르게 퍼지고 끝은 부드럽게 멈춘다.
-    static let animation: Animation = .smooth(duration: 0.45)
-    // 홈을 MY 뒤에 남겨 두는 시간. 원이 다 퍼지기 전에 홈이 먼저 사라지면 모서리가 잠깐 비어 보여,
-    // 움직임(0.45초)보다 조금 넉넉히 둔다. 그동안 홈은 MY에 덮여 보이지 않는다.
-    private static let coverDuration: Duration = .milliseconds(600)
-
-    /// 홈 내 사진의 가운데(화면 좌표). 원이 여기서 퍼진다.
-    var avatarCenter: CGPoint?
-    /// 펼치는 중인지 — 이동안 홈을 MY 뒤에 남겨 원 밖이 비지 않게 한다.
-    private(set) var isRevealing = false
-    @ObservationIgnored private var endTask: Task<Void, Never>?
-
-    /// 내 사진을 눌러 MY로 가기 직전에 부른다.
-    func begin() {
-        isRevealing = true
-        endTask?.cancel()
-        endTask = Task { [weak self] in
-            try? await Task.sleep(for: Self.coverDuration)
-            guard !Task.isCancelled else { return }
-            self?.isRevealing = false
-        }
-    }
-}
-
-/// MY 탭을 내 사진 자리의 원으로 가린다. 열리면 원이 화면의 가장 먼 모서리까지 커진다.
-private struct MyProfileRevealMask: ViewModifier {
-    let isEnabled: Bool
-    let isOpen: Bool
-    let center: CGPoint?
-
-    // 닫힌 원은 GNB 내 사진(28pt)과 같은 크기라, 사진이 그대로 커지는 것처럼 보인다.
-    private static let closedDiameter: CGFloat = 28
-
-    func body(content: Content) -> some View {
-        // 사진 자리를 아직 모를 때도 같은 가림막을 씌운다. 자리를 알게 되는 순간 가림막을 새로 붙이면
-        // MY 화면이 통째로 다시 만들어져(로그인 직후 MY가 떠 있을 때 등) 열어 둔 시트·상태가 사라진다.
-        if isEnabled {
-            content.mask {
-                GeometryReader { proxy in
-                    let frame = proxy.frame(in: .global)
-                    let local = center.map { CGPoint(x: $0.x - frame.minX, y: $0.y - frame.minY) }
-                        ?? CGPoint(x: frame.width / 2, y: frame.height / 2)
-                    let farthest = max(
-                        hypot(local.x, local.y),
-                        hypot(frame.width - local.x, local.y),
-                        hypot(local.x, frame.height - local.y),
-                        hypot(frame.width - local.x, frame.height - local.y)
-                    )
-                    let diameter = isOpen ? farthest * 2 : Self.closedDiameter
-                    Circle()
-                        .frame(width: diameter, height: diameter)
-                        .position(local)
-                }
-                .ignoresSafeArea()
-            }
-        } else {
-            content
-        }
-    }
 }

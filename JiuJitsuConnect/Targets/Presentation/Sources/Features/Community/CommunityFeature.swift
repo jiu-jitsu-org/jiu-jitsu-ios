@@ -146,7 +146,7 @@ public struct CommunityFeature: Sendable {
             case tabSelected(Tab)
             case notificationTapped
             case searchTapped
-            // GNB 맨 오른쪽 내 사진 버튼 → MY 탭. (#43, #128)
+            // GNB 맨 오른쪽 내 사진 버튼 → MY 화면 push. (#43, #128, #197)
             case myProfileTapped
 
             // MARK: 브릿지 다이얼로그 결과 (AppTabView가 그린 알럿/시트 → Feature로 회신)
@@ -191,8 +191,9 @@ public struct CommunityFeature: Sendable {
             case logoutRequested
             // 웹뷰 토큰 만료 → 부모가 네이티브 refresh로 갱신 후 결과를 웹에 주입한다.
             case tokenRefreshRequested
-            // 헤더의 내 사진 버튼(#128)·웹에서 내 이름 탭(#116) → 부모가 하단 탭을 MY로 바꾼다.
-            case myTabRequested
+            // 헤더의 내 사진 버튼(#128)·웹에서 내 이름 탭(#116) → 부모가 MY 화면을 이 스택에 push한다(#197).
+            // MY 화면을 만들려면 로그인 정보(authInfo)가 필요해 부모(AppTab)가 직접 쌓는다.
+            case myProfileRequested
         }
 
         /// 부모가 세션 상태 변화를 알려주면 그에 맞는 아웃바운드 메시지를 웹에 주입한다.
@@ -211,6 +212,8 @@ public struct CommunityFeature: Sendable {
     public enum Path: Sendable {
         case detail(CommunityDetailFeature)
         case userProfile(UserProfileFeature)
+        /// 커뮤니티에서 내 사진·이름을 눌러 연 MY 화면(#197). 탭의 MY와 같은 화면이고 왼쪽 위에 뒤로가기가 붙는다.
+        case myProfile(MyProfileFeature)
     }
 
     /// 중첩 서브뷰가 어느 컨테이너(푸시 스택 / 모달 내부 스택)에서 올라왔는지 구분한다.
@@ -250,11 +253,12 @@ public struct CommunityFeature: Sendable {
                 state.path.append(.detail(.init(url: url, accessToken: state.accessToken)))
                 return .none
 
-            // 앱 다른 곳에서 내 사진은 MY를 뜻하므로 커뮤니티 헤더도 MY 탭으로 보낸다. 커뮤니티 활동은
-            // MY 화면의 '커뮤니티 활동' 줄로 계속 들어갈 수 있다. 탭 전환은 부모의 탭 선택 경로를 탄다. (#128)
+            // 앱 다른 곳에서 내 사진은 MY를 뜻하므로 커뮤니티 헤더도 MY 화면을 연다. 커뮤니티 활동은
+            // MY 화면의 '커뮤니티 활동' 줄로 계속 들어갈 수 있다. (#128)
+            // 남의 사진처럼 탭을 바꾸지 않고 이 스택에 쌓아, 뒤로가기로 돌아온다(#197).
             case .view(.myProfileTapped):
                 guard state.isMyProfileButtonVisible else { return .none }
-                return .send(.delegate(.myTabRequested))
+                return .send(.delegate(.myProfileRequested))
 
             // FIXME: 검색 화면 진입 (커뮤니티 검색 기능 도입 시 구현)
             case .view(.searchTapped):
@@ -417,7 +421,7 @@ public struct CommunityFeature: Sendable {
                     guard payload.isMe else {
                         return .send(.openUserProfile(userId: payload.userId))
                     }
-                    return .send(.delegate(.myTabRequested))
+                    return .send(.delegate(.myProfileRequested))
 
                 case let .unknown(type):
                     // 계약에 없는 타입 — 한쪽만 먼저 배포된 경우를 대비해 무시한다.
@@ -537,6 +541,21 @@ public struct CommunityFeature: Sendable {
             case let .detailCover(.presented(.delegate(delegate))):
                 return Self.handleDetailDelegate(delegate, from: .modal, into: &state)
 
+            // MARK: - 커뮤니티에서 연 MY 화면의 위임 (#197)
+
+            // '커뮤니티 활동'은 탭의 MY와 달리 MY 자기 스택이 아니라 이 커뮤니티 스택에 쌓는다.
+            // 그래야 그 안에서 여는 글·남의 프로필도 같은 스택에 쌓이고 뒤로가기 한 줄로 돌아온다.
+            case .path(.element(id: _, action: .myProfile(.delegate(.communityActivityRequested)))):
+                return Self.pushMyActivity(from: .push, into: &state)
+
+            case .coverPath(.element(id: _, action: .myProfile(.delegate(.communityActivityRequested)))):
+                return Self.pushMyActivity(from: .modal, into: &state)
+
+            // MY에서 바꾼 사진을 헤더의 내 사진에 바로 반영한다. 탭의 MY는 탭에 들어갈 때 다시 불러온다.
+            case let .path(.element(id: _, action: .myProfile(.delegate(.profileImageChanged(url))))),
+                 let .coverPath(.element(id: _, action: .myProfile(.delegate(.profileImageChanged(url))))):
+                return .send(.myProfileImageChanged(url.flatMap(URL.init(string:))))
+
             // 알림함에서 읽은 알림을 점에 반영한다. forEach보다 먼저 실행돼 pop 대상이 아직 스택에 남아 있다.
             // 알림함 위에 쌓인 상세까지 한 번에 닫히는 경우도 있어 pop 범위 전체를 본다.
             case let .path(.popFrom(id)):
@@ -644,10 +663,44 @@ public struct CommunityFeature: Sendable {
         case .tokenRefreshRequested:
             return .send(.delegate(.tokenRefreshRequested))
         case .myTabRequested:
-            return .send(.delegate(.myTabRequested))
+            return .send(.delegate(.myProfileRequested))
         case let .userProfileRequested(userId):
             // 모달 안이면 openUserProfile이 모달 스택에 쌓는다
             return .send(.openUserProfile(userId: userId))
+        }
+    }
+
+    /// MY 화면의 '커뮤니티 활동'(내 글·댓글 웹)을 그 MY가 놓인 스택에 쌓는다(#197).
+    private static func pushMyActivity(from container: SubviewContainer, into state: inout State) -> Effect<Action> {
+        guard let base = state.url, let url = myActivityURL(base: base) else { return .none }
+        let detail = CommunityDetailFeature.State(url: url, accessToken: state.accessToken)
+        switch container {
+        case .push: state.path.append(.detail(detail))
+        case .modal: state.coverPath.append(.detail(detail))
+        }
+        return .none
+    }
+
+    /// 커뮤니티에서 MY 화면을 연다(#197). 상세 모달이 떠 있으면 모달 안 스택에 쌓는다.
+    /// 남의 프로필처럼 누른 화면 위에 쌓아, 뒤로가기를 누르면 누른 그 화면(글 상세 등)으로 돌아간다.
+    /// 연타·중복 전달로 MY가 겹쳐 쌓이지 않게 맨 위가 이미 MY면 그대로 둔다.
+    public static func pushMyProfile(_ profile: MyProfileFeature.State, into state: inout State) {
+        let top = state.detailCover != nil ? state.coverPath.last : state.path.last
+        if case .myProfile? = top { return }
+        if state.detailCover != nil {
+            state.coverPath.append(.myProfile(profile))
+        } else {
+            state.path.append(.myProfile(profile))
+        }
+    }
+
+    /// 로그아웃·탈퇴 때 이전 계정으로 연 MY 화면을 닫는다(#197). 그 위에 쌓인 화면도 MY에서 연 것이라 함께 닫는다.
+    public static func closeMyProfiles(into state: inout State) {
+        if let index = state.path.firstIndex(where: { if case .myProfile = $0 { true } else { false } }) {
+            state.path.removeSubrange(index...)
+        }
+        if let index = state.coverPath.firstIndex(where: { if case .myProfile = $0 { true } else { false } }) {
+            state.coverPath.removeSubrange(index...)
         }
     }
 

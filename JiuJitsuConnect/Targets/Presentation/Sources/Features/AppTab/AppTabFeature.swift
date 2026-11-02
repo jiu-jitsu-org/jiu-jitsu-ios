@@ -167,6 +167,8 @@ public struct AppTabFeature: Sendable {
                 state.authInfo = .guest
                 state.myPage = MyProfileFeature.State(authInfo: .guest)
                 state.settings = SettingsFeature.State(authInfo: .guest)
+                // 이전 계정으로 커뮤니티에 쌓아 둔 MY 화면도 닫는다(#197).
+                CommunityFeature.closeMyProfiles(into: &state.home)
                 state.selectedTab = .home
                 // 웹 세션도 함께 정리.
                 return .send(.home(.session(.loggedOut)))
@@ -175,6 +177,8 @@ public struct AppTabFeature: Sendable {
                 state.authInfo = .guest
                 state.myPage = MyProfileFeature.State(authInfo: .guest)
                 state.settings = SettingsFeature.State(authInfo: .guest)
+                // 이전 계정으로 커뮤니티에 쌓아 둔 MY 화면도 닫는다(#197).
+                CommunityFeature.closeMyProfiles(into: &state.home)
                 state.selectedTab = .home
                 return .merge(
                     .send(.home(.session(.loggedOut))),
@@ -207,11 +211,19 @@ public struct AppTabFeature: Sendable {
                 Log.trace("커뮤니티 로그인 모달 요청: reason=\(reason ?? "-")", category: .view, level: .info)
                 return .send(.internal(.showLoginModal))
 
-            // 헤더의 내 사진 버튼(#128)·웹에서 내 이름 탭(#116). 탭바에서 MY를 누른 것과 같은 경로라 프로필 재조회·게스트 처리도 그대로 따른다.
+            // 커뮤니티의 내 사진 버튼(#128)·피드·글 상세·댓글에서 내 이름 탭(#116).
+            // 남의 사진을 누를 때처럼 MY 화면을 커뮤니티 스택에 쌓아 뒤로가기로 돌아오게 한다(#197).
+            // 탭의 MY가 불러 둔 프로필을 넘겨 바로 그린다. 게스트는 탭바에서 MY를 누른 것과 같이 로그인 안내를 띄운다.
+            case .home(.delegate(.myProfileRequested)):
+                guard !state.authInfo.isGuest else {
+                    return .send(.internal(.showLoginPromptAlert))
+                }
+                CommunityFeature.pushMyProfile(.pushed(from: state.myPage), into: &state.home)
+                return .none
+
+            // MY·설정 탭 웹 서브뷰에서 내 이름 탭. 탭바에서 MY를 누른 것과 같은 경로라 프로필 재조회도 그대로 따른다.
             // 내 사진은 내 프로필을 뜻하므로, MY에 열어 둔 하위 화면(커뮤니티 활동 등)은 닫고 프로필 첫 화면으로 보낸다.
-            // 홈의 모달 상세는 탭 전체를 덮어서, 닫지 않으면 MY로 바뀌어도 화면에 아무 변화가 없다.
-            case .home(.delegate(.myTabRequested)),
-                 .myPage(.delegate(.webSubview(.myTabRequested))),
+            case .myPage(.delegate(.webSubview(.myTabRequested))),
                  .settings(.delegate(.webSubview(.myTabRequested))):
                 if !state.authInfo.isGuest {
                     state.myPage.path.removeAll()
@@ -319,6 +331,8 @@ public struct AppTabFeature: Sendable {
                 state.authInfo = .guest
                 state.myPage = MyProfileFeature.State(authInfo: .guest)
                 state.settings = SettingsFeature.State(authInfo: .guest)
+                // 이전 계정으로 커뮤니티에 쌓아 둔 MY 화면도 닫는다(#197).
+                CommunityFeature.closeMyProfiles(into: &state.home)
                 state.selectedTab = .home
                 return .send(.home(.session(.loggedOut)))
 
@@ -359,6 +373,8 @@ public struct AppTabFeature: Sendable {
                 state.authInfo = .guest
                 state.myPage = MyProfileFeature.State(authInfo: .guest)
                 state.settings = SettingsFeature.State(authInfo: .guest)
+                // 이전 계정으로 커뮤니티에 쌓아 둔 MY 화면도 닫는다(#197).
+                CommunityFeature.closeMyProfiles(into: &state.home)
                 state.selectedTab = .home
                 return .merge(
                     .run { _ in await authClient.signOut() },

@@ -13,6 +13,8 @@ import Domain
 // MARK: - Layout Metrics
 
 private enum Metrics {
+    // 아래 탭바 높이(AppTabView와 같은 값)
+    static let tabBarHeight: CGFloat = 58
     // 카드가 헤더와 겹치는 높이 — 도장명 유무에 따라 분기 적용
     enum Card {
         static let overlapWithButton: CGFloat = 46.49
@@ -57,8 +59,41 @@ public struct MyProfileView: View {
     }
     
     // MARK: - Body
-    
+
     public var body: some View {
+        screen
+            // 커뮤니티에서 연 MY(#197)는 남의 프로필처럼 왼쪽 위에 뒤로가기를 둔다.
+            // 바깥은 safe area를 지켜 뒤로가기가 상태바 아래에 온다(헤더만 위로 꽉 채움).
+            // 세로는 같은 줄 오른쪽 "..." 버튼(safe area + 12, 높이 32)과 가운데를 맞춘다 — 터치 40이라 위 8.
+            .overlay(alignment: .topLeading) {
+                if store.isPushed {
+                    backButton
+                        .padding(.leading, 8)
+                        .padding(.top, 8)
+                }
+            }
+            .toolbar(store.isPushed ? .hidden : .automatic, for: .navigationBar)
+            .navigationBarBackButtonHidden(store.isPushed)
+    }
+
+    // 남의 프로필(UserProfileView)·웹 상세의 뒤로가기와 같은 자리·크기(아이콘 24 / 터치 40). 띠 색 헤더 위라 흰색.
+    private var backButton: some View {
+        Button {
+            store.send(.view(.backTapped))
+        } label: {
+            Assets.Common.Icon.chevronLeft.swiftUIImage
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 24, height: 24)
+                .foregroundStyle(Color.component.list.setting.background)
+                .frame(width: 40, height: 40)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var screen: some View {
         GeometryReader { geometry in
             let safeAreaTop = geometry.safeAreaInsets.top
             let safeAreaBottom = geometry.safeAreaInsets.bottom
@@ -112,7 +147,8 @@ public struct MyProfileView: View {
 
                     // 배경 그라데이션 (디폴트 화면일 때만)
                     if showsDefaultScreen {
-                        backgroundGradient(safeAreaBottom: safeAreaBottom)
+                        // 탭의 MY는 아래 탭바(58) 밑까지 내린다. 커뮤니티에서 연 MY는 탭바가 없다(#197).
+                        backgroundGradient(bottomOffset: (store.isPushed ? 0 : Metrics.tabBarHeight) + safeAreaBottom)
                     }
                 }
             }
@@ -276,7 +312,7 @@ public struct MyProfileView: View {
     }
     
     /// 배경 그라데이션
-    private func backgroundGradient(safeAreaBottom: CGFloat) -> some View {
+    private func backgroundGradient(bottomOffset: CGFloat) -> some View {
         VStack {
             Spacer()
             LinearGradient(
@@ -289,7 +325,7 @@ public struct MyProfileView: View {
             )
             .frame(height: 433)
         }
-        .offset(y: 58 + safeAreaBottom)
+        .offset(y: bottomOffset)
         .allowsHitTesting(false)
         .zIndex(-1)
     }
