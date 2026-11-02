@@ -66,6 +66,8 @@ struct CompetitionRequestDTO: Codable {
     let competitionYear: Int
     let competitionName: String
     let competitionPinned: Bool
+    // 회원이 끌어서 정한 자리. 정한 적 없으면 키를 보내지 않는다(목록 전체 교체라 서버에서 null이 된다).
+    let competitionDisplayOrder: Int?
     // 자동완성에서 고른 등록 대회. 직접 입력이면 키를 보내지 않는다.
     let competitionId: Int?
     let divisions: [CompetitionDivisionRequestDTO]
@@ -105,6 +107,8 @@ struct CompetitionRequestDTO: Codable {
         self.competitionName = first.competitionName.trimmingCharacters(in: .whitespaces)
         // 고정은 대회 단위 — 부문 중 하나라도 고정이면 대회를 고정한다.
         self.competitionPinned = competitions.contains(where: \.isPinned)
+        // 자리도 대회 단위 — 앱에서 한 줄로 묶인 부문들은 같은 자리를 갖지만, 다르면 가장 앞 자리를 쓴다.
+        self.competitionDisplayOrder = competitions.compactMap(\.displayOrder).min()
         self.competitionId = competitionId
         self.divisions = competitions.map(CompetitionDivisionRequestDTO.init(from:))
     }

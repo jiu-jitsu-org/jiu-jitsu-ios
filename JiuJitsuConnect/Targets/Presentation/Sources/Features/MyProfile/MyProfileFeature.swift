@@ -171,6 +171,7 @@ public struct MyProfileFeature: Sendable {
             case addDivisionTapped([Competition])     // 저장한 대회에 부문 추가 (그 대회의 기록들)
             case deleteCompetitionConfirmed([Competition])  // 대회 시트에서 삭제 확인 (그 대회의 부문 전부)
             case competitionPinToggled([Competition])  // 대회 줄 ⋯ 메뉴 '맨 위에 고정'/'고정 해제' — 묶인 부문 전부 (#124)
+            case competitionsReordered([[Competition]])  // 대회 줄을 끌어 옮기고 '완료' — 순서가 바뀐 묶음(고정/고정 안 함)의 줄별 부문들, 위에서부터 (#204)
             case moreButtonTapped                   // 우측 상단 "..." 버튼 탭 (토글)
             case instructorVerificationMenuTapped   // "관장 사범 인증" 메뉴 항목 탭
             case imagePicked(Data)                  // 카메라/앨범 픽커에서 이미지 선택됨
@@ -208,6 +209,8 @@ public struct MyProfileFeature: Sendable {
             case competitionUpdated(CommunityProfile) // 대회 정보 수정 저장 완료
             case competitionDeleted(CommunityProfile) // 대회 정보 삭제 저장 완료
             case competitionPinUpdated(CommunityProfile, isPinned: Bool) // 대회 고정/해제 저장 완료
+            case competitionOrderSaved(CommunityProfile)    // 대회 순서 저장 완료
+            case competitionOrderReverted(CommunityProfile) // 대회 순서 저장 실패 — 바꾸기 전 목록으로 되돌림
             
             case showToast(ToastState)
             case toastDismissed
@@ -1015,6 +1018,36 @@ public struct MyProfileFeature: Sendable {
                         await send(.internal(.updateProfileResponse(.failure(error))))
                     }
                 }
+
+            case let .view(.competitionsReordered(groups)):
+                // 끌어 옮긴 뒤 머리줄 '완료'에서 순서가 바뀐 묶음만 한 번에 저장한다. 저장 중에는 '완료'가 막혀 있다.
+                guard let profile = state.communityProfile, !state.isLoadingProfile else { return .none }
+                let updatedProfile = profile.reorderingCompetitions(groups)
+                guard updatedProfile != profile else { return .none }
+                // 끌어 놓은 순서가 저장을 기다리는 동안 원래 자리로 튀었다 돌아오지 않게 먼저 화면에 반영한다.
+                state.communityProfile = updatedProfile
+                state.isLoadingProfile = true
+                return .run { send in
+                    let result = await TaskResult {
+                        try await communityClient.updateProfile(updatedProfile, .competition)
+                    }
+                    switch result {
+                    case .success(let saved):
+                        await send(.internal(.competitionOrderSaved(saved)))
+                    case .failure(let error):
+                        await send(.internal(.competitionOrderReverted(profile)))
+                        await send(.internal(.updateProfileResponse(.failure(error))))
+                    }
+                }
+
+            case let .internal(.competitionOrderSaved(profile)):
+                state.isLoadingProfile = false
+                state.communityProfile = profile
+                return .none
+
+            case let .internal(.competitionOrderReverted(profile)):
+                state.communityProfile = profile
+                return .none
 
             case let .internal(.competitionPinUpdated(profile, isPinned)):
                 state.isLoadingProfile = false

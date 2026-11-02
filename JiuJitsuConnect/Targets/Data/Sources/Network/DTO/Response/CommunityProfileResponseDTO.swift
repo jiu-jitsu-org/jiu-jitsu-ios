@@ -78,6 +78,8 @@ struct CompetitionDTO: Codable {
     // 대회명 없는 기록은 ""로 온다.
     let competitionName: String
     let competitionPinned: Bool?
+    // 회원이 끌어서 정한 자리(고정한 대회끼리, 고정 안 한 대회끼리 각각 0이 맨 위). 정한 적 없으면 null.
+    let competitionDisplayOrder: Int?
     // 등록 대회에서 고른 기록이면 ID, 직접 입력이면 null.
     let competitionId: Int?
     let divisions: [CompetitionDivisionDTO]?
@@ -88,6 +90,7 @@ struct CompetitionDTO: Codable {
                 year: competitionYear,
                 name: competitionName,
                 isPinned: competitionPinned ?? false,
+                displayOrder: competitionDisplayOrder,
                 competitionId: competitionId
             )
         }
@@ -116,7 +119,7 @@ struct CompetitionDivisionDTO: Codable {
         }
     }
 
-    func toDomain(year: Int, name: String, isPinned: Bool, competitionId: Int?) -> Competition {
+    func toDomain(year: Int, name: String, isPinned: Bool, displayOrder: Int?, competitionId: Int?) -> Competition {
         // 모르는 값은 부문 없음으로 둔다 — 값이 늘어나도 프로필 전체 디코딩이 깨지지 않게.
         Competition(
             competitionYear: year,
@@ -127,6 +130,7 @@ struct CompetitionDivisionDTO: Codable {
             competitionAbsolute: competitionAbsolute ?? false,
             competitionBelt: competitionBelt.flatMap(BeltRank.init(rawValue:)),
             isPinned: isPinned,
+            displayOrder: displayOrder,
             competitionId: competitionId
         )
     }

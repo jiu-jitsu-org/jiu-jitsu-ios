@@ -273,7 +273,9 @@ public struct MyProfileView: View {
                 // 이전 시트가 닫힘 신호 없이 사라졌을 때 남은 동작이 이번 시트를 닫을 때 실행되지 않게 비운다.
                 pendingCompetitionAction = nil
                 competitionSheet = CompetitionSheetTarget(entries: entries)
-            }
+            },
+            onCompetitionsReordered: { store.send(.view(.competitionsReordered($0))) },
+            isSaving: store.isLoadingProfile
         )
     }
 
