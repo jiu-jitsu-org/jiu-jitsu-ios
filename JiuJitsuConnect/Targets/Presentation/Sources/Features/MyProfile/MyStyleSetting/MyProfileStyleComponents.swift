@@ -11,9 +11,10 @@ import Domain
 
 // MARK: - MyProfileStyleSectionView
 
-/// 최애 스타일 섹션 (포지션 · 기술 · 서브미션 최애 한 칸씩)
+/// 최애 기술 섹션 (포지션 · 기술 · 서브미션 최애 한 칸씩)
 ///
-/// 포지션·서브미션은 '기술'에 들지 않아, 셋을 아우르는 이름으로 앱이 이미 쓰는 '스타일'을 쓴다.
+/// 제목은 '최애 기술'이다(#199). '최애 스타일'은 무엇을 말하는지 애매하다는 피드백이 있어,
+/// 포지션·서브미션까지 넓게 '기술'로 묶어 부른다.
 ///
 /// 특기는 자기 평가라 입력 부담이 커서 최애만 보여 준다(#118). 남이 보는 프로필도 같은 모양을 쓴다.
 public struct MyProfileStyleSectionView: View {
@@ -56,7 +57,7 @@ public struct MyProfileStyleSectionView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("최애 스타일")
+            Text("최애 기술")
                 .font(.pretendard.title3)
                 .foregroundStyle(Color.component.sectionHeader.title)
 
