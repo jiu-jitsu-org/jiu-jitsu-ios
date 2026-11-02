@@ -44,6 +44,8 @@ public struct AppTabView: View {
                         CommunityDetailView(store: detailStore)
                     case let .userProfile(profileStore):
                         UserProfileView(store: profileStore)
+                    case let .myProfile(myStore):
+                        MyProfileView(store: myStore)
                     }
                 }
             }
@@ -100,6 +102,8 @@ public struct AppTabView: View {
                     CommunityDetailView(store: detailStore)
                 case let .userProfile(profileStore):
                     UserProfileView(store: profileStore)
+                case let .myProfile(myStore):
+                    MyProfileView(store: myStore)
                 }
             }
         }
