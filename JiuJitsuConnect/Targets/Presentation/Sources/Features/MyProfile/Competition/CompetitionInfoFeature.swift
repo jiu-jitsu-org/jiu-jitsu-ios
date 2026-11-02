@@ -592,7 +592,7 @@ public struct CompetitionInfoFeature: Sendable {
         weightLimit: CompetitionWeightLimit?,
         isAbsolute: Bool
     ) -> Effect<Action> {
-        // 새 기록은 월 없이 저장하고, 월이 있던 기존 기록은 수정해도 원래 월·고정 여부를 유지한다.
+        // 새 기록은 월 없이 저장하고, 월이 있던 기존 기록은 수정해도 원래 월·고정 여부·자리를 유지한다.
         let original: Competition? = if case let .edit(original) = state.mode { original } else { nil }
         let competition = Competition(
             competitionYear: state.year,
@@ -604,6 +604,7 @@ public struct CompetitionInfoFeature: Sendable {
             competitionAbsolute: isAbsolute,
             competitionBelt: belt,
             isPinned: original?.isPinned ?? false,
+            displayOrder: original?.displayOrder,
             competitionId: state.linkedCompetition?.id
         )
         switch state.mode {
