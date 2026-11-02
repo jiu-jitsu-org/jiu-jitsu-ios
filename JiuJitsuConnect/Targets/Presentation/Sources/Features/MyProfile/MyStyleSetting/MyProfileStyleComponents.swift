@@ -66,7 +66,9 @@ public struct MyProfileStyleSectionView: View {
                     FavoriteStyleCardItem(
                         category: item.type.title,
                         style: item.style,
-                        emptyText: onStyleCardTapped == nil ? "아직 안 골랐어요" : "지정해주세요",
+                        // 좁은 기기(375pt)에서는 한 줄에 다 들어가지 않아 '지정해주세/요'로 끊긴다.
+                        // 보이지 않는 줄바꿈 자리(U+200B)를 두어 넘어갈 때는 '지정해/주세요'로 넘어가게 한다.
+                        emptyText: onStyleCardTapped == nil ? "아직 안 골랐어요" : "지정해\u{200B}주세요",
                         onTapped: tapAction(for: item.type)
                     )
                 }
@@ -101,20 +103,20 @@ private struct FavoriteStyleCardItem: View {
                 style.iconImage.swiftUIImage
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 32, height: 32)
+                    .frame(width: 36, height: 36)
             } else {
-                RoundedRectangle(cornerRadius: 11)
+                RoundedRectangle(cornerRadius: 12)
                     .fill(Color.primitive.coolGray.cg50)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 36, height: 36)
             }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(category)
-                    .font(Font.pretendard.labelM)
+                    .font(Font.pretendard.bodyS)
                     .foregroundStyle(Color.component.skillCard.default.labelText)
 
                 Text(style?.tabTitle ?? emptyText)
-                    .font(.pretendard.custom(weight: .semiBold, size: 14))
+                    .font(.pretendard.custom(weight: .semiBold, size: 16))
                     .foregroundStyle(
                         style == nil
                             ? Color.component.skillCard.default.titleTextEmpty
@@ -125,7 +127,8 @@ private struct FavoriteStyleCardItem: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(14)
+        // 세 칸이라 폭이 좁아, 글자를 키운 만큼 안쪽 여백을 줄여 긴 이름(「이스케이프 디펜스」)이 두 줄 안에 들게 한다.
+        .padding(12)
         .background(Color.component.skillCard.default.bg)
         .clipShape(RoundedRectangle(cornerRadius: 18))
     }
