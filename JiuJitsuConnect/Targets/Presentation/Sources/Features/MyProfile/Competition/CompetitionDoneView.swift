@@ -31,10 +31,11 @@ struct CompetitionDoneView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 64, height: 64)
-                    // 회원가입 완료와 같은 꽃가루를 메달 뒤에서 한 번 터뜨린다. 부문을 더해 저장할 때마다 다시 터진다.
+                    // 띠 색(흰·파랑·보라·갈색·검정)으로 칠한 꽃가루를 메달 뒤에서 한 번 터뜨린다(#211). 부문을 더해 저장할 때마다 다시 터진다.
+                    // 회원가입 완료는 원래 색 Confetti를 그대로 쓴다.
                     .background {
                         if store.celebratesOnDone {
-                            JJSLottieView("Confetti", loopMode: .playOnce)
+                            JJSLottieView("ConfettiBelt", loopMode: .playOnce)
                                 .frame(width: 280, height: 280)
                                 .allowsHitTesting(false)
                         }
