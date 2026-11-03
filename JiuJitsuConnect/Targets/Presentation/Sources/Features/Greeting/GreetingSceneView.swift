@@ -34,6 +34,9 @@ struct GreetingSceneView: View {
                 onFinish()
                 return
             }
+            // 이 장면은 홈·커뮤니티 웹뷰와 함께 만들어져 첫 프레임이 무겁다. 그 그리기가 끝난 뒤부터 재야
+            // 느린 기기에서도 글자·그래픽이 중간부터 튀어 나오지 않는다(#207)
+            await DisplayFrame.next()
             start = .now
             guard await pause(Timing.cover) else { return }
             onCover()
