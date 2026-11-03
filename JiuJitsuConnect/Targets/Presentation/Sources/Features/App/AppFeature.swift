@@ -26,6 +26,8 @@ public struct AppFeature: Sendable {
         var pendingDeepLink: DeepLink?
         /// 자동 로그인으로 들어온 사람에게 홈 위에 덮어 보여주는 인사 장면. nil이면 장면 없이 홈만 보인다.
         var greeting: Greeting?
+        /// 인사 중이라 미뤄 둔 앱 진입 FCM sync. 알림 권한 창이 인사 장면을 가리지 않게 인사가 끝난 뒤 돌린다(#216).
+        var isLaunchSyncDeferred = false
 
         public init() {}
     }
@@ -77,7 +79,7 @@ public struct AppFeature: Sendable {
                 .cancellable(id: CancelID.pushTapObserver, cancelInFlight: true)
 
             case let .view(.deepLinkReceived(url)):
-                return Self.route(url, into: &state)
+                return .merge(Self.route(url, into: &state), runDeferredLaunchSync(&state))
 
             case .view(.greetingCoverStarted):
                 guard state.greeting != nil else { return .none }
@@ -86,13 +88,13 @@ public struct AppFeature: Sendable {
 
             case .view(.greetingFinished):
                 state.greeting = nil
-                return .none
+                return runDeferredLaunchSync(&state)
 
             case let .internal(.pushNotificationTapped(payload)):
                 // 푸시 payload를 공유 링크와 같은 URL로 바꿔 동일 파이프라인에 태운다.
                 // 미지원 type은 nil → 앱만 열린 채로 둔다(#28 미지원 값 처리).
                 guard let url = PushActionRouter.makeURL(from: payload) else { return .none }
-                return Self.route(url, into: &state)
+                return .merge(Self.route(url, into: &state), runDeferredLaunchSync(&state))
 
                 // MARK: - Navigation Logic
 
@@ -101,16 +103,13 @@ public struct AppFeature: Sendable {
                     state.destination = .appTab(.init(authInfo: authInfo))
                     // 공유 링크·푸시로 들어왔으면 그 글을 바로 보여줘야 해 인사를 건너뛴다
                     state.greeting = state.pendingDeepLink == nil ? .playing : nil
-                    // 앱 진입 FCM sync: 로그인 상태일 때만 실행 (취소되지 않음)
-                    return .merge(
-                        Self.consumePendingDeepLink(&state),
-                        .run { _ in
-                            await FCMAppInfoSync.syncOnAppLaunch(
-                                firebaseClient: self.firebaseClient,
-                                userClient: self.userClient
-                            )
-                        }
-                    )
+                    // 앱 진입 FCM sync: 로그인 상태일 때만 실행 (취소되지 않음).
+                    // 처음 받는 사람에게는 알림 권한 창이 뜨므로, 인사 중이면 인사가 끝날 때까지 미룬다(#216)
+                    if state.greeting != nil {
+                        state.isLaunchSyncDeferred = true
+                        return Self.consumePendingDeepLink(&state)
+                    }
+                    return .merge(Self.consumePendingDeepLink(&state), launchSync())
                 } else if state.pendingDeepLink != nil {
                     // 공유 링크로 들어온 비로그인 사용자. 게시글 상세는 비로그인 접근 가능 정책이라
                     // 로그인 화면을 세우지 않고 게스트로 바로 글을 보여준다.
@@ -145,6 +144,23 @@ public struct AppFeature: Sendable {
         }
         // ifLet runs AFTER parent logic to handle child state
         .ifLet(\.$destination, action: \.destination)
+    }
+
+    /// 앱 진입 FCM sync. 알림 권한을 아직 묻지 않았으면 여기서 권한 창이 뜬다.
+    private func launchSync() -> Effect<Action> {
+        .run { _ in
+            await FCMAppInfoSync.syncOnAppLaunch(
+                firebaseClient: self.firebaseClient,
+                userClient: self.userClient
+            )
+        }
+    }
+
+    /// 인사가 끝났거나(딥링크로) 접혔으면 미뤄 둔 앱 진입 sync를 돌린다.
+    private func runDeferredLaunchSync(_ state: inout State) -> Effect<Action> {
+        guard state.isLaunchSyncDeferred, state.greeting == nil else { return .none }
+        state.isLaunchSyncDeferred = false
+        return launchSync()
     }
 
     /// 유니버설 링크·커스텀 스킴·푸시 탭이 모두 거치는 단일 진입점.
