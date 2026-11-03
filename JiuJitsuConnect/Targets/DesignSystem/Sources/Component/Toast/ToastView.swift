@@ -34,6 +34,8 @@ public struct ToastView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// 손가락으로 끄는 중인 거리. 놓으면 제자리로 돌아오거나 닫힌다.
     @State private var drag: CGSize = .zero
+    /// 손가락이 닿아 있는지 — 끌기가 중간에 끊겨(시스템 제스처 등) onEnded가 안 와도 제자리로 돌리려고 둔다.
+    @GestureState private var isDragging = false
 
     /// 이만큼 아래로(또는 옆으로) 밀고 놓으면 닫는다.
     private static let dismissDown: CGFloat = 36
@@ -42,6 +44,8 @@ public struct ToastView: View {
     public var body: some View {
         HStack(spacing: 8) {
             // 다시 불릴 때마다(id가 바뀔 때마다) 아이콘·글자 줄만 새로 올라온다.
+            // 바뀌는 동안 앞 글자와 새 글자가 옆으로 나란히 서지 않게 겹쳐 둔다.
+            ZStack(alignment: .leading) {
             HStack(spacing: 12) {
                 ToastStatusIcon(status: state.status)
                 Text(state.message)
@@ -53,6 +57,7 @@ public struct ToastView: View {
             }
             .id(state.id)
             .transition(contentTransition)
+            }
 
             if let button = state.button {
                 Button(button.title) {
@@ -75,6 +80,7 @@ public struct ToastView: View {
         .opacity(dragOpacity)
         .gesture(
             DragGesture(minimumDistance: 8, coordinateSpace: .local)
+                .updating($isDragging) { _, dragging, _ in dragging = true }
                 .onChanged { drag = $0.translation }
                 .onEnded { value in
                     if value.translation.height > Self.dismissDown
@@ -86,7 +92,20 @@ public struct ToastView: View {
                     }
                 }
         )
-        .accessibilityElement(children: .combine)
+        .onChange(of: isDragging) { _, dragging in
+            // 닫힐 만큼 밀지 않았는데 끌기가 끝났으면 제자리로 돌아온다.
+            guard !dragging, drag.height <= Self.dismissDown, abs(drag.width) <= Self.dismissSide else { return }
+            withAnimation(.spring(duration: 0.35, bounce: 0.2)) { drag = .zero }
+        }
+        // 버튼은 VoiceOver에서 따로 누를 수 있게 남긴다.
+        .accessibilityElement(children: .contain)
+        .onAppear { announce() }
+        .onChange(of: state.id) { _, _ in announce() }
+    }
+
+    /// 2초 만에 사라지므로 VoiceOver 사용자에게 문구를 바로 읽어 준다.
+    private func announce() {
+        AccessibilityNotification.Announcement(state.message).post()
     }
 
     /// 아래로는 손가락을 그대로, 위로는 1/4만 따라온다(위로는 닫히지 않음을 손끝으로 알림).
