@@ -395,18 +395,11 @@ private extension View {
 
     /// 토스트 오버레이
     func toastOverlay(store: StoreOf<MyProfileFeature>) -> some View {
-        self.overlay(alignment: .bottom) {
-            if let toastState = store.toast {
-                ToastView(
-                    state: toastState,
-                    onSwipe: { store.send(.internal(.toastDismissed), animation: .default) },
-                    onButtonTapped: { store.send(.view(.toastButtonTapped($0)), animation: .default) }
-                )
-                .padding(.horizontal, 24)
-                .padding(.bottom, toastState.bottomPadding)
-                .animation(.default, value: toastState)
-            }
-        }
+        self.toast(
+            store.toast,
+            onSwipe: { store.send(.internal(.toastDismissed)) },
+            onButtonTapped: { store.send(.view(.toastButtonTapped($0))) }
+        )
     }
     
     /// 시트 프레젠테이션

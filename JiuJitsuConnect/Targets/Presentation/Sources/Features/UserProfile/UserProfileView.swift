@@ -42,18 +42,12 @@ public struct UserProfileView: View {
                 .padding(.leading, 8)
                 .padding(.top, 2)
         }
-        .overlay(alignment: .bottom) {
-            if let toast = store.toast {
-                ToastView(
-                    state: toast,
-                    onSwipe: { store.send(.view(.toastDismissed), animation: .default) },
-                    onButtonTapped: { _ in store.send(.view(.toastDismissed), animation: .default) }
-                )
-                .padding(.horizontal, 20)
-                .padding(.bottom, toast.bottomPadding)
-            }
-        }
-        .animation(.default, value: store.toast)
+        .toast(
+            store.toast,
+            horizontalPadding: 20,
+            onSwipe: { store.send(.view(.toastDismissed)) },
+            onButtonTapped: { _ in store.send(.view(.toastDismissed)) }
+        )
         .sheet(item: $store.scope(state: \.beltPrompt, action: \.beltPrompt)) { promptStore in
             BeltPromptView(store: promptStore)
                 // 저장 중에 내려 닫으면 저장이 끊기고 '나중에'로 7일 미뤄진다 — 저장이 끝날 때까지 막는다

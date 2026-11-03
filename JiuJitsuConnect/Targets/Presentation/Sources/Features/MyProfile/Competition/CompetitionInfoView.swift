@@ -84,19 +84,13 @@ struct CompetitionInfoView: View {
                     .transition(.opacity)
             }
         }
-        .overlay(alignment: .bottom) {
-            if let toast = store.toast {
-                ToastView(
-                    state: toast,
-                    onSwipe: { store.send(.view(.toastSwiped), animation: .default) },
-                    onButtonTapped: { _ in store.send(.view(.toastSwiped), animation: .default) }
-                )
-                .padding(.horizontal, 24)
-                // 아래 버튼(부문 단계는 완료 + 건너뛰기)을 가리지 않도록 버튼 위에 띄운다.
-                .padding(.bottom, 120)
-                .animation(.default, value: toast)
-            }
-        }
+        // 아래 버튼(부문 단계는 완료 + 건너뛰기)을 가리지 않도록 버튼 위에 띄운다.
+        .toast(
+            store.toast,
+            bottomPadding: 120,
+            onSwipe: { store.send(.view(.toastSwiped)) },
+            onButtonTapped: { _ in store.send(.view(.toastSwiped)) }
+        )
         // 저장 중에는 다시 누르거나 화면을 떠나지 못하게 막는다(중복 저장 방지).
         .disabled(store.isSaving)
         .navigationBarHidden(true)

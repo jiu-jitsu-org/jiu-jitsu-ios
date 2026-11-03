@@ -253,6 +253,31 @@ public struct ComponentColors {
             public let bg = Color.semantic.overlay.container
             public let text = Color.semantic.overlay.textPrimary
         }
+
+        // 상태 아이콘이 있는 짙은 토스트 — 웹 toast/… 토큰과 같은 값.
+        public let strong = Strong()
+        public let action = ActionText()
+        public let icon = Icon()
+
+        public struct Strong {
+            public let background = Color.primitive.coolGray.cg900
+            public let shadow = Color(red: 13 / 255, green: 13 / 255, blue: 13 / 255).opacity(0.22)
+        }
+        public struct ActionText {
+            public let text = Color.primitive.blue.b300
+            public let pressedBg = Color.semantic.surface.onDarkPressedBg
+        }
+        public struct Icon {
+            public let success = Color.primitive.blue.b300
+            public let info = Color.semantic.icon.subtle
+            /// Figma 팔레트에 아직 없는 노랑 — 토큰이 생기면 바꾼다(웹도 임시 값 #FFC233).
+            public let warning = Color(red: 1, green: 194 / 255, blue: 51 / 255)
+            public let error = Color.primitive.red.r500
+            /// 색 면 위의 짙은 기호
+            public let mark = Color.semantic.icon.primary
+            /// 실패 아이콘의 흰 기호
+            public let markOnError = Color.semantic.icon.onDark
+        }
     }
 
     // MARK: - Dialog
