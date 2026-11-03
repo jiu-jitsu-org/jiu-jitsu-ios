@@ -245,7 +245,7 @@ public struct SettingsFeature: Sendable {
                 if isSuccess {
                     return .send(.delegate(.didWithdrawSuccessfully))
                 } else {
-                    return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info))))
+                    return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, status: .error))))
                 }
 
             case let .internal(.withdrawalResponse(.failure(error))):
@@ -309,12 +309,12 @@ public struct SettingsFeature: Sendable {
 
     private func handleError(_ error: Error) -> Effect<Action> {
         guard let domainError = error as? DomainError else {
-            return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info))))
+            return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, status: .error))))
         }
         let displayError = DomainErrorMapper.toDisplayError(from: domainError)
         switch displayError {
         case .toast(let message), .info(let message), .alert(let message):
-            return .send(.internal(.showToast(.init(message: message, style: .info))))
+            return .send(.internal(.showToast(.init(message: message, status: .error))))
         case .none:
             return .none
         }

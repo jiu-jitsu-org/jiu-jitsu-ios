@@ -569,7 +569,7 @@ public struct CompetitionInfoFeature: Sendable {
 
     /// 이 화면 안에서 토스트를 띄운다. 이 화면이 MY 화면 위에 push돼 있어 MY 화면 토스트는 가려지기 때문이다.
     private func showToast(_ state: inout State, message: String) -> Effect<Action> {
-        let toast = ToastState(message: message, style: .info)
+        let toast = ToastState(message: message, status: .error)
         state.toast = toast
         return .run { [clock] send in
             try await clock.sleep(for: toast.duration)

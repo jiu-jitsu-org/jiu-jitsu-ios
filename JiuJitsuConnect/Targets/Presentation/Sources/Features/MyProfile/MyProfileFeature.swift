@@ -328,7 +328,7 @@ public struct MyProfileFeature: Sendable {
             case let .internal(.profileResponse(.failure(error))):
                 state.isLoadingProfile = false
                 Log.trace("Failed to load profile: \(error)", category: .network, level: .error)
-                return .send(.internal(.showToast(.init(message: "프로필을 불러오는데 실패했어요", style: .info))))
+                return .send(.internal(.showToast(.init(message: "프로필을 불러오는데 실패했어요", status: .error))))
                 
             case .view(.gymInfoButtonTapped):
                 // 도장 정보 입력 화면으로 네비게이션
@@ -410,7 +410,7 @@ public struct MyProfileFeature: Sendable {
                 state.destination = nil
                 state.communityProfile = state.communityProfile?.updatingNickname(nickname)
                 return .send(.internal(.showToast(.init(
-                    message: "닉네임 수정을 완료했어요", style: .info
+                    message: "닉네임 수정을 완료했어요", status: .success
                 ))))
                 
             case .destination(.presented(.nicknameSetting(.delegate(.cancel)))):
@@ -451,7 +451,7 @@ public struct MyProfileFeature: Sendable {
                 
             case let .internal(.saveBeltInfoOnly(rank, stripe)):
                 guard let profile = state.communityProfile else {
-                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
                 
                 Log.trace("벨트 수정 - 기존: \(profile.beltRank?.displayName ?? "없음") \(profile.beltStripe?.displayName ?? ""), 새로운: \(rank.displayName) \(stripe.displayName)", category: .debug, level: .info)
@@ -476,7 +476,7 @@ public struct MyProfileFeature: Sendable {
 
             case let .internal(.updateProfileSection(section, value)):
                 guard let profile = state.communityProfile else {
-                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
 
                 // 섹션별로 업데이트할 필드 설정
@@ -505,7 +505,7 @@ public struct MyProfileFeature: Sendable {
 
             case let .internal(.savePosition(best, favorite)):
                 guard let profile = state.communityProfile else {
-                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
 
                 let updatedProfile = profile.updatingPosition(best: best, favorite: favorite)
@@ -526,7 +526,7 @@ public struct MyProfileFeature: Sendable {
 
             case let .internal(.saveSubmission(best, favorite)):
                 guard let profile = state.communityProfile else {
-                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
 
                 let updatedProfile = profile.updatingSubmission(best: best, favorite: favorite)
@@ -547,7 +547,7 @@ public struct MyProfileFeature: Sendable {
 
             case let .internal(.saveTechnique(best, favorite)):
                 guard let profile = state.communityProfile else {
-                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
 
                 let updatedProfile = profile.updatingTechnique(best: best, favorite: favorite)
@@ -573,7 +573,7 @@ public struct MyProfileFeature: Sendable {
                 state.communityProfile = profile
                 if case let .myStyleSetting(styleState) = state.destination, styleState.mode == .edit {
                     state.destination = nil
-                    return .send(.internal(.showToast(.init(message: "포지션을 저장했어요", style: .info))))
+                    return .send(.internal(.showToast(.init(message: "포지션을 저장했어요", status: .success))))
                 } else {
                     // register 플로우: 다음 단계(기술)로 이동
                     state.destination = .myStyleSetting(
@@ -592,7 +592,7 @@ public struct MyProfileFeature: Sendable {
                 state.communityProfile = profile
                 if case let .myStyleSetting(styleState) = state.destination, styleState.mode == .edit {
                     state.destination = nil
-                    return .send(.internal(.showToast(.init(message: "기술을 저장했어요", style: .info))))
+                    return .send(.internal(.showToast(.init(message: "기술을 저장했어요", status: .success))))
                 } else {
                     // register 플로우: 다음 단계(서브미션)로 이동
                     state.destination = .myStyleSetting(
@@ -611,11 +611,11 @@ public struct MyProfileFeature: Sendable {
                 state.communityProfile = profile
                 if case let .myStyleSetting(styleState) = state.destination, styleState.mode == .edit {
                     state.destination = nil
-                    return .send(.internal(.showToast(.init(message: "서브미션을 저장했어요", style: .info))))
+                    return .send(.internal(.showToast(.init(message: "서브미션을 저장했어요", status: .success))))
                 }
                 // register 플로우 마지막 단계: 프로필 화면으로 복귀
                 state.destination = nil
-                return .send(.internal(.showToast(.init(message: "모든 스타일 설정을 완료했어요", style: .info))))
+                return .send(.internal(.showToast(.init(message: "모든 스타일 설정을 완료했어요", status: .success))))
                 
             // MARK: - API 호출: 프로필 섹션 업데이트
                 
@@ -645,12 +645,12 @@ public struct MyProfileFeature: Sendable {
                     message = "프로필 수정을 완료했어요"
                 }
                 
-                return .send(.internal(.showToast(.init(message: message, style: .info))))
+                return .send(.internal(.showToast(.init(message: message, status: .success))))
                 
             case let .internal(.updateProfileResponse(.failure(error))):
                 state.isLoadingProfile = false
                 Log.trace("Failed to update profile: \(error)", category: .network, level: .error)
-                return .send(.internal(.showToast(.init(message: "저장에 실패했어요. 다시 시도해주세요", style: .info))))
+                return .send(.internal(.showToast(.init(message: "저장에 실패했어요. 다시 시도해주세요", status: .error))))
                 
             case let .internal(.showToast(toastState)):
                 state.toast = toastState
@@ -721,7 +721,7 @@ public struct MyProfileFeature: Sendable {
             case let .destination(.presented(.competitionInfo(.delegate(.didFinishAdding(competition))))):
                 guard let profile = state.communityProfile else {
                     state.destination = nil
-                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
                 Log.trace(
                     "대회 추가 요청: \(competition.competitionYear) \(competition.competitionName) \(competition.competitionRank.displayName)",
@@ -747,7 +747,7 @@ public struct MyProfileFeature: Sendable {
             case let .destination(.presented(.competitionInfo(.delegate(.didFinishEditing(original, updated))))):
                 guard let profile = state.communityProfile else {
                     state.destination = nil
-                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
                 Log.trace(
                     "대회 수정 요청: \(original.competitionName) → \(updated.competitionName)",
@@ -772,7 +772,7 @@ public struct MyProfileFeature: Sendable {
             case let .destination(.presented(.competitionInfo(.delegate(.didDelete(competition))))):
                 guard let profile = state.communityProfile else {
                     state.destination = nil
-                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
                 state.destination = nil
                 return deleteCompetitions([competition], from: profile, state: &state)
@@ -781,7 +781,7 @@ public struct MyProfileFeature: Sendable {
                 // 앞선 저장이 끝나기 전에 목록 전체를 다시 저장하면 그 저장을 덮어쓴다.
                 guard !state.isLoadingProfile else { return .none }
                 guard let profile = state.communityProfile else {
-                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", style: .info))))
+                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
                 return deleteCompetitions(entries, from: profile, state: &state)
 
@@ -790,7 +790,7 @@ public struct MyProfileFeature: Sendable {
                 state.communityProfile = profile
                 // 입력 화면이 완료 화면을 대신 보여 준다. 저장 중 화면이 닫혔으면(예외적) 토스트로 알린다.
                 guard case .competitionInfo? = state.destination else {
-                    return .send(.internal(.showToast(.init(message: "대회 정보를 추가했어요", style: .info))))
+                    return .send(.internal(.showToast(.init(message: "대회 정보를 추가했어요", status: .success))))
                 }
                 return .send(.destination(.presented(.competitionInfo(.saveFinished(.succeeded(competition))))))
 
@@ -798,19 +798,19 @@ public struct MyProfileFeature: Sendable {
                 state.isLoadingProfile = false
                 // MY 화면 토스트는 입력 화면에 가려지므로 입력 화면이 실패를 안내하고, 입력값을 지켜 다시 저장하게 한다.
                 guard case .competitionInfo? = state.destination else {
-                    return .send(.internal(.showToast(.init(message: "저장에 실패했어요. 다시 시도해주세요", style: .info))))
+                    return .send(.internal(.showToast(.init(message: "저장에 실패했어요. 다시 시도해주세요", status: .error))))
                 }
                 return .send(.destination(.presented(.competitionInfo(.saveFinished(.failed)))))
 
             case let .internal(.competitionUpdated(profile)):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
-                return .send(.internal(.showToast(.init(message: "대회 정보를 수정했어요", style: .info))))
+                return .send(.internal(.showToast(.init(message: "대회 정보를 수정했어요", status: .success))))
 
             case let .internal(.competitionDeleted(profile)):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
-                return .send(.internal(.showToast(.init(message: "대회 정보를 삭제했어요", style: .info))))
+                return .send(.internal(.showToast(.init(message: "대회 정보를 삭제했어요", status: .success))))
 
             case let .view(.addDivisionTapped(entries)):
                 guard !state.isLoadingProfile else { return .none }
@@ -833,7 +833,7 @@ public struct MyProfileFeature: Sendable {
                     guard pinnedCount < CompetitionGroup.maxPinnedCount else {
                         return .send(.internal(.showToast(.init(
                             message: "대표 기록은 \(CompetitionGroup.maxPinnedCount)개까지 고정할 수 있어요",
-                            style: .info
+                            status: .warning
                         ))))
                     }
                 }
@@ -885,7 +885,7 @@ public struct MyProfileFeature: Sendable {
                 state.isLoadingProfile = false
                 state.communityProfile = profile
                 let message = isPinned ? "맨 위에 고정했어요" : "고정을 해제했어요"
-                return .send(.internal(.showToast(.init(message: message, style: .info))))
+                return .send(.internal(.showToast(.init(message: message, status: .success))))
 
             case let .view(.competitionDetailTapped(competition)):
                 state.destination = .competitionInfo(
@@ -963,7 +963,7 @@ public struct MyProfileFeature: Sendable {
                 state.sheet = nil
                 guard let profile = state.userProfile else {
                     return .send(.internal(.showToast(.init(
-                        message: "프로필 정보를 불러올 수 없어요", style: .info
+                        message: "프로필 정보를 불러올 수 없어요", status: .error
                     ))))
                 }
                 // 삭제는 DELETE /api/image/{id} 사용 — 현재 이미지의 서버 파일 id가 필요하다.
@@ -971,7 +971,7 @@ public struct MyProfileFeature: Sendable {
                 guard let imageFileId = profile.profileImageFileId else {
                     Log.trace("프로필 이미지 - 삭제 불가(파일 id 없음)", category: .network, level: .error)
                     return .send(.internal(.showToast(.init(
-                        message: "이미지 정보를 불러올 수 없어 삭제하지 못했어요", style: .info
+                        message: "이미지 정보를 불러올 수 없어 삭제하지 못했어요", status: .error
                     ))))
                 }
                 let updatedProfile = profile.updatingProfileImage(url: nil, fileId: nil)
@@ -1060,7 +1060,7 @@ public struct MyProfileFeature: Sendable {
                 state.pendingImagePurpose = nil
                 guard state.userProfile != nil else {
                     return .send(.internal(.showToast(.init(
-                        message: "프로필 정보를 불러올 수 없어요", style: .info
+                        message: "프로필 정보를 불러올 수 없어요", status: .error
                     ))))
                 }
                 state.isLoadingProfile = true
@@ -1091,7 +1091,7 @@ public struct MyProfileFeature: Sendable {
                     state.isLoadingProfile = false
                     state.pendingProfileImageData = nil
                     return .send(.internal(.showToast(.init(
-                        message: "프로필 정보를 불러올 수 없어요", style: .info
+                        message: "프로필 정보를 불러올 수 없어요", status: .error
                     ))))
                 }
                 // 헤더 표시는 등록된 이미지 URL을, BE 반영·이후 삭제는 발급된 id를 사용한다.
@@ -1114,7 +1114,7 @@ public struct MyProfileFeature: Sendable {
                 state.pendingProfileImageData = nil
                 Log.trace("Failed to upload profile image: \(error)", category: .network, level: .error)
                 return .send(.internal(.showToast(.init(
-                    message: "이미지 업로드에 실패했어요. 다시 시도해주세요", style: .info
+                    message: "이미지 업로드에 실패했어요. 다시 시도해주세요", status: .error
                 ))))
 
             case let .internal(.instructorVerificationImageUploadResponse(.success(registeredImage))):
@@ -1141,7 +1141,7 @@ public struct MyProfileFeature: Sendable {
                 state.isUploadingInstructorVerification = false
                 Log.trace("Failed to upload instructor verification image: \(error)", category: .network, level: .error)
                 return .send(.internal(.showToast(.init(
-                    message: "사진 업로드에 실패했어요. 다시 시도해주세요", style: .info
+                    message: "사진 업로드에 실패했어요. 다시 시도해주세요", status: .error
                 ))))
 
             case let .internal(.instructorVerificationRequestResponse(.success(uploadedImageUrl))):
@@ -1155,14 +1155,14 @@ public struct MyProfileFeature: Sendable {
                     OwnerVerification(status: .pending, documentImageUrl: uploadedImageUrl)
                 )
                 return .send(.internal(.showToast(.init(
-                    message: "업로드 완료! 관리자 검토 후 결과를 알려드릴게요.", style: .info
+                    message: "업로드 완료! 관리자 검토 후 결과를 알려드릴게요.", status: .success
                 ))))
 
             case let .internal(.instructorVerificationRequestResponse(.failure(error))):
                 state.isUploadingInstructorVerification = false
                 Log.trace("Failed to request owner verification: \(error)", category: .network, level: .error)
                 return .send(.internal(.showToast(.init(
-                    message: "인증 요청에 실패했어요. 다시 시도해주세요", style: .info
+                    message: "인증 요청에 실패했어요. 다시 시도해주세요", status: .error
                 ))))
 
             case let .internal(.profileImageUpdateResponse(.success(updatedProfile))):
@@ -1182,7 +1182,7 @@ public struct MyProfileFeature: Sendable {
                     : "프로필 이미지를 변경했어요"
                 return .merge(
                     .send(.delegate(.profileImageChanged(updatedProfile.profileImageUrl))),
-                    .send(.internal(.showToast(.init(message: message, style: .info))))
+                    .send(.internal(.showToast(.init(message: message, status: .success))))
                 )
 
             case let .internal(.profileImageUpdateResponse(.failure(error))):
@@ -1192,7 +1192,7 @@ public struct MyProfileFeature: Sendable {
                 state.isProfileImageDeleting = false
                 Log.trace("Failed to update profile image url: \(error)", category: .network, level: .error)
                 return .send(.internal(.showToast(.init(
-                    message: "프로필 저장에 실패했어요. 다시 시도해주세요", style: .info
+                    message: "프로필 저장에 실패했어요. 다시 시도해주세요", status: .error
                 ))))
 
             case .destination, .sheet, .imageCropCover, .path, .view, .internal, .delegate:
@@ -1222,7 +1222,7 @@ public struct MyProfileFeature: Sendable {
         let updatedProfile = entries.reduce(profile) { $0.removingCompetition($1) }
         // 지울 기록을 못 찾았으면(그사이 프로필이 바뀜) 저장하지 않는다 — 성공 토스트가 거짓이 된다.
         guard updatedProfile.competitions.count < profile.competitions.count else {
-            return .send(.internal(.showToast(.init(message: "삭제하지 못했어요. 다시 시도해주세요", style: .info))))
+            return .send(.internal(.showToast(.init(message: "삭제하지 못했어요. 다시 시도해주세요", status: .error))))
         }
         state.isLoadingProfile = true
         return .run { send in
