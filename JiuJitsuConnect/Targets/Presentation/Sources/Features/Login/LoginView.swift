@@ -29,18 +29,11 @@ public struct LoginView: View {
                 SignupCompleteView(store: signupCompleteStore)
             }
         }
-        .overlay(alignment: .bottom) {
-            if let toastState = store.toast {
-                ToastView(
-                    state: toastState,
-                    onSwipe: { store.send(.internal(.toastDismissed), animation: .default) },
-                    onButtonTapped: { store.send(.view(.toastButtonTapped($0)), animation: .default) }
-                )
-                .padding(.horizontal, 24)
-                .padding(.bottom, toastState.bottomPadding)
-            }
-        }
-        .animation(.default, value: store.toast)
+        .toast(
+            store.toast,
+            onSwipe: { store.send(.internal(.toastDismissed)) },
+            onButtonTapped: { store.send(.view(.toastButtonTapped($0))) }
+        )
         .sheet(item: $store.scope(state: \.sheet, action: \.sheet)) { store in
             // CaseLet을 바로 사용하지 않고, destinationStore의 상태로 switch합니다.
             switch store.case {

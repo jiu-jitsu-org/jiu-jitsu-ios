@@ -139,7 +139,8 @@ public struct NotificationSettingFeature: Sendable {
                 // 토글은 스켈레톤으로 둔 채 그 자리에서 다시 불러올 수 있게 한다.
                 return .send(.internal(.showToast(.init(
                     message: "알림 설정을 불러오지 못했어요.",
-                    style: .action(title: "다시 시도", action: .done)
+                    status: .error,
+                    button: .init(title: "다시 시도", action: .done)
                 ))))
 
             case let .internal(.updateSettingResponse(.success(setting))):
@@ -187,12 +188,12 @@ public struct NotificationSettingFeature: Sendable {
 
     private func handleError(_ error: Error) -> Effect<Action> {
         guard let domainError = error as? DomainError else {
-            return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info))))
+            return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, status: .error))))
         }
         let displayError = DomainErrorMapper.toDisplayError(from: domainError)
         switch displayError {
         case .toast(let message), .info(let message), .alert(let message):
-            return .send(.internal(.showToast(.init(message: message, style: .info))))
+            return .send(.internal(.showToast(.init(message: message, status: .error))))
         case .none:
             return .none
         }

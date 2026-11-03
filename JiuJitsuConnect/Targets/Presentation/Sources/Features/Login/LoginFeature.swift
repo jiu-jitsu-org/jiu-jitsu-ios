@@ -132,7 +132,7 @@ public struct LoginFeature: Sendable {
                 if authInfo.isNewUser == true {
                     guard let tempToken = authInfo.tempToken else {
                         Log.trace("Temp Token is missing for new user.", category: .debug, level: .error)
-                        return .send(.internal(.showToast(.init(message: "오류가 발생했습니다. 다시 시도해주세요.", style: .info))))
+                        return .send(.internal(.showToast(.init(message: "오류가 발생했습니다. 다시 시도해주세요.", status: .error))))
                     }
                     state.tempToken = tempToken
                     state.sheet = .termsAgreement(.init())
@@ -151,7 +151,7 @@ public struct LoginFeature: Sendable {
                 guard let tempToken = state.tempToken else {
                     Log.trace("Temp Token is missing for new user.", category: .debug, level: .error)
                     state.sheet = nil
-                    return .send(.internal(.showToast(.init(message: "오류가 발생했습니다. 다시 시도해주세요.", style: .info))))
+                    return .send(.internal(.showToast(.init(message: "오류가 발생했습니다. 다시 시도해주세요.", status: .error))))
                 }
                 
                 state.sheet = nil
@@ -176,13 +176,13 @@ public struct LoginFeature: Sendable {
                     
                     // 닉네임 설정 실패
                 case let .element(id: _, action: .nicknameSetting(.delegate(.signupFailed(message)))):
-                    return .send(.internal(.showToast(.init(message: message, style: .info, bottomPadding: 72))))
+                    return .send(.internal(.showToast(.init(message: message, status: .error, bottomPadding: 72))))
 
                     // 임시 토큰 만료 — 이 토큰으로는 가입할 수 없어 첫 화면으로 돌려 로그인부터 다시 하게 한다.
                 case .element(id: _, action: .nicknameSetting(.delegate(.signupSessionExpired))):
                     state.tempToken = nil
                     state.path.removeAll()
-                    return .send(.internal(.showToast(.init(message: "시간이 지나 가입이 중단됐어요. 다시 로그인해주세요.", style: .info))))
+                    return .send(.internal(.showToast(.init(message: "시간이 지나 가입이 중단됐어요. 다시 로그인해주세요.", status: .info))))
                     
                 default: return .none
                 }
@@ -224,7 +224,7 @@ public struct LoginFeature: Sendable {
 
         guard let domainError = error as? DomainError else {
             Log.trace("Unknown login error: \(error)", category: .network, level: .error)
-            return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, style: .info))))
+            return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, status: .error))))
         }
 
         switch domainError {
@@ -232,13 +232,13 @@ public struct LoginFeature: Sendable {
             return .none
 
         case .apiError(let code, _):
-            return .send(.internal(.showToast(.init(message: code.displayMessage, style: .info))))
+            return .send(.internal(.showToast(.init(message: code.displayMessage, status: .error))))
 
         default:
             let displayError = DomainErrorMapper.toDisplayError(from: domainError)
             switch displayError {
             case .toast(let message), .info(let message), .alert(let message):
-                return .send(.internal(.showToast(.init(message: message, style: .info))))
+                return .send(.internal(.showToast(.init(message: message, status: .error))))
             case .none:
                 return .none
             }

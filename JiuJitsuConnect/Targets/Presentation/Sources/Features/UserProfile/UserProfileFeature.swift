@@ -120,7 +120,7 @@ public struct UserProfileFeature: Sendable {
 
             case .beltPrompt(.presented(.delegate(.saved))):
                 state.beltPrompt = nil
-                return .send(.internal(.showToast(.init(message: "벨트를 저장했어요", style: .info))))
+                return .send(.internal(.showToast(.init(message: "벨트를 저장했어요", status: .success))))
 
             case .beltPrompt(.presented(.delegate(.later))):
                 state.beltPrompt = nil

@@ -80,18 +80,12 @@ public struct NotificationSettingView: View {
                 }
                 .background(Color.component.background.default)
             }
-
-            if let toastState = store.toast {
-                ToastView(
-                    state: toastState,
-                    onSwipe: { store.send(.internal(.toastDismissed), animation: .default) },
-                    onButtonTapped: { store.send(.view(.toastButtonTapped($0)), animation: .default) }
-                )
-                .padding(.horizontal, 24)
-                .padding(.bottom, toastState.bottomPadding)
-            }
         }
-        .animation(.default, value: store.toast)
+        .toast(
+            store.toast,
+            onSwipe: { store.send(.internal(.toastDismissed)) },
+            onButtonTapped: { store.send(.view(.toastButtonTapped($0))) }
+        )
         .navigationBarHidden(true)
         .ignoresSafeArea(edges: .bottom)
         .onAppear { store.send(.view(.onAppear)) }
