@@ -42,20 +42,23 @@ public struct MyProfileCompetitionSection: View {
 
                 // 순서를 옮기는 중에는 추가 대신 취소·완료 — 끝내는 자리를 눈 가는 머리줄 오른쪽에 둔다.
                 if pendingGroups != nil {
-                    HStack(spacing: 16) {
-                        Button("취소") {
+                    // 글자만 있던 버튼이 잘 안 보여(#212) 바탕이 있는 작은 공통 버튼으로 — 완료가 주 동작이라 파랑.
+                    HStack(spacing: 8) {
+                        Button {
                             withAnimation(.easeInOut(duration: 0.5)) { pendingGroups = nil }
+                        } label: {
+                            AppButtonConfiguration(title: "취소", size: .small)
                         }
-                        .foregroundStyle(Color.component.sectionHeader.subTitle)
+                        .appButtonStyle(.neutral, size: .small, height: 32)
 
-                        Button("완료") { finishReordering() }
-                            .foregroundStyle(Color.component.button.ghost.defaultText)
-                            .opacity(isSaving ? 0.3 : 1)
-                            .disabled(isSaving)
+                        Button {
+                            finishReordering()
+                        } label: {
+                            AppButtonConfiguration(title: "완료", size: .small)
+                        }
+                        .appButtonStyle(.primary, size: .small, height: 32)
+                        .disabled(isSaving)
                     }
-                    .font(.pretendard.buttonS)
-                    .buttonStyle(.plain)
-                    .frame(height: 32)
                 } else {
                     Button {
                         onAddCompetitionTapped()
