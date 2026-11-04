@@ -133,6 +133,10 @@ public struct AppTabFeature: Sendable {
                 .cancellable(id: CancelID.sessionObserver, cancelInFlight: false)
 
             case let .view(.tabSelected(tab)):
+                // 이미 홈인데 홈 아이콘을 다시 누르면 피드를 맨 위로 올린다(#229).
+                if tab == .home, state.selectedTab == .home {
+                    return .send(.home(.view(.tabReselected)))
+                }
                 // 다른 탭에서 커뮤니티로 돌아오면 새 알림 점을 갱신한다(탭 뷰가 유지돼 onAppear가 다시 오지 않음).
                 if tab == .home, state.selectedTab != .home {
                     state.selectedTab = tab

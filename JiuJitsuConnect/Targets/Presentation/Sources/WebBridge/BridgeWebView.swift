@@ -20,6 +20,8 @@ struct BridgeWebView: UIViewRepresentable {
     let url: URL
     // 같은 URL로 강제 reload를 트리거하기 위한 토큰.
     let loadToken: UUID
+    // 값이 바뀌면 웹뷰를 맨 위로 부드럽게 올린다. 메인 피드는 문서가 스크롤돼 웹을 고치지 않아도 된다.
+    var scrollToTopToken: UUID?
     // 현재 백엔드 access token. 웹뷰 로드 전에 FE 세션 쿠키(oss_session)로 주입해
     // SSR이 첫 요청부터 인증되게 한다(특히 서브뷰). 게스트면 nil → 주입하지 않는다.
     var accessToken: String?
@@ -151,6 +153,7 @@ struct BridgeWebView: UIViewRepresentable {
             onBridgeMessage: onBridgeMessage,
             onOutboundDelivered: onOutboundDelivered
         )
+        context.coordinator.scrollToTop(token: scrollToTopToken)
         // 토큰 변동(갱신) 시에도 세션 쿠키를 최신으로 유지한 뒤 (재)로드/플러시한다.
         let cookieStore = context.coordinator.webView?.configuration.websiteDataStore.httpCookieStore
             ?? WKWebsiteDataStore.default().httpCookieStore
@@ -181,6 +184,7 @@ struct BridgeWebView: UIViewRepresentable {
 
         private var lastLoadedURL: URL?
         private var lastLoadToken: UUID?
+        private var lastScrollToTopToken: UUID?
         // 이미 evaluateJavaScript로 전달한 아웃바운드 id. updateUIView가 여러 번
         // 호출돼도 같은 메시지를 중복 주입하지 않도록 가드한다.
         private var deliveredOutboundIDs: Set<UUID> = []
@@ -236,6 +240,16 @@ struct BridgeWebView: UIViewRepresentable {
             webView?.stopLoading()
             webView?.navigationDelegate = nil
             webView?.uiDelegate = nil
+        }
+
+        func scrollToTop(token: UUID?) {
+            guard token != lastScrollToTopToken else { return }
+            lastScrollToTopToken = token
+            guard let scrollView = webView?.scrollView else { return }
+            scrollView.setContentOffset(
+                CGPoint(x: 0, y: -scrollView.adjustedContentInset.top),
+                animated: true
+            )
         }
 
         func load(url: URL, token: UUID) {

@@ -40,6 +40,7 @@ public struct CommunityView: View {
                         source: .list,
                         url: url,
                         loadToken: store.loadToken,
+                        scrollToTopToken: store.scrollToTopToken,
                         accessToken: store.accessToken,
                         outbox: store.outbox,
                         // 리스트 피드 웹 배경과 맞춰, 바운스 때 다른 색이 드러나지 않게 한다.
