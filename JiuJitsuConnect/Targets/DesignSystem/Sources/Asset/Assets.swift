@@ -125,6 +125,23 @@ public enum Assets {
       public static let styleTopPosition = ImageAsset(name: "MyProfile/Icon/style-top-position")
       public static let triangleAlert = ImageAsset(name: "MyProfile/Icon/triangle-alert")
     }
+    public enum Medal {
+      public static let blackBronze = ImageAsset(name: "MyProfile/Medal/black-bronze")
+      public static let blackGold = ImageAsset(name: "MyProfile/Medal/black-gold")
+      public static let blackSilver = ImageAsset(name: "MyProfile/Medal/black-silver")
+      public static let blueBronze = ImageAsset(name: "MyProfile/Medal/blue-bronze")
+      public static let blueGold = ImageAsset(name: "MyProfile/Medal/blue-gold")
+      public static let blueSilver = ImageAsset(name: "MyProfile/Medal/blue-silver")
+      public static let brownBronze = ImageAsset(name: "MyProfile/Medal/brown-bronze")
+      public static let brownGold = ImageAsset(name: "MyProfile/Medal/brown-gold")
+      public static let brownSilver = ImageAsset(name: "MyProfile/Medal/brown-silver")
+      public static let purpleBronze = ImageAsset(name: "MyProfile/Medal/purple-bronze")
+      public static let purpleGold = ImageAsset(name: "MyProfile/Medal/purple-gold")
+      public static let purpleSilver = ImageAsset(name: "MyProfile/Medal/purple-silver")
+      public static let whiteBronze = ImageAsset(name: "MyProfile/Medal/white-bronze")
+      public static let whiteGold = ImageAsset(name: "MyProfile/Medal/white-gold")
+      public static let whiteSilver = ImageAsset(name: "MyProfile/Medal/white-silver")
+    }
   }
   public enum Signup {
     public enum Icon {
