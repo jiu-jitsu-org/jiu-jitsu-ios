@@ -139,6 +139,14 @@ public struct CompetitionInfoFeature: Sendable {
         // 출전 띠 휠 — 띠 버튼을 누르면 화면 전체를 흐리게 덮고 띠를 휠로 고른다(#190).
         var isBeltPickerPresented = false
 
+        // 지금 프로필 띠. 출전 띠를 저장하지 않은 기록의 완료 화면 캐릭터에 쓴다.
+        var profileBelt: BeltRank?
+
+        /// 완료 화면 캐릭터의 띠 — 그 대회의 기록이므로 출전 띠를 먼저 쓴다. 둘 다 없으면 캐릭터 대신 메달 아이콘을 보여 준다.
+        var doneCharacterBelt: BeltRank? {
+            savedRecords.last?.competitionBelt ?? profileBelt
+        }
+
         public init() {}
 
         /// - Parameters:
@@ -146,6 +154,7 @@ public struct CompetitionInfoFeature: Sendable {
         ///   - recentWeightLimit: 지난 기록의 체급. 새 기록의 체급 기본값으로 쓴다.
         public init(mode: Mode, currentBelt: BeltRank? = nil, recentWeightLimit: CompetitionWeightLimit? = nil) {
             self.mode = mode
+            self.profileBelt = currentBelt
             switch mode {
             case .add:
                 self.belt = currentBelt
