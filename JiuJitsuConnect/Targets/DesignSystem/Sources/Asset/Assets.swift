@@ -128,18 +128,23 @@ public enum Assets {
     public enum Medal {
       public static let blackBronze = ImageAsset(name: "MyProfile/Medal/black-bronze")
       public static let blackGold = ImageAsset(name: "MyProfile/Medal/black-gold")
+      public static let blackParticipation = ImageAsset(name: "MyProfile/Medal/black-participation")
       public static let blackSilver = ImageAsset(name: "MyProfile/Medal/black-silver")
       public static let blueBronze = ImageAsset(name: "MyProfile/Medal/blue-bronze")
       public static let blueGold = ImageAsset(name: "MyProfile/Medal/blue-gold")
+      public static let blueParticipation = ImageAsset(name: "MyProfile/Medal/blue-participation")
       public static let blueSilver = ImageAsset(name: "MyProfile/Medal/blue-silver")
       public static let brownBronze = ImageAsset(name: "MyProfile/Medal/brown-bronze")
       public static let brownGold = ImageAsset(name: "MyProfile/Medal/brown-gold")
+      public static let brownParticipation = ImageAsset(name: "MyProfile/Medal/brown-participation")
       public static let brownSilver = ImageAsset(name: "MyProfile/Medal/brown-silver")
       public static let purpleBronze = ImageAsset(name: "MyProfile/Medal/purple-bronze")
       public static let purpleGold = ImageAsset(name: "MyProfile/Medal/purple-gold")
+      public static let purpleParticipation = ImageAsset(name: "MyProfile/Medal/purple-participation")
       public static let purpleSilver = ImageAsset(name: "MyProfile/Medal/purple-silver")
       public static let whiteBronze = ImageAsset(name: "MyProfile/Medal/white-bronze")
       public static let whiteGold = ImageAsset(name: "MyProfile/Medal/white-gold")
+      public static let whiteParticipation = ImageAsset(name: "MyProfile/Medal/white-participation")
       public static let whiteSilver = ImageAsset(name: "MyProfile/Medal/white-silver")
     }
   }
