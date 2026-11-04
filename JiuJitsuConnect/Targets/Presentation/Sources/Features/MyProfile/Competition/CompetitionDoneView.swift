@@ -3,62 +3,94 @@ import ComposableArchitecture
 import Domain
 import DesignSystem
 
-/// 저장 후 완료 화면 — 방금 남긴 기록을 보여 주고, 같은 대회의 다른 부문을 이어서 기록할 수 있게 한다(#123).
+/// 저장 후 완료 화면 — 방금 남긴 기록을 메달 캐릭터로 축하하고, 같은 대회의 다른 부문을 이어서 기록할 수 있게 한다(#123, #220).
 ///
 /// 한 부문만 나간 대부분은 '완료'로 바로 닫고, 더 딴 사람만 '부문 추가'를 누른다.
 struct CompetitionDoneView: View {
     let store: StoreOf<CompetitionInfoFeature>
 
-    var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                resultSection
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 24)
-            }
-            .scrollBounceBehavior(.basedOnSize)
+    private enum Metrics {
+        static let stageHeight: CGFloat = 320
+        // 몸통 밑단은 잘린 단면이라 시트 뒤로 숨긴다(로그인 화면과 같은 방식).
+        static let sheetOverlap: CGFloat = 20
+        static let characterTopGap: CGFloat = 30
+        static let characterBottomInset: CGFloat = 14
+    }
 
-            buttonSection
+    var body: some View {
+        GeometryReader { proxy in
+            // 작은 화면에서도 기록 줄과 버튼 자리를 남긴다.
+            let stageHeight = min(Metrics.stageHeight, proxy.size.height * 0.5)
+
+            VStack(spacing: 0) {
+                stage(height: stageHeight)
+
+                sheet
+                    .padding(.top, -Metrics.sheetOverlap)
+            }
         }
     }
 
     // MARK: - View Components
 
-    private var resultSection: some View {
-        VStack(spacing: 16) {
-            if let latest = store.savedRecords.last {
-                latest.competitionRank.medalImage
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 64, height: 64)
-                    // 띠 색(흰·파랑·보라·갈색·검정)으로 칠한 꽃가루를 메달 뒤에서 한 번 터뜨린다(#211). 부문을 더해 저장할 때마다 다시 터진다.
-                    // 회원가입 완료는 원래 색 Confetti를 그대로 쓴다.
-                    .background {
-                        if store.celebratesOnDone {
-                            JJSLottieView("ConfettiBelt", loopMode: .playOnce)
-                                .frame(width: 280, height: 280)
-                                .allowsHitTesting(false)
-                        }
-                    }
+    private func stage(height: CGFloat) -> some View {
+        let latest = store.savedRecords.last
+        let characterHeight = height - Metrics.characterTopGap
+        let character = latest.flatMap { record in
+            store.doneCharacterBelt.flatMap { MedalCharacter(belt: $0, rank: record.competitionRank) }
+        }
+
+        return ZStack(alignment: .bottom) {
+            Color.primitive.coolGray.cg25
+
+            if store.celebratesOnDone {
+                // 캐릭터 뒤에서 퍼진다. 그림이 있는 쪽은 올라오는 움직임이 끝날 즈음, 아이콘은 조금 일찍 시작한다.
+                PaperConfettiView(startDelay: character == nil ? 0.22 : 0.44)
             }
 
+            if let character {
+                MedalCharacterView(character: character, height: characterHeight, celebrates: store.celebratesOnDone)
+                    .padding(.bottom, Metrics.characterBottomInset)
+            } else if let latest {
+                MedalIconRiseView(image: latest.competitionRank.medalImage, celebrates: store.celebratesOnDone)
+                    .padding(.bottom, height * 0.3)
+            }
+        }
+        .frame(height: height)
+        .clipped()
+    }
+
+    private var sheet: some View {
+        VStack(spacing: 0) {
             Text("기록했어요")
                 .font(Font.pretendard.display1)
                 .foregroundStyle(Color.component.textfieldDisplay.focus.title)
                 .frame(height: 36)
+                .padding(.bottom, 8)
 
             // 부문을 추가할 때마다 한 줄씩 늘어, 이 대회에서 무엇을 남겼는지 한눈에 보인다.
-            VStack(spacing: 6) {
-                ForEach(Array(store.savedRecords.enumerated()), id: \.offset) { _, record in
-                    Text(record.completionSummary)
-                        .font(Font.pretendard.bodyM)
-                        .foregroundStyle(Color.component.sectionHeader.subTitle)
-                        .multilineTextAlignment(.center)
+            ScrollView {
+                VStack(spacing: 6) {
+                    ForEach(Array(store.savedRecords.enumerated()), id: \.offset) { _, record in
+                        Text(record.completionSummary)
+                            .font(Font.pretendard.bodyM)
+                            .foregroundStyle(Color.component.sectionHeader.subTitle)
+                            .multilineTextAlignment(.center)
+                    }
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 20)
             }
+            .scrollBounceBehavior(.basedOnSize)
+
+            buttonSection
         }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 56)
+        .padding(.top, 20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            Color.primitive.bw.white,
+            in: UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24)
+        )
     }
 
     // 부문 추가와 완료를 한 묶음으로 둔다(#146). 질문 바로 아래에 답인 '부문 추가'를 두고, '완료'는 다른 화면과 같은 맨 아래 자리에 둔다. 둘 다 색 면이라 붙어 보이지 않게 8pt를 둔다.
@@ -88,6 +120,7 @@ struct CompetitionDoneView: View {
             }
         }
         .padding(.horizontal, 20)
+        .padding(.top, 12)
         .padding(.bottom, 24)
     }
 }
