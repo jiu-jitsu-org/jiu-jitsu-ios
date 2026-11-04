@@ -66,6 +66,8 @@ public struct CommunityFeature: Sendable {
         var url: URL?
         // 같은 URL로 재시도 시 View가 reload를 인지하도록 토큰을 갱신한다.
         var loadToken: UUID = UUID()
+        // 값이 바뀔 때마다 View가 리스트 웹뷰를 맨 위로 올린다(#229). 처음엔 nil이라 움직이지 않는다.
+        var scrollToTopToken: UUID?
         var isLoading: Bool = true
         var hasError: Bool = false
 
@@ -140,6 +142,8 @@ public struct CommunityFeature: Sendable {
             case onAppear
             // 다른 탭에서 커뮤니티 탭으로 돌아옴. 탭 컨테이너가 뷰를 유지해 onAppear가 다시 오지 않으므로 부모가 보낸다.
             case tabEntered
+            // 이미 커뮤니티 탭인데 하단 탭바의 홈 아이콘을 다시 누름.
+            case tabReselected
             // 앱이 포그라운드로 복귀.
             case sceneBecameActive
             case retryTapped
@@ -236,6 +240,12 @@ public struct CommunityFeature: Sendable {
 
             case .view(.tabEntered), .view(.sceneBecameActive):
                 return refreshHeaderState(state)
+
+            case .view(.tabReselected):
+                // 상세 등이 위에 떠 있으면 가려진 피드를 움직이지 않는다.
+                guard state.path.isEmpty, state.coverPath.isEmpty, state.detailCover == nil else { return .none }
+                state.scrollToTopToken = UUID()
+                return .none
 
             case let .view(.tabSelected(tab)):
                 state.selectedTab = tab
