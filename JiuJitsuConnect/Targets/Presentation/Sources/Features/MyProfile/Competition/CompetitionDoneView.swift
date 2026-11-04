@@ -37,7 +37,7 @@ struct CompetitionDoneView: View {
         let latest = store.savedRecords.last
         let characterHeight = height - Metrics.characterTopGap
         let character = latest.flatMap { record in
-            store.doneCharacterBelt.flatMap { MedalCharacter(belt: $0, rank: record.competitionRank) }
+            store.doneCharacterBelt.map { MedalCharacter(belt: $0, rank: record.competitionRank) }
         }
 
         return ZStack(alignment: .bottom) {
