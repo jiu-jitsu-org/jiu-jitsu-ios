@@ -7,11 +7,9 @@ struct MedalCharacter: Equatable {
     let belt: BeltRank
     let rank: CompetitionRank
 
-    /// 메달이 없는 '참가'는 캐릭터가 없다.
-    init?(belt: BeltRank, rank: CompetitionRank) {
-        guard rank != .participation else { return nil }
-        self.belt = belt
-        self.rank = rank
+    /// '참가'는 메달을 걸지 않은 그림이라 메달 움직임이 없다.
+    var hasMedal: Bool {
+        rank != .participation
     }
 
     var image: Image {
@@ -23,23 +21,29 @@ struct MedalCharacter: Equatable {
         switch (belt, rank) {
         case (.white, .gold): return Medal.whiteGold
         case (.white, .silver): return Medal.whiteSilver
-        case (.white, _): return Medal.whiteBronze
+        case (.white, .bronze): return Medal.whiteBronze
+        case (.white, .participation): return Medal.whiteParticipation
         case (.blue, .gold): return Medal.blueGold
         case (.blue, .silver): return Medal.blueSilver
-        case (.blue, _): return Medal.blueBronze
+        case (.blue, .bronze): return Medal.blueBronze
+        case (.blue, .participation): return Medal.blueParticipation
         case (.purple, .gold): return Medal.purpleGold
         case (.purple, .silver): return Medal.purpleSilver
-        case (.purple, _): return Medal.purpleBronze
+        case (.purple, .bronze): return Medal.purpleBronze
+        case (.purple, .participation): return Medal.purpleParticipation
         case (.brown, .gold): return Medal.brownGold
         case (.brown, .silver): return Medal.brownSilver
-        case (.brown, _): return Medal.brownBronze
+        case (.brown, .bronze): return Medal.brownBronze
+        case (.brown, .participation): return Medal.brownParticipation
         case (.black, .gold): return Medal.blackGold
         case (.black, .silver): return Medal.blackSilver
-        case (.black, _): return Medal.blackBronze
+        case (.black, .bronze): return Medal.blackBronze
+        case (.black, .participation): return Medal.blackParticipation
         }
     }
 
     /// 그림 비율과 그림 안 메달 자리(0~1). 띠마다 기운 방향이 달라 메달 자리도 다르다. 같은 띠의 금·은·동은 자리가 같다.
+    /// 참가 그림은 메달이 없어 비율만 쓴다.
     var layout: Layout {
         switch belt {
         case .white: return Layout(aspectRatio: 344.0 / 870.0, medalCenter: UnitPoint(x: 0.4142, y: 0.7851), medalHeightRatio: 0.2690)
@@ -47,6 +51,18 @@ struct MedalCharacter: Equatable {
         case .purple: return Layout(aspectRatio: 271.0 / 870.0, medalCenter: UnitPoint(x: 0.5314, y: 0.7695), medalHeightRatio: 0.2632)
         case .brown: return Layout(aspectRatio: 264.0 / 870.0, medalCenter: UnitPoint(x: 0.5530, y: 0.7776), medalHeightRatio: 0.2655)
         case .black: return Layout(aspectRatio: 266.0 / 870.0, medalCenter: UnitPoint(x: 0.4436, y: 0.7810), medalHeightRatio: 0.2678)
+        }
+    }
+
+    /// 그림 가로 ÷ 세로. 메달 유무에 따라 그림 폭이 달라 띠와 함께 따로 둔다.
+    var aspectRatio: CGFloat {
+        guard !hasMedal else { return layout.aspectRatio }
+        switch belt {
+        case .white: return 342.0 / 870.0
+        case .blue: return 270.0 / 870.0
+        case .purple: return 270.0 / 870.0
+        case .brown: return 224.0 / 870.0
+        case .black: return 223.0 / 870.0
         }
     }
 
@@ -89,7 +105,7 @@ struct MedalCharacterView: View {
 
     var body: some View {
         let layout = character.layout
-        let width = height * layout.aspectRatio
+        let width = height * character.aspectRatio
         let diameter = height * layout.medalHeightRatio
         let center = CGPoint(x: width * layout.medalCenter.x, y: height * layout.medalCenter.y)
 
@@ -142,6 +158,7 @@ struct MedalCharacterView: View {
             return
         }
         withAnimation(Motion.rise) { isRisen = true }
+        guard character.hasMedal else { return }
 
         guard (try? await Task.sleep(for: Motion.medalDelay)) != nil else { return }
         isMedalActive = true
