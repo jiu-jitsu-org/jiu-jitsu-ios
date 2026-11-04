@@ -6,8 +6,10 @@ import DesignSystem
 /// 스플래시가 끝난 모습에서 시작해 문구·OSS 글자는 위로 올라가고, 둥근 그래픽은 조금만 가라앉아 캐릭터 뒤에 남는다.
 /// 로그인 화면과 같은 띠 캐릭터 다섯이 화면 아래 끝에서 띠용 올라와 다 같이 깡충 뛰고, 한 명이 오늘 요일 인사를 건넨다.
 /// 이어서 `onCover`로 홈이 아래에서 올라와 덮기 시작하고, 다 덮으면 `onFinish`를 부른다.
+/// 화면 어디든 누르면 기다리지 않고 지금 모습에서 바로 덮기 시작한다.
 /// 시안 기준 화면은 393×852이며, 캐릭터 크기·위치는 화면 폭에 비례해 맞춘다.
 struct GreetingSceneView: View {
+    let onStart: () -> Void
     let onCover: () -> Void
     let onFinish: () -> Void
 
@@ -15,6 +17,7 @@ struct GreetingSceneView: View {
     @State private var start: Date?
     @State private var greeting = DayGreeting.today()
     @State private var bubbleWidth: CGFloat = 0
+    @State private var isCovering = false
 
     var body: some View {
         // 바깥 리더로 노치 높이를 읽고, 안쪽 리더는 화면 끝까지 넓혀 그린다 (LoginSceneView와 같은 이유)
@@ -26,6 +29,8 @@ struct GreetingSceneView: View {
                     scene(layout: layout, elapsed: timeline.date.timeIntervalSince(start ?? timeline.date))
                 }
             }
+            .contentShape(Rectangle())
+            .onTapGesture { beginCover() }
             .ignoresSafeArea()
         }
         .task {
@@ -38,11 +43,21 @@ struct GreetingSceneView: View {
             // 느린 기기에서도 글자·그래픽이 중간부터 튀어 나오지 않는다(#207)
             await DisplayFrame.next()
             start = .now
+            onStart()
             guard await pause(Timing.cover) else { return }
-            onCover()
-            guard await pause(Timing.coverDuration) else { return }
+            beginCover()
+        }
+        .task(id: isCovering) {
+            guard isCovering, await pause(Timing.coverDuration) else { return }
             onFinish()
         }
+    }
+
+    /// 시간표가 다 되었거나 눌렀을 때 부른다. 어느 쪽이 먼저든, 몇 번을 눌러도 한 번만 덮는다.
+    private func beginCover() {
+        guard !isCovering else { return }
+        isCovering = true
+        onCover()
     }
 
     // MARK: - 장면
@@ -61,7 +76,7 @@ struct GreetingSceneView: View {
             ZStack(alignment: .topLeading) {
                 ForEach(Array(BeltCast.members.enumerated()), id: \.offset) { index, member in
                     let placement = layout.placement(of: member)
-                    let rise = BeltRise.pose(elapsed: elapsed - member.start, speed: member.speed, visible: placement.visible)
+                    let rise = BeltRise.pose(elapsed: elapsed - member.start + Timing.riseLead, speed: member.speed * Timing.riseSpeed, visible: placement.visible)
                     let jump = Jump(at: elapsed - Timing.jumpStart(of: index))
                     BeltCharacterView(
                         member: member,
@@ -181,22 +196,26 @@ private struct GreetingLayout {
 
 // MARK: - 시간표
 
-/// 시안(웹)의 시간표를 그대로 옮긴 값. 단위는 초.
+/// 시안(웹)의 시간표를 약 2.5초로 줄인 값(#223). 단위는 초.
 private enum Timing {
-    static let brand = SceneSegment(delay: 0.45, duration: 0.76, curve: .init(0.6, 0, 0.2, 1))
-    static let pattern = SceneSegment(delay: 0.6, duration: 1.1, curve: .init(0.55, 0, 0.3, 1))
-    /// 캐릭터 등장은 BeltCast 각자의 시작·속도를 따른다(로그인 화면과 같다). 마지막(보라)이 약 2.03초에 앉는다
-    static let idle: Double = 2.1
+    static let brand = SceneSegment(delay: 0.08, duration: 0.62, curve: .init(0.6, 0, 0.2, 1))
+    static let pattern = SceneSegment(delay: 0.12, duration: 0.82, curve: .init(0.55, 0, 0.3, 1))
+    /// 캐릭터 등장은 BeltCast의 순서·어긋남은 그대로 두고(로그인 화면과 공용) 이 장면에서만 앞당기고 빠르게 한다.
+    /// 마지막(보라)이 약 0.96초에 앉는다
+    static let riseLead: Double = 0.77
+    static let riseSpeed: Double = 0.72
+    static let idle: Double = 1.4
     /// 다 같이 깡충. 가운데(검정)부터 바깥으로 0.05초씩 늦게 뛴다
-    static let jump: Double = 2.15
+    static let jump: Double = 0.84
     static let jumpDuration: Double = 0.44
     static let jumpCurve = CubicBezier(0, 0, 0.58, 1)
-    static let say: Double = jump + 0.48
-    static let sayLife: Double = 1.3
+    /// 깡충이 끝나기를 기다리지 않고 말풍선을 띄워 읽을 시간을 번다
+    static let say: Double = jump + 0.14
+    static let sayLife: Double = 1.08
     /// 로그인 화면의 말풍선이 사라지는 움직임(easeIn 0.28초)과 같다
     static let sayLeave = SceneSegment(delay: say + sayLife, duration: 0.28, curve: .init(0.42, 0, 1, 1))
-    /// 읽을 시간을 두고 홈이 덮기 시작한다
-    static let cover: Double = 3.95
+    /// 덮는 움직임은 천천히 시작해, 말풍선은 홈이 닿기 직전까지 남겨 둔다
+    static let cover: Double = 1.98
     static let coverDuration: Double = 0.52
 
     static func jumpStart(of member: Int) -> Double {
@@ -288,5 +307,5 @@ private struct SayBubble: View {
 }
 
 #Preview("Greeting Scene") {
-    GreetingSceneView(onCover: {}, onFinish: {})
+    GreetingSceneView(onStart: {}, onCover: {}, onFinish: {})
 }
