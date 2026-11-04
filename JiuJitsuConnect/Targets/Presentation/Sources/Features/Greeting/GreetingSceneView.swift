@@ -61,7 +61,7 @@ struct GreetingSceneView: View {
             ZStack(alignment: .topLeading) {
                 ForEach(Array(BeltCast.members.enumerated()), id: \.offset) { index, member in
                     let placement = layout.placement(of: member)
-                    let rise = BeltRise.pose(elapsed: elapsed - member.start, speed: member.speed, visible: placement.visible)
+                    let rise = BeltRise.pose(elapsed: elapsed - member.start + Timing.riseLead, speed: member.speed * Timing.riseSpeed, visible: placement.visible)
                     let jump = Jump(at: elapsed - Timing.jumpStart(of: index))
                     BeltCharacterView(
                         member: member,
@@ -181,22 +181,26 @@ private struct GreetingLayout {
 
 // MARK: - 시간표
 
-/// 시안(웹)의 시간표를 그대로 옮긴 값. 단위는 초.
+/// 시안(웹)의 시간표를 약 2.5초로 줄인 값(#223). 단위는 초.
 private enum Timing {
-    static let brand = SceneSegment(delay: 0.45, duration: 0.76, curve: .init(0.6, 0, 0.2, 1))
-    static let pattern = SceneSegment(delay: 0.6, duration: 1.1, curve: .init(0.55, 0, 0.3, 1))
-    /// 캐릭터 등장은 BeltCast 각자의 시작·속도를 따른다(로그인 화면과 같다). 마지막(보라)이 약 2.03초에 앉는다
-    static let idle: Double = 2.1
+    static let brand = SceneSegment(delay: 0.08, duration: 0.62, curve: .init(0.6, 0, 0.2, 1))
+    static let pattern = SceneSegment(delay: 0.12, duration: 0.82, curve: .init(0.55, 0, 0.3, 1))
+    /// 캐릭터 등장은 BeltCast의 순서·어긋남은 그대로 두고(로그인 화면과 공용) 이 장면에서만 앞당기고 빠르게 한다.
+    /// 마지막(보라)이 약 0.96초에 앉는다
+    static let riseLead: Double = 0.77
+    static let riseSpeed: Double = 0.72
+    static let idle: Double = 1.4
     /// 다 같이 깡충. 가운데(검정)부터 바깥으로 0.05초씩 늦게 뛴다
-    static let jump: Double = 2.15
+    static let jump: Double = 0.84
     static let jumpDuration: Double = 0.44
     static let jumpCurve = CubicBezier(0, 0, 0.58, 1)
-    static let say: Double = jump + 0.48
-    static let sayLife: Double = 1.3
+    /// 깡충이 끝나기를 기다리지 않고 말풍선을 띄워 읽을 시간을 번다
+    static let say: Double = jump + 0.14
+    static let sayLife: Double = 1.08
     /// 로그인 화면의 말풍선이 사라지는 움직임(easeIn 0.28초)과 같다
     static let sayLeave = SceneSegment(delay: say + sayLife, duration: 0.28, curve: .init(0.42, 0, 1, 1))
-    /// 읽을 시간을 두고 홈이 덮기 시작한다
-    static let cover: Double = 3.95
+    /// 덮는 움직임은 천천히 시작해, 말풍선은 홈이 닿기 직전까지 남겨 둔다
+    static let cover: Double = 1.98
     static let coverDuration: Double = 0.52
 
     static func jumpStart(of member: Int) -> Double {
