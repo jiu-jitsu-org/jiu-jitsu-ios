@@ -6,6 +6,7 @@ import DesignSystem
 /// 스플래시가 끝난 모습에서 시작해 문구·OSS 글자는 위로 올라가고, 둥근 그래픽은 조금만 가라앉아 캐릭터 뒤에 남는다.
 /// 로그인 화면과 같은 띠 캐릭터 다섯이 화면 아래 끝에서 띠용 올라와 다 같이 깡충 뛰고, 한 명이 오늘 요일 인사를 건넨다.
 /// 이어서 `onCover`로 홈이 아래에서 올라와 덮기 시작하고, 다 덮으면 `onFinish`를 부른다.
+/// 화면 어디든 누르면 기다리지 않고 지금 모습에서 바로 덮기 시작한다.
 /// 시안 기준 화면은 393×852이며, 캐릭터 크기·위치는 화면 폭에 비례해 맞춘다.
 struct GreetingSceneView: View {
     let onCover: () -> Void
@@ -15,6 +16,7 @@ struct GreetingSceneView: View {
     @State private var start: Date?
     @State private var greeting = DayGreeting.today()
     @State private var bubbleWidth: CGFloat = 0
+    @State private var isCovering = false
 
     var body: some View {
         // 바깥 리더로 노치 높이를 읽고, 안쪽 리더는 화면 끝까지 넓혀 그린다 (LoginSceneView와 같은 이유)
@@ -26,6 +28,8 @@ struct GreetingSceneView: View {
                     scene(layout: layout, elapsed: timeline.date.timeIntervalSince(start ?? timeline.date))
                 }
             }
+            .contentShape(Rectangle())
+            .onTapGesture { beginCover() }
             .ignoresSafeArea()
         }
         .task {
@@ -39,10 +43,19 @@ struct GreetingSceneView: View {
             await DisplayFrame.next()
             start = .now
             guard await pause(Timing.cover) else { return }
-            onCover()
-            guard await pause(Timing.coverDuration) else { return }
+            beginCover()
+        }
+        .task(id: isCovering) {
+            guard isCovering, await pause(Timing.coverDuration) else { return }
             onFinish()
         }
+    }
+
+    /// 시간표가 다 되었거나 눌렀을 때 부른다. 어느 쪽이 먼저든, 몇 번을 눌러도 한 번만 덮는다.
+    private func beginCover() {
+        guard !isCovering else { return }
+        isCovering = true
+        onCover()
     }
 
     // MARK: - 장면

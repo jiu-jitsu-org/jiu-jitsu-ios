@@ -27,6 +27,8 @@ public struct AppView: View {
           }
           AppTabView(store: appTabStore)
             .modifier(GreetingCover(isHidden: store.greeting == .playing, isActive: store.greeting != nil))
+            // 건너뛰려고 연달아 누른 탭이 올라오는 중인 홈의 버튼에 닿지 않게 한다
+            .allowsHitTesting(store.greeting == nil)
         }
       } else {
         EmptyView()

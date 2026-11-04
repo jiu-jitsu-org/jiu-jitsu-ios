@@ -47,7 +47,7 @@ public struct AppFeature: Sendable {
             case onAppear
             /// 유니버설 링크 수신(`NSUserActivityTypeBrowsingWeb`).
             case deepLinkReceived(URL)
-            /// 인사가 끝나 홈이 아래에서 올라오기 시작한다.
+            /// 인사가 끝났거나 눌러서 건너뛰어 홈이 아래에서 올라오기 시작한다.
             case greetingCoverStarted
             /// 홈이 화면을 다 덮었다. 인사 장면을 걷어낸다.
             case greetingFinished
@@ -82,7 +82,8 @@ public struct AppFeature: Sendable {
                 return .merge(Self.route(url, into: &state), runDeferredLaunchSync(&state))
 
             case .view(.greetingCoverStarted):
-                guard state.greeting != nil else { return .none }
+                // 건너뛰기 탭과 시간표가 겹쳐도 덮는 움직임은 한 번만 시작한다
+                guard state.greeting == .playing else { return .none }
                 state.greeting = .covering
                 return .none
 
