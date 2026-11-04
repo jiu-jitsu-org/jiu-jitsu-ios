@@ -86,8 +86,9 @@ public struct AppFeature: Sendable {
                 return .merge(Self.route(url, into: &state), runDeferredLaunchSync(&state))
 
             case .view(.greetingStarted):
-                // 첫 프레임을 기다리는 사이 딥링크로 인사가 접혔으면 본 게 아니라 남기지 않는다
-                guard state.greeting == .playing else { return .none }
+                // 첫 프레임을 기다리는 사이 딥링크로 인사가 접혔으면 본 게 아니라 남기지 않는다.
+                // 눌러서 이미 덮는 중(.covering)이면 본 것으로 남긴다
+                guard state.greeting != nil else { return .none }
                 return .run { [now] _ in greetingClient.markPlayed(now) }
 
             case .view(.greetingCoverStarted):
