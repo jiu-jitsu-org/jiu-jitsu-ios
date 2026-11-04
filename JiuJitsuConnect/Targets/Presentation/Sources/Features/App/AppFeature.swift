@@ -47,6 +47,8 @@ public struct AppFeature: Sendable {
             case onAppear
             /// 유니버설 링크 수신(`NSUserActivityTypeBrowsingWeb`).
             case deepLinkReceived(URL)
+            /// 인사 장면이 실제로 재생되기 시작했다. 움직임 줄이기로 건너뛰면 오지 않는다.
+            case greetingStarted
             /// 인사가 끝났거나 눌러서 건너뛰어 홈이 아래에서 올라오기 시작한다.
             case greetingCoverStarted
             /// 홈이 화면을 다 덮었다. 인사 장면을 걷어낸다.
@@ -62,6 +64,8 @@ public struct AppFeature: Sendable {
     @Dependency(\.firebaseClient) var firebaseClient
     @Dependency(\.userClient) var userClient
     @Dependency(\.pushNotificationClient) var pushNotificationClient
+    @Dependency(\.greetingClient) var greetingClient
+    @Dependency(\.date.now) var now
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -80,6 +84,11 @@ public struct AppFeature: Sendable {
 
             case let .view(.deepLinkReceived(url)):
                 return .merge(Self.route(url, into: &state), runDeferredLaunchSync(&state))
+
+            case .view(.greetingStarted):
+                // 첫 프레임을 기다리는 사이 딥링크로 인사가 접혔으면 본 게 아니라 남기지 않는다
+                guard state.greeting == .playing else { return .none }
+                return .run { [now] _ in greetingClient.markPlayed(now) }
 
             case .view(.greetingCoverStarted):
                 // 건너뛰기 탭과 시간표가 겹쳐도 덮는 움직임은 한 번만 시작한다
@@ -102,8 +111,9 @@ public struct AppFeature: Sendable {
             case let .destination(.presented(.splash(.delegate(.finishedLaunch(authInfo))))):
                 if let authInfo = authInfo {
                     state.destination = .appTab(.init(authInfo: authInfo))
-                    // 공유 링크·푸시로 들어왔으면 그 글을 바로 보여줘야 해 인사를 건너뛴다
-                    state.greeting = state.pendingDeepLink == nil ? .playing : nil
+                    // 공유 링크·푸시로 들어왔으면 그 글을 바로 보여줘야 해 인사를 건너뛰고,
+                    // 오늘 이미 봤으면 다시 틀지 않는다(#223)
+                    state.greeting = state.pendingDeepLink == nil && greetingClient.shouldPlay(now) ? .playing : nil
                     // 앱 진입 FCM sync: 로그인 상태일 때만 실행 (취소되지 않음).
                     // 처음 받는 사람에게는 알림 권한 창이 뜨므로, 인사 중이면 인사가 끝날 때까지 미룬다(#216)
                     if state.greeting != nil {

@@ -38,6 +38,7 @@ public final class DependencyContainer {
     /// AppDelegate가 받은 푸시 탭을 Presentation(딥링크 라우팅)으로 전달하는 채널.
     private let pushNotificationTapRelay = PushNotificationTapRelay()
     private let beltPromptStorage = BeltPromptStorage()
+    private let greetingStorage = GreetingStorage()
     private lazy var sharedNetworkService: NetworkService = DefaultNetworkService(
         tokenStorage: sharedTokenStorage,
         sessionEventBroadcaster: authSessionEventBroadcaster
@@ -176,6 +177,13 @@ public final class DependencyContainer {
             canCheck: { self.beltPromptStorage.canCheck(now: $0) },
             markChecked: { self.beltPromptStorage.markChecked(now: $0) },
             snooze: { self.beltPromptStorage.snooze(now: $0) }
+        )
+    }
+
+    public func configureGreetingClient() -> GreetingClient {
+        GreetingClient(
+            shouldPlay: { self.greetingStorage.shouldPlay(now: $0) },
+            markPlayed: { self.greetingStorage.markPlayed(now: $0) }
         )
     }
 
