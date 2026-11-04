@@ -21,7 +21,8 @@ struct PaperConfettiView: View {
             let size = proxy.size
             let colors = pieceColors
 
-            TimelineView(.animation(paused: reduceMotion || scenePhase != .active)) { context in
+            // 계속 내리므로 화면에 오래 머물러도 배터리를 덜 쓰게 120Hz 기기에서도 60번까지만 그린다.
+            TimelineView(.animation(minimumInterval: 1.0 / 60, paused: reduceMotion || scenePhase != .active)) { context in
                 let pieces = simulation.pieces(
                     at: context.date,
                     size: size,
