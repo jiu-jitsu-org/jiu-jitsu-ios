@@ -147,7 +147,7 @@ struct CompetitionActionSheetView: View {
                     .frame(width: Metrics.leadingIconSize, height: Metrics.leadingIconSize)
 
                 Text(title)
-                    .font(Font.pretendard.bodyS)
+                    .font(Font.pretendard.bodyM)
                     .foregroundStyle(Color.component.bottomSheet.unselected.listItem.label)
 
                 Spacer()

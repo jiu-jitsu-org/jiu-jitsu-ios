@@ -114,7 +114,7 @@ public struct ProfileImageEditView: View {
         Button(action: action) {
             HStack(spacing: 0) {
                 Text(title)
-                    .font(Font.pretendard.bodyS)
+                    .font(Font.pretendard.bodyM)
                     .foregroundStyle(Color.component.bottomSheet.unselected.listItem.label)
 
                 Spacer()
