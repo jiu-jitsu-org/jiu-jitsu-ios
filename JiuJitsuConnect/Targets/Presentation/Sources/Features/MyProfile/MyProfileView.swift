@@ -27,7 +27,7 @@ private enum Metrics {
 public struct MyProfileView: View {
     @Bindable var store: StoreOf<MyProfileFeature>
 
-    // 대회 줄(⋯)을 눌렀을 때 띄우는 시트(부문 수정 / 부문 추가 / 삭제). 화면 표시용 일시 상태라 Feature로 올리지 않고,
+    // 대회 줄을 눌렀을 때 띄우는 시트(부문 수정 / 부문 추가 / 삭제). 화면 표시용 일시 상태라 Feature로 올리지 않고,
     // 고른 동작은 시트가 다 닫힌 뒤 한다 — 닫히는 중에 입력 화면을 push하거나 알럿을 띄우면 전환이 겹친다.
     @State private var competitionSheet: CompetitionSheetTarget?
     @State private var pendingCompetitionAction: (() -> Void)?

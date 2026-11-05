@@ -7,7 +7,7 @@ import SwiftUI
 import Domain
 import DesignSystem
 
-/// 프로필 대회 줄(또는 ⋯)을 눌렀을 때의 시트 — 맨 위 고정(#124), 부문 수정, 부문 추가, 대회 삭제(#123).
+/// 프로필 대회 줄을 눌렀을 때의 시트 — 맨 위 고정(#124), 부문 수정, 부문 추가, 대회 삭제(#123).
 ///
 /// 프로필 사진 수정 시트(ProfileImageEditView)와 같은 모양(손잡이 · 제목 · 행 · 취소)을 쓴다.
 struct CompetitionActionSheetView: View {

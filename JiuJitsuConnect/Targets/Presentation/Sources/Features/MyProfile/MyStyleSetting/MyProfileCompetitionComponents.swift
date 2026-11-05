@@ -153,6 +153,35 @@ struct CompetitionGroup {
         entries.map(\.competitionRank).min { $0.medalOrder < $1.medalOrder } ?? .participation
     }
 
+    /// 줄에 보일 메달 — 딴 메달 전부를 금·은·동 순으로. 딴 메달이 없으면 참가 메달 하나.
+    var displayedMedals: [CompetitionRank] {
+        let won = entries.map(\.competitionRank)
+            .filter { $0 != .participation }
+            .sorted { $0.medalOrder < $1.medalOrder }
+        return won.isEmpty ? [.participation] : won
+    }
+
+    /// 줄에 보일 띠 — 부문마다 띠가 다르면 가장 높은 띠. 부문별 띠는 시트의 부문 줄에 적혀 있다.
+    var topBelt: BeltRank? {
+        entries.compactMap(\.competitionBelt)
+            .max { (BeltRank.allCases.firstIndex(of: $0) ?? 0) < (BeltRank.allCases.firstIndex(of: $1) ?? 0) }
+    }
+
+    /// 기본 순서 — 높은 띠 먼저, 같은 띠면 최신 연도 먼저. 띠를 안 적은 줄은 가장 낮게 본다.
+    fileprivate func comesBefore(_ other: CompetitionGroup) -> Bool {
+        let beltIndex = topBelt.flatMap { BeltRank.allCases.firstIndex(of: $0) } ?? -1
+        let otherBeltIndex = other.topBelt.flatMap { BeltRank.allCases.firstIndex(of: $0) } ?? -1
+        return beltIndex != otherBeltIndex ? beltIndex > otherBeltIndex : year > other.year
+    }
+
+    /// 줄의 부가 정보 — "도복 -76kg · 2026". 여러 부문이면 "4개 부문 · 2025"처럼 수만 적고, 비어 있는 값은 건너뛴다. 띠는 줄 앞에 따로 둔다.
+    var rowDetailText: String {
+        let division = entries.count > 1 ? "\(entries.count)개 부문" : entries.first?.divisionText
+        return [division, String(year)]
+            .compactMap { $0 }
+            .joined(separator: " · ")
+    }
+
     /// 선택지 제목 — "2026 서울 오픈". 이름에 연도가 이미 있으면 붙이지 않는다.
     /// (연도를 숫자 그대로 문자열에 끼우면 "2,026"처럼 쉼표가 붙어 String으로 바꿔 넣는다.)
     var titleWithYear: String {
@@ -193,10 +222,11 @@ struct CompetitionGroup {
 
     /// 같은 대회끼리 묶어, 고정한 줄을 맨 위에 두고 그 아래 고정 안 한 줄을 둔다.
     /// - 고정한 줄: 자리 순. 새로 고정한 줄이 맨 위(자리 0)로 들어가고, 회원이 끌어서 바꿀 수 있다.
-    ///   자리가 없는 고정 줄(순서 저장 전에 고정한 기록)은 자리 있는 줄 뒤에 연도 최신순으로 둔다.
-    /// - 고정 안 한 줄: 연도 최신순이 기본. 회원이 끌어서 정한 자리가 있으면 그 순서를 지키고,
-    ///   자리를 정한 적 없는 기록(새로 입력한 기록 등)은 그 사이 연도에 맞는 자리(처음 나오는 더 오래된 줄 앞)로 들어간다.
-    /// 같은 연도끼리는 처음 입력한 순서를 지킨다(월은 더 받지 않으므로).
+    ///   자리가 없는 고정 줄(순서 저장 전에 고정한 기록)은 자리 있는 줄 뒤에 기본 순서로 둔다.
+    /// - 고정 안 한 줄: 높은 띠 먼저, 같은 띠 안에서는 연도 최신순이 기본이고 띠를 안 적은 줄은 맨 아래에 둔다.
+    ///   회원이 끌어서 정한 자리가 있으면 그 순서를 지키고,
+    ///   자리를 정한 적 없는 기록(새로 입력한 기록 등)은 기본 순서에 맞는 자리(처음 나오는 더 뒤에 올 줄 앞)로 들어간다.
+    /// 띠와 연도가 같으면 처음 입력한 순서를 지킨다(월은 더 받지 않으므로).
     static func grouped(_ competitions: [Competition]) -> [CompetitionGroup] {
         struct Key: Hashable {
             let name: String
@@ -220,8 +250,10 @@ struct CompetitionGroup {
             let name = entries.first?.competitionName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             return (inputIndex, CompetitionGroup(id: "\(key.year)|\(key.name)", name: name, year: key.year, entries: entries))
         }
-        let newestYearFirst: (Indexed, Indexed) -> Bool = { lhs, rhs in
-            lhs.group.year != rhs.group.year ? lhs.group.year > rhs.group.year : lhs.inputIndex < rhs.inputIndex
+        let defaultOrder: (Indexed, Indexed) -> Bool = { lhs, rhs in
+            if lhs.group.comesBefore(rhs.group) { return true }
+            if rhs.group.comesBefore(lhs.group) { return false }
+            return lhs.inputIndex < rhs.inputIndex
         }
 
         let pinned = groups.filter { $0.group.isPinned }.sorted { lhs, rhs in
@@ -233,7 +265,7 @@ struct CompetitionGroup {
             case (nil, _?):
                 return false
             default:
-                return newestYearFirst(lhs, rhs)
+                return defaultOrder(lhs, rhs)
             }
         }
 
@@ -242,8 +274,8 @@ struct CompetitionGroup {
             .filter { $0.group.displayOrder != nil }
             .sorted { ($0.group.displayOrder ?? 0, $0.inputIndex) < ($1.group.displayOrder ?? 0, $1.inputIndex) }
             .map(\.group)
-        for item in unpinned.filter({ $0.group.displayOrder == nil }).sorted(by: newestYearFirst) {
-            let index = placed.firstIndex { $0.year < item.group.year } ?? placed.endIndex
+        for item in unpinned.filter({ $0.group.displayOrder == nil }).sorted(by: defaultOrder) {
+            let index = placed.firstIndex { item.group.comesBefore($0) } ?? placed.endIndex
             placed.insert(item.group, at: index)
         }
         return pinned.map(\.group) + placed
@@ -304,7 +336,7 @@ private struct CompetitionMedalSummaryView: View {
 ///
 /// 줄을 길게 눌러 끌면 순서를 바꾼다(#204). 처음 하나를 옮기면 머리줄에 취소·완료가 나오고, 완료를 눌러야 저장한다.
 /// 고정한 줄은 고정한 줄끼리, 고정 안 한 줄은 고정 안 한 줄끼리만 자리를 바꾼다
-/// — 고정 안 한 줄을 고정 자리로 올리려면 ⋯ 의 '맨 위에 고정'을 쓴다.
+/// — 고정 안 한 줄을 고정 자리로 올리려면 줄을 눌러 뜨는 시트의 '맨 위에 고정'을 쓴다.
 private struct CompetitionListView: View {
     let competitions: [Competition]
     let onCompetitionTapped: ([Competition]) -> Void
@@ -318,7 +350,7 @@ private struct CompetitionListView: View {
     @State private var rowHeights: [String: CGFloat] = [:]
 
     private enum Metrics {
-        static let rowSpacing: CGFloat = 4
+        static let rowSpacing: CGFloat = 0
     }
 
     /// 끌기를 시작할 때의 순서 — 앞서 옮겨 둔 순서가 있으면 그것부터
@@ -336,11 +368,13 @@ private struct CompetitionListView: View {
 
     var body: some View {
         VStack(spacing: Metrics.rowSpacing) {
-            ForEach(liveGroups ?? baseGroups, id: \.id) { group in
+            let groups = liveGroups ?? baseGroups
+            ForEach(groups, id: \.id) { group in
+                let index = groups.firstIndex { $0.id == group.id } ?? 0
                 CompetitionRowView(
                     group: group,
+                    startsPlainBlock: index > 0 && groups[index - 1].isPinned && !group.isPinned,
                     // 순서를 옮기는 중에는 수정·고정 시트로 들어가지 않는다(저장 안 한 순서를 잃지 않게).
-                    isInteractionDisabled: pendingGroups != nil,
                     onTapped: {
                         guard pendingGroups == nil else { return }
                         onCompetitionTapped(group.entries)
@@ -361,6 +395,7 @@ private struct CompetitionListView: View {
                 }
             }
         }
+        .contentShape(Rectangle())
         .onDrop(of: [CompetitionDropDelegate.rowType], delegate: CompetitionDropDelegate(
             groups: baseGroups,
             isSaving: isSaving,
@@ -456,113 +491,205 @@ private struct CompetitionDropDelegate: DropDelegate {
     }
 }
 
+// MARK: - CompetitionMedalCluster
+
+/// 한 대회에서 딴 메달을 금·은·동 순서로 가로로 놓는다. 겹치지 않게 띄워 개수와 색이 그대로 보이게 한다.
+private struct CompetitionMedalCluster: View {
+    let medals: [CompetitionRank]
+    /// 펼칠 때 메달이 부문 줄의 자기 자리로 이어서 움직이게 하는 이름 공간
+    let namespace: Namespace.ID
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(Array(medals.enumerated()), id: \.offset) { index, rank in
+                rank.medalImage
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 22, height: 22)
+                    .accessibilityLabel(rank.displayName)
+                    .matchedGeometryEffect(id: index, in: namespace)
+            }
+        }
+        .fixedSize()
+    }
+}
+
+// MARK: - CompetitionBeltMark
+
+/// 세로로 놓인 띠 한 토막 — 글자 없이 색과 끝부분(검은 띠만 빨강)으로 띠를 알린다.
+private struct CompetitionBeltMark: View {
+    let belt: BeltRank
+
+    private var fill: Color {
+        let colors = Color.component.beltSelectButton.belt
+        switch belt {
+        case .white: return colors.white
+        case .blue: return colors.blue
+        case .purple: return colors.purple
+        case .brown: return colors.brown
+        case .black: return colors.black
+        }
+    }
+
+    var body: some View {
+        let colors = Color.component.beltSelectButton.belt
+        RoundedRectangle(cornerRadius: 2)
+            .fill(fill)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(belt == .black ? colors.blackRankBar : colors.rankBar)
+                    .frame(height: 7)
+                    .padding(.bottom, 2)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 2))
+            .overlay {
+                // 흰 띠는 카드 바탕에 묻혀 띠 선택 버튼과 같은 옅은 테두리를 두른다.
+                if belt == .white {
+                    RoundedRectangle(cornerRadius: 2)
+                        .strokeBorder(colors.whiteEdge, lineWidth: 1)
+                }
+            }
+            .frame(width: 8, height: 24)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(belt.displayName) 띠")
+    }
+}
+
 // MARK: - CompetitionRowView
 
-/// 대회 한 줄 — 메달 아이콘은 가장 높은 것 하나만. 여러 부문이면 아래에 부문을 "도복 -76kg 은"처럼 글로 한 줄씩 적는다.
-/// (부문마다 메달 아이콘을 달면 목록이 메달로 도배돼 보인다)
-/// 줄이나 오른쪽 ⋯ 을 누르면 수정·부문 추가·삭제 시트를 띄운다. 길게 눌러 끌면 순서를 바꾼다(CompetitionListView).
+/// 대회 한 줄 — 왼쪽에 띠, 가운데에 대회 이름과 그 아래 약한 부가 정보 한 줄(종목·체급 · 연도), 오른쪽에 메달.
+/// 고정한 줄은 맨 위에 두고 이름을 굵게 해서 알린다.
+/// 부문이 하나면 줄을 눌러 수정·부문 추가·고정·삭제 시트를 띄운다.
+/// 부문이 여럿이면 줄을 눌러 펼치고, 펼친 부문 줄을 누르면 같은 시트를 띄운다. 길게 눌러 끌면 순서를 바꾼다(CompetitionListView).
 private struct CompetitionRowView: View {
     let group: CompetitionGroup
-    /// 순서를 옮기는 중 — ⋯ 을 막는다(줄 탭은 목록이 무시한다. 줄 버튼을 막으면 끌기까지 막힐 수 있어서).
-    var isInteractionDisabled = false
+    /// 고정 묶음 다음 첫 줄 — 위에 여백을 둬 두 묶음을 가른다.
+    var startsPlainBlock = false
     let onTapped: () -> Void
+
+    // 펼침은 화면 표시용 일시 상태라 저장하지 않는다.
+    @State private var isExpanded = false
+    @Namespace private var medalNamespace
 
     private enum Metrics {
         static let medalSize: CGFloat = 22
-        // 여러 줄일 때 메달을 대회 이름 줄 가운데에 맞춘다.
-        static let titleLineHeight: CGFloat = 22
+        /// 부문 줄의 글자를 대회 이름과 같은 세로줄에 맞추는 들여쓰기(띠 8 + 띠 뒤 여백 4 + 간격 8)
+        static let divisionIndent: CGFloat = 20
     }
 
     private var hasDivisions: Bool { group.entries.count > 1 }
 
+    /// 펼쳤을 때의 부문 — 접은 줄의 메달과 같은 금·은·동 순서
+    private var sortedEntries: [Competition] {
+        group.entries.enumerated()
+            .sorted { lhs, rhs in
+                let (left, right) = (lhs.element.competitionRank.medalOrder, rhs.element.competitionRank.medalOrder)
+                return left == right ? lhs.offset < rhs.offset : left < right
+            }
+            .map(\.element)
+    }
+
     var body: some View {
-        HStack(alignment: hasDivisions ? .top : .center, spacing: 0) {
-            Button {
+        VStack(spacing: 0) {
+            header
+
+            if isExpanded {
+                VStack(spacing: 0) {
+                    ForEach(Array(sortedEntries.enumerated()), id: \.offset) { index, entry in
+                        divisionRow(entry, index: index)
+                    }
+                }
+                .padding(.leading, Metrics.divisionIndent)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 6)
+            }
+        }
+        .padding(.top, startsPlainBlock ? 12 : 0)
+        // 줄의 빈 곳도 끌기 영역에 넣는다 — 빠지면 끄는 손가락이 줄 사이를 지날 때 놓기가 끊겨 옮기던 순서가 되돌아간다.
+        .contentShape(Rectangle())
+        // 펼치는 동안 부문 줄이 아래 대회 줄과 겹쳐 보이지 않게 줄 높이만큼만 보여 준다.
+        .clipped()
+    }
+
+    private var header: some View {
+        Button {
+            if hasDivisions {
+                withAnimation(.easeInOut(duration: 0.5)) { isExpanded.toggle() }
+            } else {
                 onTapped()
-            } label: {
-                HStack(alignment: hasDivisions ? .top : .center, spacing: 8) {
-                    group.representativeRank.medalImage
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: Metrics.medalSize, height: Metrics.medalSize)
-                        .frame(height: hasDivisions ? Metrics.titleLineHeight : nil)
-                        .accessibilityLabel(group.representativeRank.displayName)
+            }
+        } label: {
+            HStack(spacing: 8) {
+                // 띠를 안 적은 줄도 띠 자리를 비워 대회 이름이 같은 세로줄에서 시작하게 한다.
+                Group {
+                    if let belt = group.topBelt {
+                        CompetitionBeltMark(belt: belt)
+                    } else {
+                        Color.clear.frame(width: 8, height: 24)
+                    }
+                }
+                .padding(.trailing, 4)
 
-                    // 대회 이름 + 상세 줄(연도 · 띠 · 부문) — 같은 메달도 띠·부문에 따라 무게가 달라 함께 보여 준다(#122).
-                    VStack(alignment: .leading, spacing: 2) {
-                        title
-                            .frame(minHeight: Metrics.titleLineHeight)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(group.name)
+                        .font(group.isPinned ? .pretendard.custom(weight: .semiBold, size: 16) : .pretendard.bodyM)
+                        .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
+                        .lineLimit(1)
+                        .accessibilityLabel(group.isPinned ? "\(group.name), 고정됨" : group.name)
 
-                        Text(group.detailText)
+                    HStack(spacing: 2) {
+                        Text(group.rowDetailText)
                             .font(.pretendard.bodyS)
                             .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .lineLimit(1)
 
-                        // 부문 줄은 위 상세 줄(연도 · 띠)과 구분되게 진한 글자 + 간격을 둔다.
                         if hasDivisions {
-                            VStack(alignment: .leading, spacing: 6) {
-                                ForEach(Array(group.entries.enumerated()), id: \.offset) { _, entry in
-                                    Text(group.divisionMedalText(of: entry))
-                                        .font(.pretendard.bodyS)
-                                        .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                            }
-                            .padding(.top, 6)
+                            Assets.Common.Icon.chevronRight.swiftUIImage
+                                .renderingMode(.template)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 12, height: 12)
+                                .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
+                                .rotationEffect(.degrees(isExpanded ? -90 : 90))
+                                .accessibilityHidden(true)
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.vertical, 12)
-                .frame(minHeight: 40)
-                .padding(.leading, 16)
-                .contentShape(Rectangle())
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if !isExpanded {
+                    CompetitionMedalCluster(medals: group.displayedMedals, namespace: medalNamespace)
+                }
             }
-            .buttonStyle(.plain)
-
-            menuButton
-        }
-    }
-
-    // 고정 표시는 이름 뒤에 옅은 회색 압정으로 — 대회 이름보다 눈에 띄지 않게 한다(#124).
-    private var title: some View {
-        HStack(spacing: 4) {
-            Text(group.name)
-                .font(.pretendard.custom(weight: .semiBold, size: 16))
-                .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
-                .lineLimit(1)
-
-            if group.isPinned {
-                Assets.Common.Icon.pin.swiftUIImage
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 12, height: 12)
-                    .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
-                    .accessibilityLabel("고정됨")
-            }
-        }
-    }
-
-    private var menuButton: some View {
-        Button {
-            onTapped()
-        } label: {
-            Assets.MyProfile.Icon.menu.swiftUIImage
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 16, height: 16)
-                .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
+            // 줄 안 간격(2)보다 줄 사이 간격(8 + 8)을 크게 둬, 이름과 부가 정보가 한 덩어리로 읽히게 한다.
+            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(isInteractionDisabled)
-        .opacity(isInteractionDisabled ? 0.3 : 1)
-        // 줄을 눌러도 같은 시트가 떠서, 화면 읽기에서는 줄 하나만 읽히게 한다.
-        .accessibilityHidden(true)
-        .padding(.trailing, 2)
+        .accessibilityValue(hasDivisions ? (isExpanded ? "펼침" : "접힘") : "")
+    }
+
+    private func divisionRow(_ entry: Competition, index: Int) -> some View {
+        Button(action: onTapped) {
+            HStack(spacing: 8) {
+                Text(group.divisionLineText(of: entry))
+                    .font(.pretendard.bodyS)
+                    .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                entry.competitionRank.medalImage
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: Metrics.medalSize, height: Metrics.medalSize)
+                    .accessibilityLabel(entry.competitionRank.displayName)
+                    .matchedGeometryEffect(id: index, in: medalNamespace)
+            }
+            .padding(.vertical, 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -587,6 +714,7 @@ private struct EmptyCompetitionView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: Metrics.iconSize, height: Metrics.iconSize)
+                    .frame(width: 22)
 
                 // 텍스트
                 Text("출전한 대회 정보를 입력해주세요")
@@ -603,8 +731,7 @@ private struct EmptyCompetitionView: View {
                     .foregroundStyle(Color.component.list.setting.icon)
             }
             .frame(height: 56)
-            .padding(.leading, 12)
-            .padding(.trailing, 20)
+            .padding(.horizontal, 16)
             .background(Color.component.list.setting.background)
             .clipShape(RoundedRectangle(cornerRadius: 18))
         }
