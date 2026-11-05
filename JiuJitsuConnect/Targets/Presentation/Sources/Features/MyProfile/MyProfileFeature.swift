@@ -158,7 +158,7 @@ public struct MyProfileFeature: Sendable {
             case competitionDetailTapped(Competition)  // 대회 정보 행 탭
             case addDivisionTapped([Competition])     // 저장한 대회에 부문 추가 (그 대회의 기록들)
             case deleteCompetitionConfirmed([Competition])  // 대회 시트에서 삭제 확인 (그 대회의 부문 전부)
-            case competitionPinToggled([Competition])  // 대회 줄 ⋯ 메뉴 '맨 위에 고정'/'고정 해제' — 묶인 부문 전부 (#124)
+            case competitionPinToggled([Competition])  // 대회 줄 시트 '맨 위에 고정'/'고정 해제' — 묶인 부문 전부 (#124)
             case competitionsReordered([[Competition]])  // 대회 줄을 끌어 옮기고 '완료' — 순서가 바뀐 묶음(고정/고정 안 함)의 줄별 부문들, 위에서부터 (#204)
             case moreButtonTapped                   // 우측 상단 "..." 버튼 탭 (토글)
             case instructorVerificationMenuTapped   // "관장 사범 인증" 메뉴 항목 탭
