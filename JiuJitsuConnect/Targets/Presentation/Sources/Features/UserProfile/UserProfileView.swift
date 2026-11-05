@@ -295,11 +295,6 @@ private struct UserProfileBeltCardView: View {
 private struct UserProfileCompetitionSection: View {
     let competitions: [Competition]
 
-    private enum RowMetrics {
-        static let medalSize: CGFloat = 22
-        static let titleLineHeight: CGFloat = 22
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
@@ -331,10 +326,16 @@ private struct UserProfileCompetitionSection: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 20)
                 } else {
-                    VStack(spacing: 4) {
-                        ForEach(Array(CompetitionGroup.grouped(competitions).enumerated()), id: \.offset) { _, group in
-                            row(group)
-                                .fixedSize(horizontal: false, vertical: true)
+                    let groups = CompetitionGroup.grouped(competitions)
+                    VStack(spacing: 0) {
+                        ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
+                            // 읽기만 하는 화면이라 시트는 띄우지 않는다. 부문이 여럿인 줄은 눌러서 펼친다.
+                            CompetitionRowView(
+                                group: group,
+                                startsPlainBlock: index > 0 && groups[index - 1].isPinned && !group.isPinned
+                            )
+                            // 줄 높이를 내용만큼 고정한다 — 없으면 펼친 줄이 다른 줄과 같은 높이로 눌린다.
+                            .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
@@ -343,47 +344,6 @@ private struct UserProfileCompetitionSection: View {
             .background(Color.component.skillCard.default.bg)
             .clipShape(RoundedRectangle(cornerRadius: 18))
         }
-    }
-
-    private func row(_ group: CompetitionGroup) -> some View {
-        let hasDivisions = group.entries.count > 1
-        return HStack(alignment: hasDivisions ? .top : .center, spacing: 8) {
-            group.representativeRank.medalImage
-                .resizable()
-                .scaledToFit()
-                .frame(width: RowMetrics.medalSize, height: RowMetrics.medalSize)
-                .frame(height: hasDivisions ? RowMetrics.titleLineHeight : nil)
-                .accessibilityLabel(group.representativeRank.displayName)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(group.name)
-                    .font(.pretendard.custom(weight: .semiBold, size: 16))
-                    .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
-                    .lineLimit(1)
-                    .frame(minHeight: RowMetrics.titleLineHeight)
-
-                Text(group.detailText)
-                    .font(.pretendard.bodyS)
-                    .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if hasDivisions {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(Array(group.entries.enumerated()), id: \.offset) { _, entry in
-                            Text(group.divisionMedalText(of: entry))
-                                .font(.pretendard.bodyS)
-                                .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .padding(.top, 6)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.vertical, 12)
-        .frame(minHeight: 40)
-        .padding(.horizontal, 16)
     }
 }
 
