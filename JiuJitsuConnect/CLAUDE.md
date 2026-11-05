@@ -492,6 +492,14 @@ private enum Metrics {
 - `.xcodeproj` / `.xcworkspace` 직접 편집 금지 (Tuist 생성물)
 - 의존성/타겟 변경 후 `tuist generate`로 검증한 상태에서만 커밋
 - Asset 추가 후 SwiftGen 미실행 상태로 코드 푸시 금지
+- **에셋 용량 (#221):**
+  - 이미지는 표시 크기의 @3x를 넘기지 않는다. 카드·배경처럼 큰 그림에는 @1x를 넣지 않는다 (iPhone 전용·iOS 26이라 @1x 기기가 없다).
+  - 파일 한 개가 200KB를 넘으면 PR 본문에 이유를 적는다. PR 검사 `Asset Size`가 경고로 알려 준다. 200KB는 제안값이다 (#221 이후 앱에서 가장 큰 이미지가 약 90KB).
+  - 단순한 도형은 벡터(SVG·PDF), 투명 없는 큰 그림은 JPEG(품질 90, 4:4:4), 투명 있는 큰 그림은 HEIC로 넣는다. 카탈로그는 JPEG는 그대로 담지만 HEIC는 원본 옆에 약 3배 크기의 대체본을 함께 담는다(그래도 같은 그림을 PNG로 넣을 때보다 작다). 에셋 카탈로그는 PNG를 빌드 때 다시 압축하므로 PNG 파일만 줄여도 결과가 줄지 않고, 카탈로그의 `lossy` 옵션은 색을 RGB555로 낮추므로 쓰지 않는다.
+  - 줄인 효과는 원본이 아니라 빌드 결과물(`.app`·`Assets.car`)로 잰다.
+  - 폰트는 실제로 쓰는 굵기만 넣는다 (현재 Pretendard SemiBold·Medium, CookieRun Black). 굵기를 추가할 때는 파일, `Project.swift`의 `UIAppFonts`, `Font+.swift`의 목록과 `Weight`를 함께 고친다.
+  - 움직임이 있는 화면은 반영 전에 실기기에서 끊김을 확인한다.
+- **리소스 위치 (#224):** 같은 파일을 앱 본체와 `DesignSystem.framework`에 두 벌 넣지 않는다. 폰트 파일은 `Targets/DesignSystem/Resources/Fonts`에 두되 앱 타깃만 담고(`UIAppFonts`는 앱 본체에서 찾는다), 이미지·색·로티는 DesignSystem 타깃만 담는다. 앱 아이콘과 런치 화면 그림·색은 `Targets/App/Resources/AppAssets.xcassets`에 둔다. 이 중 `Splash` 그림과 `Blue-500-Primary`는 런치 화면(앱 본체)과 앱 코드(프레임워크)가 각각 읽어야 해서 사본이므로, 바꿀 때 양쪽을 함께 고친다.
 
 ---
 
