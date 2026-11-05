@@ -167,6 +167,13 @@ struct CompetitionGroup {
             .max { (BeltRank.allCases.firstIndex(of: $0) ?? 0) < (BeltRank.allCases.firstIndex(of: $1) ?? 0) }
     }
 
+    /// 기본 순서 — 높은 띠 먼저, 같은 띠면 최신 연도 먼저. 띠를 안 적은 줄은 가장 낮게 본다.
+    fileprivate func comesBefore(_ other: CompetitionGroup) -> Bool {
+        let beltIndex = topBelt.flatMap { BeltRank.allCases.firstIndex(of: $0) } ?? -1
+        let otherBeltIndex = other.topBelt.flatMap { BeltRank.allCases.firstIndex(of: $0) } ?? -1
+        return beltIndex != otherBeltIndex ? beltIndex > otherBeltIndex : year > other.year
+    }
+
     /// 줄의 부가 정보 — "도복 -76kg · 2026". 여러 부문이면 "4개 부문 · 2025"처럼 수만 적고, 비어 있는 값은 건너뛴다. 띠는 줄 앞에 따로 둔다.
     var rowDetailText: String {
         let division = entries.count > 1 ? "\(entries.count)개 부문" : entries.first?.divisionText
@@ -215,10 +222,11 @@ struct CompetitionGroup {
 
     /// 같은 대회끼리 묶어, 고정한 줄을 맨 위에 두고 그 아래 고정 안 한 줄을 둔다.
     /// - 고정한 줄: 자리 순. 새로 고정한 줄이 맨 위(자리 0)로 들어가고, 회원이 끌어서 바꿀 수 있다.
-    ///   자리가 없는 고정 줄(순서 저장 전에 고정한 기록)은 자리 있는 줄 뒤에 연도 최신순으로 둔다.
-    /// - 고정 안 한 줄: 연도 최신순이 기본. 회원이 끌어서 정한 자리가 있으면 그 순서를 지키고,
-    ///   자리를 정한 적 없는 기록(새로 입력한 기록 등)은 그 사이 연도에 맞는 자리(처음 나오는 더 오래된 줄 앞)로 들어간다.
-    /// 같은 연도끼리는 처음 입력한 순서를 지킨다(월은 더 받지 않으므로).
+    ///   자리가 없는 고정 줄(순서 저장 전에 고정한 기록)은 자리 있는 줄 뒤에 기본 순서로 둔다.
+    /// - 고정 안 한 줄: 높은 띠 먼저, 같은 띠 안에서는 연도 최신순이 기본이고 띠를 안 적은 줄은 맨 아래에 둔다.
+    ///   회원이 끌어서 정한 자리가 있으면 그 순서를 지키고,
+    ///   자리를 정한 적 없는 기록(새로 입력한 기록 등)은 기본 순서에 맞는 자리(처음 나오는 더 뒤에 올 줄 앞)로 들어간다.
+    /// 띠와 연도가 같으면 처음 입력한 순서를 지킨다(월은 더 받지 않으므로).
     static func grouped(_ competitions: [Competition]) -> [CompetitionGroup] {
         struct Key: Hashable {
             let name: String
@@ -242,8 +250,10 @@ struct CompetitionGroup {
             let name = entries.first?.competitionName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             return (inputIndex, CompetitionGroup(id: "\(key.year)|\(key.name)", name: name, year: key.year, entries: entries))
         }
-        let newestYearFirst: (Indexed, Indexed) -> Bool = { lhs, rhs in
-            lhs.group.year != rhs.group.year ? lhs.group.year > rhs.group.year : lhs.inputIndex < rhs.inputIndex
+        let defaultOrder: (Indexed, Indexed) -> Bool = { lhs, rhs in
+            if lhs.group.comesBefore(rhs.group) { return true }
+            if rhs.group.comesBefore(lhs.group) { return false }
+            return lhs.inputIndex < rhs.inputIndex
         }
 
         let pinned = groups.filter { $0.group.isPinned }.sorted { lhs, rhs in
@@ -255,7 +265,7 @@ struct CompetitionGroup {
             case (nil, _?):
                 return false
             default:
-                return newestYearFirst(lhs, rhs)
+                return defaultOrder(lhs, rhs)
             }
         }
 
@@ -264,8 +274,8 @@ struct CompetitionGroup {
             .filter { $0.group.displayOrder != nil }
             .sorted { ($0.group.displayOrder ?? 0, $0.inputIndex) < ($1.group.displayOrder ?? 0, $1.inputIndex) }
             .map(\.group)
-        for item in unpinned.filter({ $0.group.displayOrder == nil }).sorted(by: newestYearFirst) {
-            let index = placed.firstIndex { $0.year < item.group.year } ?? placed.endIndex
+        for item in unpinned.filter({ $0.group.displayOrder == nil }).sorted(by: defaultOrder) {
+            let index = placed.firstIndex { item.group.comesBefore($0) } ?? placed.endIndex
             placed.insert(item.group, at: index)
         }
         return pinned.map(\.group) + placed
