@@ -604,57 +604,59 @@ struct CompetitionRowView: View {
             .buttonStyle(.plain)
             .accessibilityValue(hasDivisions ? (isExpanded ? "펼침" : "접힘") : "")
         } else {
+            // 버튼이 없으면 이름·부가 정보·메달이 따로 읽히므로 한 덩어리로 묶는다.
             headerContent
+                .accessibilityElement(children: .combine)
         }
     }
 
     private var headerContent: some View {
-            HStack(spacing: 8) {
-                // 띠를 안 적은 줄도 띠 자리를 비워 대회 이름이 같은 세로줄에서 시작하게 한다.
-                Group {
-                    if let belt = group.topBelt {
-                        CompetitionBeltMark(belt: belt)
-                    } else {
-                        Color.clear.frame(width: 8, height: 24)
-                    }
-                }
-                .padding(.trailing, 4)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(group.name)
-                        .font(group.isPinned ? .pretendard.custom(weight: .semiBold, size: 16) : .pretendard.bodyM)
-                        .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
-                        .lineLimit(1)
-                        .accessibilityLabel(group.isPinned ? "\(group.name), 고정됨" : group.name)
-
-                    HStack(spacing: 2) {
-                        Text(group.rowDetailText)
-                            .font(.pretendard.bodyS)
-                            .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
-                            .lineLimit(1)
-
-                        if hasDivisions {
-                            Assets.Common.Icon.chevronRight.swiftUIImage
-                                .renderingMode(.template)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 12, height: 12)
-                                .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
-                                .rotationEffect(.degrees(isExpanded ? -90 : 90))
-                                .accessibilityHidden(true)
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                if !isExpanded {
-                    CompetitionMedalCluster(medals: group.displayedMedals, namespace: medalNamespace)
+        HStack(spacing: 8) {
+            // 띠를 안 적은 줄도 띠 자리를 비워 대회 이름이 같은 세로줄에서 시작하게 한다.
+            Group {
+                if let belt = group.topBelt {
+                    CompetitionBeltMark(belt: belt)
+                } else {
+                    Color.clear.frame(width: 8, height: 24)
                 }
             }
-            // 줄 안 간격(2)보다 줄 사이 간격(8 + 8)을 크게 둬, 이름과 부가 정보가 한 덩어리로 읽히게 한다.
-            .padding(.vertical, 8)
-            .padding(.horizontal, 16)
-            .contentShape(Rectangle())
+            .padding(.trailing, 4)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(group.name)
+                    .font(group.isPinned ? .pretendard.custom(weight: .semiBold, size: 16) : .pretendard.bodyM)
+                    .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
+                    .lineLimit(1)
+                    .accessibilityLabel(group.isPinned ? "\(group.name), 고정됨" : group.name)
+
+                HStack(spacing: 2) {
+                    Text(group.rowDetailText)
+                        .font(.pretendard.bodyS)
+                        .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
+                        .lineLimit(1)
+
+                    if hasDivisions {
+                        Assets.Common.Icon.chevronRight.swiftUIImage
+                            .renderingMode(.template)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 12, height: 12)
+                            .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
+                            .rotationEffect(.degrees(isExpanded ? -90 : 90))
+                            .accessibilityHidden(true)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if !isExpanded {
+                CompetitionMedalCluster(medals: group.displayedMedals, namespace: medalNamespace)
+            }
+        }
+        // 줄 안 간격(2)보다 줄 사이 간격(8 + 8)을 크게 둬, 이름과 부가 정보가 한 덩어리로 읽히게 한다.
+        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .contentShape(Rectangle())
     }
 
     @ViewBuilder
@@ -666,26 +668,27 @@ struct CompetitionRowView: View {
             .buttonStyle(.plain)
         } else {
             divisionContent(entry, index: index)
+                .accessibilityElement(children: .combine)
         }
     }
 
     private func divisionContent(_ entry: Competition, index: Int) -> some View {
-            HStack(spacing: 8) {
-                Text(group.divisionLineText(of: entry))
-                    .font(.pretendard.bodyS)
-                    .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        HStack(spacing: 8) {
+            Text(group.divisionLineText(of: entry))
+                .font(.pretendard.bodyS)
+                .foregroundStyle(Color.component.competitionCard.cardTextPrimary)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                entry.competitionRank.medalImage
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: Metrics.medalSize, height: Metrics.medalSize)
-                    .accessibilityLabel(entry.competitionRank.displayName)
-                    .matchedGeometryEffect(id: index, in: medalNamespace)
-            }
-            .padding(.vertical, 2)
-            .contentShape(Rectangle())
+            entry.competitionRank.medalImage
+                .resizable()
+                .scaledToFit()
+                .frame(width: Metrics.medalSize, height: Metrics.medalSize)
+                .accessibilityLabel(entry.competitionRank.displayName)
+                .matchedGeometryEffect(id: index, in: medalNamespace)
+        }
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
     }
 }
 
