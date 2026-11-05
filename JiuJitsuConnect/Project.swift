@@ -161,9 +161,11 @@ let project = Project(
             infoPlist: .extendingDefault(with: appInfoPlist),
             sources: ["Targets/App/Sources/**"],
             resources: [
+                // AppAssets: 앱 아이콘과 런치 화면 전용. 시스템이 앱 본체에서만 읽는다.
                 "Targets/App/Resources/**",
                 "Secrets/GoogleService-Info.plist",
-                .glob(pattern: .relativeToRoot("Targets/DesignSystem/Resources/**"))
+                // UIAppFonts는 앱 본체에서 찾으므로 폰트 파일은 앱 타깃에만 넣는다(#224).
+                .glob(pattern: .relativeToRoot("Targets/DesignSystem/Resources/Fonts/**"))
             ],
             dependencies: [
                 .target(name: "Presentation"),
@@ -280,7 +282,13 @@ let project = Project(
             deploymentTargets: appDeploymentTargets,
             infoPlist: .default,
             sources: ["Targets/DesignSystem/Sources/**"],
-            resources: ["Targets/DesignSystem/Resources/**"],
+            // Fonts는 앱 타깃에만 넣는다(#224). 나머지는 이 프레임워크 번들에서 읽는다.
+            resources: [
+                "Targets/DesignSystem/Resources/Assets.xcassets",
+                "Targets/DesignSystem/Resources/Colors.xcassets",
+                "Targets/DesignSystem/Resources/Localizable.xcstrings",
+                "Targets/DesignSystem/Resources/Lottie/**"
+            ],
             dependencies: [
                 .target(name: "CoreKit"),
                 .external(name: "Lottie")
