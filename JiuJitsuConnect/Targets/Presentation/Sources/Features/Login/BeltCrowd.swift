@@ -362,13 +362,15 @@ struct BubbleEntrance: ViewModifier {
     let isStatic: Bool
     /// 나타날 때 한 번 바뀌어 튀어나오는 움직임을 재생한다
     let trigger: Bool
+    /// 참일 때만 둥실 뜬다. 미리 붙여 두고 나중에 보여 주는 말풍선은 보이는 순간부터 뜨게 한다
+    var floats = true
 
     func body(content: Content) -> some View {
         if isStatic {
             content
         } else {
             content
-                .keyframeAnimator(initialValue: BubbleFloat(), repeating: true) { content, pose in
+                .keyframeAnimator(initialValue: BubbleFloat(), repeating: floats) { content, pose in
                     content.offset(y: pose.lift)
                 } keyframes: { _ in
                     KeyframeTrack(\.lift) {
