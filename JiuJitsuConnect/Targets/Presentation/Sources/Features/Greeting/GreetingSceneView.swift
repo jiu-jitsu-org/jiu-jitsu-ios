@@ -115,10 +115,14 @@ struct GreetingSceneView: View {
 
     /// 말하는 캐릭터 머리 위에 띄우고, 화면 밖으로 나가지 않게 민다. 꼬리는 늘 머리 쪽에 붙는다.
     /// 로그인 화면의 `···` 말풍선처럼 꼬리 쪽에서 튀어나와 둥실 떠 있다가, 위로 떠오르며 작아진다.
+    ///
+    /// 말풍선은 첫 프레임부터 투명하게 붙여 두고 `Timing.say`에 튀어나오게만 한다.
+    /// 캐릭터가 뛰는 도중에 처음 붙이면 만드는 비용이 그 프레임에 몰려, 웹 페이지가 늦게 도착하는 망에서는 거의 매번 한 프레임 끊겼다(#207)
     @ViewBuilder
     private func sayBubble(layout: GreetingLayout, elapsed: TimeInterval) -> some View {
         let leave = Timing.sayLeave.progress(at: elapsed)
-        if elapsed >= Timing.say, leave < 1 {
+        if leave < 1 {
+            let isShown = elapsed >= Timing.say
             let head = layout.placement(of: BeltCast.members[greeting.speaker]).head
             // 머리가 화면 오른쪽에 있으면 말풍선을 왼쪽으로 펼친다
             let opensLeft = head.x > layout.width / 2
@@ -126,11 +130,12 @@ struct GreetingSceneView: View {
             let tailX = min(max(head.x - left, 20), max(bubbleWidth - 20, 20))
             let anchor = UnitPoint(x: bubbleWidth > 0 ? tailX / bubbleWidth : 0.5, y: 1.2)
 
-            SayBubble(text: greeting.line, tailX: tailX, tailLean: opensLeft ? 4 : -4, anchor: anchor)
+            SayBubble(text: greeting.line, tailX: tailX, tailLean: opensLeft ? 4 : -4, anchor: anchor, isShown: isShown)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { bubbleWidth = $0 }
                 .modifier(BubbleLeave(progress: leave, anchor: anchor))
                 .offset(x: left, y: head.y - SayBubble.height - 14)
                 .accessibilityLabel(greeting.line)
+                .accessibilityHidden(!isShown)
         }
     }
 
@@ -273,10 +278,10 @@ private struct SayBubble: View {
     let tailLean: CGFloat
     /// 꼬리 쪽에서 튀어나온다
     let anchor: UnitPoint
+    /// 거짓이면 투명하게 기다리고, 참이 되는 순간 튀어나와 둥실 뜨기 시작한다
+    let isShown: Bool
 
     static let height: CGFloat = 40
-
-    @State private var hasAppeared = false
 
     var body: some View {
         Text(text)
@@ -301,8 +306,7 @@ private struct SayBubble: View {
                 .compositingGroup()
                 .shadow(color: Color.primitive.blue.b900.opacity(0.09), radius: 4, y: 4.8)
             }
-            .modifier(BubbleEntrance(anchor: anchor, isStatic: false, trigger: hasAppeared))
-            .onAppear { hasAppeared = true }
+            .modifier(BubbleEntrance(anchor: anchor, isStatic: false, trigger: isShown, floats: isShown))
     }
 }
 
