@@ -46,18 +46,9 @@ let appInfoPlist: [String: Plist.Value] = {
         "UISupportedInterfaceOrientations": ["UIInterfaceOrientationPortrait"],
 
         "UIAppFonts": [
-            "Pretendard-Black.otf",
-            "Pretendard-Bold.otf",
-            "Pretendard-ExtraBold.otf",
-            "Pretendard-ExtraLight.otf",
-            "Pretendard-Light.otf",
             "Pretendard-Medium.otf",
-            "Pretendard-Regular.otf",
             "Pretendard-SemiBold.otf",
-            "Pretendard-Thin.otf",
-            "CookieRun Black.otf",
-            "CookieRun Bold.otf",
-            "CookieRun Regular.otf"
+            "CookieRun Black.otf"
         ],
         // MY 대회 줄을 끌어 순서를 바꿀 때 쓰는 앱 안 전용 끌기 형식(#204). 다른 앱과 주고받지 않는다.
         "UTExportedTypeDeclarations": [

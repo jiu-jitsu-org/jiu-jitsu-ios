@@ -54,15 +54,8 @@ public struct PretendardUIFont {
 private extension Pretendard.Weight {
     var uiFontWeight: UIFont.Weight {
         switch self {
-        case .black: return .black
-        case .bold: return .bold
-        case .extraBold: return .heavy
         case .semiBold: return .semibold
         case .medium: return .medium
-        case .regular: return .regular
-        case .light: return .light
-        case .extraLight: return .ultraLight
-        case .thin: return .thin
         }
     }
 }
