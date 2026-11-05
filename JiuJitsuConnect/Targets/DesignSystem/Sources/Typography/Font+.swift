@@ -14,18 +14,9 @@ private final class FontInitializer {
     
     private init() {
         let fontNames = [
-            "Pretendard-Black.otf",
-            "Pretendard-Bold.otf",
-            "Pretendard-ExtraBold.otf",
             "Pretendard-SemiBold.otf",
             "Pretendard-Medium.otf",
-            "Pretendard-Regular.otf",
-            "Pretendard-Light.otf",
-            "Pretendard-ExtraLight.otf",
-            "Pretendard-Thin.otf",
-            "CookieRunBlack.otf",
-            "CookieRunBold.otf",
-            "CookieRunRegular.otf"
+            "CookieRunBlack.otf"
         ]
         
         for fontName in fontNames {
@@ -89,15 +80,8 @@ public struct Pretendard {
     }
     
     public enum Weight: String {
-        case black = "Black"
-        case bold = "Bold"
-        case extraBold = "ExtraBold"
         case semiBold = "SemiBold"
         case medium = "Medium"
-        case regular = "Regular"
-        case light = "Light"
-        case extraLight = "ExtraLight"
-        case thin = "Thin"
     }
 }
 // MARK: - CookieRun Font
@@ -110,7 +94,5 @@ public struct CookieRun {
     
     public enum Weight: String {
         case black = "Black"
-        case bold = "Bold"
-        case regular = "Regular"
     }
 }

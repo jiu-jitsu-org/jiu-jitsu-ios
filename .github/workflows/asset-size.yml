@@ -1,0 +1,49 @@
+# PR에서 추가·수정한 앱 이미지 중 상한을 넘는 파일을 경고로 표시합니다.
+# 실패시키지 않습니다. 넘는 파일은 PR 본문에 이유를 적습니다(JiuJitsuConnect/CLAUDE.md §9.4).
+name: Asset Size
+
+on:
+  pull_request:
+    paths:
+      - 'JiuJitsuConnect/Targets/**/*.png'
+      - 'JiuJitsuConnect/Targets/**/*.jpg'
+      - 'JiuJitsuConnect/Targets/**/*.jpeg'
+      - 'JiuJitsuConnect/Targets/**/*.heic'
+      - 'JiuJitsuConnect/Targets/**/*.webp'
+      - 'JiuJitsuConnect/Targets/**/*.pdf'
+      - 'JiuJitsuConnect/Targets/**/*.svg'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: 상한을 넘는 이미지 찾기
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          LIMIT_KB: "200"
+        run: |
+          limit=$((LIMIT_KB * 1024))
+          over=0
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              *.png|*.jpg|*.jpeg|*.heic|*.webp|*.pdf|*.svg) ;;
+              *) continue ;;
+            esac
+            size=$(git cat-file -s "$HEAD_SHA:$path")
+            if [ "$size" -gt "$limit" ]; then
+              over=$((over + 1))
+              # 경고 명령의 속성 값에서 예약된 글자를 이스케이프한다
+              escaped=$(printf '%s' "$path" | sed -e 's/%/%25/g' -e 's/:/%3A/g' -e 's/,/%2C/g')
+              echo "::warning file=$escaped,title=이미지 용량 상한 초과::$((size / 1024))KB로 상한 ${LIMIT_KB}KB를 넘습니다. 압축하거나 PR 본문에 이유를 적어 주세요."
+            fi
+          done < <(git diff -z --name-only --diff-filter=AMR "$BASE_SHA...$HEAD_SHA" -- 'JiuJitsuConnect/Targets/')
+          echo "상한(${LIMIT_KB}KB) 초과: ${over}개"
