@@ -82,7 +82,9 @@ final class PaperConfettiSimulation {
 
     // 색종이 정도의 무게. 화면 320pt를 약 3.9초에 내려온다.
     private enum Physics {
+        // 높이 320pt 무대에서 맞춘 값. 무대가 커지면 터지는 거리와 조각 수를 높이에 비례해 늘려 같은 모습으로 무대 전체에 퍼진다(#235).
         static let pieceCount = 40
+        static let referenceHeight: CGFloat = 320
         static let gravity: CGFloat = 380
         static let drag: CGFloat = 5.5
         static let swayForce: CGFloat = 175
@@ -134,16 +136,18 @@ final class PaperConfettiSimulation {
 
     /// 캐릭터 뒤 가슴께에서 사방으로 터진다.
     private func burst(colorCount: Int) {
-        pieces = (0..<Physics.pieceCount).map { index in
+        // 공기 저항이 같아 터지는 시간은 그대로이고 거리만 늘어난다.
+        let scale = max(1, size.height / Physics.referenceHeight)
+        pieces = (0..<Int((CGFloat(Physics.pieceCount) * scale).rounded())).map { index in
             let angle = CGFloat.random(in: 0..<(2 * .pi))
-            let speed = CGFloat.random(in: 260...1000)
+            let speed = CGFloat.random(in: 260...1000) * scale
             let baseFlipSpeed = CGFloat.random(in: 4...8)
             let direction: CGFloat = Bool.random() ? 1 : -1
             return Piece(
                 x: size.width / 2 + .random(in: -16...16),
                 y: size.height * 0.42 + .random(in: -30...30),
                 velocityX: cos(angle) * speed,
-                velocityY: sin(angle) * speed - 190,
+                velocityY: sin(angle) * speed - 190 * scale,
                 mass: .random(in: 0.75...1.3),
                 width: .random(in: 6...9),
                 height: .random(in: 9...13),
