@@ -148,11 +148,6 @@ struct CompetitionGroup {
         entries.compactMap(\.displayOrder).min()
     }
 
-    /// 대회 줄의 메달 — 묶인 부문 중 가장 높은 메달
-    var representativeRank: CompetitionRank {
-        entries.map(\.competitionRank).min { $0.medalOrder < $1.medalOrder } ?? .participation
-    }
-
     /// 줄에 보일 메달 — 딴 메달 전부를 금·은·동 순으로. 딴 메달이 없으면 참가 메달 하나.
     var displayedMedals: [CompetitionRank] {
         let won = entries.map(\.competitionRank)
@@ -193,16 +188,6 @@ struct CompetitionGroup {
     var sharedBelt: BeltRank? {
         let belts = Set(entries.compactMap(\.competitionBelt))
         return belts.count <= 1 ? belts.first : nil
-    }
-
-    /// 대회 줄의 상세 줄 — 한 부문: "2026 · 브라운 · 도복 -76kg", 여러 부문: "2026 · 브라운"(부문은 아래 줄에)
-    var detailText: String {
-        guard entries.count > 1 else {
-            return entries.first?.detailText ?? String(year)
-        }
-        return [String(year), sharedBelt?.displayName]
-            .compactMap { $0 }
-            .joined(separator: " · ")
     }
 
     /// 시트의 부문 행 — "도복 -76kg"(메달은 아이콘으로). 띠가 부문마다 다르면 "퍼플 · 노기", 부문을 비웠으면 메달 이름.
@@ -279,14 +264,6 @@ struct CompetitionGroup {
             placed.insert(item.group, at: index)
         }
         return pinned.map(\.group) + placed
-    }
-
-    /// 부문 한 줄 — "도복 -76kg 은". 메달은 글로 적는다(아이콘은 대회 줄에 하나만).
-    func divisionMedalText(of entry: Competition) -> String {
-        let division = [sharedBelt == nil ? entry.competitionBelt?.displayName : nil, entry.divisionText]
-            .compactMap { $0 }
-            .joined(separator: " · ")
-        return division.isEmpty ? entry.competitionRank.displayName : "\(division) \(entry.competitionRank.shortName)"
     }
 
     /// 섹션 머리 메달 합계 — 금·은·동 순으로 (메달, 개수). 부문(항목) 기준으로 세고 참가와 0개는 뺀다.
@@ -561,11 +538,12 @@ private struct CompetitionBeltMark: View {
 /// 고정한 줄은 맨 위에 두고 이름을 굵게 해서 알린다.
 /// 부문이 하나면 줄을 눌러 수정·부문 추가·고정·삭제 시트를 띄운다.
 /// 부문이 여럿이면 줄을 눌러 펼치고, 펼친 부문 줄을 누르면 같은 시트를 띄운다. 길게 눌러 끌면 순서를 바꾼다(CompetitionListView).
-private struct CompetitionRowView: View {
+/// 남의 프로필처럼 읽기만 하는 곳은 onTapped를 비워 둔다 — 부문이 여럿인 줄의 펼치기만 남는다.
+struct CompetitionRowView: View {
     let group: CompetitionGroup
     /// 고정 묶음 다음 첫 줄 — 위에 여백을 둬 두 묶음을 가른다.
     var startsPlainBlock = false
-    let onTapped: () -> Void
+    var onTapped: (() -> Void)?
 
     // 펼침은 화면 표시용 일시 상태라 저장하지 않는다.
     @State private var isExpanded = false
@@ -611,14 +589,26 @@ private struct CompetitionRowView: View {
         .clipped()
     }
 
+    @ViewBuilder
     private var header: some View {
-        Button {
-            if hasDivisions {
-                withAnimation(.easeInOut(duration: 0.5)) { isExpanded.toggle() }
-            } else {
-                onTapped()
+        if hasDivisions || onTapped != nil {
+            Button {
+                if hasDivisions {
+                    withAnimation(.easeInOut(duration: 0.5)) { isExpanded.toggle() }
+                } else {
+                    onTapped?()
+                }
+            } label: {
+                headerContent
             }
-        } label: {
+            .buttonStyle(.plain)
+            .accessibilityValue(hasDivisions ? (isExpanded ? "펼침" : "접힘") : "")
+        } else {
+            headerContent
+        }
+    }
+
+    private var headerContent: some View {
             HStack(spacing: 8) {
                 // 띠를 안 적은 줄도 띠 자리를 비워 대회 이름이 같은 세로줄에서 시작하게 한다.
                 Group {
@@ -665,13 +655,21 @@ private struct CompetitionRowView: View {
             .padding(.vertical, 8)
             .padding(.horizontal, 16)
             .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityValue(hasDivisions ? (isExpanded ? "펼침" : "접힘") : "")
     }
 
+    @ViewBuilder
     private func divisionRow(_ entry: Competition, index: Int) -> some View {
-        Button(action: onTapped) {
+        if let onTapped {
+            Button(action: onTapped) {
+                divisionContent(entry, index: index)
+            }
+            .buttonStyle(.plain)
+        } else {
+            divisionContent(entry, index: index)
+        }
+    }
+
+    private func divisionContent(_ entry: Competition, index: Int) -> some View {
             HStack(spacing: 8) {
                 Text(group.divisionLineText(of: entry))
                     .font(.pretendard.bodyS)
@@ -688,8 +686,6 @@ private struct CompetitionRowView: View {
             }
             .padding(.vertical, 2)
             .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 }
 
