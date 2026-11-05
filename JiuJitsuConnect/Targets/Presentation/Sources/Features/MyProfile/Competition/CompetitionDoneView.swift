@@ -10,24 +10,27 @@ struct CompetitionDoneView: View {
     let store: StoreOf<CompetitionInfoFeature>
 
     private enum Metrics {
-        static let stageHeight: CGFloat = 320
+        // 기록 줄이 많아 글자 영역이 길어져도 캐릭터가 이만큼은 보이고, 넘치는 기록 줄은 스크롤한다.
+        static let minStageHeight: CGFloat = 280
         // 몸통 밑단은 잘린 단면이라 시트 뒤로 숨긴다(로그인 화면과 같은 방식).
         static let sheetOverlap: CGFloat = 20
         static let characterTopGap: CGFloat = 30
+        // 무대가 아무리 커져도 캐릭터는 이 높이까지만 커지고, 남는 자리는 꽃가루가 쓴다.
+        static let maxCharacterHeight: CGFloat = 400
         static let characterBottomInset: CGFloat = 14
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            // 작은 화면에서도 기록 줄과 버튼 자리를 남긴다.
-            let stageHeight = min(Metrics.stageHeight, proxy.size.height * 0.5)
-
-            VStack(spacing: 0) {
-                stage(height: stageHeight)
-
-                sheet
-                    .padding(.top, -Metrics.sheetOverlap)
+        // 글자 영역이 내용만큼 먼저 자리를 잡고, 남는 높이는 모두 캐릭터·꽃가루 자리가 된다(#235).
+        VStack(spacing: 0) {
+            GeometryReader { proxy in
+                stage(height: proxy.size.height)
             }
+            .frame(minHeight: Metrics.minStageHeight)
+
+            sheet
+                .padding(.top, -Metrics.sheetOverlap)
+                .layoutPriority(1)
         }
     }
 
@@ -35,7 +38,7 @@ struct CompetitionDoneView: View {
 
     private func stage(height: CGFloat) -> some View {
         let latest = store.savedRecords.last
-        let characterHeight = height - Metrics.characterTopGap
+        let characterHeight = min(height - Metrics.characterTopGap, Metrics.maxCharacterHeight)
         let character = latest.flatMap { record in
             store.doneCharacterBelt.map { MedalCharacter(belt: $0, rank: record.competitionRank) }
         }
@@ -68,29 +71,38 @@ struct CompetitionDoneView: View {
                 .frame(height: 36)
                 .padding(.bottom, 8)
 
-            // 부문을 추가할 때마다 한 줄씩 늘어, 이 대회에서 무엇을 남겼는지 한눈에 보인다.
-            ScrollView {
-                VStack(spacing: 6) {
-                    ForEach(Array(store.savedRecords.enumerated()), id: \.offset) { _, record in
-                        Text(record.completionSummary)
-                            .font(Font.pretendard.bodyM)
-                            .foregroundStyle(Color.component.sectionHeader.subTitle)
-                            .multilineTextAlignment(.center)
-                    }
+            // 다 들어가면 줄 수만큼만 차지하고, 캐릭터 최소 자리에 닿으면 그때부터 스크롤한다.
+            ViewThatFits(in: .vertical) {
+                recordList
+
+                ScrollView {
+                    recordList
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 20)
+                .scrollBounceBehavior(.basedOnSize)
             }
-            .scrollBounceBehavior(.basedOnSize)
 
             buttonSection
         }
         .padding(.top, 20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
         .background(
             Color.primitive.bw.white,
             in: UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24)
         )
+    }
+
+    // 부문을 추가할 때마다 한 줄씩 늘어, 이 대회에서 무엇을 남겼는지 한눈에 보인다.
+    private var recordList: some View {
+        VStack(spacing: 6) {
+            ForEach(Array(store.savedRecords.enumerated()), id: \.offset) { _, record in
+                Text(record.completionSummary)
+                    .font(Font.pretendard.bodyM)
+                    .foregroundStyle(Color.component.sectionHeader.subTitle)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
     }
 
     // 부문 추가와 완료를 한 묶음으로 둔다(#146). 질문 바로 아래에 답인 '부문 추가'를 두고, '완료'는 다른 화면과 같은 맨 아래 자리에 둔다. 둘 다 색 면이라 붙어 보이지 않게 8pt를 둔다.
