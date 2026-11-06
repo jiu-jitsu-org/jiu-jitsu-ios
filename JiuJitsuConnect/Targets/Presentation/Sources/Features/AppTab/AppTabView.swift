@@ -49,6 +49,21 @@ public struct AppTabView: View {
                     }
                 }
             }
+            tabContainer(for: .competition) {
+                NavigationStack(
+                    path: $store.scope(state: \.competition.path, action: \.competition.path)
+                ) {
+                    CompetitionTabView(store: store.scope(state: \.competition, action: \.competition))
+                        .safeAreaInset(edge: .bottom, spacing: 0) { bottomTabBar }
+                } destination: { destinationStore in
+                    switch destinationStore.case {
+                    case let .communityDetail(detailStore):
+                        CommunityDetailView(store: detailStore)
+                    case let .userProfile(profileStore):
+                        UserProfileView(store: profileStore)
+                    }
+                }
+            }
             tabContainer(for: .myPage) {
                 NavigationStack(
                     path: $store.scope(state: \.myPage.path, action: \.myPage.path)
@@ -61,21 +76,8 @@ public struct AppTabView: View {
                         CommunityDetailView(store: detailStore)
                     case let .userProfile(profileStore):
                         UserProfileView(store: profileStore)
-                    }
-                }
-            }
-            tabContainer(for: .settings) {
-                NavigationStack(
-                    path: $store.scope(state: \.settings.path, action: \.settings.path)
-                ) {
-                    SettingsView(store: store.scope(state: \.settings, action: \.settings))
-                        .safeAreaInset(edge: .bottom, spacing: 0) { bottomTabBar }
-                } destination: { destinationStore in
-                    switch destinationStore.case {
-                    case let .communityDetail(detailStore):
-                        CommunityDetailView(store: detailStore)
-                    case let .userProfile(profileStore):
-                        UserProfileView(store: profileStore)
+                    case let .settings(settingsStore):
+                        SettingsView(store: settingsStore)
                     }
                 }
             }
@@ -124,13 +126,22 @@ public struct AppTabView: View {
             onSelectSubmit: { store.send(.home(.view(.selectSheetSubmitted(value: $0, customText: $1)))) },
             onSelectDismiss: { store.send(.home(.view(.selectSheetDismissed))) }
         )
+        // 대회 목록 웹의 확인 알럿·선택 시트도 같은 이유로 여기서 그린다(#240).
+        .webBridgeDialogs(
+            confirmDialog: store.competition.web?.pendingConfirmDialog,
+            selectSheet: store.competition.web?.pendingSelectSheet,
+            onConfirmButton: { store.send(.competition(.web(.view(.confirmDialogButtonTapped($0))))) },
+            onConfirmDismiss: { store.send(.competition(.web(.view(.confirmDialogDismissed)))) },
+            onSelectSubmit: { store.send(.competition(.web(.view(.selectSheetSubmitted(value: $0, customText: $1))))) },
+            onSelectDismiss: { store.send(.competition(.web(.view(.selectSheetDismissed)))) }
+        )
         .onAppear { store.send(.view(.onAppear)) }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { store.send(.view(.sceneBecameActive)) }
         }
     }
 
-    // 게스트가 인증 필요 동작(MY 탭 진입·커뮤니티 행위 등)을 시도할 때 노출되는 공통 로그인 유도 알럿.
+    // 게스트가 인증 필요 동작(커뮤니티 글쓰기·대회 관심 등)을 시도할 때 노출되는 공통 로그인 유도 알럿.
     // 특정 화면에 종속되지 않도록 문구를 일반화해 여러 진입점에서 그대로 재사용한다.
     private var loginPromptAlertConfiguration: AppAlertConfiguration {
         AppAlertConfiguration(
@@ -164,8 +175,8 @@ public struct AppTabView: View {
     private var bottomTabBar: some View {
         HStack(spacing: 0) {
             tabBarButton(tab: .home, asset: Assets.Bottom.Icon.home, label: "홈")
+            tabBarButton(tab: .competition, asset: Assets.Bottom.Icon.competition, label: "대회")
             tabBarButton(tab: .myPage, asset: Assets.Bottom.Icon.my, label: "MY")
-            tabBarButton(tab: .settings, asset: Assets.Bottom.Icon.setting, label: "설정")
         }
         .frame(height: Metrics.tabBarHeight)
         .padding(.horizontal, 20)

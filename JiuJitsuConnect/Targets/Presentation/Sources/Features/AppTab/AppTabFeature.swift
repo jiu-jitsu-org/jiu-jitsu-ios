@@ -19,10 +19,11 @@ public struct AppTabFeature: Sendable {
         case sessionObserver
     }
 
+    // 세 번째 탭은 설정 대신 대회(#240). 설정은 MY 오른쪽 위로 옮겼다(#241).
     public enum Tab: String, CaseIterable, Equatable, Sendable {
         case home = "홈"
+        case competition = "대회"
         case myPage = "MY"
-        case settings = "설정"
     }
 
     @ObservableState
@@ -31,17 +32,17 @@ public struct AppTabFeature: Sendable {
 
         // 각 탭의 독립적인 State
         var home: CommunityFeature.State
+        var competition: CompetitionTabFeature.State
         var myPage: MyProfileFeature.State
-        var settings: SettingsFeature.State
 
         // 로그인 모달
         @Presents var loginCover: LoginFeature.State?
-        // 게스트가 인증 필요 탭(MY)을 탭했을 때 노출되는 공통 AppAlert 표시 여부
+        // 게스트가 로그인이 필요한 행위(커뮤니티 글쓰기·대회 관심 등)를 할 때 노출되는 공통 AppAlert 표시 여부
         var isLoginPromptPresented: Bool = false
-        // 로그인 모달이 커뮤니티 웹뷰의 행위(글쓰기 등)에서 트리거됐는지 여부.
-        // true면 로그인 성공 시 탭 전환 없이 커뮤니티에 머물러 행위를 복귀시키고,
-        // 취소 시 웹에 AUTH_LOGIN_CANCELLED를 보내 대기 중 행위를 폐기시킨다.
-        var pendingCommunityLogin: Bool = false
+        // 로그인 모달이 어느 탭 웹뷰의 행위(글쓰기·관심 등록 등)에서 트리거됐는지(홈·대회).
+        // 값이 있으면 로그인 성공 시 탭 전환 없이 그 탭에 머물러 행위를 복귀시키고,
+        // 취소 시 그 웹에 AUTH_LOGIN_CANCELLED를 보내 대기 중 행위를 폐기시킨다.
+        var pendingWebLoginTab: Tab?
         // 세션 이벤트 구독을 onAppear 중복 호출에도 한 번만 시작하기 위한 가드.
         var didStartSessionObserver: Bool = false
         // 웹뷰 위임 토큰 갱신이 진행 중인지. 리스트·상세 여러 웹뷰가 동시에 만료를 감지해도
@@ -53,9 +54,11 @@ public struct AppTabFeature: Sendable {
         public init(authInfo: AuthInfo) {
             self.authInfo = authInfo
             // 이미 로그인 상태로 진입하면 WEBVIEW_READY 핸드셰이크 때 토큰을 주입하도록 전달.
-            self.home = CommunityFeature.State(accessToken: authInfo.accessToken)
+            let home = CommunityFeature.State(accessToken: authInfo.accessToken)
+            self.home = home
+            // 대회 웹은 커뮤니티 웹과 같은 origin(테스트용 도메인 오버라이드 포함)으로 연다.
+            self.competition = CompetitionTabFeature.State(base: home.url, accessToken: authInfo.accessToken)
             self.myPage = MyProfileFeature.State(authInfo: authInfo)
-            self.settings = SettingsFeature.State(authInfo: authInfo)
         }
     }
 
@@ -65,8 +68,8 @@ public struct AppTabFeature: Sendable {
 
         // 자식 Feature 액션 연결
         case home(CommunityFeature.Action)
+        case competition(CompetitionTabFeature.Action)
         case myPage(MyProfileFeature.Action)
-        case settings(SettingsFeature.Action)
 
         case loginCover(PresentationAction<LoginFeature.Action>)
 
@@ -107,16 +110,17 @@ public struct AppTabFeature: Sendable {
     @Dependency(\.userClient) var userClient
     @Dependency(\.authClient) var authClient
     @Dependency(\.authSessionEventClient) var authSessionEventClient
+    @Dependency(\.notificationPermissionClient) var notificationPermissionClient
 
     public var body: some ReducerOf<Self> {
         Scope(state: \.home, action: \.home) {
             CommunityFeature()
         }
+        Scope(state: \.competition, action: \.competition) {
+            CompetitionTabFeature()
+        }
         Scope(state: \.myPage, action: \.myPage) {
             MyProfileFeature()
-        }
-        Scope(state: \.settings, action: \.settings) {
-            SettingsFeature()
         }
 
         Reduce { state, action in
@@ -142,20 +146,16 @@ public struct AppTabFeature: Sendable {
                     state.selectedTab = tab
                     return .send(.home(.view(.tabEntered)))
                 }
-                if state.authInfo.isGuest {
-                    switch tab {
-                    case .home, .settings:
-                        state.selectedTab = tab
-                    case .myPage:
-                        return .send(.internal(.showLoginPromptAlert))
-                    }
-                } else {
-                    // 다른 탭에서 MY로 돌아오면 프로필을 재조회한다(탭 뷰가 유지돼 onAppear가 다시 오지 않음, #69).
-                    let isEnteringMyPage = tab == .myPage && state.selectedTab != .myPage
-                    state.selectedTab = tab
-                    if isEnteringMyPage {
-                        return .send(.myPage(.view(.tabEntered)))
-                    }
+                // 이미 대회인데 대회 아이콘을 다시 누르면 목록을 맨 위로 올린다(#240, 홈과 같은 동작).
+                if tab == .competition, state.selectedTab == .competition {
+                    return .send(.competition(.view(.tabReselected)))
+                }
+                // 비로그인도 MY를 연다 — 로그인 안내와 설정 입구가 있다(#242).
+                // 다른 탭에서 MY로 돌아오면 프로필을 재조회한다(탭 뷰가 유지돼 onAppear가 다시 오지 않음, #69).
+                let isEnteringMyPage = tab == .myPage && state.selectedTab != .myPage
+                state.selectedTab = tab
+                if isEnteringMyPage, !state.authInfo.isGuest {
+                    return .send(.myPage(.view(.tabEntered)))
                 }
                 return .none
 
@@ -164,28 +164,21 @@ public struct AppTabFeature: Sendable {
                 guard state.selectedTab == .myPage, !state.authInfo.isGuest else { return .none }
                 return .send(.myPage(.view(.sceneBecameActive)))
 
-            case .settings(.delegate(.loginRequested)):
+            // MARK: - 설정 (MY 스택에서 연다, #241)
+
+            case .myPage(.delegate(.settings(.loginRequested))),
+                 .myPage(.delegate(.loginRequested)):
                 return .send(.internal(.showLoginModal))
 
-            case .settings(.delegate(.didLogoutSuccessfully)):
-                state.authInfo = .guest
-                state.myPage = MyProfileFeature.State(authInfo: .guest)
-                state.settings = SettingsFeature.State(authInfo: .guest)
-                // 이전 계정으로 커뮤니티에 쌓아 둔 MY 화면도 닫는다(#197).
-                CommunityFeature.closeMyProfiles(into: &state.home)
-                state.selectedTab = .home
+            case .myPage(.delegate(.settings(.didLogoutSuccessfully))):
+                Self.resetToGuest(&state)
                 // 웹 세션도 함께 정리.
-                return .send(.home(.session(.loggedOut)))
+                return Self.broadcastLoggedOut()
 
-            case .settings(.delegate(.didWithdrawSuccessfully)):
-                state.authInfo = .guest
-                state.myPage = MyProfileFeature.State(authInfo: .guest)
-                state.settings = SettingsFeature.State(authInfo: .guest)
-                // 이전 계정으로 커뮤니티에 쌓아 둔 MY 화면도 닫는다(#197).
-                CommunityFeature.closeMyProfiles(into: &state.home)
-                state.selectedTab = .home
+            case .myPage(.delegate(.settings(.didWithdrawSuccessfully))):
+                Self.resetToGuest(&state)
                 return .merge(
-                    .send(.home(.session(.loggedOut))),
+                    Self.broadcastLoggedOut(),
                     // 로컬 세션 정리를 끝낸 뒤 로그인 모달을 띄운다. 먼저 띄우면 새로 로그인한 토큰을
                     // 뒤늦은 signOut이 지우거나, 새 로그인이 폐기 직전의 FCM 토큰을 등록할 수 있다.
                     .run { send in
@@ -205,13 +198,13 @@ public struct AppTabFeature: Sendable {
             // MARK: - Community Web Bridge Delegate
             case let .home(.delegate(.loginPromptRequested(reason))):
                 // 커뮤니티 웹뷰의 비로그인 행위 → "로그인이 필요해요" 안내 알럿(소프트 유도).
-                state.pendingCommunityLogin = true
+                state.pendingWebLoginTab = .home
                 Log.trace("커뮤니티 로그인 알럿 요청: reason=\(reason ?? "-")", category: .view, level: .info)
                 return .send(.internal(.showLoginPromptAlert))
 
             case let .home(.delegate(.loginModalRequested(reason))):
                 // 커뮤니티 웹뷰의 비로그인 행위 → 로그인 모달 즉시 노출(다이렉트).
-                state.pendingCommunityLogin = true
+                state.pendingWebLoginTab = .home
                 Log.trace("커뮤니티 로그인 모달 요청: reason=\(reason ?? "-")", category: .view, level: .info)
                 return .send(.internal(.showLoginModal))
 
@@ -225,10 +218,10 @@ public struct AppTabFeature: Sendable {
                 CommunityFeature.pushMyProfile(.pushed(from: state.myPage), into: &state.home)
                 return .none
 
-            // MY·설정 탭 웹 서브뷰에서 내 이름 탭. 탭바에서 MY를 누른 것과 같은 경로라 프로필 재조회도 그대로 따른다.
+            // MY 탭 웹 서브뷰(커뮤니티 활동·차단한 회원)·대회 탭 웹에서 내 이름 탭. 탭바에서 MY를 누른 것과 같은 경로라 프로필 재조회도 그대로 따른다.
             // 내 사진은 내 프로필을 뜻하므로, MY에 열어 둔 하위 화면(커뮤니티 활동 등)은 닫고 프로필 첫 화면으로 보낸다.
             case .myPage(.delegate(.webSubview(.myTabRequested))),
-                 .settings(.delegate(.webSubview(.myTabRequested))):
+                 .competition(.delegate(.myTabRequested)):
                 if !state.authInfo.isGuest {
                     state.myPage.path.removeAll()
                     state.home.detailCover = nil
@@ -238,12 +231,12 @@ public struct AppTabFeature: Sendable {
 
             case .home(.delegate(.logoutRequested)),
                  .myPage(.delegate(.webSubview(.logoutRequested))),
-                 .settings(.delegate(.webSubview(.logoutRequested))):
+                 .competition(.delegate(.webSubview(.logoutRequested))):
                 return .send(.internal(.performWebLogout))
 
             case .home(.delegate(.tokenRefreshRequested)),
                  .myPage(.delegate(.webSubview(.tokenRefreshRequested))),
-                 .settings(.delegate(.webSubview(.tokenRefreshRequested))):
+                 .competition(.delegate(.webSubview(.tokenRefreshRequested))):
                 // 하이브리드 토큰 소유권은 네이티브 — 웹뷰 만료 시 네이티브 refresh로 갱신해 웹에 돌려준다.
                 // 갱신 결과는 열려 있는 모든 웹뷰에 전파되므로, 진행 중이면 그 응답을 함께 기다리면 된다.
                 guard !state.isRefreshingWebToken else { return .none }
@@ -279,25 +272,55 @@ public struct AppTabFeature: Sendable {
             case let .myPage(.delegate(.profileImageChanged(url))):
                 return .send(.home(.myProfileImageChanged(url.flatMap(URL.init(string:)))))
 
-            // MY 탭은 로그인 전용이라 웹의 대기 중 행위를 되살릴 일이 없어 커뮤니티발 로그인(pendingCommunityLogin)으로 표시하지 않는다.
-            case .myPage(.delegate(.webSubview(.loginPromptRequested))),
-                 .settings(.delegate(.webSubview(.loginPromptRequested))):
+            // MY 탭 웹 서브뷰는 로그인한 사람만 여는 화면(커뮤니티 활동·차단한 회원)이라 웹의 대기 중 행위를 되살릴 일이 없어
+            // 웹발 로그인(pendingWebLoginTab)으로 표시하지 않는다.
+            case .myPage(.delegate(.webSubview(.loginPromptRequested))):
                 return .send(.internal(.showLoginPromptAlert))
 
-            case .myPage(.delegate(.webSubview(.loginModalRequested))),
-                 .settings(.delegate(.webSubview(.loginModalRequested))):
+            case .myPage(.delegate(.webSubview(.loginModalRequested))):
                 return .send(.internal(.showLoginModal))
 
-            // MARK: - 설정 탭 웹 서브뷰 (#56)
-
-            // '차단한 회원'을 설정 스택에 push한다. MY의 '커뮤니티 활동'과 같은 이유로 리스트 웹뷰의 origin·최신 토큰을 쓴다.
-            case .settings(.delegate(.blockedUsersRequested)):
+            // '차단한 회원'(#56)을 MY 스택(설정 위)에 push한다. '커뮤니티 활동'과 같은 이유로 리스트 웹뷰의 origin·최신 토큰을 쓴다.
+            case .myPage(.delegate(.settings(.blockedUsersRequested))):
                 guard
                     let base = state.home.url,
                     let url = CommunityFeature.blockedUsersURL(base: base)
                 else { return .none }
-                state.settings.path.append(.communityDetail(.init(url: url, accessToken: state.home.accessToken)))
+                state.myPage.path.append(.communityDetail(.init(url: url, accessToken: state.home.accessToken)))
                 return .none
+
+            // MARK: - 대회 탭 웹 (#240)
+
+            // 비로그인 관심 등록 등 → 커뮤니티와 같이 로그인 안내. 로그인하면 대회 탭에 머물러 웹이 하던 행위로 돌아간다.
+            case .competition(.delegate(.webSubview(.loginPromptRequested))):
+                state.pendingWebLoginTab = .competition
+                return .send(.internal(.showLoginPromptAlert))
+
+            case .competition(.delegate(.webSubview(.loginModalRequested))):
+                state.pendingWebLoginTab = .competition
+                return .send(.internal(.showLoginModal))
+
+            // 대회 관심 첫 등록(#243). 아직 묻지 않았을 때만 시스템 권한 창을 띄운다. 이미 거절했으면 다시 묻지 않고
+            // denied로 회신해, 설정 앱으로 안내할지는 웹이 정하게 한다.
+            case let .competition(.delegate(.webSubview(.notificationPermissionRequested(requestId)))):
+                let isGuest = state.authInfo.isGuest
+                return .run { send in
+                    var status = await notificationPermissionClient.status()
+                    if status == .notDetermined {
+                        if isGuest {
+                            // 비로그인은 서버에 기기를 등록할 수 없어 권한만 묻는다(로그인하면 FCM 동기화가 등록한다).
+                            _ = await firebaseClient.requestPermission()
+                        } else {
+                            // 권한 창 → 허용하면 푸시 등록·FCM 토큰 발급·서버 등록까지 앱 진입 동기화와 같은 흐름으로 잇는다.
+                            await FCMAppInfoSync.syncOnAppLaunch(firebaseClient: firebaseClient, userClient: userClient)
+                        }
+                        status = await notificationPermissionClient.status()
+                    }
+                    await send(.competition(.notificationPermissionResolved(
+                        requestId: requestId,
+                        status: status == .granted ? .granted : .denied
+                    )))
+                }
 
             // MARK: - DeepLink
 
@@ -311,7 +334,7 @@ public struct AppTabFeature: Sendable {
                     .send(.home(.deepLink(link)))
                 )
 
-            case .home, .myPage, .settings:
+            case .home, .competition, .myPage:
                 return .none
                 
             // MARK: - Login Logic
@@ -332,13 +355,8 @@ public struct AppTabFeature: Sendable {
                 }
 
             case .internal(.webLogoutCompleted):
-                state.authInfo = .guest
-                state.myPage = MyProfileFeature.State(authInfo: .guest)
-                state.settings = SettingsFeature.State(authInfo: .guest)
-                // 이전 계정으로 커뮤니티에 쌓아 둔 MY 화면도 닫는다(#197).
-                CommunityFeature.closeMyProfiles(into: &state.home)
-                state.selectedTab = .home
-                return .send(.home(.session(.loggedOut)))
+                Self.resetToGuest(&state)
+                return Self.broadcastLoggedOut()
 
             case let .internal(.sessionEvent(event)):
                 // 게스트 상태에서 들어온 잔여 이벤트는 무시한다(로그아웃 직후 등).
@@ -348,8 +366,8 @@ public struct AppTabFeature: Sendable {
                     // 네이티브 API가 갱신한 토큰을 웹뷰에도 동기화.
                     return .merge(
                         .send(.home(.session(.loggedIn(accessToken: accessToken)))),
-                        .send(.myPage(.session(.loggedIn(accessToken: accessToken)))),
-                        .send(.settings(.session(.loggedIn(accessToken: accessToken))))
+                        .send(.competition(.session(.loggedIn(accessToken: accessToken)))),
+                        .send(.myPage(.session(.loggedIn(accessToken: accessToken))))
                     )
                 case .sessionExpired:
                     return .send(.internal(.handleSessionExpired))
@@ -361,8 +379,8 @@ public struct AppTabFeature: Sendable {
                 // 다른 요청이 이미 갱신을 마쳐 토큰 값이 그대로여도, 요청한 웹뷰는 응답을 받아야 한다.
                 return .merge(
                     .send(.home(.session(.tokenRefreshed(accessToken: accessToken)))),
-                    .send(.myPage(.session(.tokenRefreshed(accessToken: accessToken)))),
-                    .send(.settings(.session(.tokenRefreshed(accessToken: accessToken))))
+                    .send(.competition(.session(.tokenRefreshed(accessToken: accessToken)))),
+                    .send(.myPage(.session(.tokenRefreshed(accessToken: accessToken))))
                 )
 
             case .internal(.tokenRefreshFailed):
@@ -374,15 +392,11 @@ public struct AppTabFeature: Sendable {
             case .internal(.handleSessionExpired):
                 state.isRefreshingWebToken = false
                 // refresh 토큰까지 만료 — 로컬 토큰만 정리하고 게스트로 전환한다(서버 세션은 이미 죽음).
-                state.authInfo = .guest
-                state.myPage = MyProfileFeature.State(authInfo: .guest)
-                state.settings = SettingsFeature.State(authInfo: .guest)
-                // 이전 계정으로 커뮤니티에 쌓아 둔 MY 화면도 닫는다(#197).
-                CommunityFeature.closeMyProfiles(into: &state.home)
-                state.selectedTab = .home
+                Self.resetToGuest(&state)
                 return .merge(
                     .run { _ in await authClient.signOut() },
-                    .send(.home(.session(.sessionExpired)))
+                    .send(.home(.session(.sessionExpired))),
+                    .send(.competition(.session(.sessionExpired)))
                 )
 
             case .view(.loginPromptLoginTapped):
@@ -395,30 +409,32 @@ public struct AppTabFeature: Sendable {
 
             case .view(.loginPromptCancelTapped):
                 state.isLoginPromptPresented = false
-                // 커뮤니티발 로그인 알럿을 취소하면 웹의 대기 중 행위(pendingAction)를 폐기시킨다.
-                // (MY 탭 진입 알럿은 pendingCommunityLogin=false라 웹에 영향 없음)
-                guard state.pendingCommunityLogin else { return .none }
-                state.pendingCommunityLogin = false
-                return .send(.home(.session(.loginCancelled)))
+                // 웹발 로그인 알럿을 취소하면 그 웹의 대기 중 행위(pendingAction)를 폐기시킨다.
+                return Self.cancelPendingWebLogin(&state)
 
             case let .loginCover(.presented(.delegate(delegateAction))):
                 switch delegateAction {
                 case let .didLogin(newAuthInfo), let .didSignup(newAuthInfo):
-                    // 커뮤니티발 로그인은 탭 전환 없이 그대로 두어 원래 행위로 복귀시킨다.
+                    // 웹발 로그인(커뮤니티·대회)은 탭 전환 없이 그대로 두어 원래 행위로 복귀시킨다.
                     // 그 외에는 기존 회원 로그인이면 MY 탭, 신규 가입이면 항상 홈 탭으로 보낸다(#72).
                     let isSignup = if case .didSignup = delegateAction { true } else { false }
-                    let cameFromCommunity = state.pendingCommunityLogin
-                    state.pendingCommunityLogin = false
+                    let cameFromWeb = state.pendingWebLoginTab != nil
+                    state.pendingWebLoginTab = nil
                     state.authInfo = newAuthInfo
                     state.myPage.authInfo = newAuthInfo
-                    state.settings.authInfo = newAuthInfo
                     state.loginCover = nil
-                    if !cameFromCommunity {
+                    if !cameFromWeb {
+                        // 비로그인 MY에서 열어 둔 설정 등은 닫고, 같은 MY를 로그인 상태로 보인다(#242).
+                        state.myPage.path.removeAll()
+                        state.myPage.isMoreMenuPresented = false
                         state.selectedTab = isSignup ? .home : .myPage
                     }
-                    // 웹 세션 동기화: 새 access token을 커뮤니티 웹뷰에 주입(있을 때만).
+                    // 웹 세션 동기화: 새 access token을 커뮤니티·대회 웹뷰에 주입(있을 때만).
                     let syncWeb: Effect<Action> = newAuthInfo.accessToken.map {
-                        .send(.home(.session(.loggedIn(accessToken: $0))))
+                        .merge(
+                            .send(.home(.session(.loggedIn(accessToken: $0)))),
+                            .send(.competition(.session(.loggedIn(accessToken: $0))))
+                        )
                     } ?? .none
                     return .merge(
                         .send(.myPage(.internal(.loadProfile))),
@@ -432,11 +448,9 @@ public struct AppTabFeature: Sendable {
                     )
 
                 case .skipLogin:
-                    // 커뮤니티발 로그인을 취소하면 웹의 대기 중 행위(pendingAction)를 폐기시킨다.
-                    let cameFromCommunity = state.pendingCommunityLogin
-                    state.pendingCommunityLogin = false
+                    // 웹발 로그인을 취소하면 그 웹의 대기 중 행위(pendingAction)를 폐기시킨다.
                     state.loginCover = nil
-                    return cameFromCommunity ? .send(.home(.session(.loginCancelled))) : .none
+                    return Self.cancelPendingWebLogin(&state)
                 }
 
             case .loginCover, .view, .internal:
@@ -446,6 +460,38 @@ public struct AppTabFeature: Sendable {
         }
         .ifLet(\.$loginCover, action: \.loginCover) {
             LoginFeature()
+        }
+    }
+
+    /// 로그아웃·탈퇴·세션 만료 — 게스트로 바꾸고 이전 계정의 화면을 정리한 뒤 홈으로 보낸다.
+    private static func resetToGuest(_ state: inout State) {
+        state.authInfo = .guest
+        // MY 스택에 열어 둔 설정·웹 화면도 함께 닫힌다.
+        state.myPage = MyProfileFeature.State(authInfo: .guest)
+        // 이전 계정으로 커뮤니티에 쌓아 둔 MY 화면도 닫는다(#197).
+        CommunityFeature.closeMyProfiles(into: &state.home)
+        state.selectedTab = .home
+    }
+
+    /// 네이티브 로그아웃을 홈·대회 웹 세션에도 알린다.
+    private static func broadcastLoggedOut() -> Effect<Action> {
+        .merge(
+            .send(.home(.session(.loggedOut))),
+            .send(.competition(.session(.loggedOut)))
+        )
+    }
+
+    /// 웹발 로그인을 취소 — 그 웹이 보관한 행위(글쓰기·관심 등록 등)를 버리게 한다.
+    private static func cancelPendingWebLogin(_ state: inout State) -> Effect<Action> {
+        let tab = state.pendingWebLoginTab
+        state.pendingWebLoginTab = nil
+        switch tab {
+        case .home:
+            return .send(.home(.session(.loginCancelled)))
+        case .competition:
+            return .send(.competition(.session(.loginCancelled)))
+        case .myPage, nil:
+            return .none
         }
     }
 }
