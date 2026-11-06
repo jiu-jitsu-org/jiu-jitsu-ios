@@ -42,8 +42,6 @@ public struct SettingsFeature: Sendable {
 
         @Presents var destination: Destination.State?
         @Presents var termsWebCover: TermsWebViewFeature.State?
-        // 설정 스택에 push되는 커뮤니티 웹 서브뷰('차단한 회원' 등, #56)
-        var path = StackState<Path.State>()
 
         public enum Alert: Equatable, Sendable {
             case logout
@@ -68,25 +66,16 @@ public struct SettingsFeature: Sendable {
         case notificationSetting(NotificationSettingFeature)
     }
 
-    @Reducer
-    public enum Path {
-        case communityDetail(CommunityDetailFeature)
-        case userProfile(UserProfileFeature)
-    }
-
     public enum Action: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
         case delegate(DelegateAction)
         case destination(PresentationAction<Destination.Action>)
         case termsWebCover(PresentationAction<TermsWebViewFeature.Action>)
-        case path(StackAction<Path.State, Path.Action>)
-        /// 다른 회원 프로필 열기 — 차단 목록 웹에서 회원을 누름(#116). 차단 관계와 무관하게 열린다.
-        case openUserProfile(userId: Int)
-        // 부모(AppTab)가 토큰 갱신·만료를 서브뷰 웹뷰에도 전파한다.
-        case session(CommunityDetailFeature.SessionUpdate)
 
         public enum ViewAction: Sendable {
+            // MY에서 밀어 연 설정의 왼쪽 위 뒤로가기(#241)
+            case backTapped
             case notificationButtonTapped
             case blockedUsersButtonTapped
             case termsButtonTapped
@@ -113,10 +102,8 @@ public struct SettingsFeature: Sendable {
             case didLogoutSuccessfully
             case didWithdrawSuccessfully
             case loginRequested
-            // '차단한 회원' 탭 → 부모가 커뮤니티와 같은 origin·최신 토큰으로 서브뷰를 push한다.
+            // '차단한 회원' 탭 → 부모가 커뮤니티와 같은 origin·최신 토큰으로 서브뷰를 MY 스택(설정 위)에 push한다.
             case blockedUsersRequested
-            // 웹 서브뷰의 인증류 위임(로그인 유도·로그아웃·토큰 갱신) → 부모가 커뮤니티와 같은 흐름으로 처리한다.
-            case webSubview(CommunityDetailFeature.Action.DelegateAction)
         }
     }
 
@@ -125,12 +112,16 @@ public struct SettingsFeature: Sendable {
     @Dependency(\.userClient) var userClient
     @Dependency(\.noticeClient) var noticeClient
     @Dependency(\.continuousClock) var clock
+    @Dependency(\.dismiss) var dismiss
 
     // MARK: - Reducer Body
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
             // MARK: UI Actions
+            case .view(.backTapped):
+                return .run { _ in await self.dismiss() }
+
             case .view(.notificationButtonTapped):
                 guard !state.authInfo.isGuest else { return .none }
                 state.destination = .notificationSetting(NotificationSettingFeature.State())
@@ -164,43 +155,6 @@ public struct SettingsFeature: Sendable {
             case .view(.blockedUsersButtonTapped):
                 guard !state.authInfo.isGuest else { return .none }
                 return .send(.delegate(.blockedUsersRequested))
-
-            // 서브뷰 안의 중첩 OPEN_SUBVIEW는 설정 스택에 push로 쌓는다. (동일 origin 검증은 상세가 위임 전에 끝냈다)
-            case let .path(.element(id: id, action: .communityDetail(.delegate(.openSubviewRequested(payload))))):
-                guard
-                    case let .communityDetail(source)? = state.path[id: id],
-                    let url = URL(string: payload.url)
-                else { return .none }
-                state.path.append(.communityDetail(.init(
-                    url: url,
-                    title: payload.title,
-                    accessToken: source.accessToken
-                )))
-                return .none
-
-            case let .path(.element(id: _, action: .communityDetail(.delegate(.userProfileRequested(userId))))):
-                return .send(.openUserProfile(userId: userId))
-
-            case let .path(.element(id: _, action: .communityDetail(.delegate(delegate)))):
-                return .send(.delegate(.webSubview(delegate)))
-
-            case let .openUserProfile(userId):
-                // 연타·중복 전달로 같은 프로필이 겹쳐 쌓이지 않게 한다
-                if case let .userProfile(current)? = state.path.last, current.userId == userId { return .none }
-                state.path.append(.userProfile(.init(userId: userId)))
-                return .none
-
-            case let .session(update):
-                for id in state.path.ids {
-                    if case var .communityDetail(detail)? = state.path[id: id] {
-                        CommunityDetailFeature.apply(update, into: &detail)
-                        state.path[id: id] = .communityDetail(detail)
-                    }
-                }
-                return .none
-
-            case .path:
-                return .none
 
             case .view(.loginButtonTapped):
                 return .send(.delegate(.loginRequested))
@@ -304,7 +258,6 @@ public struct SettingsFeature: Sendable {
         .ifLet(\.$termsWebCover, action: \.termsWebCover) {
             TermsWebViewFeature()
         }
-        .forEach(\.path, action: \.path)
     }
 
     private func handleError(_ error: Error) -> Effect<Action> {
@@ -323,5 +276,3 @@ public struct SettingsFeature: Sendable {
 
 extension SettingsFeature.Destination.State: Equatable, Sendable {}
 extension SettingsFeature.Destination.Action: Sendable {}
-extension SettingsFeature.Path.State: Equatable, Sendable {}
-extension SettingsFeature.Path.Action: Sendable {}

@@ -21,6 +21,8 @@ public struct BeltCardView: View {
     let beltRank: BeltRank?
     let beltStripe: BeltStripe?
 
+    // 비로그인 MY(#242)는 같은 빈 카드에서 로그인으로 보낸다.
+    var registerButtonTitle: String = "벨트 등록하기"
     let onBeltTapped: () -> Void
     let onRegisterTapped: () -> Void
 
@@ -84,7 +86,7 @@ public struct BeltCardView: View {
             Button {
                 onRegisterTapped()
             } label: {
-                AppButtonConfiguration(title: "벨트 등록하기", size: .medium)
+                AppButtonConfiguration(title: registerButtonTitle, size: .medium)
             }
             .appButtonStyle(.primary, size: .medium, height: 38)
             .padding(.bottom, 24)

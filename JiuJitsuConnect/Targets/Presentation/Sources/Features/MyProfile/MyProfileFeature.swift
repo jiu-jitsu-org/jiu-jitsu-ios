@@ -103,6 +103,8 @@ public struct MyProfileFeature: Sendable {
     public enum Path {
         case communityDetail(CommunityDetailFeature)
         case userProfile(UserProfileFeature)
+        // 하단 탭에서 빠진 설정은 MY 오른쪽 위 톱니바퀴로 연다(#241). 차단한 회원 등 설정이 여는 웹 화면도 이 스택에 쌓인다.
+        case settings(SettingsFeature)
     }
 
     @Reducer
@@ -137,6 +139,10 @@ public struct MyProfileFeature: Sendable {
             case webSubview(CommunityDetailFeature.Action.DelegateAction)
             // 프로필 이미지 업로드·삭제가 서버에 반영됨(삭제 시 nil) → 부모가 커뮤니티 헤더의 내 사진에 바로 반영한다.
             case profileImageChanged(String?)
+            // 비로그인 MY의 '로그인하기'(#242) → 부모가 로그인 화면을 띄운다.
+            case loginRequested
+            // MY 스택에 연 설정의 위임(로그아웃·탈퇴·로그인·차단한 회원) → 부모가 설정 탭이던 때와 같이 처리한다.
+            case settings(SettingsFeature.Action.DelegateAction)
         }
 
         public enum ViewAction: Sendable {
@@ -166,6 +172,8 @@ public struct MyProfileFeature: Sendable {
             case imagePickerCancelled               // 픽커 취소 (시스템 dismiss 포함)
             case profileImageEditButtonTapped       // 프로필 이미지 우측 하단 카메라 버튼 탭
             case communityActivityTapped            // 벨트 카드 아래 '커뮤니티 활동' 줄 탭 (#44)
+            case settingsButtonTapped               // 우측 상단 톱니바퀴 탭 — 설정 열기 (#241)
+            case guestLoginTapped                   // 비로그인 MY의 '로그인하기' 탭 (#242)
         }
         
         public enum InternalAction: Sendable {
@@ -669,6 +677,19 @@ public struct MyProfileFeature: Sendable {
                 
             case .view(.communityActivityTapped):
                 return .send(.delegate(.communityActivityRequested))
+
+            case .view(.settingsButtonTapped):
+                // 연타로 설정이 두 번 쌓이지 않게 한다.
+                if case .settings? = state.path.last { return .none }
+                state.isMoreMenuPresented = false
+                state.path.append(.settings(SettingsFeature.State(authInfo: state.authInfo)))
+                return .none
+
+            case .view(.guestLoginTapped):
+                return .send(.delegate(.loginRequested))
+
+            case let .path(.element(id: _, action: .settings(.delegate(delegate)))):
+                return .send(.delegate(.settings(delegate)))
 
             // MARK: - 웹 서브뷰 (커뮤니티 활동 등)
 

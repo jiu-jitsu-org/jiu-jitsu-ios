@@ -24,6 +24,10 @@ public struct MyProfileHeaderView: View {
     let safeAreaTop: CGFloat
     /// 관장/사범 인증 완료 여부 — `true`이면 닉네임 왼쪽에 인증 뱃지 표시
     let isOwner: Bool
+    /// 비로그인 MY(#242) — 닉네임 대신 인사와 로그인 안내를 보이고, 고치는 버튼과 "..." 메뉴를 숨긴다.
+    let isGuest: Bool
+    /// 오른쪽 위 톱니바퀴(설정, #241). 커뮤니티에서 쌓아 연 MY에는 두지 않는다.
+    let showsSettingsButton: Bool
 
     // Optimistic Update 입력 — 업로드/삭제 진행 중 표시
     let pendingProfileImageData: Data?
@@ -34,6 +38,7 @@ public struct MyProfileHeaderView: View {
     let onGymInfoTapped: () -> Void
     let onMoreButtonTapped: () -> Void
     let onProfileImageEditTapped: () -> Void
+    let onSettingsTapped: () -> Void
 
     // 기존 호출처 호환 유지를 위한 기본값 init
     public init(
@@ -43,13 +48,16 @@ public struct MyProfileHeaderView: View {
         beltRank: BeltRank?,
         safeAreaTop: CGFloat,
         isOwner: Bool = false,
+        isGuest: Bool = false,
+        showsSettingsButton: Bool = false,
         pendingProfileImageData: Data? = nil,
         isProfileImageDeleting: Bool = false,
         isProfileImageBusy: Bool = false,
         onNicknameEditTapped: @escaping () -> Void,
         onGymInfoTapped: @escaping () -> Void,
         onMoreButtonTapped: @escaping () -> Void,
-        onProfileImageEditTapped: @escaping () -> Void
+        onProfileImageEditTapped: @escaping () -> Void,
+        onSettingsTapped: @escaping () -> Void = {}
     ) {
         self.nickname = nickname
         self.academyName = academyName
@@ -57,6 +65,8 @@ public struct MyProfileHeaderView: View {
         self.beltRank = beltRank
         self.safeAreaTop = safeAreaTop
         self.isOwner = isOwner
+        self.isGuest = isGuest
+        self.showsSettingsButton = showsSettingsButton
         self.pendingProfileImageData = pendingProfileImageData
         self.isProfileImageDeleting = isProfileImageDeleting
         self.isProfileImageBusy = isProfileImageBusy
@@ -64,6 +74,7 @@ public struct MyProfileHeaderView: View {
         self.onGymInfoTapped = onGymInfoTapped
         self.onMoreButtonTapped = onMoreButtonTapped
         self.onProfileImageEditTapped = onProfileImageEditTapped
+        self.onSettingsTapped = onSettingsTapped
     }
 
     // MARK: - Body
@@ -87,59 +98,114 @@ public struct MyProfileHeaderView: View {
                     size: 90,
                     cornerRadius: 24,
                     iconSize: 64,
+                    showsCameraButton: !isGuest,
                     onCameraTapped: onProfileImageEditTapped
                 )
 
-                // 닉네임 + 수정 버튼
-                NicknameEditRow(
-                    nickname: nickname,
-                    isOwner: isOwner,
-                    height: 29,
-                    onEditTapped: onNicknameEditTapped
-                )
-                .padding(.top, 12)
-
-                // 도장명 + 수정 버튼 (있는 경우)
-                if let academyName = academyName {
-                    AcademyNameEditRow(
-                        academyName: academyName,
-                        height: 32,
-                        onEditTapped: onGymInfoTapped
-                    )
-
-                    Spacer().frame(height: 84)
-                }
-
-                // "도장 정보 입력하기" 버튼 (도장명이 없을 때만)
-                if academyName == nil {
-                    Button {
-                        onGymInfoTapped()
-                    } label: {
-                        AppButtonConfiguration(title: "도장 정보 입력하기", size: .small)
-                    }
-                    .appButtonStyle(.tint, size: .small, height: 32)
-                    .padding(.top, 15)
-
-                    Spacer().frame(height: 82.49)
+                if isGuest {
+                    guestGreeting
+                } else {
+                    memberInfo
                 }
             }
 
-            // 우측 상단 "..." 버튼 (safe area 상단을 피해서 배치)
-            Button {
-                onMoreButtonTapped()
-            } label: {
-                Assets.MyProfile.Icon.menu.swiftUIImage
-                    .resizable()
-                    .frame(width: 16, height: 16)
-                    .foregroundStyle(Color.component.button.inverted.defaultBg)
-                    .frame(width: 32, height: 32)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.top, safeAreaTop + 12)
-            .padding(.trailing, 16)
-            .frame(maxWidth: .infinity, alignment: .trailing)
+            topTrailingButtons
         }
+    }
+
+    // 비로그인 MY(#242): 닉네임·도장명 자리에 인사와 로그인 안내를 같은 글자·높이로 둔다.
+    // 아래 여백은 도장명이 있을 때와 같아 벨트 카드가 같은 만큼 겹친다(MyProfileView overlapWithAcademyName).
+    @ViewBuilder
+    private var guestGreeting: some View {
+        Text("반가워요")
+            .font(Font.pretendard.title3)
+            .foregroundStyle(Color.component.list.setting.background)
+            .frame(height: 29)
+            .padding(.top, 12)
+
+        Text("로그인하고 내 프로필을 만들어 보세요")
+            .font(Font.pretendard.bodyS)
+            .foregroundStyle(Color.component.list.setting.background.opacity(0.7))
+            .frame(height: 32)
+
+        Spacer().frame(height: 84)
+    }
+
+    @ViewBuilder
+    private var memberInfo: some View {
+        // 닉네임 + 수정 버튼
+        NicknameEditRow(
+            nickname: nickname,
+            isOwner: isOwner,
+            height: 29,
+            onEditTapped: onNicknameEditTapped
+        )
+        .padding(.top, 12)
+
+        // 도장명 + 수정 버튼 (있는 경우)
+        if let academyName = academyName {
+            AcademyNameEditRow(
+                academyName: academyName,
+                height: 32,
+                onEditTapped: onGymInfoTapped
+            )
+
+            Spacer().frame(height: 84)
+        }
+
+        // "도장 정보 입력하기" 버튼 (도장명이 없을 때만)
+        if academyName == nil {
+            Button {
+                onGymInfoTapped()
+            } label: {
+                AppButtonConfiguration(title: "도장 정보 입력하기", size: .small)
+            }
+            .appButtonStyle(.tint, size: .small, height: 32)
+            .padding(.top, 15)
+
+            Spacer().frame(height: 82.49)
+        }
+    }
+
+    // 우측 상단 버튼 (safe area 상단을 피해서 배치) — "..."(관장 사범 인증) 오른쪽에 설정 톱니바퀴(#241).
+    // 비로그인은 관장 사범 인증을 쓸 수 없어 "..."를 숨긴다(#242).
+    private var topTrailingButtons: some View {
+        HStack(spacing: 4) {
+            if !isGuest {
+                Button {
+                    onMoreButtonTapped()
+                } label: {
+                    Assets.MyProfile.Icon.menu.swiftUIImage
+                        .resizable()
+                        .frame(width: 16, height: 16)
+                        .foregroundStyle(Color.component.button.inverted.defaultBg)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+
+            if showsSettingsButton {
+                Button {
+                    onSettingsTapped()
+                } label: {
+                    Assets.Bottom.Icon.setting.swiftUIImage
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 22, height: 22)
+                        // 띠 색 헤더 위라 흰색 — 커뮤니티에서 연 MY의 뒤로가기와 같은 색
+                        .foregroundStyle(Color.component.list.setting.background)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("설정")
+            }
+        }
+        .padding(.top, safeAreaTop + 12)
+        .padding(.trailing, 16)
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 }
 
@@ -162,6 +228,7 @@ private struct ProfileImageView: View {
     let size: CGFloat
     let cornerRadius: CGFloat
     let iconSize: CGFloat
+    var showsCameraButton: Bool = true
     let onCameraTapped: () -> Void
 
     var body: some View {
@@ -182,8 +249,10 @@ private struct ProfileImageView: View {
         }
         .frame(width: size, height: size)
         .overlay(alignment: .bottomTrailing) {
-            cameraButton
-                .offset(x: 5, y: 4)
+            if showsCameraButton {
+                cameraButton
+                    .offset(x: 5, y: 4)
+            }
         }
     }
 
