@@ -433,6 +433,12 @@ public struct CommunityFeature: Sendable {
                     }
                     return .send(.delegate(.myProfileRequested))
 
+                case let .requestNotificationPermission(requestId):
+                    // 알림 권한 요청은 대회 탭만 알린다(#243). 혹시 오면 웹이 기다리지 않게 거절로 바로 회신한다.
+                    Log.trace("리스트 웹뷰 REQUEST_NOTIFICATION_PERMISSION 수신 — 거절로 회신", category: .network, level: .info)
+                    Self.enqueue(.notificationPermissionResult(requestId: requestId, status: .denied), into: &state)
+                    return .none
+
                 case let .unknown(type):
                     // 계약에 없는 타입 — 한쪽만 먼저 배포된 경우를 대비해 무시한다.
                     Log.trace("WebBridge 미지원 메시지 무시: \(type)", category: .network, level: .info)
@@ -677,6 +683,9 @@ public struct CommunityFeature: Sendable {
         case let .userProfileRequested(userId):
             // 모달 안이면 openUserProfile이 모달 스택에 쌓는다
             return .send(.openUserProfile(userId: userId))
+        case .notificationPermissionRequested:
+            // 커뮤니티 상세는 알림 권한 요청을 알리지 않아, 상세가 이미 거절로 회신했다(#243).
+            return .none
         }
     }
 
