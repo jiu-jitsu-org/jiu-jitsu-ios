@@ -138,6 +138,8 @@ private struct FavoriteStyleCardItem: View {
 
 /// 스타일 정보가 전혀 없을 때 표시되는 뷰
 public struct EmptyStyleView: View {
+    // 비로그인 MY(#242)는 등록할 수 없어 버튼 없이 안내와 카드만 보인다.
+    var showsRegisterButton: Bool = true
     let onRegisterStyleTapped: () -> Void
 
     public var body: some View {
@@ -151,13 +153,15 @@ public struct EmptyStyleView: View {
                 .font(Font.pretendard.bodyM)
                 .foregroundStyle(Color.component.sectionHeader.subTitle)
 
-            Button {
-                onRegisterStyleTapped()
-            } label: {
-                AppButtonConfiguration(title: "내 스타일 등록하기", size: .medium)
+            if showsRegisterButton {
+                Button {
+                    onRegisterStyleTapped()
+                } label: {
+                    AppButtonConfiguration(title: "내 스타일 등록하기", size: .medium)
+                }
+                .appButtonStyle(.tint, size: .medium, height: 38)
+                .padding(.top, 24)
             }
-            .appButtonStyle(.tint, size: .medium, height: 38)
-            .padding(.top, 24)
 
             DecorativeCardsView()
                 .padding(.top, 16)

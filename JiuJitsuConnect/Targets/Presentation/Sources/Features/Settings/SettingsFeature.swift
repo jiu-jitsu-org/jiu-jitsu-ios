@@ -42,8 +42,6 @@ public struct SettingsFeature: Sendable {
 
         @Presents var destination: Destination.State?
         @Presents var termsWebCover: TermsWebViewFeature.State?
-        // 설정 스택에 push되는 커뮤니티 웹 서브뷰('차단한 회원' 등, #56)
-        var path = StackState<Path.State>()
 
         public enum Alert: Equatable, Sendable {
             case logout
@@ -52,6 +50,8 @@ public struct SettingsFeature: Sendable {
 
         var alert: Alert? = nil
         public var toast: ToastState?
+        // 탈퇴 요청이 서버에 가 있는 동안. MY 스택의 한 화면이라 닫히면 요청도 취소되므로(#241) 그동안 나가지 못하게 막는다.
+        var isWithdrawing = false
 
         public init(authInfo: AuthInfo) {
             self.authInfo = authInfo
@@ -68,25 +68,16 @@ public struct SettingsFeature: Sendable {
         case notificationSetting(NotificationSettingFeature)
     }
 
-    @Reducer
-    public enum Path {
-        case communityDetail(CommunityDetailFeature)
-        case userProfile(UserProfileFeature)
-    }
-
     public enum Action: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
         case delegate(DelegateAction)
         case destination(PresentationAction<Destination.Action>)
         case termsWebCover(PresentationAction<TermsWebViewFeature.Action>)
-        case path(StackAction<Path.State, Path.Action>)
-        /// 다른 회원 프로필 열기 — 차단 목록 웹에서 회원을 누름(#116). 차단 관계와 무관하게 열린다.
-        case openUserProfile(userId: Int)
-        // 부모(AppTab)가 토큰 갱신·만료를 서브뷰 웹뷰에도 전파한다.
-        case session(CommunityDetailFeature.SessionUpdate)
 
         public enum ViewAction: Sendable {
+            // MY에서 밀어 연 설정의 왼쪽 위 뒤로가기(#241)
+            case backTapped
             case notificationButtonTapped
             case blockedUsersButtonTapped
             case termsButtonTapped
@@ -103,34 +94,37 @@ public struct SettingsFeature: Sendable {
 
         public enum InternalAction: Sendable {
             case withdrawalResponse(TaskResult<Bool>)
-            // 알림 화면이 닫힐 때 이어받은 저장의 결과.
-            case notificationSettingSaveResponse(TaskResult<NoticeSetting>)
             case showToast(ToastState)
             case toastDismissed
         }
 
         public enum DelegateAction: Sendable {
-            case didLogoutSuccessfully
+            // 로그아웃 확인 → 부모(AppTab)가 서버 로그아웃·로컬 정리를 한다. 이 화면은 MY 스택의 한 화면이라
+            // 스와이프로 닫히면 여기서 돌던 요청이 취소되므로, 화면보다 오래 사는 부모가 맡는다(#241).
+            case logoutConfirmed
             case didWithdrawSuccessfully
+            // 알림 화면을 나갈 때 서버에 아직 안 간 값 → 부모(MY)가 대신 저장한다. 설정까지 바로 닫아도 저장이 끊기지 않게 한다.
+            case notificationSettingSaveRequested(NoticeSetting)
             case loginRequested
-            // '차단한 회원' 탭 → 부모가 커뮤니티와 같은 origin·최신 토큰으로 서브뷰를 push한다.
+            // '차단한 회원' 탭 → 부모가 커뮤니티와 같은 origin·최신 토큰으로 서브뷰를 MY 스택(설정 위)에 push한다.
             case blockedUsersRequested
-            // 웹 서브뷰의 인증류 위임(로그인 유도·로그아웃·토큰 갱신) → 부모가 커뮤니티와 같은 흐름으로 처리한다.
-            case webSubview(CommunityDetailFeature.Action.DelegateAction)
         }
     }
 
     // MARK: - Dependencies
-    @Dependency(\.authClient) var authClient
     @Dependency(\.userClient) var userClient
-    @Dependency(\.noticeClient) var noticeClient
     @Dependency(\.continuousClock) var clock
+    @Dependency(\.dismiss) var dismiss
 
     // MARK: - Reducer Body
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
             // MARK: UI Actions
+            case .view(.backTapped):
+                guard !state.isWithdrawing else { return .none }
+                return .run { _ in await self.dismiss() }
+
             case .view(.notificationButtonTapped):
                 guard !state.authInfo.isGuest else { return .none }
                 state.destination = .notificationSetting(NotificationSettingFeature.State())
@@ -165,43 +159,6 @@ public struct SettingsFeature: Sendable {
                 guard !state.authInfo.isGuest else { return .none }
                 return .send(.delegate(.blockedUsersRequested))
 
-            // 서브뷰 안의 중첩 OPEN_SUBVIEW는 설정 스택에 push로 쌓는다. (동일 origin 검증은 상세가 위임 전에 끝냈다)
-            case let .path(.element(id: id, action: .communityDetail(.delegate(.openSubviewRequested(payload))))):
-                guard
-                    case let .communityDetail(source)? = state.path[id: id],
-                    let url = URL(string: payload.url)
-                else { return .none }
-                state.path.append(.communityDetail(.init(
-                    url: url,
-                    title: payload.title,
-                    accessToken: source.accessToken
-                )))
-                return .none
-
-            case let .path(.element(id: _, action: .communityDetail(.delegate(.userProfileRequested(userId))))):
-                return .send(.openUserProfile(userId: userId))
-
-            case let .path(.element(id: _, action: .communityDetail(.delegate(delegate)))):
-                return .send(.delegate(.webSubview(delegate)))
-
-            case let .openUserProfile(userId):
-                // 연타·중복 전달로 같은 프로필이 겹쳐 쌓이지 않게 한다
-                if case let .userProfile(current)? = state.path.last, current.userId == userId { return .none }
-                state.path.append(.userProfile(.init(userId: userId)))
-                return .none
-
-            case let .session(update):
-                for id in state.path.ids {
-                    if case var .communityDetail(detail)? = state.path[id: id] {
-                        CommunityDetailFeature.apply(update, into: &detail)
-                        state.path[id: id] = .communityDetail(detail)
-                    }
-                }
-                return .none
-
-            case .path:
-                return .none
-
             case .view(.loginButtonTapped):
                 return .send(.delegate(.loginRequested))
 
@@ -216,21 +173,12 @@ public struct SettingsFeature: Sendable {
             // MARK: Alert Actions
             case .view(.confirmLogout):
                 // 서버 로그아웃 결과와 상관없이 항상 로그아웃한다(정책 2026-10-21, #65).
-                // 서버 세션은 만료되며 정리되고, 웹 요청 로그아웃(`AppTabFeature.performWebLogout`)과 동작을 맞춘다.
-                return .run { send in
-                    do {
-                        let isSuccess = try await authClient.serverLogout()
-                        if !isSuccess {
-                            Log.trace("Server logout returned false — proceeding with local logout", category: .network, level: .error)
-                        }
-                    } catch {
-                        Log.trace("Server logout failed — proceeding with local logout: \(error)", category: .network, level: .error)
-                    }
-                    await authClient.signOut()
-                    await send(.delegate(.didLogoutSuccessfully))
-                }
+                // 웹 요청 로그아웃과 같은 경로(`AppTabFeature.performWebLogout`)로 처리한다.
+                return .send(.delegate(.logoutConfirmed))
 
             case .view(.confirmWithdrawal):
+                guard !state.isWithdrawing else { return .none }
+                state.isWithdrawing = true
                 return .run { send in
                     await send(.internal(.withdrawalResponse(
                         await TaskResult { try await
@@ -241,6 +189,7 @@ public struct SettingsFeature: Sendable {
 
             case let .internal(.withdrawalResponse(.success(isSuccess))):
                 Log.trace("\(isSuccess)")
+                state.isWithdrawing = false
 
                 if isSuccess {
                     return .send(.delegate(.didWithdrawSuccessfully))
@@ -250,6 +199,7 @@ public struct SettingsFeature: Sendable {
 
             case let .internal(.withdrawalResponse(.failure(error))):
                 Log.trace("\(error)")
+                state.isWithdrawing = false
                 return handleError(error)
 
             case .view(.alertDismissed):
@@ -274,23 +224,13 @@ public struct SettingsFeature: Sendable {
 
             case .destination(.dismiss):
                 // 알림 화면이 닫히면 그 화면의 디바운스·저장 요청도 함께 취소된다(뒤로가기·스와이프 모두).
-                // 아직 서버에 반영되지 않은 값이 있으면 화면보다 오래 사는 여기서 대신 저장한다.
+                // 아직 서버에 반영되지 않은 값이 있으면 설정보다 오래 사는 부모(MY)에게 저장을 넘긴다 — 설정도 MY 스택의
+                // 한 화면이라 곧바로 닫히면 여기서 돌던 저장이 함께 취소된다(#241).
                 // (dismiss는 자식 상태가 지워지기 전에 이 리듀서를 거치므로 마지막 값을 읽을 수 있다)
                 guard case let .notificationSetting(notification)? = state.destination,
                       let setting = notification.unsavedSetting
                 else { return .none }
-                return .run { send in
-                    await send(.internal(.notificationSettingSaveResponse(
-                        await TaskResult { try await noticeClient.updateSetting(setting) }
-                    )))
-                }
-
-            case .internal(.notificationSettingSaveResponse(.success)):
-                return .none
-
-            case let .internal(.notificationSettingSaveResponse(.failure(error))):
-                Log.trace("알림 화면 이탈 후 설정 저장 실패: \(error)", category: .network, level: .error)
-                return handleError(error)
+                return .send(.delegate(.notificationSettingSaveRequested(setting)))
 
             case .destination:
                 return .none
@@ -304,7 +244,6 @@ public struct SettingsFeature: Sendable {
         .ifLet(\.$termsWebCover, action: \.termsWebCover) {
             TermsWebViewFeature()
         }
-        .forEach(\.path, action: \.path)
     }
 
     private func handleError(_ error: Error) -> Effect<Action> {
@@ -323,5 +262,3 @@ public struct SettingsFeature: Sendable {
 
 extension SettingsFeature.Destination.State: Equatable, Sendable {}
 extension SettingsFeature.Destination.Action: Sendable {}
-extension SettingsFeature.Path.State: Equatable, Sendable {}
-extension SettingsFeature.Path.Action: Sendable {}

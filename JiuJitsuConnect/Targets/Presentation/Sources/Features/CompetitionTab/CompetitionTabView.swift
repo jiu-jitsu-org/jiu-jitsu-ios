@@ -1,0 +1,124 @@
+//
+//  CompetitionTabView.swift
+//  Presentation
+//
+//  하단 탭 '대회'(#240). 머리줄은 앱이, 목록은 웹이 그린다 — 웹은 앱 머리줄·탭바 사이에 들어가
+//  안전 영역 여백을 따로 두지 않는다(홈 피드와 같은 기준, 웹 #332).
+//
+
+import SwiftUI
+import ComposableArchitecture
+import DesignSystem
+
+public struct CompetitionTabView: View {
+    let store: StoreOf<CompetitionTabFeature>
+
+    public init(store: StoreOf<CompetitionTabFeature>) {
+        self.store = store
+    }
+
+    public var body: some View {
+        VStack(spacing: 0) {
+            header
+            ZStack {
+                if let webStore = store.scope(state: \.web, action: \.web) {
+                    CompetitionListWebView(store: webStore, scrollToTopToken: store.scrollToTopToken)
+                } else {
+                    errorMessage
+                }
+            }
+            // 키보드 대응은 BridgeWebView 한 곳에서만 한다(홈 피드와 같음).
+            .ignoresSafeArea(.keyboard, edges: .bottom)
+        }
+        .background(Color.component.background.default)
+        .toolbar(.hidden, for: .navigationBar)
+    }
+
+    // 홈 머리줄(높이 44 · 왼쪽 16 · 아래 구분선)과 같은 자리에 탭 이름을 둔다.
+    private var header: some View {
+        ZStack(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.component.navibar.container.divider)
+                .frame(height: 1)
+
+            Text("대회")
+                .font(Font.pretendard.title3)
+                .foregroundStyle(Color.component.header.text)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .padding(.leading, 16)
+        }
+        .frame(height: 44)
+        // 홈 머리줄과 같은 흰 바탕을 상태바까지 끌어올린다.
+        .background {
+            Color.component.header.background
+                .ignoresSafeArea(edges: .top)
+        }
+    }
+
+    private var errorMessage: some View {
+        Text("잠시 문제가 생겼어요")
+            .font(.pretendard.bodyM)
+            .foregroundStyle(Color.component.errorState.default.titleText)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// 대회 목록 웹뷰 + 로딩·오류 덮개. 탭 첫 화면이라 상세 웹과 달리 뒤로가기를 두지 않는다.
+private struct CompetitionListWebView: View {
+    let store: StoreOf<CommunityDetailFeature>
+    let scrollToTopToken: UUID?
+
+    var body: some View {
+        ZStack {
+            BridgeWebView(
+                source: .detail(store.url),
+                url: store.url,
+                loadToken: store.loadToken,
+                scrollToTopToken: scrollToTopToken,
+                accessToken: store.accessToken,
+                outbox: store.outbox,
+                // 목록 웹 배경(surface-container)과 맞춰 바운스 때 다른 색이 드러나지 않게 한다.
+                overscrollBackground: Color.primitive.bw.white,
+                capabilities: store.capabilities,
+                onLoadingStarted: { store.send(.internal(.loadingStarted)) },
+                onLoadingFinished: { store.send(.internal(.loadingFinished)) },
+                onLoadingFailed: { store.send(.internal(.loadingFailed)) },
+                onBridgeMessage: { store.send(.internal(.bridgeMessageReceived($0))) },
+                onOutboundDelivered: { store.send(.internal(.outboundDelivered(id: $0))) }
+            )
+
+            if store.isLoading {
+                ProgressView()
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.component.background.default)
+            }
+
+            if store.hasError {
+                VStack(spacing: 13) {
+                    Text("잠시 문제가 생겼어요")
+                        .font(.pretendard.bodyM)
+                        .foregroundStyle(Color.component.errorState.default.titleText)
+                    Button {
+                        store.send(.view(.retryTapped))
+                    } label: {
+                        AppButtonConfiguration(title: "재시도", size: .medium)
+                    }
+                    .appButtonStyle(.neutral, size: .medium)
+                    .frame(height: 38)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.component.background.default)
+            }
+        }
+        // 웹이 요청한 확인 알럿·선택 시트는 탭바까지 덮도록 AppTabView가 그린다(홈 피드와 같음).
+    }
+}
+
+#Preview {
+    CompetitionTabView(
+        store: Store(initialState: CompetitionTabFeature.State(base: URL(string: "https://example.com"), accessToken: nil)) {
+            CompetitionTabFeature()
+        }
+    )
+}

@@ -20,6 +20,11 @@ private enum Metrics {
         static let overlapWithButton: CGFloat = 46.49
         static let overlapWithAcademyName: CGFloat = 71
     }
+    // "..." 메뉴 오른쪽 끝을 "..." 버튼에 맞춘다. 옆에 톱니바퀴(32 + 간격 4)가 있으면 그만큼 안쪽으로(#241).
+    enum MoreMenu {
+        static let trailing: CGFloat = 16
+        static let trailingWithSettings: CGFloat = 16 + 32 + 4
+    }
 }
 
 // MARK: - MyProfileView
@@ -97,7 +102,8 @@ public struct MyProfileView: View {
         GeometryReader { geometry in
             let safeAreaTop = geometry.safeAreaInsets.top
             let safeAreaBottom = geometry.safeAreaInsets.bottom
-            let cardOverlapHeight = store.communityProfile?.academyName != nil
+            // 비로그인 머리(#242)는 도장명이 있을 때와 같은 높이라 같은 만큼 겹친다.
+            let cardOverlapHeight = store.authInfo.isGuest || store.communityProfile?.academyName != nil
                 ? Metrics.Card.overlapWithAcademyName
                 : Metrics.Card.overlapWithButton
 
@@ -119,7 +125,7 @@ public struct MyProfileView: View {
                                     // "..." 버튼(safeAreaTop + 12 ~ safeAreaTop + 44) 하단에 간격 없이 붙임
                                     // 우측은 버튼 trailing(16)과 동일하게 정렬
                                     .padding(.top, safeAreaTop + 44)
-                                    .padding(.trailing, 16)
+                                    .padding(.trailing, store.isPushed ? Metrics.MoreMenu.trailing : Metrics.MoreMenu.trailingWithSettings)
                                     .transition(.opacity)
                                 }
                             }
@@ -133,11 +139,14 @@ public struct MyProfileView: View {
 
                         // 3. 커뮤니티 활동 진입 줄 — 내 글·댓글로 가는 길이라 프로필 내용(대회·기술)과 섞지 않고,
                         //    헤더에 누르는 글자를 늘리지 않으면서 내리지 않아도 보이는 벨트 카드 바로 아래 (#44, #117)
-                        MyProfileCommunityActivityRow(
-                            onTapped: { store.send(.view(.communityActivityTapped)) }
-                        )
-                        .padding(.top, 12)
-                        .padding(.horizontal, 20)
+                        //    비로그인은 내 글이 없어 숨긴다(#242).
+                        if !store.authInfo.isGuest {
+                            MyProfileCommunityActivityRow(
+                                onTapped: { store.send(.view(.communityActivityTapped)) }
+                            )
+                            .padding(.top, 12)
+                            .padding(.horizontal, 20)
+                        }
 
                         // 4. 콘텐츠 영역 — 남에게 보여 줄 정보를 위로: 대회 기록 → 최애 기술 (#117)
                         contentView
@@ -213,6 +222,9 @@ public struct MyProfileView: View {
             beltRank: store.communityProfile?.beltRank,
             safeAreaTop: safeAreaTop,
             isOwner: store.userProfile?.userRole == .owner,
+            isGuest: store.authInfo.isGuest,
+            // 설정은 탭의 MY에서만 연다. 커뮤니티에서 쌓아 연 MY(#197)는 뒤로가기로 돌아가는 화면이다.
+            showsSettingsButton: !store.isPushed,
             // Optimistic Update — 업로드/삭제 진행 중 헤더 이미지 미리보기·로딩 표시
             pendingProfileImageData: store.pendingProfileImageData,
             isProfileImageDeleting: store.isProfileImageDeleting,
@@ -221,7 +233,8 @@ public struct MyProfileView: View {
             onNicknameEditTapped: { store.send(.view(.nicknameEditButtonTapped)) },
             onGymInfoTapped: { store.send(.view(.gymInfoButtonTapped)) },
             onMoreButtonTapped: { store.send(.view(.moreButtonTapped)) },
-            onProfileImageEditTapped: { store.send(.view(.profileImageEditButtonTapped)) }
+            onProfileImageEditTapped: { store.send(.view(.profileImageEditButtonTapped)) },
+            onSettingsTapped: { store.send(.view(.settingsButtonTapped)) }
         )
     }
     
@@ -230,8 +243,11 @@ public struct MyProfileView: View {
         BeltCardView(
             beltRank: store.communityProfile?.beltRank,
             beltStripe: store.communityProfile?.beltStripe,
+            registerButtonTitle: store.authInfo.isGuest ? "로그인하기" : "벨트 등록하기",
             onBeltTapped: { store.send(.view(.beltTapped)) },
-            onRegisterTapped: { store.send(.view(.registerBeltButtonTapped)) }
+            onRegisterTapped: {
+                store.send(store.authInfo.isGuest ? .view(.guestLoginTapped) : .view(.registerBeltButtonTapped))
+            }
         )
     }
     
@@ -240,6 +256,7 @@ public struct MyProfileView: View {
         VStack(spacing: 0) {
             if showsDefaultScreen {
                 EmptyStyleView(
+                    showsRegisterButton: !store.authInfo.isGuest,
                     onRegisterStyleTapped: { store.send(.view(.registerStyleButtonTapped)) }
                 )
                 .padding(.bottom, 18)

@@ -54,11 +54,28 @@ public struct CommunityDetailFeature: Sendable {
         // 스와이프가 이탈 확인을 우회해 작성 내용을 잃지 않게 하려는 것(#82와 같은 동작).
         var leaveGuardEnabled: Bool
 
+        // 하단 탭의 첫 화면으로 띄운 웹(대회 탭, #240). 닫을 곳이 없어 CLOSE_SUBVIEW·뒤로가기로 닫지 않는다.
+        let isTabRoot: Bool
+        // 이 웹뷰가 window.AppBridgeCapabilities로 알릴 '사전 확인형' 메시지. 처리하는 화면만 넣는다.
+        let capabilities: [WebBridgeCapability]
+
         public init(url: URL, title: String? = nil, accessToken: String? = nil) {
+            self.init(url: url, title: title, accessToken: accessToken, isTabRoot: false, capabilities: [.pickPhotos])
+        }
+
+        init(
+            url: URL,
+            title: String? = nil,
+            accessToken: String? = nil,
+            isTabRoot: Bool,
+            capabilities: [WebBridgeCapability]
+        ) {
             self.url = url
             self.title = title
             self.accessToken = accessToken
             self.leaveGuardEnabled = Self.isWriteOrEditScreen(url)
+            self.isTabRoot = isTabRoot
+            self.capabilities = capabilities
         }
 
         /// 글쓰기(`/community/write`)·글 수정(`/community/{id}/edit`) 화면인지.
@@ -127,6 +144,8 @@ public struct CommunityDetailFeature: Sendable {
             case myTabRequested
             // 다른 회원의 작성자 탭(OPEN_USER_PROFILE, isMe=false) → 부모가 그 회원의 프로필을 같은 스택에 쌓는다. (#116)
             case userProfileRequested(userId: Int)
+            // 대회 관심 첫 등록(REQUEST_NOTIFICATION_PERMISSION) → 부모가 권한을 묻고 결과를 deliverNotificationPermission으로 돌려준다. (#243)
+            case notificationPermissionRequested(requestId: String?)
         }
     }
 
@@ -155,6 +174,7 @@ public struct CommunityDetailFeature: Sendable {
                 return .none
 
             case .view(.backTapped):
+                guard !state.isTabRoot else { return .none }
                 state.isClosing = true
                 return .run { _ in await self.dismiss() }
 
@@ -256,6 +276,10 @@ public struct CommunityDetailFeature: Sendable {
 
                 case .closeSubview:
                     // 자기 자신(최상단 서브뷰)을 닫는다. 스택 push면 pop, 모달이면 dismiss된다.
+                    guard !state.isTabRoot else {
+                        Log.trace("탭 첫 화면 웹의 CLOSE_SUBVIEW 무시", category: .network, level: .info)
+                        return .none
+                    }
                     state.isClosing = true
                     return .run { _ in await self.dismiss() }
 
@@ -270,6 +294,12 @@ public struct CommunityDetailFeature: Sendable {
                     return Self.presentSelectSheet(payload, into: &state)
 
                 case let .pickPhotos(payload):
+                    // 사진 고르기를 알리지 않은 웹뷰(대회 목록)는 피커를 띄우지 않아, 빈 결과로 바로 회신한다 —
+                    // 받아 두면 대기 표시가 남아 이후 확인 알럿·선택 시트가 모두 막힌다.
+                    guard state.capabilities.contains(.pickPhotos) else {
+                        Self.enqueue(.photosPicked(requestId: payload.requestId, files: []), into: &state)
+                        return .none
+                    }
                     return Self.presentPhotoPicker(payload, into: &state)
 
                 case let .authLoginPrompt(reason):
@@ -291,6 +321,15 @@ public struct CommunityDetailFeature: Sendable {
                         return .send(.delegate(.userProfileRequested(userId: payload.userId)))
                     }
                     return .send(.delegate(.myTabRequested))
+
+                case let .requestNotificationPermission(requestId):
+                    // 지원을 알린 웹뷰(대회 탭)만 보낸다. 알리지 않았는데 오면 묻지 않고 지금 상태를 모르니 거절로 답해
+                    // 웹이 응답을 기다리지 않게 한다.
+                    guard state.capabilities.contains(.requestNotificationPermission) else {
+                        Self.enqueue(.notificationPermissionResult(requestId: requestId, status: .denied), into: &state)
+                        return .none
+                    }
+                    return .send(.delegate(.notificationPermissionRequested(requestId: requestId)))
 
                 case let .unknown(type):
                     Log.trace("WebBridge 미지원 메시지 무시: \(type)", category: .network, level: .info)
@@ -329,6 +368,15 @@ public struct CommunityDetailFeature: Sendable {
             state.accessToken = nil
             enqueue(.authSessionExpired, into: &state)
         }
+    }
+
+    /// 알림 권한 요청(#243)의 결과를 웹에 회신한다.
+    static func deliverNotificationPermission(
+        requestId: String?,
+        status: NotificationPermissionStatus,
+        into state: inout State
+    ) {
+        enqueue(.notificationPermissionResult(requestId: requestId, status: status), into: &state)
     }
 
     /// 웹 요청으로 띄운 네이티브 표면(알럿·시트·사진 피커)이 있는지. 한 번에 하나만 띄운다.

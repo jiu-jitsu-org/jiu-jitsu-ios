@@ -143,6 +143,8 @@ private extension WebBridgeInboundMessage {
             return "PICK_PHOTOS  reqId=\(payload.requestId) limit=\(payload.limit)"
         case let .openUserProfile(payload):
             return "OPEN_USER_PROFILE  userId=\(payload.userId) isMe=\(payload.isMe)"
+        case let .requestNotificationPermission(requestId):
+            return "REQUEST_NOTIFICATION_PERMISSION  reqId=\(requestId ?? "-")"
         case let .unknown(type):
             return "\(type)  (unsupported)"
         }
@@ -175,6 +177,8 @@ private extension WebBridgeOutboundMessage {
             // base64 원문은 장당 수백 KB라 로그에는 개수와 크기만 남긴다.
             let sizes = files.map { "\($0.data.count / 1024)KB" }.joined(separator: ",")
             return "PHOTOS_PICKED  reqId=\(requestId) files=\(files.count) base64=[\(sizes)]"
+        case let .notificationPermissionResult(requestId, status):
+            return "NOTIFICATION_PERMISSION_RESULT  reqId=\(requestId ?? "-") status=\(status.rawValue)"
         }
     }
 }
@@ -220,6 +224,10 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 글·댓글 작성자(사진·닉네임) 탭 → 회원 프로필 열기 요청(#116). 내 이름이면 MY 탭,
     /// 남이면 다른 회원 프로필 화면으로 간다.
     case openUserProfile(OpenUserProfilePayload)
+    /// 알림 권한 요청(#243). 대회 관심을 처음 등록할 때 웹이 보낸다 — 앱을 켤 때가 아니라 알림이 필요한 순간에 묻는다.
+    /// 아직 묻지 않았으면 시스템 권한 창을 띄우고, 결과를 NOTIFICATION_PERMISSION_RESULT로 회신한다.
+    /// requestId는 선택 — 웹이 보냈으면 회신에 그대로 싣는다.
+    case requestNotificationPermission(requestId: String?)
     /// 계약에 없는 타입(상위 버전/오타 등) — 무시 대상.
     case unknown(type: String)
 
@@ -236,6 +244,7 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case showSelectSheet = "SHOW_SELECT_SHEET"
         case pickPhotos = "PICK_PHOTOS"
         case openUserProfile = "OPEN_USER_PROFILE"
+        case requestNotificationPermission = "REQUEST_NOTIFICATION_PERMISSION"
     }
 
     /// `WKScriptMessage.body`를 파싱한다.
@@ -378,6 +387,9 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
                 return nil
             }
             return .openUserProfile(OpenUserProfilePayload(userId: userId, isMe: isMe))
+        case .requestNotificationPermission:
+            let requestId = (payload?["requestId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            return .requestNotificationPermission(requestId: requestId)
         case .none:
             return .unknown(type: rawType)
         }
@@ -581,14 +593,24 @@ public struct PickedPhoto: Equatable, Sendable {
     }
 }
 
+// MARK: - NOTIFICATION_PERMISSION_RESULT status
+
+/// 알림 권한 회신 값(#243). 웹은 granted가 아니면 알림이 오지 않는다고 보면 된다.
+public enum NotificationPermissionStatus: String, Equatable, Sendable {
+    case granted
+    case denied
+}
+
 // MARK: - Capabilities (window.AppBridgeCapabilities)
 
 /// 웹이 **보내기 전에** 앱의 지원 여부를 알아야 하는 웹 → 네이티브 메시지.
 /// PICK_PHOTOS는 탭 직후 file input을 열지 네이티브에 맡길지 정해야 해서(사용자 제스처 제약),
 /// "보내 보고 응답 없으면 폴백"이 불가능하다. 그래서 페이지 스크립트보다 먼저 목록을 주입한다.
 /// 목록이 없는 웹뷰(구버전 앱·리스트)에서 웹은 기존 file input을 쓴다.
-enum WebBridgeCapability: String, Sendable {
+enum WebBridgeCapability: String, Equatable, Sendable {
     case pickPhotos = "PICK_PHOTOS"
+    /// 대회 탭과 그 위에 쌓인 화면만 알린다(#243). 목록이 없으면 웹은 신호를 보내지 않는다.
+    case requestNotificationPermission = "REQUEST_NOTIFICATION_PERMISSION"
 
     /// `window.AppBridgeCapabilities = [...]`를 정의하는 스크립트 소스. 직렬화 실패 시 nil.
     static func injectionScriptSource(for capabilities: [WebBridgeCapability]) -> String? {
@@ -650,6 +672,9 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
     case selectSheetResult(requestId: String, outcome: SelectSheetOutcome)
     /// PICK_PHOTOS의 결과. 고른 순서대로이며, 취소면 빈 배열이다.
     case photosPicked(requestId: String, files: [PickedPhoto])
+    /// REQUEST_NOTIFICATION_PERMISSION의 결과(#243). 이미 거절했으면 다시 묻지 않고 denied로 회신한다 —
+    /// 설정 앱으로 안내할지는 웹이 이 값을 보고 정한다.
+    case notificationPermissionResult(requestId: String?, status: NotificationPermissionStatus)
 
     private var type: String {
         switch self {
@@ -661,6 +686,7 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         case .confirmDialogResult: return "CONFIRM_DIALOG_RESULT"
         case .selectSheetResult: return "SELECT_SHEET_RESULT"
         case .photosPicked: return "PHOTOS_PICKED"
+        case .notificationPermissionResult: return "NOTIFICATION_PERMISSION_RESULT"
         }
     }
 
@@ -687,6 +713,10 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
                 "requestId": requestId,
                 "files": files.map { ["name": $0.name, "mimeType": $0.mimeType, "data": $0.data] }
             ]
+        case let .notificationPermissionResult(requestId, status):
+            var payload: [String: Any] = ["status": status.rawValue]
+            if let requestId { payload["requestId"] = requestId }
+            return payload
         }
     }
 
