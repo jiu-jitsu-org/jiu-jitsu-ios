@@ -152,7 +152,11 @@ public struct AppTabFeature: Sendable {
                 }
                 // 처음 만들 때 웹 주소가 없었으면(커뮤니티 주소 미정) 들어올 때 다시 만든다 — 홈이 다시 시도해 주소를 얻었을 수 있다.
                 if tab == .competition, state.competition.web == nil {
-                    state.competition = CompetitionTabFeature.State(base: state.home.url, accessToken: state.authInfo.accessToken)
+                    // 토큰은 갱신이 반영된 커뮤니티 쪽 값을 쓴다(authInfo는 갱신 때 바뀌지 않는다).
+                    state.competition = CompetitionTabFeature.State(
+                        base: state.home.url,
+                        accessToken: state.home.accessToken ?? state.authInfo.accessToken
+                    )
                 }
                 // 비로그인도 MY를 연다 — 로그인 안내와 설정 입구가 있다(#242).
                 // 다른 탭에서 MY로 돌아오면 프로필을 재조회한다(탭 뷰가 유지돼 onAppear가 다시 오지 않음, #69).
@@ -470,6 +474,9 @@ public struct AppTabFeature: Sendable {
     /// 로그아웃·탈퇴·세션 만료 — 게스트로 바꾸고 이전 계정의 화면을 정리한 뒤 홈으로 보낸다.
     private static func resetToGuest(_ state: inout State) {
         state.authInfo = .guest
+        state.pendingWebLoginTab = nil
+        // 이전 계정으로 대회 탭에 쌓아 둔 상세·프로필도 닫는다.
+        state.competition.path.removeAll()
         // MY 스택에 열어 둔 설정·웹 화면도 함께 닫힌다.
         state.myPage = MyProfileFeature.State(authInfo: .guest)
         // 이전 계정으로 커뮤니티에 쌓아 둔 MY 화면도 닫는다(#197).

@@ -3,7 +3,7 @@
 //  Presentation
 //
 //  시스템 알림 권한의 지금 상태를 읽는다(#243).
-//  권한 창은 FirebaseClient.getFCMToken이 띄운다 — 허용되면 같은 흐름에서 푸시 등록과 FCM 토큰 발급까지 이어진다.
+//  권한 창은 FirebaseClient.requestPermission이 띄우고, 허용되면 FCMAppInfoSync가 푸시 등록과 FCM 토큰 발급을 잇는다.
 //
 
 import ComposableArchitecture
