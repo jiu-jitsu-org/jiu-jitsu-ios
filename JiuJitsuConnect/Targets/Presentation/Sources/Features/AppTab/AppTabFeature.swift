@@ -150,6 +150,10 @@ public struct AppTabFeature: Sendable {
                 if tab == .competition, state.selectedTab == .competition {
                     return .send(.competition(.view(.tabReselected)))
                 }
+                // 처음 만들 때 웹 주소가 없었으면(커뮤니티 주소 미정) 들어올 때 다시 만든다 — 홈이 다시 시도해 주소를 얻었을 수 있다.
+                if tab == .competition, state.competition.web == nil {
+                    state.competition = CompetitionTabFeature.State(base: state.home.url, accessToken: state.authInfo.accessToken)
+                }
                 // 비로그인도 MY를 연다 — 로그인 안내와 설정 입구가 있다(#242).
                 // 다른 탭에서 MY로 돌아오면 프로필을 재조회한다(탭 뷰가 유지돼 onAppear가 다시 오지 않음, #69).
                 let isEnteringMyPage = tab == .myPage && state.selectedTab != .myPage
@@ -169,11 +173,6 @@ public struct AppTabFeature: Sendable {
             case .myPage(.delegate(.settings(.loginRequested))),
                  .myPage(.delegate(.loginRequested)):
                 return .send(.internal(.showLoginModal))
-
-            case .myPage(.delegate(.settings(.didLogoutSuccessfully))):
-                Self.resetToGuest(&state)
-                // 웹 세션도 함께 정리.
-                return Self.broadcastLoggedOut()
 
             case .myPage(.delegate(.settings(.didWithdrawSuccessfully))):
                 Self.resetToGuest(&state)
@@ -210,7 +209,7 @@ public struct AppTabFeature: Sendable {
 
             // 커뮤니티의 내 사진 버튼(#128)·피드·글 상세·댓글에서 내 이름 탭(#116).
             // 남의 사진을 누를 때처럼 MY 화면을 커뮤니티 스택에 쌓아 뒤로가기로 돌아오게 한다(#197).
-            // 탭의 MY가 불러 둔 프로필을 넘겨 바로 그린다. 게스트는 탭바에서 MY를 누른 것과 같이 로그인 안내를 띄운다.
+            // 탭의 MY가 불러 둔 프로필을 넘겨 바로 그린다. 게스트는 커뮤니티 행위와 같이 로그인 안내를 띄운다.
             case .home(.delegate(.myProfileRequested)):
                 guard !state.authInfo.isGuest else {
                     return .send(.internal(.showLoginPromptAlert))
@@ -229,8 +228,10 @@ public struct AppTabFeature: Sendable {
                 }
                 return .send(.view(.tabSelected(.myPage)))
 
+            // 설정의 로그아웃 확인(#241)도 같은 경로 — 설정은 MY 스택의 한 화면이라 닫히면 거기서 돌던 요청이 취소된다.
             case .home(.delegate(.logoutRequested)),
                  .myPage(.delegate(.webSubview(.logoutRequested))),
+                 .myPage(.delegate(.settings(.logoutConfirmed))),
                  .competition(.delegate(.webSubview(.logoutRequested))):
                 return .send(.internal(.performWebLogout))
 
@@ -302,24 +303,26 @@ public struct AppTabFeature: Sendable {
 
             // 대회 관심 첫 등록(#243). 아직 묻지 않았을 때만 시스템 권한 창을 띄운다. 이미 거절했으면 다시 묻지 않고
             // denied로 회신해, 설정 앱으로 안내할지는 웹이 정하게 한다.
-            case let .competition(.delegate(.webSubview(.notificationPermissionRequested(requestId)))):
+            case let .competition(.delegate(.notificationPermissionRequested(requestId, origin))):
                 let isGuest = state.authInfo.isGuest
                 return .run { send in
-                    var status = await notificationPermissionClient.status()
-                    if status == .notDetermined {
-                        if isGuest {
-                            // 비로그인은 서버에 기기를 등록할 수 없어 권한만 묻는다(로그인하면 FCM 동기화가 등록한다).
-                            _ = await firebaseClient.requestPermission()
-                        } else {
-                            // 권한 창 → 허용하면 푸시 등록·FCM 토큰 발급·서버 등록까지 앱 진입 동기화와 같은 흐름으로 잇는다.
-                            await FCMAppInfoSync.syncOnAppLaunch(firebaseClient: firebaseClient, userClient: userClient)
-                        }
+                    let before = await notificationPermissionClient.status()
+                    var status = before
+                    if before == .notDetermined {
+                        _ = await firebaseClient.requestPermission()
                         status = await notificationPermissionClient.status()
                     }
+                    // 웹은 결과를 기다리므로 푸시 등록보다 먼저 회신한다.
                     await send(.competition(.notificationPermissionResolved(
                         requestId: requestId,
+                        origin: origin,
                         status: status == .granted ? .granted : .denied
                     )))
+                    // 방금 허용했으면 푸시 등록·FCM 토큰 발급·서버 등록을 앱 진입 동기화와 같은 흐름으로 잇는다.
+                    // 비로그인은 서버에 기기를 등록할 수 없어 권한만 받아 두고, 로그인 때 FCM 동기화가 등록한다.
+                    if before == .notDetermined, status == .granted, !isGuest {
+                        await FCMAppInfoSync.syncOnAppLaunch(firebaseClient: firebaseClient, userClient: userClient)
+                    }
                 }
 
             // MARK: - DeepLink
@@ -423,10 +426,11 @@ public struct AppTabFeature: Sendable {
                     state.authInfo = newAuthInfo
                     state.myPage.authInfo = newAuthInfo
                     state.loginCover = nil
+                    // 비로그인 MY에서 열어 둔 설정 등은 닫고, 같은 MY를 로그인 상태로 보인다(#242).
+                    // 웹발 로그인이어도 닫는다 — 비로그인으로 연 설정이 남으면 로그인했는데도 '로그인' 줄만 보인다.
+                    state.myPage.path.removeAll()
+                    state.myPage.isMoreMenuPresented = false
                     if !cameFromWeb {
-                        // 비로그인 MY에서 열어 둔 설정 등은 닫고, 같은 MY를 로그인 상태로 보인다(#242).
-                        state.myPage.path.removeAll()
-                        state.myPage.isMoreMenuPresented = false
                         state.selectedTab = isSignup ? .home : .myPage
                     }
                     // 웹 세션 동기화: 새 access token을 커뮤니티·대회 웹뷰에 주입(있을 때만).

@@ -111,6 +111,7 @@ public struct SettingsView: View {
         )
         .navigationBarHidden(true)
         .ignoresSafeArea(edges: .bottom)
+        .withdrawalGuard(isWithdrawing: store.isWithdrawing)
         .navigationDestination(
             item: $store.scope(
                 state: \.destination?.notificationSetting,
@@ -196,4 +197,32 @@ import Domain
                 ._printChanges()
         }
     )
+}
+
+private extension View {
+    /// 탈퇴 요청 중에는 화면이 닫히면 요청이 취소되므로(설정은 MY 스택의 한 화면, #241) 딤으로 조작을 막고 스와이프 백도 막는다.
+    func withdrawalGuard(isWithdrawing: Bool) -> some View {
+        self
+            // MY의 관장 사범 인증 업로드 중 덮개와 같은 모양
+            .overlay {
+                if isWithdrawing {
+                    ZStack {
+                        Color.black.opacity(0.4)
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .controlSize(.large)
+                            .tint(.white)
+                    }
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.15), value: isWithdrawing)
+            .background {
+                if isWithdrawing {
+                    InteractivePopBlocker()
+                }
+            }
+    }
 }

@@ -294,6 +294,12 @@ public struct CommunityDetailFeature: Sendable {
                     return Self.presentSelectSheet(payload, into: &state)
 
                 case let .pickPhotos(payload):
+                    // 사진 고르기를 알리지 않은 웹뷰(대회 목록)는 피커를 띄우지 않아, 빈 결과로 바로 회신한다 —
+                    // 받아 두면 대기 표시가 남아 이후 확인 알럿·선택 시트가 모두 막힌다.
+                    guard state.capabilities.contains(.pickPhotos) else {
+                        Self.enqueue(.photosPicked(requestId: payload.requestId, files: []), into: &state)
+                        return .none
+                    }
                     return Self.presentPhotoPicker(payload, into: &state)
 
                 case let .authLoginPrompt(reason):

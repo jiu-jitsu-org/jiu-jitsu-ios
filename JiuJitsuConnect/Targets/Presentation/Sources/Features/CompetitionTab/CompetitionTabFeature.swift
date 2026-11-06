@@ -59,16 +59,24 @@ public struct CompetitionTabFeature: Sendable {
         // 부모(AppTab)가 세션 변화(로그인·토큰 갱신·로그아웃)를 이 탭의 웹뷰 전부에 전파한다.
         case session(CommunityDetailFeature.SessionUpdate)
         // 부모가 알림 권한을 묻고 난 결과 → 요청한 웹뷰에 회신한다(#243).
-        case notificationPermissionResolved(requestId: String?, status: NotificationPermissionStatus)
+        case notificationPermissionResolved(requestId: String?, origin: WebOrigin, status: NotificationPermissionStatus)
 
         public enum ViewAction: Sendable {
             case tabReselected
         }
 
         public enum DelegateAction: Sendable {
-            // 웹의 인증류·알림 권한 위임 → 부모가 커뮤니티와 같은 흐름으로 처리한다.
+            // 웹의 인증류 위임 → 부모가 커뮤니티와 같은 흐름으로 처리한다.
             case webSubview(CommunityDetailFeature.Action.DelegateAction)
             case myTabRequested
+            // 관심 첫 등록(#243) → 부모가 권한을 묻고, 결과는 물은 웹(origin)에만 돌려준다.
+            case notificationPermissionRequested(requestId: String?, origin: WebOrigin)
+        }
+
+        /// 이 탭의 어느 웹이 보낸 요청인지 — 목록(root) 또는 쌓인 화면.
+        public enum WebOrigin: Equatable, Sendable {
+            case root
+            case element(StackElementID)
         }
     }
 
@@ -95,6 +103,9 @@ public struct CompetitionTabFeature: Sendable {
             case .web(.delegate(.myTabRequested)):
                 return .send(.delegate(.myTabRequested))
 
+            case let .web(.delegate(.notificationPermissionRequested(requestId))):
+                return .send(.delegate(.notificationPermissionRequested(requestId: requestId, origin: .root)))
+
             case let .web(.delegate(delegate)):
                 return .send(.delegate(.webSubview(delegate)))
 
@@ -117,6 +128,9 @@ public struct CompetitionTabFeature: Sendable {
             case .path(.element(id: _, action: .communityDetail(.delegate(.myTabRequested)))):
                 return .send(.delegate(.myTabRequested))
 
+            case let .path(.element(id: id, action: .communityDetail(.delegate(.notificationPermissionRequested(requestId))))):
+                return .send(.delegate(.notificationPermissionRequested(requestId: requestId, origin: .element(id))))
+
             case let .path(.element(id: _, action: .communityDetail(.delegate(delegate)))):
                 return .send(.delegate(.webSubview(delegate)))
 
@@ -138,18 +152,17 @@ public struct CompetitionTabFeature: Sendable {
                 }
                 return .none
 
-            case let .notificationPermissionResolved(requestId, status):
-                // 어느 웹뷰가 물었는지는 모르므로 이 탭에 열린 웹 전부에 회신한다. requestId가 다르거나
-                // 기다리는 요청이 없는 웹은 회신을 무시한다.
-                if var web = state.web {
+            case let .notificationPermissionResolved(requestId, origin, status):
+                // 물은 웹에만 회신한다. 그 사이 닫힌 화면이면 받을 곳이 없으니 버린다.
+                switch origin {
+                case .root:
+                    guard var web = state.web else { return .none }
                     CommunityDetailFeature.deliverNotificationPermission(requestId: requestId, status: status, into: &web)
                     state.web = web
-                }
-                for id in state.path.ids {
-                    if case var .communityDetail(detail)? = state.path[id: id] {
-                        CommunityDetailFeature.deliverNotificationPermission(requestId: requestId, status: status, into: &detail)
-                        state.path[id: id] = .communityDetail(detail)
-                    }
+                case let .element(id):
+                    guard case var .communityDetail(detail)? = state.path[id: id] else { return .none }
+                    CommunityDetailFeature.deliverNotificationPermission(requestId: requestId, status: status, into: &detail)
+                    state.path[id: id] = .communityDetail(detail)
                 }
                 return .none
 

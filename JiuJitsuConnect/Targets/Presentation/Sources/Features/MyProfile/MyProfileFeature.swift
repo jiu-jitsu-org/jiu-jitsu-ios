@@ -235,6 +235,7 @@ public struct MyProfileFeature: Sendable {
     @Dependency(\.imageUploadClient) var imageUploadClient
     @Dependency(\.imageClient) var imageClient
     @Dependency(\.userClient) var userClient
+    @Dependency(\.noticeClient) var noticeClient
     @Dependency(\.dismiss) var dismiss
 
 
@@ -687,6 +688,17 @@ public struct MyProfileFeature: Sendable {
 
             case .view(.guestLoginTapped):
                 return .send(.delegate(.loginRequested))
+
+            // 설정의 알림 화면을 나갈 때 남은 값 저장 — 설정이 바로 닫혀도 끊기지 않게 MY가 맡는다(#241).
+            case let .path(.element(id: _, action: .settings(.delegate(.notificationSettingSaveRequested(setting))))):
+                return .run { send in
+                    do {
+                        _ = try await noticeClient.updateSetting(setting)
+                    } catch {
+                        Log.trace("알림 화면 이탈 후 설정 저장 실패: \(error)", category: .network, level: .error)
+                        await send(.internal(.showToast(.init(message: "알림 설정을 저장하지 못했어요. 다시 시도해주세요", status: .error))))
+                    }
+                }
 
             case let .path(.element(id: _, action: .settings(.delegate(delegate)))):
                 return .send(.delegate(.settings(delegate)))
