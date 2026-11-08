@@ -113,6 +113,7 @@ public struct SettingsFeature: Sendable {
 
     // MARK: - Dependencies
     @Dependency(\.userClient) var userClient
+    @Dependency(\.authClient) var authClient
     @Dependency(\.continuousClock) var clock
     @Dependency(\.dismiss) var dismiss
 
@@ -181,8 +182,11 @@ public struct SettingsFeature: Sendable {
                 state.isWithdrawing = true
                 return .run { send in
                     await send(.internal(.withdrawalResponse(
-                        await TaskResult { try await
-                            userClient.withdrawal()
+                        await TaskResult {
+                            // Apple 회원은 탈퇴 시점 재인증으로 새 authorizationCode를 받아 서버 revoke에 쓴다.
+                            // 비-Apple이면 nil → 기존처럼 body 없이 탈퇴. 재인증을 취소하면 여기서 throw되어 탈퇴가 중단된다(#41).
+                            let authorizationCode = try await authClient.appleAuthorizationCodeForWithdrawal()
+                            return try await userClient.withdrawal(authorizationCode)
                         }
                     )))
                 }

@@ -10,7 +10,11 @@ import Foundation
 public protocol UserRepository: Sendable {
     func signup(info: SignupInfo) async throws -> AuthInfo
     func checkNickname(info: CheckNicknameInfo) async throws -> Bool
-    func withdrawal() async throws -> Bool
+    /// 회원 탈퇴 (DELETE `/api/user`).
+    ///
+    /// Apple 회원은 서버의 Apple 토큰 revoke를 위해 탈퇴 시점에 재인증으로 발급받은 `authorizationCode`를
+    /// 함께 보낸다. 카카오/구글은 `nil`을 넘겨 기존처럼 body 없이 호출한다(#41).
+    func withdrawal(authorizationCode: String?) async throws -> Bool
     /// 사용자 프로필 조회 (GET `/api/user/profile`).
     func fetchUserProfile() async throws -> UserProfile
     /// 회원 앱 정보 등록 (POST `/api/user/appInfo` — FCM 토큰·디바이스 등)

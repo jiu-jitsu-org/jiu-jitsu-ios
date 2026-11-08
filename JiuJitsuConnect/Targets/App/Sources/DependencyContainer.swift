@@ -99,6 +99,9 @@ public final class DependencyContainer {
             },
             refreshSession: {
                 try await self.authRepository.refreshSession()
+            },
+            appleAuthorizationCodeForWithdrawal: {
+                try await self.authRepository.appleAuthorizationCodeForWithdrawal()
             }
         )
     }
@@ -130,8 +133,8 @@ public final class DependencyContainer {
             checkNickname: { info in
                 try await self.userRepository.checkNickname(info: info)
             },
-            withdrawal: {
-                try await self.userRepository.withdrawal()
+            withdrawal: { authorizationCode in
+                try await self.userRepository.withdrawal(authorizationCode: authorizationCode)
             },
             fetchUserProfile: {
                 try await self.userRepository.fetchUserProfile()

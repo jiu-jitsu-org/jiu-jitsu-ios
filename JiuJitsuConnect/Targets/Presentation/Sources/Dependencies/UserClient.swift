@@ -13,7 +13,8 @@ import UIKit
 public struct UserClient {
     public var signup: @Sendable (Domain.SignupInfo) async throws -> Domain.AuthInfo // 회원 가입
     public var checkNickname: @Sendable (Domain.CheckNicknameInfo) async throws -> Bool // 닉네임 중복 체크
-    public var withdrawal: @Sendable () async throws -> Bool // 회원 탈퇴
+    /// 회원 탈퇴 — Apple은 재인증 authorizationCode를 전달하고, 카카오/구글은 nil을 넘긴다(#41).
+    public var withdrawal: @Sendable (_ authorizationCode: String?) async throws -> Bool
     /// 사용자 프로필 조회 (GET `/api/user/profile`) — 관장사범 인증 신청 상태(ownerVerification) 등 포함
     public var fetchUserProfile: @Sendable () async throws -> UserProfile
     /// 회원 앱 정보 등록 (`/api/user/appInfo`)
@@ -35,7 +36,7 @@ public struct UserClient {
     public init(
         signup: @Sendable @escaping (Domain.SignupInfo) async throws -> Domain.AuthInfo,
         checkNickname: @Sendable @escaping (Domain.CheckNicknameInfo) async throws -> Bool,
-        withdrawal: @Sendable @escaping () async throws -> Bool,
+        withdrawal: @Sendable @escaping (_ authorizationCode: String?) async throws -> Bool,
         fetchUserProfile: @Sendable @escaping () async throws -> UserProfile,
         registerAppInfo: @Sendable @escaping (AppInfo) async throws -> Void,
         updateFCMToken: @Sendable @escaping (String) async throws -> Void,
@@ -70,7 +71,7 @@ extension UserClient: DependencyKey {
         checkNickname: { _ in
             true
         },
-        withdrawal: {
+        withdrawal: { _ in
             true
         },
         fetchUserProfile: {
@@ -108,7 +109,7 @@ extension UserClient {
         checkNickname: { _ in
             fatalError("unimplemented.checkNickname is not implemented")
         },
-        withdrawal: {
+        withdrawal: { _ in
             fatalError("unimplemented.withdrawal is not implemented")
         },
         fetchUserProfile: {

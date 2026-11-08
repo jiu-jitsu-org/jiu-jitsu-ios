@@ -13,6 +13,8 @@ public struct AuthClient {
     public var hasValidToken: @Sendable () -> Bool
     /// 웹뷰 토큰 만료 위임용 — 저장된 refresh 토큰으로 갱신 후 새 accessToken 반환.
     public var refreshSession: @Sendable () async throws -> String
+    /// 탈퇴 시 Apple 재인증으로 새 authorizationCode를 받아 반환(서버 revoke용). Apple 외 provider면 nil(#41).
+    public var appleAuthorizationCodeForWithdrawal: @Sendable () async throws -> String?
 
     public init(
         loginWithGoogle: @Sendable @escaping () async throws -> Domain.SNSUser,
@@ -23,7 +25,8 @@ public struct AuthClient {
         signOut: @Sendable @escaping () async -> Void,
         autoLogin: @Sendable @escaping () async throws -> Domain.AuthInfo?,
         hasValidToken: @Sendable @escaping () -> Bool,
-        refreshSession: @Sendable @escaping () async throws -> String
+        refreshSession: @Sendable @escaping () async throws -> String,
+        appleAuthorizationCodeForWithdrawal: @Sendable @escaping () async throws -> String?
     ) {
         self.loginWithGoogle = loginWithGoogle
         self.loginWithApple = loginWithApple
@@ -34,6 +37,7 @@ public struct AuthClient {
         self.autoLogin = autoLogin
         self.hasValidToken = hasValidToken
         self.refreshSession = refreshSession
+        self.appleAuthorizationCodeForWithdrawal = appleAuthorizationCodeForWithdrawal
     }
 }
 
@@ -77,6 +81,9 @@ extension AuthClient: DependencyKey {
         },
         refreshSession: {
             "test-access-token"
+        },
+        appleAuthorizationCodeForWithdrawal: {
+            "test-authorization-code"
         }
     )
 }
@@ -117,6 +124,9 @@ extension AuthClient {
         },
         refreshSession: {
             fatalError("unimplemented.refreshSession is not implemented")
+        },
+        appleAuthorizationCodeForWithdrawal: {
+            fatalError("unimplemented.appleAuthorizationCodeForWithdrawal is not implemented")
         }
     )
 }

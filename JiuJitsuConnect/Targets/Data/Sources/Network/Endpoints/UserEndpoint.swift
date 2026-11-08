@@ -11,7 +11,8 @@ import Domain
 enum UserEndpoint {
     case signup(request: SignupRequestDTO, tempToken: String)
     case checkNickname(request: CheckNicknameRequestDTO)
-    case withdrawal
+    /// 회원 탈퇴 (DELETE `/api/user`). Apple은 재인증으로 받은 authorizationCode를 body에 담아 전송한다(#41).
+    case withdrawal(authorizationCode: String?)
     /// 사용자 프로필 조회 (GET `/api/user/profile`) — 계정/권한/관장사범 인증 상태 포함.
     case getProfile
     /// 회원 앱 정보 등록 (Swagger: POST `/user/appInfo` — 서버 라우팅에 맞춰 `/api/user/appInfo`)
@@ -93,6 +94,10 @@ extension UserEndpoint: Endpoint {
             return try? JSONEncoder().encode(request)
         case .registerAppInfo(let request):
             return try? JSONEncoder().encode(request)
+        case .withdrawal(let authorizationCode):
+            // Apple만 authorizationCode를 싣고, 카카오/구글은 nil → body 없이 보낸다(서버는 required=false).
+            guard let authorizationCode else { return nil }
+            return try? JSONEncoder().encode(DeactivateRequestDTO(authorizationCode: authorizationCode))
         default: return nil
         }
     }
