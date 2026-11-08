@@ -12,6 +12,11 @@ public protocol AuthRepository: Sendable {
     func signInWithApple() async throws -> SNSUser
     func signInWithKakao() async throws -> SNSUser
     func signOut() async
+
+    /// 탈퇴 시점에 Apple 재인증으로 **새 authorizationCode**를 발급받아 반환한다.
+    /// 서버가 Apple 토큰 revoke에 쓰며, 로그인 때 받은 code는 이미 만료되어 쓸 수 없다(#41, BE #149).
+    /// 현재 로그인 provider가 Apple이 아니면 재인증 없이 `nil`을 반환한다(카카오/구글은 iOS 작업 불필요).
+    func appleAuthorizationCodeForWithdrawal() async throws -> String?
     
     func serverLogin(user: SNSUser) async throws -> AuthInfo
     func serverLogout() async throws -> Bool

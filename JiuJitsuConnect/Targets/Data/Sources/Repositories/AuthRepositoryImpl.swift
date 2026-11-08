@@ -17,15 +17,19 @@ import OSLog
 import CoreKit
 
 /// @unchecked Sendable 사유: Apple Sign-In delegate 채택을 위해 NSObject 상속이 강제되며,
-/// `appleSignInContinuation`은 `@MainActor` 메서드(`signInWithApple`)에서 설정되고
+/// `appleSignInContinuation`·`appleAuthCodeContinuation`은 `@MainActor` 메서드
+/// (`signInWithApple` / `appleAuthorizationCodeForWithdrawal`)에서 설정되고
 /// 동일 메인 스레드에서 발화하는 delegate 콜백(`authorizationController(...)`)에서만 접근하므로
 /// 외부 동시성 경계에서 안전하다.
 public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding, @unchecked Sendable {
-    
+
     private let networkService: NetworkService
     private let tokenStorage: TokenStorage
 
     private var appleSignInContinuation: CheckedContinuation<SNSUser, Error>?
+    /// 탈퇴 재인증(`appleAuthorizationCodeForWithdrawal`) 전용 continuation.
+    /// 로그인용(`appleSignInContinuation`)과 같은 delegate를 공유하므로, 둘 중 하나만 동시에 살아 있다.
+    private var appleAuthCodeContinuation: CheckedContinuation<String, Error>?
     
     public init(networkService: NetworkService = DefaultNetworkService(),
                 tokenStorage: TokenStorage = DefaultTokenStorage(),
@@ -70,6 +74,33 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
         }
     }
     
+    /// 탈퇴 시점에 Apple 재인증으로 **새 authorizationCode**를 발급받는다.
+    /// 로그인 때 받은 code는 이미 만료되어 서버의 Apple 토큰 revoke에 쓸 수 없다(#41, BE #149).
+    /// provider가 Apple이 아니면 재인증 창을 띄우지 않고 nil을 반환해 기존 탈퇴 경로를 그대로 탄다.
+    @MainActor
+    public func appleAuthorizationCodeForWithdrawal() async throws -> String? {
+        guard SNSProvider(rawValue: tokenStorage.getProvider() ?? "") == .apple else {
+            return nil
+        }
+        // 로그인/재인증 요청은 같은 delegate·continuation을 공유하므로, 진행 중이면 겹치지 않게 막는다(#87).
+        guard appleSignInContinuation == nil, appleAuthCodeContinuation == nil else {
+            Log.trace("Apple auth already in progress — ignoring withdrawal re-auth", category: .debug, level: .info)
+            throw DomainError.signInCancelled
+        }
+        return try await withCheckedThrowingContinuation { continuation in
+            self.appleAuthCodeContinuation = continuation
+
+            let appleIDProvider = ASAuthorizationAppleIDProvider()
+            let request = appleIDProvider.createRequest()
+            request.requestedScopes = []
+
+            let authorizationController = ASAuthorizationController(authorizationRequests: [request])
+            authorizationController.delegate = self
+            authorizationController.presentationContextProvider = self
+            authorizationController.performRequests()
+        }
+    }
+
     @MainActor
     public func signInWithKakao() async throws -> Domain.SNSUser {
         return try await withCheckedThrowingContinuation { continuation in
@@ -230,26 +261,48 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     // MARK: - ASAuthorizationControllerDelegate
     
     public func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
-        if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
-            guard let identityToken = appleIDCredential.identityToken,
-                  let tokenString = String(data: identityToken, encoding: .utf8) else {
-                resumeAppleSignIn(with: .failure(DomainError.missingProfileData))
+        guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+            resumeActiveAppleRequest(with: DomainError.unknown("Apple credential is not AppleIDCredential."))
+            return
+        }
+
+        // 탈퇴 재인증 경로: identityToken이 아니라 서버 revoke용 authorizationCode가 필요하다.
+        if appleAuthCodeContinuation != nil {
+            guard let authorizationCode = appleIDCredential.authorizationCode,
+                  let code = String(data: authorizationCode, encoding: .utf8) else {
+                resumeAppleAuthCode(with: .failure(DomainError.missingProfileData))
                 return
             }
-            
-            let user = SNSUser(
-                accessToken: tokenString,
-                snsProvider: .apple
-            )
-            resumeAppleSignIn(with: .success(user))
-        } else {
-            resumeAppleSignIn(with: .failure(DomainError.unknown("Apple credential is not AppleIDCredential.")))
+            resumeAppleAuthCode(with: .success(code))
+            return
         }
+
+        // 로그인 경로
+        guard let identityToken = appleIDCredential.identityToken,
+              let tokenString = String(data: identityToken, encoding: .utf8) else {
+            resumeAppleSignIn(with: .failure(DomainError.missingProfileData))
+            return
+        }
+
+        let user = SNSUser(
+            accessToken: tokenString,
+            snsProvider: .apple
+        )
+        resumeAppleSignIn(with: .success(user))
     }
-    
+
     public func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
         let authError = AuthErrorMapper.map(from: error, provider: .apple)
-        resumeAppleSignIn(with: .failure(authError))
+        resumeActiveAppleRequest(with: authError)
+    }
+
+    /// 로그인/탈퇴 재인증 중 살아 있는 쪽 continuation을 실패로 resume한다.
+    private func resumeActiveAppleRequest(with error: Error) {
+        if appleAuthCodeContinuation != nil {
+            resumeAppleAuthCode(with: .failure(error))
+        } else {
+            resumeAppleSignIn(with: .failure(error))
+        }
     }
 
     /// continuation을 비운 뒤 resume한다. 비우지 않으면 다음 요청이 진행 중으로 오인되고,
@@ -257,6 +310,13 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     private func resumeAppleSignIn(with result: Result<SNSUser, Error>) {
         guard let continuation = appleSignInContinuation else { return }
         appleSignInContinuation = nil
+        continuation.resume(with: result)
+    }
+
+    /// `appleAuthCodeContinuation`도 동일하게 비운 뒤 resume한다(이중 resume 방지).
+    private func resumeAppleAuthCode(with result: Result<String, Error>) {
+        guard let continuation = appleAuthCodeContinuation else { return }
+        appleAuthCodeContinuation = nil
         continuation.resume(with: result)
     }
     

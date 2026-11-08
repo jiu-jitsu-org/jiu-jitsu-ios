@@ -72,9 +72,9 @@ public final class UserRepositoryImpl: UserRepository {
         }
     }
     
-    public func withdrawal() async throws -> Bool {
+    public func withdrawal(authorizationCode: String?) async throws -> Bool {
         do {
-            let endpoint = UserEndpoint.withdrawal
+            let endpoint = UserEndpoint.withdrawal(authorizationCode: authorizationCode)
             let responseDTO: Bool = try await networkService.request(endpoint: endpoint)
             
             return responseDTO
