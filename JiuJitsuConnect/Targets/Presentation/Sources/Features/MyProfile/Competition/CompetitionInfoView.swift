@@ -144,6 +144,9 @@ struct CompetitionInfoView: View {
         }
         .padding(.horizontal, Style.horizontalPadding)
         .frame(height: Style.headerHeight)
+        // 완료 화면은 머리줄(상태 표시줄 영역까지)을 아래 캐릭터 무대와 같은 색으로 이어, 흰 띠가 따로 얹혀 보이지 않게 한다(#246).
+        // 전환과 함께 바뀌도록 화면에 그려지는 단계(shownStep)를 따른다. 아래 흰 시트·홈 인디케이터 쪽은 바깥 흰 바탕 그대로다.
+        .background(shownStep == .done ? Color.primitive.coolGray.cg25 : Color.clear)
     }
 
     private var backButton: some View {
