@@ -150,6 +150,8 @@ public struct CommunityDetailFeature: Sendable {
             case competitionRecordRequested(OpenCompetitionRecordPayload)
             // 관심 대회 첫 등록 시트의 '알림 받기'(COMPETITION_ALERTS_ENABLED) → 부모가 알림 설정을 켜고 기기 알림 상태를 본다. (#257)
             case competitionAlertsEnabled(competitionId: String?)
+            // 대회 목록 맨 위 색(COMPETITION_HEADER_TINT) → 대회 탭이 머리줄을 그 색으로 칠한다. nil이면 기본색.
+            case competitionHeaderTintChanged(hex: String?)
         }
     }
 
@@ -344,6 +346,11 @@ public struct CommunityDetailFeature: Sendable {
                 case let .competitionAlertsEnabled(competitionId):
                     // 웹은 capability 없이 늘 보낸다(홈 피드의 대회 카드·글 상세·알림함·대회 화면). 어느 탭이든 부모가 AppTab까지 올린다.
                     return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
+
+                case let .competitionHeaderTint(hex):
+                    // 대회 탭 목록 웹만 알린다. 다른 웹뷰에서 오면 칠할 머리줄이 없어 무시한다.
+                    guard state.capabilities.contains(.competitionHeaderTint) else { return .none }
+                    return .send(.delegate(.competitionHeaderTintChanged(hex: hex)))
 
                 case let .unknown(type):
                     Log.trace("WebBridge 미지원 메시지 무시: \(type)", category: .network, level: .info)

@@ -23,6 +23,8 @@ public struct CompetitionTabFeature: Sendable {
         var path = StackState<Path.State>()
         // 값이 바뀌면 목록을 맨 위로 올린다(탭 아이콘 다시 누름, 홈 #229와 같은 동작).
         var scrollToTopToken: UUID?
+        // 웹이 알린 목록 맨 위 색(`#RRGGBB`). 머리줄·상태바를 이 색으로 칠해 웹 그라데이션과 이음새가 없게 한다. nil이면 기본색.
+        var headerTint: String?
 
         /// - Parameter base: 커뮤니티 웹과 같은 origin(테스트용 도메인 오버라이드 포함). 세션 쿠키를 가진 웹뷰에 다른 origin이 실리지 않게 한다.
         public init(base: URL?, accessToken: String?) {
@@ -32,7 +34,8 @@ public struct CompetitionTabFeature: Sendable {
                     accessToken: accessToken,
                     isTabRoot: true,
                     // 사진 고르기는 쌓인 상세 화면만 띄울 수 있어 목록에서는 알리지 않는다.
-                    capabilities: []
+                    // 머리줄 색은 이 탭 머리줄 아래 붙은 목록만 알린다.
+                    capabilities: [.competitionHeaderTint]
                 )
             }
         }
@@ -128,8 +131,19 @@ public struct CompetitionTabFeature: Sendable {
             case let .web(.delegate(.competitionAlertsEnabled(competitionId))):
                 return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
 
+            case let .web(.delegate(.competitionHeaderTintChanged(hex))):
+                state.headerTint = hex
+                return .none
+
             case let .web(.delegate(delegate)):
                 return .send(.delegate(.webSubview(delegate)))
+
+            case .web(.internal(.loadingFailed)):
+                // 불러오기에 실패하면 오류 화면 위에 지난 색이 남지 않게 기본색으로 돌린다.
+                // 시작할 때 지우지 않는 건 당겨서 새로고침 동안 머리·밴드가 흰색으로 깜빡이지 않게 하려는 것 —
+                // 다시 그려진 웹은 붙자마자 색(또는 null)을 다시 보낸다.
+                state.headerTint = nil
+                return .none
 
             case .web:
                 return .none

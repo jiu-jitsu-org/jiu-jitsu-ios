@@ -8,6 +8,7 @@
 
 import SwiftUI
 import ComposableArchitecture
+import CoreKit
 import DesignSystem
 
 public struct CompetitionTabView: View {
@@ -25,7 +26,7 @@ public struct CompetitionTabView: View {
             header
             ZStack {
                 if let webStore = store.scope(state: \.web, action: \.web) {
-                    CompetitionListWebView(store: webStore, scrollToTopToken: store.scrollToTopToken)
+                    CompetitionListWebView(store: webStore, scrollToTopToken: store.scrollToTopToken, headerTint: headerTint)
                 } else {
                     errorMessage
                 }
@@ -37,12 +38,18 @@ public struct CompetitionTabView: View {
         .toolbar(.hidden, for: .navigationBar)
     }
 
+    // 웹이 알린 목록 맨 위 색. 없으면 nil(기본 머리줄).
+    private var headerTint: Color? { store.headerTint.map { Color(hex: $0) } }
+
     // 홈 머리줄(높이 44 · 왼쪽 16 · 오른쪽 8 · 아래 구분선)과 같은 자리에 탭 이름과 알림함 종을 둔다.
     private var header: some View {
         ZStack(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.component.navibar.container.divider)
-                .frame(height: 1)
+            // 웹 그라데이션과 한 면으로 이어질 때는 구분선을 숨긴다.
+            if headerTint == nil {
+                Rectangle()
+                    .fill(Color.component.navibar.container.divider)
+                    .frame(height: 1)
+            }
 
             HStack(spacing: 0) {
                 Text("대회")
@@ -60,9 +67,10 @@ public struct CompetitionTabView: View {
             .padding(.trailing, 8)
         }
         .frame(height: 44)
-        // 홈 머리줄과 같은 흰 바탕을 상태바까지 끌어올린다.
+        // 홈 머리줄과 같은 흰 바탕(웹이 색을 알리면 그 색)을 상태바까지 끌어올린다.
+        // 웹이 스크롤하며 조금씩 다른 색을 연달아 보내므로 애니메이션 없이 바로 바꾼다.
         .background {
-            Color.component.header.background
+            (headerTint ?? Color.component.header.background)
                 .ignoresSafeArea(edges: .top)
         }
     }
@@ -79,6 +87,7 @@ public struct CompetitionTabView: View {
 private struct CompetitionListWebView: View {
     let store: StoreOf<CommunityDetailFeature>
     let scrollToTopToken: UUID?
+    let headerTint: Color?
 
     var body: some View {
         ZStack {
@@ -91,6 +100,8 @@ private struct CompetitionListWebView: View {
                 outbox: store.outbox,
                 // 목록 웹 배경(surface-container)과 맞춰 바운스 때 다른 색이 드러나지 않게 한다.
                 overscrollBackground: Color.primitive.bw.white,
+                // 머리줄이 칠해져 있으면 맨 위에서 당길 때 드러나는 밴드도 같은 색으로 이어 준다.
+                pullToRefreshBackground: headerTint,
                 capabilities: store.capabilities,
                 onLoadingStarted: { store.send(.internal(.loadingStarted)) },
                 onLoadingFinished: { store.send(.internal(.loadingFinished)) },

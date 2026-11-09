@@ -444,8 +444,8 @@ public struct CommunityFeature: Sendable {
                     // 홈 피드 글 속 대회 카드에서도 관심 첫 등록 시트가 뜬다(#257) → 부모(AppTab)가 대회 탭과 같이 처리한다.
                     return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
 
-                case .openHomeFeed, .openCompetitionRecord:
-                    // 대회 상세만 알리는 신호(#250)라 홈 피드 웹에서는 오지 않아야 한다. 받을 곳이 없어 무시한다.
+                case .openHomeFeed, .openCompetitionRecord, .competitionHeaderTint:
+                    // 대회 화면만 알리는 신호(#250)라 홈 피드 웹에서는 오지 않아야 한다. 받을 곳이 없어 무시한다.
                     Log.trace("리스트 웹뷰 \(message) 수신 — 무시", category: .network, level: .info)
                     return .none
 
@@ -688,8 +688,8 @@ public struct CommunityFeature: Sendable {
             return .send(.openUserProfile(userId: userId))
         case let .competitionAlertsEnabled(competitionId):
             return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
-        case .homeFeedRequested, .competitionRecordRequested:
-            // 커뮤니티 상세는 두 신호를 알리지 않아 상세가 이미 무시했다(#250). 홈은 이미 피드 탭이기도 하다.
+        case .homeFeedRequested, .competitionRecordRequested, .competitionHeaderTintChanged:
+            // 커뮤니티 상세는 이 신호들을 알리지 않아 상세가 이미 무시했다(#250). 홈은 이미 피드 탭이기도 하다.
             return .none
         }
     }
