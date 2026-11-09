@@ -53,7 +53,11 @@ public struct AppTabView: View {
                 NavigationStack(
                     path: $store.scope(state: \.competition.path, action: \.competition.path)
                 ) {
-                    CompetitionTabView(store: store.scope(state: \.competition, action: \.competition))
+                    // 대회 탭 종의 새 알림 점은 홈이 조회한 값 하나를 함께 쓴다(#258).
+                    CompetitionTabView(
+                        store: store.scope(state: \.competition, action: \.competition),
+                        hasUnreadNotification: store.home.hasUnreadNotification
+                    )
                         .safeAreaInset(edge: .bottom, spacing: 0) { bottomTabBar }
                 } destination: { destinationStore in
                     switch destinationStore.case {
@@ -110,6 +114,11 @@ public struct AppTabView: View {
                     MyProfileView(store: myStore)
                 }
             }
+            // 모달 안 웹의 '알림 받기'(#257)면 아래 탭 화면의 알럿이 모달에 가려지므로 모달 위에 그린다.
+            .appAlert(
+                isPresented: deviceNotificationAlertBinding(isInCover: true),
+                configuration: deviceNotificationAlertConfiguration
+            )
         }
         .appAlert(
             isPresented: Binding(
@@ -117,6 +126,10 @@ public struct AppTabView: View {
                 set: { if !$0 { store.send(.view(.loginPromptDismissed)) } }
             ),
             configuration: loginPromptAlertConfiguration
+        )
+        .appAlert(
+            isPresented: deviceNotificationAlertBinding(isInCover: false),
+            configuration: deviceNotificationAlertConfiguration
         )
         // 리스트 웹뷰가 요청한 확인 알럿·선택 시트를 최상위에서 그려 GNB·하단 탭바까지 덮는다.
         // (웹뷰는 자기 프레임 밖을 딤 처리할 수 없어 이 표면은 네이티브가 소유한다.)
@@ -158,6 +171,32 @@ public struct AppTabView: View {
                 title: "닫기",
                 style: .neutral,
                 action: { store.send(.view(.loginPromptCancelTapped)) }
+            )
+        )
+    }
+
+    // 기기 알림 꺼짐 안내는 맨 위 화면 한 곳에만 그린다 — 상세 모달이 떠 있으면 모달 위, 아니면 탭 화면 위.
+    private func deviceNotificationAlertBinding(isInCover: Bool) -> Binding<Bool> {
+        Binding(
+            get: { store.isDeviceNotificationAlertPresented && (store.home.detailCover != nil) == isInCover },
+            set: { if !$0 { store.send(.view(.deviceNotificationAlertDismissed)) } }
+        )
+    }
+
+    // 관심 대회 알림을 켰는데 기기 알림이 꺼져 있을 때(#257). 앱은 다시 물을 수 없어 설정 앱으로 보낸다.
+    private var deviceNotificationAlertConfiguration: AppAlertConfiguration {
+        AppAlertConfiguration(
+            title: "기기 알림이 꺼져 있어요",
+            message: "설정에서 알림을 켜면 관심 대회 마감 전날 알려 드릴게요.",
+            primaryButton: .init(
+                title: "설정으로 가기",
+                style: .primary,
+                action: { store.send(.view(.deviceNotificationAlertSettingsTapped)) }
+            ),
+            secondaryButton: .init(
+                title: "나중에",
+                style: .neutral,
+                action: { store.send(.view(.deviceNotificationAlertDismissed)) }
             )
         )
     }

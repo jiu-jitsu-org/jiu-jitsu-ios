@@ -143,12 +143,12 @@ private extension WebBridgeInboundMessage {
             return "PICK_PHOTOS  reqId=\(payload.requestId) limit=\(payload.limit)"
         case let .openUserProfile(payload):
             return "OPEN_USER_PROFILE  userId=\(payload.userId) isMe=\(payload.isMe)"
-        case let .requestNotificationPermission(requestId):
-            return "REQUEST_NOTIFICATION_PERMISSION  reqId=\(requestId ?? "-")"
         case .openHomeFeed:
             return "OPEN_HOME_FEED"
         case let .openCompetitionRecord(payload):
             return "OPEN_COMPETITION_RECORD  competitionId=\(payload.competitionId) year=\(payload.year)"
+        case let .competitionAlertsEnabled(competitionId):
+            return "COMPETITION_ALERTS_ENABLED  competitionId=\(competitionId ?? "-")"
         case let .unknown(type):
             return "\(type)  (unsupported)"
         }
@@ -181,8 +181,6 @@ private extension WebBridgeOutboundMessage {
             // base64 원문은 장당 수백 KB라 로그에는 개수와 크기만 남긴다.
             let sizes = files.map { "\($0.data.count / 1024)KB" }.joined(separator: ",")
             return "PHOTOS_PICKED  reqId=\(requestId) files=\(files.count) base64=[\(sizes)]"
-        case let .notificationPermissionResult(requestId, status):
-            return "NOTIFICATION_PERMISSION_RESULT  reqId=\(requestId ?? "-") status=\(status.rawValue)"
         }
     }
 }
@@ -228,15 +226,15 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 글·댓글 작성자(사진·닉네임) 탭 → 회원 프로필 열기 요청(#116). 내 이름이면 MY 탭,
     /// 남이면 다른 회원 프로필 화면으로 간다.
     case openUserProfile(OpenUserProfilePayload)
-    /// 알림 권한 요청(#243). 대회 관심을 처음 등록할 때 웹이 보낸다 — 앱을 켤 때가 아니라 알림이 필요한 순간에 묻는다.
-    /// 아직 묻지 않았으면 시스템 권한 창을 띄우고, 결과를 NOTIFICATION_PERMISSION_RESULT로 회신한다.
-    /// requestId는 선택 — 웹이 보냈으면 회신에 그대로 싣는다.
-    case requestNotificationPermission(requestId: String?)
     /// 대회 상세의 '커뮤니티에서 더 보기'(#250). 서브뷰를 닫고 홈 피드로 보내 달라는 요청이다.
     /// 웹은 capability 목록에 이 타입이 있을 때만 보내고, 없으면 OPEN_SUBVIEW('/')로 대신한다.
     case openHomeFeed
     /// 끝난 대회 배너의 '내 기록에 남기기'(#250). 대회 이름·연도를 채운 채 내 대회 기록 추가 흐름을 열어 달라는 요청이다.
     case openCompetitionRecord(OpenCompetitionRecordPayload)
+    /// 관심 대회 첫 등록 시트에서 '알림 받기'를 고름(#257). 웹은 앱 안이면 늘 보낸다(capability 확인 없음).
+    /// 네이티브는 '관심 대회 알림' 설정을 켜고, 기기 알림이 꺼져 있으면 설정 앱으로 안내한다.
+    /// competitionId는 웹 대회 slug(`/competition/{id}`)로 로그에만 남긴다 — 없어도 설정은 켠다.
+    case competitionAlertsEnabled(competitionId: String?)
     /// 계약에 없는 타입(상위 버전/오타 등) — 무시 대상.
     case unknown(type: String)
 
@@ -253,9 +251,9 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case showSelectSheet = "SHOW_SELECT_SHEET"
         case pickPhotos = "PICK_PHOTOS"
         case openUserProfile = "OPEN_USER_PROFILE"
-        case requestNotificationPermission = "REQUEST_NOTIFICATION_PERMISSION"
         case openHomeFeed = "OPEN_HOME_FEED"
         case openCompetitionRecord = "OPEN_COMPETITION_RECORD"
+        case competitionAlertsEnabled = "COMPETITION_ALERTS_ENABLED"
     }
 
     /// `WKScriptMessage.body`를 파싱한다.
@@ -398,9 +396,6 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
                 return nil
             }
             return .openUserProfile(OpenUserProfilePayload(userId: userId, isMe: isMe))
-        case .requestNotificationPermission:
-            let requestId = (payload?["requestId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-            return .requestNotificationPermission(requestId: requestId)
         case .openHomeFeed:
             return .openHomeFeed
         case .openCompetitionRecord:
@@ -409,6 +404,9 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
                 return nil
             }
             return .openCompetitionRecord(record)
+        case .competitionAlertsEnabled:
+            let competitionId = (payload?["competitionId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            return .competitionAlertsEnabled(competitionId: competitionId)
         case .none:
             return .unknown(type: rawType)
         }
@@ -612,14 +610,6 @@ public struct PickedPhoto: Equatable, Sendable {
     }
 }
 
-// MARK: - NOTIFICATION_PERMISSION_RESULT status
-
-/// 알림 권한 회신 값(#243). 웹은 granted가 아니면 알림이 오지 않는다고 보면 된다.
-public enum NotificationPermissionStatus: String, Equatable, Sendable {
-    case granted
-    case denied
-}
-
 // MARK: - Capabilities (window.AppBridgeCapabilities)
 
 /// 웹이 **보내기 전에** 앱의 지원 여부를 알아야 하는 웹 → 네이티브 메시지.
@@ -628,8 +618,6 @@ public enum NotificationPermissionStatus: String, Equatable, Sendable {
 /// 목록이 없는 웹뷰(구버전 앱·리스트)에서 웹은 기존 file input을 쓴다.
 enum WebBridgeCapability: String, Equatable, Sendable {
     case pickPhotos = "PICK_PHOTOS"
-    /// 대회 탭과 그 위에 쌓인 화면만 알린다(#243). 목록이 없으면 웹은 신호를 보내지 않는다.
-    case requestNotificationPermission = "REQUEST_NOTIFICATION_PERMISSION"
     /// 대회 상세 서브뷰만 알린다(#250). 목록이 없으면 웹은 OPEN_SUBVIEW('/')로 대신한다.
     case openHomeFeed = "OPEN_HOME_FEED"
     /// 대회 상세 서브뷰만 알린다(#250). 목록이 없으면 웹은 '내 기록에 남기기'를 보내지 않는다.
@@ -695,9 +683,6 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
     case selectSheetResult(requestId: String, outcome: SelectSheetOutcome)
     /// PICK_PHOTOS의 결과. 고른 순서대로이며, 취소면 빈 배열이다.
     case photosPicked(requestId: String, files: [PickedPhoto])
-    /// REQUEST_NOTIFICATION_PERMISSION의 결과(#243). 이미 거절했으면 다시 묻지 않고 denied로 회신한다 —
-    /// 설정 앱으로 안내할지는 웹이 이 값을 보고 정한다.
-    case notificationPermissionResult(requestId: String?, status: NotificationPermissionStatus)
 
     private var type: String {
         switch self {
@@ -709,7 +694,6 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         case .confirmDialogResult: return "CONFIRM_DIALOG_RESULT"
         case .selectSheetResult: return "SELECT_SHEET_RESULT"
         case .photosPicked: return "PHOTOS_PICKED"
-        case .notificationPermissionResult: return "NOTIFICATION_PERMISSION_RESULT"
         }
     }
 
@@ -736,10 +720,6 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
                 "requestId": requestId,
                 "files": files.map { ["name": $0.name, "mimeType": $0.mimeType, "data": $0.data] }
             ]
-        case let .notificationPermissionResult(requestId, status):
-            var payload: [String: Any] = ["status": status.rawValue]
-            if let requestId { payload["requestId"] = requestId }
-            return payload
         }
     }
 

@@ -39,6 +39,7 @@ public final class DependencyContainer {
     private let pushNotificationTapRelay = PushNotificationTapRelay()
     private let beltPromptStorage = BeltPromptStorage()
     private let greetingStorage = GreetingStorage()
+    private let competitionAlertSettingStorage = CompetitionAlertSettingStorage()
     private lazy var sharedNetworkService: NetworkService = DefaultNetworkService(
         tokenStorage: sharedTokenStorage,
         sessionEventBroadcaster: authSessionEventBroadcaster
@@ -187,6 +188,23 @@ public final class DependencyContainer {
         GreetingClient(
             shouldPlay: { self.greetingStorage.shouldPlay(now: $0) },
             markPlayed: { self.greetingStorage.markPlayed(now: $0) }
+        )
+    }
+
+    public func configureCompetitionAlertSettingClient() -> CompetitionAlertSettingClient {
+        // 비로그인(userId nil)은 저장할 회원이 없어 늘 꺼짐으로 읽고 쓰기는 버린다.
+        CompetitionAlertSettingClient(
+            isEnabled: { userId in
+                userId.map { self.competitionAlertSettingStorage.isEnabled(userId: $0) } ?? false
+            },
+            setEnabled: { isEnabled, userId in
+                guard let userId else { return }
+                self.competitionAlertSettingStorage.setEnabled(isEnabled, userId: userId)
+            },
+            changes: { userId in
+                guard let userId else { return AsyncStream { $0.finish() } }
+                return self.competitionAlertSettingStorage.changes(userId: userId)
+            }
         )
     }
 

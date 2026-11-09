@@ -19,13 +19,9 @@ public struct CommunityView: View {
     }
 
     private enum Metrics {
-        // 알림·검색·내 사진 버튼에서 공유
+        // 검색·내 사진 버튼에서 공유(알림함 종은 NotificationInboxButton이 같은 값으로 그린다)
         static let trailingIconSize: CGFloat = 24
         static let trailingIconButtonSize: CGFloat = 40
-        // 새 알림 점: 6pt 원 + 바깥 1pt 테두리. 빨간 원이 종 아이콘(24pt) 상단에 딱 붙고 오른쪽에서 1pt 안쪽에 겹친다.
-        static let notificationDotSize: CGFloat = 6
-        static let notificationDotStrokeWidth: CGFloat = 1
-        static let notificationDotTrailingInset: CGFloat = 1
         // 내 사진: 28pt 원을 다른 아이콘과 같은 터치 영역 가운데에 둔다. 사진이 없으면 기본 사람 아이콘.
         static let avatarSize: CGFloat = 28
         static let avatarDefaultIconSize: CGFloat = 20
@@ -104,23 +100,9 @@ public struct CommunityView: View {
                     #endif
 
                     if store.isNotificationButtonVisible {
-                        Button {
+                        NotificationInboxButton(hasUnread: store.hasUnreadNotification) {
                             store.send(.view(.notificationTapped))
-                        } label: {
-                            Assets.Common.Icon.inbox.swiftUIImage
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: Metrics.trailingIconSize, height: Metrics.trailingIconSize)
-                                .foregroundStyle(Color.component.header.iconButton)
-                                .overlay(alignment: .topTrailing) {
-                                    if store.hasUnreadNotification {
-                                        notificationDot
-                                    }
-                                }
-                                .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
-                                .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
                     }
 
                     Button {
@@ -194,20 +176,6 @@ public struct CommunityView: View {
                 .frame(width: Metrics.avatarDefaultIconSize, height: Metrics.avatarDefaultIconSize)
                 .foregroundStyle(Color.component.header.avatarDefaultIcon)
         }
-    }
-
-    // 테두리는 바깥(outside) 정렬이라 6pt 원 뒤에 테두리 두께만큼 큰 원을 깔아 표현한다.
-    // 위치는 빨간 원 기준이라 테두리는 아이콘 위·오른쪽 바깥으로 1pt씩 걸칠 수 있다.
-    private var notificationDot: some View {
-        Circle()
-            .fill(Color.primitive.red.notification)
-            .frame(width: Metrics.notificationDotSize, height: Metrics.notificationDotSize)
-            .background {
-                Circle()
-                    .fill(Color.primitive.bw.white)
-                    .padding(-Metrics.notificationDotStrokeWidth)
-            }
-            .padding(.trailing, Metrics.notificationDotTrailingInset)
     }
 
     private func tabButton(_ tab: CommunityFeature.Tab) -> some View {

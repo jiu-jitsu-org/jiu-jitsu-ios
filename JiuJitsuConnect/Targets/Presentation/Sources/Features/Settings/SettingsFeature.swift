@@ -108,6 +108,8 @@ public struct SettingsFeature: Sendable {
             case loginRequested
             // '차단한 회원' 탭 → 부모가 커뮤니티와 같은 origin·최신 토큰으로 서브뷰를 MY 스택(설정 위)에 push한다.
             case blockedUsersRequested
+            // 알림 화면에서 '관심 대회 알림'을 켬(#257) → 부모(AppTab)가 기기 알림이 꺼져 있으면 안내한다.
+            case competitionAlertTurnedOn
         }
     }
 
@@ -128,7 +130,7 @@ public struct SettingsFeature: Sendable {
 
             case .view(.notificationButtonTapped):
                 guard !state.authInfo.isGuest else { return .none }
-                state.destination = .notificationSetting(NotificationSettingFeature.State())
+                state.destination = .notificationSetting(NotificationSettingFeature.State(userId: state.authInfo.userInfo?.userId))
                 return .none
 
             case .view(.termsButtonTapped):
@@ -235,6 +237,9 @@ public struct SettingsFeature: Sendable {
                       let setting = notification.unsavedSetting
                 else { return .none }
                 return .send(.delegate(.notificationSettingSaveRequested(setting)))
+
+            case .destination(.presented(.notificationSetting(.delegate(.competitionAlertTurnedOn)))):
+                return .send(.delegate(.competitionAlertTurnedOn))
 
             case .destination:
                 return .none

@@ -132,6 +132,8 @@ public struct CommunityFeature: Sendable {
         case openUserProfile(userId: Int)
         // 부모(AppTabFeature)가 MY에서 바뀐 내 사진(삭제 시 nil)을 주입하는 통로.
         case myProfileImageChanged(URL?)
+        // 부모가 새 알림 점을 다시 조회시킨다 — 대회 탭의 종도 이 값을 그린다(#258).
+        case unreadNotificationRefreshRequested
 
         // 게시글 상세 서브뷰 네비게이션.
         case path(StackAction<Path.State, Path.Action>)
@@ -200,6 +202,8 @@ public struct CommunityFeature: Sendable {
             case myProfileRequested
             // 테스트용 '딥링크로 열기'(DEBUG/BETA) → 부모가 실제 유니버설 링크와 같은 경로(.deepLink)로 보낸다.
             case debugDeepLinkRequested(DeepLink)
+            // 홈 웹(피드·글 상세·알림함)의 관심 대회 '알림 받기'(#257) → 부모가 알림 설정을 켜고 기기 알림 상태를 본다.
+            case competitionAlertsEnabled(competitionId: String?)
         }
 
         /// 부모가 세션 상태 변화를 알려주면 그에 맞는 아웃바운드 메시지를 웹에 주입한다.
@@ -260,7 +264,7 @@ public struct CommunityFeature: Sendable {
                 guard
                     state.isNotificationButtonVisible,
                     let base = state.url,
-                    let url = Self.notificationsURL(base: base)
+                    let url = NotificationInbox.url(base: base)
                 else { return .none }
                 state.path.append(.detail(.init(url: url, accessToken: state.accessToken)))
                 return .none
@@ -436,11 +440,9 @@ public struct CommunityFeature: Sendable {
                     }
                     return .send(.delegate(.myProfileRequested))
 
-                case let .requestNotificationPermission(requestId):
-                    // 알림 권한 요청은 대회 탭만 알린다(#243). 혹시 오면 웹이 기다리지 않게 거절로 바로 회신한다.
-                    Log.trace("리스트 웹뷰 REQUEST_NOTIFICATION_PERMISSION 수신 — 거절로 회신", category: .network, level: .info)
-                    Self.enqueue(.notificationPermissionResult(requestId: requestId, status: .denied), into: &state)
-                    return .none
+                case let .competitionAlertsEnabled(competitionId):
+                    // 홈 피드 글 속 대회 카드에서도 관심 첫 등록 시트가 뜬다(#257) → 부모(AppTab)가 대회 탭과 같이 처리한다.
+                    return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
 
                 case .openHomeFeed, .openCompetitionRecord:
                     // 대회 상세만 알리는 신호(#250)라 홈 피드 웹에서는 오지 않아야 한다. 받을 곳이 없어 무시한다.
@@ -531,6 +533,9 @@ public struct CommunityFeature: Sendable {
                 // MY의 업로드·삭제가 끝나기 전에 홈으로 넘어오면 탭 진입 조회가 변경 전 사진을 들고 늦게 도착해
                 // 방금 반영한 값을 덮는다. 진행 중인 조회는 이미 낡은 값이므로 버린다.
                 return .cancel(id: CancelID.myProfileImage)
+
+            case .unreadNotificationRefreshRequested:
+                return refreshUnreadNotification(state)
 
             // MARK: - DeepLink (부모 주입 → 게시글 상세 진입)
 
@@ -635,16 +640,6 @@ public struct CommunityFeature: Sendable {
         .cancellable(id: CancelID.unreadNotification, cancelInFlight: true)
     }
 
-    /// 알림함 웹 라우트(`/community/notifications`). 숫자 id가 아니라 `DeepLinkParser`의
-    /// 게시글 상세 경로로 오인되지 않는다.
-    private static let notificationsPath = "/\(DeepLinkParser.communitySegment)/notifications"
-
-    /// 리스트 웹뷰와 같은 origin(테스트용 도메인 오버라이드 포함)에 알림함 경로를 붙인다.
-    /// OPEN_SUBVIEW와 마찬가지로 세션 쿠키를 가진 웹뷰에 다른 origin이 실리지 않게 하기 위함이다.
-    private static func notificationsURL(base: URL) -> URL? {
-        URL(string: notificationsPath, relativeTo: base)?.absoluteURL
-    }
-
     /// 커뮤니티 활동 웹 라우트(`/community/me`). 알림함과 같이 숫자 id가 아니라 게시글 상세로 오인되지 않는다.
     private static let myActivityPath = "/\(DeepLinkParser.communitySegment)/me"
 
@@ -663,7 +658,7 @@ public struct CommunityFeature: Sendable {
 
     private static func isNotificationsDetail(_ element: Path.State?) -> Bool {
         guard case let .detail(detail)? = element else { return false }
-        return detail.url.path() == notificationsPath
+        return NotificationInbox.isInbox(detail.url)
     }
 
     // MARK: - Subview 라우팅 헬퍼
@@ -691,9 +686,8 @@ public struct CommunityFeature: Sendable {
         case let .userProfileRequested(userId):
             // 모달 안이면 openUserProfile이 모달 스택에 쌓는다
             return .send(.openUserProfile(userId: userId))
-        case .notificationPermissionRequested:
-            // 커뮤니티 상세는 알림 권한 요청을 알리지 않아, 상세가 이미 거절로 회신했다(#243).
-            return .none
+        case let .competitionAlertsEnabled(competitionId):
+            return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
         case .homeFeedRequested, .competitionRecordRequested:
             // 커뮤니티 상세는 두 신호를 알리지 않아 상세가 이미 무시했다(#250). 홈은 이미 피드 탭이기도 하다.
             return .none

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import UIKit
 import ComposableArchitecture
 import Domain
 import CoreKit
@@ -17,6 +18,8 @@ public struct AppTabFeature: Sendable {
     private enum CancelID: Hashable, Sendable {
         // 401 인터셉터가 방송하는 세션 이벤트 구독. AppTab 생명주기 동안만 유지한다.
         case sessionObserver
+        // 관심 대회 알림 켜기(#257) — 권한 창을 기다리는 동안 로그아웃되면 이전 계정으로 FCM을 등록하지 않게 끊는다.
+        case competitionAlerts
     }
 
     // 세 번째 탭은 설정 대신 대회(#240). 설정은 MY 오른쪽 위로 옮겼다(#241).
@@ -39,6 +42,8 @@ public struct AppTabFeature: Sendable {
         @Presents var loginCover: LoginFeature.State?
         // 게스트가 로그인이 필요한 행위(커뮤니티 글쓰기·대회 관심 등)를 할 때 노출되는 공통 AppAlert 표시 여부
         var isLoginPromptPresented: Bool = false
+        // 관심 대회 알림을 켰는데 기기 알림이 꺼져 있을 때 설정 앱으로 안내하는 AppAlert 표시 여부(#257)
+        var isDeviceNotificationAlertPresented: Bool = false
         // 로그인 모달이 어느 탭 웹뷰의 행위(글쓰기·관심 등록 등)에서 트리거됐는지(홈·대회).
         // 값이 있으면 로그인 성공 시 탭 전환 없이 그 탭에 머물러 행위를 복귀시키고,
         // 취소 시 그 웹에 AUTH_LOGIN_CANCELLED를 보내 대기 중 행위를 폐기시킨다.
@@ -88,11 +93,17 @@ public struct AppTabFeature: Sendable {
             // 로그인 안내 알럿의 [취소] 버튼 전용. (loginPromptDismissed는 알럿이 닫힐 때마다
             // 바인딩에 의해 함께 호출되므로, 취소 부수효과는 이 액션에만 둔다.)
             case loginPromptCancelTapped
+            // 기기 알림 꺼짐 안내(#257)의 [설정으로 가기]·닫힘([나중에] 포함)
+            case deviceNotificationAlertSettingsTapped
+            case deviceNotificationAlertDismissed
         }
 
         public enum InternalAction: Sendable {
             case showLoginPromptAlert
             case showLoginModal
+            case showDeviceNotificationAlert
+            // 관심 대회 알림 켜기 중 권한 창에서 허용함(#257). 그 사이 로그아웃했을 수 있어 지금 상태를 보고 FCM을 등록한다.
+            case competitionAlertsPermissionGranted
             // 웹 주도 로그아웃 요청(AUTH_LOGOUT_REQUEST) 처리.
             case performWebLogout
             case webLogoutCompleted
@@ -116,6 +127,8 @@ public struct AppTabFeature: Sendable {
     @Dependency(\.authSessionEventClient) var authSessionEventClient
     @Dependency(\.notificationPermissionClient) var notificationPermissionClient
     @Dependency(\.communityClient) var communityClient
+    @Dependency(\.competitionAlertSettingClient) var competitionAlertSettingClient
+    @Dependency(\.openURL) var openURL
 
     public var body: some ReducerOf<Self> {
         Scope(state: \.home, action: \.home) {
@@ -155,6 +168,10 @@ public struct AppTabFeature: Sendable {
                 if tab == .competition, state.selectedTab == .competition {
                     return .send(.competition(.view(.tabReselected)))
                 }
+                // 대회 탭 머리줄의 종도 홈의 새 알림 점을 그리므로, 들어올 때 홈에 다시 조회시킨다(#258).
+                let refreshUnread: Effect<Action> = tab == .competition && state.selectedTab != .competition
+                    ? .send(.home(.unreadNotificationRefreshRequested))
+                    : .none
                 // 처음 만들 때 웹 주소가 없었으면(커뮤니티 주소 미정) 들어올 때 다시 만든다 — 홈이 다시 시도해 주소를 얻었을 수 있다.
                 if tab == .competition, state.competition.web == nil {
                     // 토큰은 갱신이 반영된 커뮤니티 쪽 값을 쓴다(authInfo는 갱신 때 바뀌지 않는다).
@@ -170,7 +187,7 @@ public struct AppTabFeature: Sendable {
                 if isEnteringMyPage, !state.authInfo.isGuest {
                     return .send(.myPage(.view(.tabEntered)))
                 }
-                return .none
+                return refreshUnread
 
             case .view(.sceneBecameActive):
                 // MY 탭을 보고 있을 때만 포그라운드 복귀 재조회 (#69)
@@ -187,6 +204,7 @@ public struct AppTabFeature: Sendable {
                 Self.resetToGuest(&state)
                 return .merge(
                     Self.broadcastLoggedOut(),
+                    .cancel(id: CancelID.competitionAlerts),
                     // 로컬 세션 정리를 끝낸 뒤 로그인 모달을 띄운다. 먼저 띄우면 새로 로그인한 토큰을
                     // 뒤늦은 signOut이 지우거나, 새 로그인이 폐기 직전의 FCM 토큰을 등록할 수 있다.
                     .run { send in
@@ -310,29 +328,21 @@ public struct AppTabFeature: Sendable {
                 state.pendingWebLoginTab = .competition
                 return .send(.internal(.showLoginModal))
 
-            // 대회 관심 첫 등록(#243). 아직 묻지 않았을 때만 시스템 권한 창을 띄운다. 이미 거절했으면 다시 묻지 않고
-            // denied로 회신해, 설정 앱으로 안내할지는 웹이 정하게 한다.
-            case let .competition(.delegate(.notificationPermissionRequested(requestId, origin))):
-                let isGuest = state.authInfo.isGuest
-                return .run { send in
-                    let before = await notificationPermissionClient.status()
-                    var status = before
-                    if before == .notDetermined {
-                        _ = await firebaseClient.requestPermission()
-                        status = await notificationPermissionClient.status()
-                    }
-                    // 웹은 결과를 기다리므로 푸시 등록보다 먼저 회신한다.
-                    await send(.competition(.notificationPermissionResolved(
-                        requestId: requestId,
-                        origin: origin,
-                        status: status == .granted ? .granted : .denied
-                    )))
-                    // 방금 허용했으면 푸시 등록·FCM 토큰 발급·서버 등록을 앱 진입 동기화와 같은 흐름으로 잇는다.
-                    // 비로그인은 서버에 기기를 등록할 수 없어 권한만 받아 두고, 로그인 때 FCM 동기화가 등록한다.
-                    if before == .notDetermined, status == .granted, !isGuest {
-                        await FCMAppInfoSync.syncOnAppLaunch(firebaseClient: firebaseClient, userClient: userClient)
-                    }
-                }
+            // 관심 대회 첫 등록 시트의 '알림 받기'(#257). 웹은 홈 피드(글 속 대회 카드)·글 상세·알림함·대회 화면 어디서든 보내므로
+            // 모든 탭의 웹을 한곳에서 받는다.
+            case let .competition(.delegate(.competitionAlertsEnabled(competitionId))),
+                 let .home(.delegate(.competitionAlertsEnabled(competitionId))),
+                 let .myPage(.delegate(.webSubview(.competitionAlertsEnabled(competitionId)))):
+                return enableCompetitionAlerts(competitionId: competitionId, state: state)
+
+            // 설정 › 알림에서 '관심 대회 알림'을 켬(#257). 웹의 '알림 받기'와 같이 기기 알림 상태를 보고 안내한다.
+            // 안내 알럿은 이 화면의 최상위 덮개라 MY 스택에 쌓인 설정 화면 위에도 그려진다.
+            case .myPage(.delegate(.settings(.competitionAlertTurnedOn))):
+                return enableCompetitionAlerts(competitionId: nil, state: state)
+
+            // 대회 탭에서 연 알림함을 닫음(#258) → 홈의 새 알림 점을 다시 조회한다. 대회 탭의 종도 같은 값을 그린다.
+            case .competition(.delegate(.unreadNotificationRefreshRequested)):
+                return .send(.home(.unreadNotificationRefreshRequested))
 
             // 대회 상세의 '커뮤니티에서 더 보기'(#250). 대회 스택과 홈에 쌓인 화면을 닫아 피드가 바로 보이게 한 뒤 홈으로 간다.
             case .competition(.delegate(.homeFeedRequested)):
@@ -408,6 +418,30 @@ public struct AppTabFeature: Sendable {
                 state.loginCover = LoginFeature.State()
                 return .none
 
+            case .internal(.showDeviceNotificationAlert):
+                state.isDeviceNotificationAlertPresented = true
+                return .none
+
+            case .internal(.competitionAlertsPermissionGranted):
+                // 방금 허용했으면 푸시 등록·FCM 토큰 발급·서버 등록을 앱 진입 동기화와 같은 흐름으로 잇는다.
+                // 비로그인은 서버에 기기를 등록할 수 없어 권한만 받아 두고, 로그인 때 FCM 동기화가 등록한다.
+                guard !state.authInfo.isGuest else { return .none }
+                return .run { _ in
+                    await FCMAppInfoSync.syncOnAppLaunch(firebaseClient: firebaseClient, userClient: userClient)
+                }
+
+            case .view(.deviceNotificationAlertSettingsTapped):
+                state.isDeviceNotificationAlertPresented = false
+                return .run { _ in
+                    // 앱 설정 첫 화면이 아니라 이 앱의 알림 설정으로 바로 간다(iOS 16+).
+                    guard let url = URL(string: UIApplication.openNotificationSettingsURLString) else { return }
+                    await openURL(url)
+                }
+
+            case .view(.deviceNotificationAlertDismissed):
+                state.isDeviceNotificationAlertPresented = false
+                return .none
+
             case .internal(.performWebLogout):
                 // 서버 세션 정리 실패는 로컬 로그아웃을 막지 않는다(토큰은 signOut으로 정리).
                 return .run { send in
@@ -418,7 +452,7 @@ public struct AppTabFeature: Sendable {
 
             case .internal(.webLogoutCompleted):
                 Self.resetToGuest(&state)
-                return Self.broadcastLoggedOut()
+                return .merge(Self.broadcastLoggedOut(), .cancel(id: CancelID.competitionAlerts))
 
             case let .internal(.sessionEvent(event)):
                 // 게스트 상태에서 들어온 잔여 이벤트는 무시한다(로그아웃 직후 등).
@@ -457,6 +491,7 @@ public struct AppTabFeature: Sendable {
                 Self.resetToGuest(&state)
                 return .merge(
                     .run { _ in await authClient.signOut() },
+                    .cancel(id: CancelID.competitionAlerts),
                     .send(.home(.session(.sessionExpired))),
                     .send(.competition(.session(.sessionExpired)))
                 )
@@ -548,9 +583,33 @@ public struct AppTabFeature: Sendable {
         }
     }
 
+    /// 설정 › 알림의 '관심 대회 알림'을 켜고 기기 알림 상태를 본다(#257).
+    /// 이미 허용이면 할 일이 없고, 거절(또는 기기 설정에서 끔)이면 앱이 다시 물을 수 없어 설정 앱으로 안내한다.
+    /// 한 번도 묻지 않았으면 iOS 설정에 알림 줄조차 없으니 여기서 시스템 권한 창을 띄운다.
+    private func enableCompetitionAlerts(competitionId: String?, state: State) -> Effect<Action> {
+        Log.trace("관심 대회 알림 켬: competitionId=\(competitionId ?? "-")", category: .view, level: .info)
+        // 회원별 설정이라 지금 로그인한 회원에 저장한다(비로그인이면 저장하지 않는다).
+        let userId = state.authInfo.isGuest ? nil : state.authInfo.userInfo?.userId
+        return .run { send in
+            competitionAlertSettingClient.setEnabled(true, userId)
+            switch await notificationPermissionClient.status() {
+            case .granted:
+                return
+            case .denied:
+                await send(.internal(.showDeviceNotificationAlert))
+            case .notDetermined:
+                if await firebaseClient.requestPermission() {
+                    await send(.internal(.competitionAlertsPermissionGranted))
+                }
+            }
+        }
+        .cancellable(id: CancelID.competitionAlerts, cancelInFlight: true)
+    }
+
     /// 로그아웃·탈퇴·세션 만료 — 게스트로 바꾸고 이전 계정의 화면을 정리한 뒤 홈으로 보낸다.
     private static func resetToGuest(_ state: inout State) {
         state.authInfo = .guest
+        state.isDeviceNotificationAlertPresented = false
         state.pendingWebLoginTab = nil
         state.pendingCompetitionRecord = nil
         // 이전 계정으로 대회 탭에 쌓아 둔 상세·프로필도 닫는다.

@@ -32,19 +32,20 @@ public struct CompetitionTabFeature: Sendable {
                     accessToken: accessToken,
                     isTabRoot: true,
                     // 사진 고르기는 쌓인 상세 화면만 띄울 수 있어 목록에서는 알리지 않는다.
-                    capabilities: [.requestNotificationPermission]
+                    capabilities: []
                 )
             }
         }
 
-        /// 대회 탭에 쌓인 웹이 알리는 기능. 관심 첫 등록 때 알림 권한을 물을 수 있다(#243).
-        /// 대회 상세의 '커뮤니티에서 더 보기'·'내 기록에 남기기'도 네이티브가 받는다(#250).
+        /// 대회 탭에 쌓인 웹이 알리는 기능. 대회 상세의 '커뮤니티에서 더 보기'·'내 기록에 남기기'를 네이티브가 받는다(#250).
         static let subviewCapabilities: [WebBridgeCapability] = [
             .pickPhotos,
-            .requestNotificationPermission,
             .openHomeFeed,
             .openCompetitionRecord
         ]
+
+        // 머리줄의 알림함 종은 로그인한 사람만 본다(홈과 같은 알림함 정책, #258). 점 값은 홈이 가진 것을 받아 그린다.
+        var isNotificationButtonVisible: Bool { web?.accessToken != nil }
 
         static func competitionURL(base: URL) -> URL? {
             URL(string: "/competition", relativeTo: base)?.absoluteURL
@@ -66,31 +67,27 @@ public struct CompetitionTabFeature: Sendable {
         case delegate(DelegateAction)
         // 부모(AppTab)가 세션 변화(로그인·토큰 갱신·로그아웃)를 이 탭의 웹뷰 전부에 전파한다.
         case session(CommunityDetailFeature.SessionUpdate)
-        // 부모가 알림 권한을 묻고 난 결과 → 요청한 웹뷰에 회신한다(#243).
-        case notificationPermissionResolved(requestId: String?, origin: WebOrigin, status: NotificationPermissionStatus)
         // 부모가 유니버설 링크(`/competition/{id}`)로 들어온 대회 상세를 이 탭 스택에 연다(#250).
         case openDetail(url: URL, accessToken: String?)
 
         public enum ViewAction: Sendable {
             case tabReselected
+            // 머리줄의 알림함 종(#258) → 홈과 같은 알림함 웹을 이 탭 스택에 쌓는다.
+            case notificationTapped
         }
 
         public enum DelegateAction: Sendable {
             // 웹의 인증류 위임 → 부모가 커뮤니티와 같은 흐름으로 처리한다.
             case webSubview(CommunityDetailFeature.Action.DelegateAction)
             case myTabRequested
-            // 관심 첫 등록(#243) → 부모가 권한을 묻고, 결과는 물은 웹(origin)에만 돌려준다.
-            case notificationPermissionRequested(requestId: String?, origin: WebOrigin)
+            // 관심 대회 첫 등록 시트의 '알림 받기'(#257) → 부모가 알림 설정을 켜고 기기 알림 상태를 본다.
+            case competitionAlertsEnabled(competitionId: String?)
+            // 이 탭에서 연 알림함을 닫음(#258) → 부모가 홈의 새 알림 점을 다시 조회시킨다(이 탭의 종도 같은 값을 그린다).
+            case unreadNotificationRefreshRequested
             // 대회 상세의 '커뮤니티에서 더 보기'(#250) → 부모가 이 스택을 닫고 홈 탭으로 바꾼다.
             case homeFeedRequested
             // 끝난 대회의 '내 기록에 남기기'(#250) → 부모가 로그인 여부를 보고 기록 추가를 이 스택에 쌓는다.
             case competitionRecordRequested(OpenCompetitionRecordPayload)
-        }
-
-        /// 이 탭의 어느 웹이 보낸 요청인지 — 목록(root) 또는 쌓인 화면.
-        public enum WebOrigin: Equatable, Sendable {
-            case root
-            case element(StackElementID)
         }
     }
 
@@ -101,6 +98,17 @@ public struct CompetitionTabFeature: Sendable {
                 // 대회 상세 등이 위에 쌓여 있으면 목록이 보이지 않으니 움직이지 않는다(홈과 같은 기준).
                 guard state.path.isEmpty else { return .none }
                 state.scrollToTopToken = UUID()
+                return .none
+
+            case .view(.notificationTapped):
+                guard
+                    state.isNotificationButtonVisible,
+                    let web = state.web,
+                    let url = NotificationInbox.url(base: web.url)
+                else { return .none }
+                // 연타로 알림함이 겹쳐 쌓이지 않게 한다.
+                guard !Self.isNotificationsDetail(state.path.last) else { return .none }
+                state.path.append(.communityDetail(.init(url: url, accessToken: web.accessToken)))
                 return .none
 
             // MARK: - 목록 웹
@@ -117,8 +125,8 @@ public struct CompetitionTabFeature: Sendable {
             case .web(.delegate(.myTabRequested)):
                 return .send(.delegate(.myTabRequested))
 
-            case let .web(.delegate(.notificationPermissionRequested(requestId))):
-                return .send(.delegate(.notificationPermissionRequested(requestId: requestId, origin: .root)))
+            case let .web(.delegate(.competitionAlertsEnabled(competitionId))):
+                return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
 
             case let .web(.delegate(delegate)):
                 return .send(.delegate(.webSubview(delegate)))
@@ -142,8 +150,8 @@ public struct CompetitionTabFeature: Sendable {
             case .path(.element(id: _, action: .communityDetail(.delegate(.myTabRequested)))):
                 return .send(.delegate(.myTabRequested))
 
-            case let .path(.element(id: id, action: .communityDetail(.delegate(.notificationPermissionRequested(requestId))))):
-                return .send(.delegate(.notificationPermissionRequested(requestId: requestId, origin: .element(id))))
+            case let .path(.element(id: _, action: .communityDetail(.delegate(.competitionAlertsEnabled(competitionId))))):
+                return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
 
             case .path(.element(id: _, action: .communityDetail(.delegate(.homeFeedRequested)))):
                 return .send(.delegate(.homeFeedRequested))
@@ -153,6 +161,15 @@ public struct CompetitionTabFeature: Sendable {
 
             case let .path(.element(id: _, action: .communityDetail(.delegate(delegate)))):
                 return .send(.delegate(.webSubview(delegate)))
+
+            // 알림함에서 읽은 알림을 점에 반영한다(홈과 같은 처리). forEach보다 먼저 실행돼 pop 대상이 아직 스택에 남아 있고,
+            // 알림함 위에 쌓인 상세까지 한 번에 닫히는 경우도 있어 pop 범위 전체를 본다.
+            case let .path(.popFrom(id)):
+                guard
+                    let index = state.path.ids.firstIndex(of: id),
+                    state.path.ids[index...].contains(where: { Self.isNotificationsDetail(state.path[id: $0]) })
+                else { return .none }
+                return .send(.delegate(.unreadNotificationRefreshRequested))
 
             case .path:
                 return .none
@@ -169,20 +186,6 @@ public struct CompetitionTabFeature: Sendable {
                         CommunityDetailFeature.apply(update, into: &detail)
                         state.path[id: id] = .communityDetail(detail)
                     }
-                }
-                return .none
-
-            case let .notificationPermissionResolved(requestId, origin, status):
-                // 물은 웹에만 회신한다. 그 사이 닫힌 화면이면 받을 곳이 없으니 버린다.
-                switch origin {
-                case .root:
-                    guard var web = state.web else { return .none }
-                    CommunityDetailFeature.deliverNotificationPermission(requestId: requestId, status: status, into: &web)
-                    state.web = web
-                case let .element(id):
-                    guard case var .communityDetail(detail)? = state.path[id: id] else { return .none }
-                    CommunityDetailFeature.deliverNotificationPermission(requestId: requestId, status: status, into: &detail)
-                    state.path[id: id] = .communityDetail(detail)
                 }
                 return .none
 
@@ -214,6 +217,11 @@ public struct CompetitionTabFeature: Sendable {
             return "\(url.host?.lowercased() ?? "")\(path)"
         }
         return key(lhs) == key(rhs)
+    }
+
+    private static func isNotificationsDetail(_ element: Path.State?) -> Bool {
+        guard case let .communityDetail(detail)? = element else { return false }
+        return NotificationInbox.isInbox(detail.url)
     }
 
     private static func subview(url: URL, title: String?, accessToken: String?) -> CommunityDetailFeature.State {
