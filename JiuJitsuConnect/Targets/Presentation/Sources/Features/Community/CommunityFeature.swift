@@ -200,6 +200,8 @@ public struct CommunityFeature: Sendable {
             case myProfileRequested
             // 테스트용 '딥링크로 열기'(DEBUG/BETA) → 부모가 실제 유니버설 링크와 같은 경로(.deepLink)로 보낸다.
             case debugDeepLinkRequested(DeepLink)
+            // 홈 웹(피드·글 상세·알림함)의 관심 대회 '알림 받기'(#257) → 부모가 알림 설정을 켜고 기기 알림 상태를 본다.
+            case competitionAlertsEnabled(competitionId: String?)
         }
 
         /// 부모가 세션 상태 변화를 알려주면 그에 맞는 아웃바운드 메시지를 웹에 주입한다.
@@ -436,11 +438,9 @@ public struct CommunityFeature: Sendable {
                     }
                     return .send(.delegate(.myProfileRequested))
 
-                case let .requestNotificationPermission(requestId):
-                    // 알림 권한 요청은 대회 탭만 알린다(#243). 혹시 오면 웹이 기다리지 않게 거절로 바로 회신한다.
-                    Log.trace("리스트 웹뷰 REQUEST_NOTIFICATION_PERMISSION 수신 — 거절로 회신", category: .network, level: .info)
-                    Self.enqueue(.notificationPermissionResult(requestId: requestId, status: .denied), into: &state)
-                    return .none
+                case let .competitionAlertsEnabled(competitionId):
+                    // 홈 피드 글 속 대회 카드에서도 관심 첫 등록 시트가 뜬다(#257) → 부모(AppTab)가 대회 탭과 같이 처리한다.
+                    return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
 
                 case .openHomeFeed, .openCompetitionRecord:
                     // 대회 상세만 알리는 신호(#250)라 홈 피드 웹에서는 오지 않아야 한다. 받을 곳이 없어 무시한다.
@@ -691,9 +691,8 @@ public struct CommunityFeature: Sendable {
         case let .userProfileRequested(userId):
             // 모달 안이면 openUserProfile이 모달 스택에 쌓는다
             return .send(.openUserProfile(userId: userId))
-        case .notificationPermissionRequested:
-            // 커뮤니티 상세는 알림 권한 요청을 알리지 않아, 상세가 이미 거절로 회신했다(#243).
-            return .none
+        case let .competitionAlertsEnabled(competitionId):
+            return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
         case .homeFeedRequested, .competitionRecordRequested:
             // 커뮤니티 상세는 두 신호를 알리지 않아 상세가 이미 무시했다(#250). 홈은 이미 피드 탭이기도 하다.
             return .none

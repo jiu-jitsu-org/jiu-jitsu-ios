@@ -144,12 +144,12 @@ public struct CommunityDetailFeature: Sendable {
             case myTabRequested
             // 다른 회원의 작성자 탭(OPEN_USER_PROFILE, isMe=false) → 부모가 그 회원의 프로필을 같은 스택에 쌓는다. (#116)
             case userProfileRequested(userId: Int)
-            // 대회 관심 첫 등록(REQUEST_NOTIFICATION_PERMISSION) → 부모가 권한을 묻고 결과를 deliverNotificationPermission으로 돌려준다. (#243)
-            case notificationPermissionRequested(requestId: String?)
             // 대회 상세의 '커뮤니티에서 더 보기'(OPEN_HOME_FEED) → 부모가 대회 스택을 닫고 홈 탭으로 바꾼다. (#250)
             case homeFeedRequested
             // 끝난 대회의 '내 기록에 남기기'(OPEN_COMPETITION_RECORD) → 부모가 이름·연도를 채운 대회 기록 추가를 연다. (#250)
             case competitionRecordRequested(OpenCompetitionRecordPayload)
+            // 관심 대회 첫 등록 시트의 '알림 받기'(COMPETITION_ALERTS_ENABLED) → 부모가 알림 설정을 켜고 기기 알림 상태를 본다. (#257)
+            case competitionAlertsEnabled(competitionId: String?)
         }
     }
 
@@ -326,15 +326,6 @@ public struct CommunityDetailFeature: Sendable {
                     }
                     return .send(.delegate(.myTabRequested))
 
-                case let .requestNotificationPermission(requestId):
-                    // 지원을 알린 웹뷰(대회 탭)만 보낸다. 알리지 않았는데 오면 묻지 않고 지금 상태를 모르니 거절로 답해
-                    // 웹이 응답을 기다리지 않게 한다.
-                    guard state.capabilities.contains(.requestNotificationPermission) else {
-                        Self.enqueue(.notificationPermissionResult(requestId: requestId, status: .denied), into: &state)
-                        return .none
-                    }
-                    return .send(.delegate(.notificationPermissionRequested(requestId: requestId)))
-
                 case .openHomeFeed:
                     // 지원을 알린 웹뷰(대회 상세)만 보낸다. 알리지 않은 웹뷰에서 오면 받을 곳이 없어 무시한다.
                     guard state.capabilities.contains(.openHomeFeed) else {
@@ -349,6 +340,10 @@ public struct CommunityDetailFeature: Sendable {
                         return .none
                     }
                     return .send(.delegate(.competitionRecordRequested(payload)))
+
+                case let .competitionAlertsEnabled(competitionId):
+                    // 웹은 capability 없이 늘 보낸다(홈 피드의 대회 카드·글 상세·알림함·대회 화면). 어느 탭이든 부모가 AppTab까지 올린다.
+                    return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
 
                 case let .unknown(type):
                     Log.trace("WebBridge 미지원 메시지 무시: \(type)", category: .network, level: .info)
@@ -387,15 +382,6 @@ public struct CommunityDetailFeature: Sendable {
             state.accessToken = nil
             enqueue(.authSessionExpired, into: &state)
         }
-    }
-
-    /// 알림 권한 요청(#243)의 결과를 웹에 회신한다.
-    static func deliverNotificationPermission(
-        requestId: String?,
-        status: NotificationPermissionStatus,
-        into state: inout State
-    ) {
-        enqueue(.notificationPermissionResult(requestId: requestId, status: status), into: &state)
     }
 
     /// 웹 요청으로 띄운 네이티브 표면(알럿·시트·사진 피커)이 있는지. 한 번에 하나만 띄운다.

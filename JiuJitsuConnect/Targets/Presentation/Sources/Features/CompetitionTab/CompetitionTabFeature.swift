@@ -32,16 +32,14 @@ public struct CompetitionTabFeature: Sendable {
                     accessToken: accessToken,
                     isTabRoot: true,
                     // 사진 고르기는 쌓인 상세 화면만 띄울 수 있어 목록에서는 알리지 않는다.
-                    capabilities: [.requestNotificationPermission]
+                    capabilities: []
                 )
             }
         }
 
-        /// 대회 탭에 쌓인 웹이 알리는 기능. 관심 첫 등록 때 알림 권한을 물을 수 있다(#243).
-        /// 대회 상세의 '커뮤니티에서 더 보기'·'내 기록에 남기기'도 네이티브가 받는다(#250).
+        /// 대회 탭에 쌓인 웹이 알리는 기능. 대회 상세의 '커뮤니티에서 더 보기'·'내 기록에 남기기'를 네이티브가 받는다(#250).
         static let subviewCapabilities: [WebBridgeCapability] = [
             .pickPhotos,
-            .requestNotificationPermission,
             .openHomeFeed,
             .openCompetitionRecord
         ]
@@ -66,8 +64,6 @@ public struct CompetitionTabFeature: Sendable {
         case delegate(DelegateAction)
         // 부모(AppTab)가 세션 변화(로그인·토큰 갱신·로그아웃)를 이 탭의 웹뷰 전부에 전파한다.
         case session(CommunityDetailFeature.SessionUpdate)
-        // 부모가 알림 권한을 묻고 난 결과 → 요청한 웹뷰에 회신한다(#243).
-        case notificationPermissionResolved(requestId: String?, origin: WebOrigin, status: NotificationPermissionStatus)
         // 부모가 유니버설 링크(`/competition/{id}`)로 들어온 대회 상세를 이 탭 스택에 연다(#250).
         case openDetail(url: URL, accessToken: String?)
 
@@ -79,18 +75,14 @@ public struct CompetitionTabFeature: Sendable {
             // 웹의 인증류 위임 → 부모가 커뮤니티와 같은 흐름으로 처리한다.
             case webSubview(CommunityDetailFeature.Action.DelegateAction)
             case myTabRequested
-            // 관심 첫 등록(#243) → 부모가 권한을 묻고, 결과는 물은 웹(origin)에만 돌려준다.
-            case notificationPermissionRequested(requestId: String?, origin: WebOrigin)
+            // 관심 대회 첫 등록 시트의 '알림 받기'(#257) → 부모가 알림 설정을 켜고 기기 알림 상태를 본다.
+            case competitionAlertsEnabled(competitionId: String?)
+            // 이 탭에서 연 알림함을 닫음(#258) → 부모가 홈의 새 알림 점을 다시 조회시킨다(이 탭의 종도 같은 값을 그린다).
+            case unreadNotificationRefreshRequested
             // 대회 상세의 '커뮤니티에서 더 보기'(#250) → 부모가 이 스택을 닫고 홈 탭으로 바꾼다.
             case homeFeedRequested
             // 끝난 대회의 '내 기록에 남기기'(#250) → 부모가 로그인 여부를 보고 기록 추가를 이 스택에 쌓는다.
             case competitionRecordRequested(OpenCompetitionRecordPayload)
-        }
-
-        /// 이 탭의 어느 웹이 보낸 요청인지 — 목록(root) 또는 쌓인 화면.
-        public enum WebOrigin: Equatable, Sendable {
-            case root
-            case element(StackElementID)
         }
     }
 
@@ -117,8 +109,8 @@ public struct CompetitionTabFeature: Sendable {
             case .web(.delegate(.myTabRequested)):
                 return .send(.delegate(.myTabRequested))
 
-            case let .web(.delegate(.notificationPermissionRequested(requestId))):
-                return .send(.delegate(.notificationPermissionRequested(requestId: requestId, origin: .root)))
+            case let .web(.delegate(.competitionAlertsEnabled(competitionId))):
+                return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
 
             case let .web(.delegate(delegate)):
                 return .send(.delegate(.webSubview(delegate)))
@@ -142,8 +134,8 @@ public struct CompetitionTabFeature: Sendable {
             case .path(.element(id: _, action: .communityDetail(.delegate(.myTabRequested)))):
                 return .send(.delegate(.myTabRequested))
 
-            case let .path(.element(id: id, action: .communityDetail(.delegate(.notificationPermissionRequested(requestId))))):
-                return .send(.delegate(.notificationPermissionRequested(requestId: requestId, origin: .element(id))))
+            case let .path(.element(id: _, action: .communityDetail(.delegate(.competitionAlertsEnabled(competitionId))))):
+                return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
 
             case .path(.element(id: _, action: .communityDetail(.delegate(.homeFeedRequested)))):
                 return .send(.delegate(.homeFeedRequested))
@@ -169,20 +161,6 @@ public struct CompetitionTabFeature: Sendable {
                         CommunityDetailFeature.apply(update, into: &detail)
                         state.path[id: id] = .communityDetail(detail)
                     }
-                }
-                return .none
-
-            case let .notificationPermissionResolved(requestId, origin, status):
-                // 물은 웹에만 회신한다. 그 사이 닫힌 화면이면 받을 곳이 없으니 버린다.
-                switch origin {
-                case .root:
-                    guard var web = state.web else { return .none }
-                    CommunityDetailFeature.deliverNotificationPermission(requestId: requestId, status: status, into: &web)
-                    state.web = web
-                case let .element(id):
-                    guard case var .communityDetail(detail)? = state.path[id: id] else { return .none }
-                    CommunityDetailFeature.deliverNotificationPermission(requestId: requestId, status: status, into: &detail)
-                    state.path[id: id] = .communityDetail(detail)
                 }
                 return .none
 
