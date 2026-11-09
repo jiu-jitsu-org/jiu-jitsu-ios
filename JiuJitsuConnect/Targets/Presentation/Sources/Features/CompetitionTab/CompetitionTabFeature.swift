@@ -38,7 +38,13 @@ public struct CompetitionTabFeature: Sendable {
         }
 
         /// 대회 탭에 쌓인 웹이 알리는 기능. 관심 첫 등록 때 알림 권한을 물을 수 있다(#243).
-        static let subviewCapabilities: [WebBridgeCapability] = [.pickPhotos, .requestNotificationPermission]
+        /// 대회 상세의 '커뮤니티에서 더 보기'·'내 기록에 남기기'도 네이티브가 받는다(#250).
+        static let subviewCapabilities: [WebBridgeCapability] = [
+            .pickPhotos,
+            .requestNotificationPermission,
+            .openHomeFeed,
+            .openCompetitionRecord
+        ]
 
         static func competitionURL(base: URL) -> URL? {
             URL(string: "/competition", relativeTo: base)?.absoluteURL
@@ -49,6 +55,8 @@ public struct CompetitionTabFeature: Sendable {
     public enum Path {
         case communityDetail(CommunityDetailFeature)
         case userProfile(UserProfileFeature)
+        // 대회 상세의 '내 기록에 남기기'로 여는 대회 기록 추가(#250). 저장은 프로필을 아는 부모(AppTab)가 한다.
+        case competitionInfo(CompetitionInfoFeature)
     }
 
     public enum Action: Sendable {
@@ -60,6 +68,8 @@ public struct CompetitionTabFeature: Sendable {
         case session(CommunityDetailFeature.SessionUpdate)
         // 부모가 알림 권한을 묻고 난 결과 → 요청한 웹뷰에 회신한다(#243).
         case notificationPermissionResolved(requestId: String?, origin: WebOrigin, status: NotificationPermissionStatus)
+        // 부모가 유니버설 링크(`/competition/{id}`)로 들어온 대회 상세를 이 탭 스택에 연다(#250).
+        case openDetail(url: URL, accessToken: String?)
 
         public enum ViewAction: Sendable {
             case tabReselected
@@ -71,6 +81,10 @@ public struct CompetitionTabFeature: Sendable {
             case myTabRequested
             // 관심 첫 등록(#243) → 부모가 권한을 묻고, 결과는 물은 웹(origin)에만 돌려준다.
             case notificationPermissionRequested(requestId: String?, origin: WebOrigin)
+            // 대회 상세의 '커뮤니티에서 더 보기'(#250) → 부모가 이 스택을 닫고 홈 탭으로 바꾼다.
+            case homeFeedRequested
+            // 끝난 대회의 '내 기록에 남기기'(#250) → 부모가 로그인 여부를 보고 기록 추가를 이 스택에 쌓는다.
+            case competitionRecordRequested(OpenCompetitionRecordPayload)
         }
 
         /// 이 탭의 어느 웹이 보낸 요청인지 — 목록(root) 또는 쌓인 화면.
@@ -131,6 +145,12 @@ public struct CompetitionTabFeature: Sendable {
             case let .path(.element(id: id, action: .communityDetail(.delegate(.notificationPermissionRequested(requestId))))):
                 return .send(.delegate(.notificationPermissionRequested(requestId: requestId, origin: .element(id))))
 
+            case .path(.element(id: _, action: .communityDetail(.delegate(.homeFeedRequested)))):
+                return .send(.delegate(.homeFeedRequested))
+
+            case let .path(.element(id: _, action: .communityDetail(.delegate(.competitionRecordRequested(payload))))):
+                return .send(.delegate(.competitionRecordRequested(payload)))
+
             case let .path(.element(id: _, action: .communityDetail(.delegate(delegate)))):
                 return .send(.delegate(.webSubview(delegate)))
 
@@ -166,6 +186,16 @@ public struct CompetitionTabFeature: Sendable {
                 }
                 return .none
 
+            case let .openDetail(url, accessToken):
+                // 같은 대회가 이미 맨 위면 다시 쌓지 않는다(링크 재탭·중복 전달, 홈 딥링크의 isTopDetail과 같은 이유).
+                // 공유 링크엔 꼬리(?utm=…, 끝 '/')가 붙을 수 있어 주소 전체가 아니라 호스트·경로로 같은 대회인지 본다.
+                if case let .communityDetail(top)? = state.path.last, Self.isSameDetail(top.url, url) {
+                    Log.trace("대회 딥링크 무시(이미 최상단): \(url.absoluteString)", category: .view, level: .info)
+                    return .none
+                }
+                state.path.append(.communityDetail(Self.subview(url: url, title: nil, accessToken: accessToken)))
+                return .none
+
             case .delegate:
                 return .none
             }
@@ -174,6 +204,16 @@ public struct CompetitionTabFeature: Sendable {
             CommunityDetailFeature()
         }
         .forEach(\.path, action: \.path)
+    }
+
+    /// 두 상세 주소가 같은 화면인지 — 호스트와 끝 '/'를 뗀 경로만 비교한다(쿼리·조각은 무시).
+    private static func isSameDetail(_ lhs: URL, _ rhs: URL) -> Bool {
+        func key(_ url: URL) -> String {
+            var path = url.path
+            while path.count > 1, path.hasSuffix("/") { path.removeLast() }
+            return "\(url.host?.lowercased() ?? "")\(path)"
+        }
+        return key(lhs) == key(rhs)
     }
 
     private static func subview(url: URL, title: String?, accessToken: String?) -> CommunityDetailFeature.State {

@@ -145,6 +145,10 @@ private extension WebBridgeInboundMessage {
             return "OPEN_USER_PROFILE  userId=\(payload.userId) isMe=\(payload.isMe)"
         case let .requestNotificationPermission(requestId):
             return "REQUEST_NOTIFICATION_PERMISSION  reqId=\(requestId ?? "-")"
+        case .openHomeFeed:
+            return "OPEN_HOME_FEED"
+        case let .openCompetitionRecord(payload):
+            return "OPEN_COMPETITION_RECORD  competitionId=\(payload.competitionId) year=\(payload.year)"
         case let .unknown(type):
             return "\(type)  (unsupported)"
         }
@@ -228,6 +232,11 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 아직 묻지 않았으면 시스템 권한 창을 띄우고, 결과를 NOTIFICATION_PERMISSION_RESULT로 회신한다.
     /// requestId는 선택 — 웹이 보냈으면 회신에 그대로 싣는다.
     case requestNotificationPermission(requestId: String?)
+    /// 대회 상세의 '커뮤니티에서 더 보기'(#250). 서브뷰를 닫고 홈 피드로 보내 달라는 요청이다.
+    /// 웹은 capability 목록에 이 타입이 있을 때만 보내고, 없으면 OPEN_SUBVIEW('/')로 대신한다.
+    case openHomeFeed
+    /// 끝난 대회 배너의 '내 기록에 남기기'(#250). 대회 이름·연도를 채운 채 내 대회 기록 추가 흐름을 열어 달라는 요청이다.
+    case openCompetitionRecord(OpenCompetitionRecordPayload)
     /// 계약에 없는 타입(상위 버전/오타 등) — 무시 대상.
     case unknown(type: String)
 
@@ -245,6 +254,8 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case pickPhotos = "PICK_PHOTOS"
         case openUserProfile = "OPEN_USER_PROFILE"
         case requestNotificationPermission = "REQUEST_NOTIFICATION_PERMISSION"
+        case openHomeFeed = "OPEN_HOME_FEED"
+        case openCompetitionRecord = "OPEN_COMPETITION_RECORD"
     }
 
     /// `WKScriptMessage.body`를 파싱한다.
@@ -390,6 +401,14 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case .requestNotificationPermission:
             let requestId = (payload?["requestId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             return .requestNotificationPermission(requestId: requestId)
+        case .openHomeFeed:
+            return .openHomeFeed
+        case .openCompetitionRecord:
+            guard let record = OpenCompetitionRecordPayload(payload: payload) else {
+                Log.trace("OPEN_COMPETITION_RECORD payload 필수 필드 누락", category: .network, level: .error)
+                return nil
+            }
+            return .openCompetitionRecord(record)
         case .none:
             return .unknown(type: rawType)
         }
@@ -611,6 +630,10 @@ enum WebBridgeCapability: String, Equatable, Sendable {
     case pickPhotos = "PICK_PHOTOS"
     /// 대회 탭과 그 위에 쌓인 화면만 알린다(#243). 목록이 없으면 웹은 신호를 보내지 않는다.
     case requestNotificationPermission = "REQUEST_NOTIFICATION_PERMISSION"
+    /// 대회 상세 서브뷰만 알린다(#250). 목록이 없으면 웹은 OPEN_SUBVIEW('/')로 대신한다.
+    case openHomeFeed = "OPEN_HOME_FEED"
+    /// 대회 상세 서브뷰만 알린다(#250). 목록이 없으면 웹은 '내 기록에 남기기'를 보내지 않는다.
+    case openCompetitionRecord = "OPEN_COMPETITION_RECORD"
 
     /// `window.AppBridgeCapabilities = [...]`를 정의하는 스크립트 소스. 직렬화 실패 시 nil.
     static func injectionScriptSource(for capabilities: [WebBridgeCapability]) -> String? {

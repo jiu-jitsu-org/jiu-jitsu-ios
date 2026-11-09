@@ -23,10 +23,12 @@ public enum DeepLink: Equatable, Sendable {
     case communityPost(url: URL, postId: String)
     /// 밸런스 게임 상세(`/community/balance/{contentId}`). `url` 취급은 `communityPost`와 같다.
     case balanceGame(url: URL, contentId: String)
+    /// 대회 상세(`/competition/{id}`, #250). 대회 탭 스택에 연다. id는 웹 slug(문자열)다.
+    case competitionDetail(url: URL, competitionId: String)
 
     public var url: URL {
         switch self {
-        case let .communityPost(url, _), let .balanceGame(url, _):
+        case let .communityPost(url, _), let .balanceGame(url, _), let .competitionDetail(url, _):
             return url
         }
     }
@@ -38,6 +40,9 @@ enum DeepLinkParser {
 
     /// 밸런스 게임 상세 경로의 둘째 세그먼트. 웹 라우트 `src/app/community/balance/[contentId]`와 대응한다.
     static let balanceSegment = "balance"
+
+    /// 대회 상세 경로의 첫 세그먼트. 웹 라우트 `src/app/competition/[id]`와 대응한다(#250).
+    static let competitionSegment = "competition"
 
     /// 웹 페이지 안의 '앱 열기' 버튼용 커스텀 스킴.
     /// Info.plist `CFBundleURLTypes`(Project.swift)·웹(FE#72)에 등록된 값과 반드시 같아야 한다.
@@ -105,6 +110,16 @@ enum DeepLinkParser {
 
         // pathComponents는 선행 "/"를 원소로 포함하므로 걸러낸 뒤 세그먼트 수를 본다.
         let segments = url.pathComponents.filter { $0 != "/" }
+        // `/competition/{id}` — 대회 id는 숫자가 아닌 slug라 contentId 검사를 거치지 않는다.
+        // 목록(`/competition`)만 있는 링크는 상세가 아니라 처리하지 않는다(앱만 열린다).
+        if segments.first == competitionSegment {
+            guard segments.count == 2, !segments[1].isEmpty else {
+                Log.trace("딥링크 무시(지원하지 않는 경로): \(url.absoluteString)", category: .system, level: .info)
+                return nil
+            }
+            // pathComponents는 이미 퍼센트 디코딩된 값이다.
+            return .competitionDetail(url: url, competitionId: segments[1])
+        }
         guard segments.first == communitySegment else {
             Log.trace("딥링크 무시(지원하지 않는 경로): \(url.absoluteString)", category: .system, level: .info)
             return nil
