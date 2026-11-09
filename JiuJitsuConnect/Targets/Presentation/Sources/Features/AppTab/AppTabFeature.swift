@@ -348,6 +348,8 @@ public struct AppTabFeature: Sendable {
                 guard !state.authInfo.isGuest else {
                     state.pendingCompetitionRecord = payload
                     state.pendingWebLoginTab = .competition
+                    // 연타로 로그인 창이 이미 떠 있으면 새로 만들지 않는다(입력 중인 로그인이 초기화되지 않게).
+                    guard state.loginCover == nil else { return .none }
                     return .send(.internal(.showLoginModal))
                 }
                 Self.pushCompetitionRecord(payload, into: &state)
@@ -373,7 +375,8 @@ public struct AppTabFeature: Sendable {
                 // 탭 전환이 대회 웹을 다시 만들 수 있어(주소 미정이었던 경우) 전환을 마친 뒤 상세를 쌓는다.
                 state.home.detailCover = nil
                 state.home.coverPath.removeAll()
-                let accessToken = state.competition.web?.accessToken ?? state.home.accessToken
+                // 토큰은 갱신이 반영된 커뮤니티 쪽 값을 먼저 쓴다(대회 탭을 다시 만들 때와 같은 순서).
+                let accessToken = state.home.accessToken ?? state.competition.web?.accessToken ?? state.authInfo.accessToken
                 return .concatenate(
                     state.selectedTab == .competition ? .none : .send(.view(.tabSelected(.competition))),
                     .send(.competition(.openDetail(url: url, accessToken: accessToken)))
