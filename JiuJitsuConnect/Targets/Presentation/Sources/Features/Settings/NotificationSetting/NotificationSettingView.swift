@@ -67,7 +67,7 @@ public struct NotificationSettingView: View {
                                 asset: Assets.Common.Icon.bell,
                                 text: "관심 대회 알림",
                                 subtitle: "얼리버드 · 접수 마감 전날",
-                                isLoading: !store.isLoaded,
+                                isLoading: !store.isCompetitionAlertLoaded,
                                 isOn: Binding(
                                     get: { store.isCompetitionAlertEnabled },
                                     set: { store.send(.view(.competitionAlertToggled($0))) }
@@ -138,7 +138,7 @@ public struct NotificationSettingView: View {
 #Preview("Notification Setting View") {
     NavigationStack {
         NotificationSettingView(
-            store: Store(initialState: NotificationSettingFeature.State()) {
+            store: Store(initialState: NotificationSettingFeature.State(userId: 1)) {
                 NotificationSettingFeature()
             } withDependencies: {
                 $0.noticeClient = .previewValue

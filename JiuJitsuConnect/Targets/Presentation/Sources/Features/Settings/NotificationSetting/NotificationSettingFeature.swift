@@ -28,15 +28,21 @@ public struct NotificationSettingFeature: Sendable {
         var isCommunityNotificationEnabled: Bool = true
         // 정통망법상 마케팅 알림은 옵트인 → 기본 false
         var isMarketingNotificationEnabled: Bool = false
-        // 관심 대회 마감 전날 알림(#255). 서버 항목이 아직 없어 기기에 저장하고, 서버 저장(디바운스)과 따로 움직인다.
+        // 관심 대회 마감 전날 알림(#255). 서버 항목이 아직 없어 기기에 회원별로 저장하고, 서버 저장(디바운스)과 따로 움직인다.
         var isCompetitionAlertEnabled: Bool = false
+        // 기기 값을 읽었는지. 이 줄은 서버 조회와 무관해 조회가 실패해도 켜고 끌 수 있다.
+        var isCompetitionAlertLoaded: Bool = false
+        // 관심 대회 알림을 저장할 회원(비로그인이면 nil — 읽으면 꺼짐, 쓰기는 무시).
+        let userId: Int?
 
         // 서버에 반영된 것으로 확인된 마지막 값. 저장 실패 시 토글을 이 값으로 되돌린다.
         var lastSavedSetting: NoticeSetting?
 
         var toast: ToastState?
 
-        public init() {}
+        public init(userId: Int?) {
+            self.userId = userId
+        }
 
         /// 화면에는 바뀌었지만 아직 서버 반영이 확인되지 않은 값(디바운스 대기·응답 대기 중).
         /// 화면이 닫히면 이 화면의 저장 요청도 취소되므로, 부모가 닫힐 때 이 값을 대신 저장한다.
@@ -59,6 +65,7 @@ public struct NotificationSettingFeature: Sendable {
     public enum Action: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
+        case delegate(DelegateAction)
 
         public enum ViewAction: Sendable {
             case onAppear
@@ -81,6 +88,11 @@ public struct NotificationSettingFeature: Sendable {
             case showToast(ToastState)
             case toastDismissed
         }
+
+        public enum DelegateAction: Sendable {
+            // '관심 대회 알림'을 켬(#257) → 부모(AppTab)가 웹의 '알림 받기'와 같이 기기 알림 상태를 보고 안내한다.
+            case competitionAlertTurnedOn
+        }
     }
 
     @Dependency(\.noticeClient) var noticeClient
@@ -95,14 +107,15 @@ public struct NotificationSettingFeature: Sendable {
             // MARK: - View Actions
 
             case .view(.onAppear):
-                // 서버에서 카테고리별 수신 여부 초기값 로드. 관심 대회 알림은 기기 값이라 바로 읽되,
-                // 다른 줄과 함께 보이도록 서버 조회가 끝날 때까지 같은 스켈레톤으로 둔다.
-                state.isCompetitionAlertEnabled = competitionAlertSettingClient.isEnabled()
+                // 서버에서 카테고리별 수신 여부 초기값 로드. 관심 대회 알림은 기기 값이라 바로 읽고 바로 켜고 끌 수 있다.
+                state.isCompetitionAlertEnabled = competitionAlertSettingClient.isEnabled(state.userId)
+                state.isCompetitionAlertLoaded = true
                 // 탭이 살아 있어 이 화면이 열린 채 다른 탭에서 켤 수 있다 — 보이는 동안 바뀐 값을 따라간다.
+                let userId = state.userId
                 return .merge(
                     fetchSetting(),
                     .run { [competitionAlertSettingClient] send in
-                        for await isEnabled in competitionAlertSettingClient.changes() {
+                        for await isEnabled in competitionAlertSettingClient.changes(userId) {
                             await send(.internal(.competitionAlertChanged(isEnabled)))
                         }
                     }
@@ -141,10 +154,15 @@ public struct NotificationSettingFeature: Sendable {
                 return .send(.internal(.triggerUpdateSetting))
 
             case let .view(.competitionAlertToggled(isOn)):
-                // 기기에 바로 저장한다(서버 디바운스·되돌리기와 무관). 꺼도 대회별 알림 설정은 건드리지 않는다.
-                guard state.isLoaded else { return .none }
+                // 기기에 바로 저장한다(서버 조회·디바운스·되돌리기와 무관). 꺼도 대회별 알림 설정은 건드리지 않는다.
+                guard state.isCompetitionAlertLoaded else { return .none }
                 state.isCompetitionAlertEnabled = isOn
-                return .run { _ in competitionAlertSettingClient.setEnabled(isOn) }
+                let userId = state.userId
+                return .merge(
+                    .run { _ in competitionAlertSettingClient.setEnabled(isOn, userId) },
+                    // 켰는데 기기 알림이 꺼져 있으면 알림이 오지 않으니, 웹의 '알림 받기'와 같은 안내를 부모가 띄운다.
+                    isOn ? .send(.delegate(.competitionAlertTurnedOn)) : .none
+                )
 
             // MARK: - Internal Actions
 
@@ -199,6 +217,9 @@ public struct NotificationSettingFeature: Sendable {
             case .internal(.toastDismissed):
                 state.toast = nil
                 return .cancel(id: CancelID.toast)
+
+            case .delegate:
+                return .none
 
             case .view(.toastButtonTapped):
                 // 버튼이 있는 토스트는 조회 실패 안내뿐이라, 아직 못 불러온 상태면 다시 조회한다.
