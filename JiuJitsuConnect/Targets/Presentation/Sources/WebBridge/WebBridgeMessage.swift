@@ -149,6 +149,8 @@ private extension WebBridgeInboundMessage {
             return "OPEN_COMPETITION_RECORD  competitionId=\(payload.competitionId) year=\(payload.year)"
         case let .competitionAlertsEnabled(competitionId):
             return "COMPETITION_ALERTS_ENABLED  competitionId=\(competitionId ?? "-")"
+        case let .competitionHeaderTint(hex):
+            return "COMPETITION_HEADER_TINT  color=\(hex ?? "null")"
         case let .unknown(type):
             return "\(type)  (unsupported)"
         }
@@ -235,6 +237,9 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 네이티브는 '관심 대회 알림' 설정을 켜고, 기기 알림이 꺼져 있으면 설정 앱으로 안내한다.
     /// competitionId는 웹 대회 slug(`/competition/{id}`)로 로그에만 남긴다 — 없어도 설정은 켠다.
     case competitionAlertsEnabled(competitionId: String?)
+    /// 대회 목록 맨 위 띠 색 그라데이션에 맞춰 앱 대회 탭 머리줄(상태바 포함)을 칠해 달라는 요청.
+    /// hex는 `#RRGGBB`, nil이면 앱 기본 머리줄 색으로 돌린다. 스크롤하며 조금씩 옅어진 색을 여러 번 보낸다.
+    case competitionHeaderTint(hex: String?)
     /// 계약에 없는 타입(상위 버전/오타 등) — 무시 대상.
     case unknown(type: String)
 
@@ -254,6 +259,7 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case openHomeFeed = "OPEN_HOME_FEED"
         case openCompetitionRecord = "OPEN_COMPETITION_RECORD"
         case competitionAlertsEnabled = "COMPETITION_ALERTS_ENABLED"
+        case competitionHeaderTint = "COMPETITION_HEADER_TINT"
     }
 
     /// `WKScriptMessage.body`를 파싱한다.
@@ -407,6 +413,12 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case .competitionAlertsEnabled:
             let competitionId = (payload?["competitionId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             return .competitionAlertsEnabled(competitionId: competitionId)
+        case .competitionHeaderTint:
+            // `#RRGGBB`만 받는다. 형식이 어긋나면 null과 같이 기본색으로 돌린다(엉뚱한 색이 남지 않게).
+            let hex = (payload?["color"] as? String).flatMap {
+                $0.range(of: "^#[0-9A-Fa-f]{6}$", options: .regularExpression) != nil ? $0 : nil
+            }
+            return .competitionHeaderTint(hex: hex)
         case .none:
             return .unknown(type: rawType)
         }
@@ -622,6 +634,8 @@ enum WebBridgeCapability: String, Equatable, Sendable {
     case openHomeFeed = "OPEN_HOME_FEED"
     /// 대회 상세 서브뷰만 알린다(#250). 목록이 없으면 웹은 '내 기록에 남기기'를 보내지 않는다.
     case openCompetitionRecord = "OPEN_COMPETITION_RECORD"
+    /// 대회 탭 목록 웹만 알린다. 목록이 없으면 웹은 머리줄 색을 보내지 않는다(앱 기본색 그대로).
+    case competitionHeaderTint = "COMPETITION_HEADER_TINT"
 
     /// `window.AppBridgeCapabilities = [...]`를 정의하는 스크립트 소스. 직렬화 실패 시 nil.
     static func injectionScriptSource(for capabilities: [WebBridgeCapability]) -> String? {
