@@ -61,11 +61,13 @@ final class WebPullToRefreshBand: UIView {
     // 문구 투명도 계산용. 컨트롤러가 밴드를 늘릴 때와 같은 기준이다.
     private let triggerThreshold: CGFloat
 
+    // 디자인 가이드: 배경 Color/Blue/50, 글자·아이콘 Color/Blue/500
+    static let defaultBackground = UIColor(Color.semantic.surface.primarySubtle)
+
     init(triggerThreshold: CGFloat) {
         self.triggerThreshold = triggerThreshold
         super.init(frame: .zero)
-        // 디자인 가이드: 배경 Color/Blue/50, 글자·아이콘 Color/Blue/500
-        backgroundColor = UIColor(Color.semantic.surface.primarySubtle)
+        backgroundColor = Self.defaultBackground
         clipsToBounds = true
         // 밴드는 표시 전용 — 터치를 가로채 웹 스크롤을 방해하지 않게 한다.
         isUserInteractionEnabled = false
@@ -463,6 +465,11 @@ final class WebPullToRefreshController {
     }
 
     // 콘텐츠 원점 바로 위에 밴드를 가로 꽉 차게, 주어진 높이로 배치한다(바닥을 원점에 고정).
+    /// 밴드 바탕색을 바꾼다. nil이면 기본 연파랑. 화면 머리줄이 다른 색일 때 당겨도 이음새가 없게 한다.
+    func setBandBackground(_ color: UIColor?) {
+        band.backgroundColor = color ?? WebPullToRefreshBand.defaultBackground
+    }
+
     private func layoutBand(height: CGFloat) {
         guard let scrollView else { return }
         band.frame = CGRect(x: 0, y: -height, width: scrollView.bounds.width, height: height)

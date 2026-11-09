@@ -38,6 +38,8 @@ struct BridgeWebView: UIViewRepresentable {
     // 오버스크롤(바운스) 영역에 드러나는 색. 웹 콘텐츠 배경과 어긋나면 바운스할 때 이음새가
     // 보이므로 화면별로 주입한다. 리스트 피드는 B&W/White, 상세 서브뷰는 True-White.
     var overscrollBackground: Color = Color.primitive.bw.trueWhite
+    // 맨 위에서 당길 때 드러나는 풀다운 밴드의 바탕색. nil이면 기본 연파랑. 대회 목록만 머리줄 색과 맞추려고 넘긴다.
+    var pullToRefreshBackground: Color?
     // 이 웹뷰를 소유한 Feature가 실제로 처리하는 '사전 확인형' 메시지. 처리하지 않는 웹뷰가 지원한다고
     // 알리면 웹이 요청을 보내 놓고 응답 없이 기다리므로, 처리하는 화면만 넘긴다.
     var capabilities: [WebBridgeCapability] = []
@@ -154,6 +156,7 @@ struct BridgeWebView: UIViewRepresentable {
             onOutboundDelivered: onOutboundDelivered
         )
         context.coordinator.scrollToTop(token: scrollToTopToken)
+        context.coordinator.setPullToRefreshBackground(pullToRefreshBackground.map { UIColor($0) })
         // 토큰 변동(갱신) 시에도 세션 쿠키를 최신으로 유지한 뒤 (재)로드/플러시한다.
         let cookieStore = context.coordinator.webView?.configuration.websiteDataStore.httpCookieStore
             ?? WKWebsiteDataStore.default().httpCookieStore
@@ -295,6 +298,10 @@ struct BridgeWebView: UIViewRepresentable {
             pullToRefresh = WebPullToRefreshController(scrollView: scrollView) { [weak self] in
                 self?.beginRefresh()
             }
+        }
+
+        func setPullToRefreshBackground(_ color: UIColor?) {
+            pullToRefresh?.setBandBackground(color)
         }
 
         private func beginRefresh() {
