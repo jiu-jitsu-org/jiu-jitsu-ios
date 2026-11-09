@@ -146,6 +146,10 @@ public struct CommunityDetailFeature: Sendable {
             case userProfileRequested(userId: Int)
             // 대회 관심 첫 등록(REQUEST_NOTIFICATION_PERMISSION) → 부모가 권한을 묻고 결과를 deliverNotificationPermission으로 돌려준다. (#243)
             case notificationPermissionRequested(requestId: String?)
+            // 대회 상세의 '커뮤니티에서 더 보기'(OPEN_HOME_FEED) → 부모가 대회 스택을 닫고 홈 탭으로 바꾼다. (#250)
+            case homeFeedRequested
+            // 끝난 대회의 '내 기록에 남기기'(OPEN_COMPETITION_RECORD) → 부모가 이름·연도를 채운 대회 기록 추가를 연다. (#250)
+            case competitionRecordRequested(OpenCompetitionRecordPayload)
         }
     }
 
@@ -330,6 +334,21 @@ public struct CommunityDetailFeature: Sendable {
                         return .none
                     }
                     return .send(.delegate(.notificationPermissionRequested(requestId: requestId)))
+
+                case .openHomeFeed:
+                    // 지원을 알린 웹뷰(대회 상세)만 보낸다. 알리지 않은 웹뷰에서 오면 받을 곳이 없어 무시한다.
+                    guard state.capabilities.contains(.openHomeFeed) else {
+                        Log.trace("OPEN_HOME_FEED 무시(capability 미지원 웹뷰)", category: .network, level: .info)
+                        return .none
+                    }
+                    return .send(.delegate(.homeFeedRequested))
+
+                case let .openCompetitionRecord(payload):
+                    guard state.capabilities.contains(.openCompetitionRecord) else {
+                        Log.trace("OPEN_COMPETITION_RECORD 무시(capability 미지원 웹뷰)", category: .network, level: .info)
+                        return .none
+                    }
+                    return .send(.delegate(.competitionRecordRequested(payload)))
 
                 case let .unknown(type):
                     Log.trace("WebBridge 미지원 메시지 무시: \(type)", category: .network, level: .info)

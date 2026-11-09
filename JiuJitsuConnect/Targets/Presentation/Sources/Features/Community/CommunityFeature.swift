@@ -198,6 +198,8 @@ public struct CommunityFeature: Sendable {
             // 헤더의 내 사진 버튼(#128)·웹에서 내 이름 탭(#116) → 부모가 MY 화면을 이 스택에 push한다(#197).
             // MY 화면을 만들려면 로그인 정보(authInfo)가 필요해 부모(AppTab)가 직접 쌓는다.
             case myProfileRequested
+            // 테스트용 '딥링크로 열기'(DEBUG/BETA) → 부모가 실제 유니버설 링크와 같은 경로(.deepLink)로 보낸다.
+            case debugDeepLinkRequested(DeepLink)
         }
 
         /// 부모가 세션 상태 변화를 알려주면 그에 맞는 아웃바운드 메시지를 웹에 주입한다.
@@ -334,7 +336,8 @@ public struct CommunityFeature: Sendable {
                     Log.trace("테스트 딥링크 파싱 실패: \(raw)", category: .system, level: .error)
                     return .none
                 }
-                return .send(.deepLink(link))
+                // 대회 링크는 대회 탭이 열어야 하므로 실제 링크처럼 부모(AppTab)의 라우팅을 거친다.
+                return .send(.delegate(.debugDeepLinkRequested(link)))
 
             // MARK: - 브릿지 다이얼로그 결과 (→ 웹 회신)
 
@@ -437,6 +440,11 @@ public struct CommunityFeature: Sendable {
                     // 알림 권한 요청은 대회 탭만 알린다(#243). 혹시 오면 웹이 기다리지 않게 거절로 바로 회신한다.
                     Log.trace("리스트 웹뷰 REQUEST_NOTIFICATION_PERMISSION 수신 — 거절로 회신", category: .network, level: .info)
                     Self.enqueue(.notificationPermissionResult(requestId: requestId, status: .denied), into: &state)
+                    return .none
+
+                case .openHomeFeed, .openCompetitionRecord:
+                    // 대회 상세만 알리는 신호(#250)라 홈 피드 웹에서는 오지 않아야 한다. 받을 곳이 없어 무시한다.
+                    Log.trace("리스트 웹뷰 \(message) 수신 — 무시", category: .network, level: .info)
                     return .none
 
                 case let .unknown(type):
@@ -685,6 +693,9 @@ public struct CommunityFeature: Sendable {
             return .send(.openUserProfile(userId: userId))
         case .notificationPermissionRequested:
             // 커뮤니티 상세는 알림 권한 요청을 알리지 않아, 상세가 이미 거절로 회신했다(#243).
+            return .none
+        case .homeFeedRequested, .competitionRecordRequested:
+            // 커뮤니티 상세는 두 신호를 알리지 않아 상세가 이미 무시했다(#250). 홈은 이미 피드 탭이기도 하다.
             return .none
         }
     }
