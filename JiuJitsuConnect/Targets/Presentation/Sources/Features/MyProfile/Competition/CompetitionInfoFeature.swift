@@ -219,6 +219,19 @@ public struct CompetitionInfoFeature: Sendable {
             self.uniform = last.competitionUniform ?? .gi
             self.belt = last.competitionBelt ?? currentBelt
         }
+
+        /// 대회 상세 웹의 '내 기록에 남기기'(#250)에서 진입. 웹이 넘긴 대회명·연도를 미리 채워
+        /// 대부분 메달만 고르고 넘어가게 한다. 웹 대회 id는 문자열이라 등록 대회와 묶지 않는다.
+        public init(
+            prefilledName: String,
+            year: Int,
+            currentBelt: BeltRank? = nil,
+            recentWeightLimit: CompetitionWeightLimit? = nil
+        ) {
+            self.init(mode: .add, currentBelt: currentBelt, recentWeightLimit: recentWeightLimit)
+            self.name = prefilledName
+            self.preselectYear(year)
+        }
     }
 
     // 기록하는 이유(메달)를 먼저 보여 주려고 결과부터 묻는다.
