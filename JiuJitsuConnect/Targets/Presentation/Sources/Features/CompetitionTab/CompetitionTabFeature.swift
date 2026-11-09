@@ -138,8 +138,10 @@ public struct CompetitionTabFeature: Sendable {
             case let .web(.delegate(delegate)):
                 return .send(.delegate(.webSubview(delegate)))
 
-            case .web(.internal(.loadingStarted)):
-                // 새로 불러오면(재시도·이동) 새 페이지가 다시 알려 줄 때까지 기본색으로 둔다 — 지난 색이 남지 않게.
+            case .web(.internal(.loadingFailed)):
+                // 불러오기에 실패하면 오류 화면 위에 지난 색이 남지 않게 기본색으로 돌린다.
+                // 시작할 때 지우지 않는 건 당겨서 새로고침 동안 머리·밴드가 흰색으로 깜빡이지 않게 하려는 것 —
+                // 다시 그려진 웹은 붙자마자 색(또는 null)을 다시 보낸다.
                 state.headerTint = nil
                 return .none
 

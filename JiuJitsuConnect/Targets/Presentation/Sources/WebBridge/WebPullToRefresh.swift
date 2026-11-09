@@ -464,12 +464,12 @@ final class WebPullToRefreshController {
         burstView.burst(at: origin)
     }
 
-    // 콘텐츠 원점 바로 위에 밴드를 가로 꽉 차게, 주어진 높이로 배치한다(바닥을 원점에 고정).
     /// 밴드 바탕색을 바꾼다. nil이면 기본 연파랑. 화면 머리줄이 다른 색일 때 당겨도 이음새가 없게 한다.
     func setBandBackground(_ color: UIColor?) {
         band.backgroundColor = color ?? WebPullToRefreshBand.defaultBackground
     }
 
+    // 콘텐츠 원점 바로 위에 밴드를 가로 꽉 차게, 주어진 높이로 배치한다(바닥을 원점에 고정).
     private func layoutBand(height: CGFloat) {
         guard let scrollView else { return }
         band.frame = CGRect(x: 0, y: -height, width: scrollView.bounds.width, height: height)
