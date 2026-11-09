@@ -53,7 +53,11 @@ public struct AppTabView: View {
                 NavigationStack(
                     path: $store.scope(state: \.competition.path, action: \.competition.path)
                 ) {
-                    CompetitionTabView(store: store.scope(state: \.competition, action: \.competition))
+                    // 대회 탭 종의 새 알림 점은 홈이 조회한 값 하나를 함께 쓴다(#258).
+                    CompetitionTabView(
+                        store: store.scope(state: \.competition, action: \.competition),
+                        hasUnreadNotification: store.home.hasUnreadNotification
+                    )
                         .safeAreaInset(edge: .bottom, spacing: 0) { bottomTabBar }
                 } destination: { destinationStore in
                     switch destinationStore.case {

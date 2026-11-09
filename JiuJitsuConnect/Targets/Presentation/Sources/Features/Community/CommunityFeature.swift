@@ -132,6 +132,8 @@ public struct CommunityFeature: Sendable {
         case openUserProfile(userId: Int)
         // 부모(AppTabFeature)가 MY에서 바뀐 내 사진(삭제 시 nil)을 주입하는 통로.
         case myProfileImageChanged(URL?)
+        // 부모가 새 알림 점을 다시 조회시킨다 — 대회 탭의 종도 이 값을 그린다(#258).
+        case unreadNotificationRefreshRequested
 
         // 게시글 상세 서브뷰 네비게이션.
         case path(StackAction<Path.State, Path.Action>)
@@ -262,7 +264,7 @@ public struct CommunityFeature: Sendable {
                 guard
                     state.isNotificationButtonVisible,
                     let base = state.url,
-                    let url = Self.notificationsURL(base: base)
+                    let url = NotificationInbox.url(base: base)
                 else { return .none }
                 state.path.append(.detail(.init(url: url, accessToken: state.accessToken)))
                 return .none
@@ -532,6 +534,9 @@ public struct CommunityFeature: Sendable {
                 // 방금 반영한 값을 덮는다. 진행 중인 조회는 이미 낡은 값이므로 버린다.
                 return .cancel(id: CancelID.myProfileImage)
 
+            case .unreadNotificationRefreshRequested:
+                return refreshUnreadNotification(state)
+
             // MARK: - DeepLink (부모 주입 → 게시글 상세 진입)
 
             case let .deepLink(link):
@@ -635,16 +640,6 @@ public struct CommunityFeature: Sendable {
         .cancellable(id: CancelID.unreadNotification, cancelInFlight: true)
     }
 
-    /// 알림함 웹 라우트(`/community/notifications`). 숫자 id가 아니라 `DeepLinkParser`의
-    /// 게시글 상세 경로로 오인되지 않는다.
-    private static let notificationsPath = "/\(DeepLinkParser.communitySegment)/notifications"
-
-    /// 리스트 웹뷰와 같은 origin(테스트용 도메인 오버라이드 포함)에 알림함 경로를 붙인다.
-    /// OPEN_SUBVIEW와 마찬가지로 세션 쿠키를 가진 웹뷰에 다른 origin이 실리지 않게 하기 위함이다.
-    private static func notificationsURL(base: URL) -> URL? {
-        URL(string: notificationsPath, relativeTo: base)?.absoluteURL
-    }
-
     /// 커뮤니티 활동 웹 라우트(`/community/me`). 알림함과 같이 숫자 id가 아니라 게시글 상세로 오인되지 않는다.
     private static let myActivityPath = "/\(DeepLinkParser.communitySegment)/me"
 
@@ -663,7 +658,7 @@ public struct CommunityFeature: Sendable {
 
     private static func isNotificationsDetail(_ element: Path.State?) -> Bool {
         guard case let .detail(detail)? = element else { return false }
-        return detail.url.path() == notificationsPath
+        return NotificationInbox.isInbox(detail.url)
     }
 
     // MARK: - Subview 라우팅 헬퍼

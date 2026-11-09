@@ -164,6 +164,10 @@ public struct AppTabFeature: Sendable {
                 if tab == .competition, state.selectedTab == .competition {
                     return .send(.competition(.view(.tabReselected)))
                 }
+                // 대회 탭 머리줄의 종도 홈의 새 알림 점을 그리므로, 들어올 때 홈에 다시 조회시킨다(#258).
+                let refreshUnread: Effect<Action> = tab == .competition && state.selectedTab != .competition
+                    ? .send(.home(.unreadNotificationRefreshRequested))
+                    : .none
                 // 처음 만들 때 웹 주소가 없었으면(커뮤니티 주소 미정) 들어올 때 다시 만든다 — 홈이 다시 시도해 주소를 얻었을 수 있다.
                 if tab == .competition, state.competition.web == nil {
                     // 토큰은 갱신이 반영된 커뮤니티 쪽 값을 쓴다(authInfo는 갱신 때 바뀌지 않는다).
@@ -179,7 +183,7 @@ public struct AppTabFeature: Sendable {
                 if isEnteringMyPage, !state.authInfo.isGuest {
                     return .send(.myPage(.view(.tabEntered)))
                 }
-                return .none
+                return refreshUnread
 
             case .view(.sceneBecameActive):
                 // MY 탭을 보고 있을 때만 포그라운드 복귀 재조회 (#69)

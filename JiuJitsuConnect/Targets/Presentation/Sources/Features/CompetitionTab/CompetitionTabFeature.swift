@@ -44,6 +44,9 @@ public struct CompetitionTabFeature: Sendable {
             .openCompetitionRecord
         ]
 
+        // 머리줄의 알림함 종은 로그인한 사람만 본다(홈과 같은 알림함 정책, #258). 점 값은 홈이 가진 것을 받아 그린다.
+        var isNotificationButtonVisible: Bool { web?.accessToken != nil }
+
         static func competitionURL(base: URL) -> URL? {
             URL(string: "/competition", relativeTo: base)?.absoluteURL
         }
@@ -69,6 +72,8 @@ public struct CompetitionTabFeature: Sendable {
 
         public enum ViewAction: Sendable {
             case tabReselected
+            // 머리줄의 알림함 종(#258) → 홈과 같은 알림함 웹을 이 탭 스택에 쌓는다.
+            case notificationTapped
         }
 
         public enum DelegateAction: Sendable {
@@ -93,6 +98,17 @@ public struct CompetitionTabFeature: Sendable {
                 // 대회 상세 등이 위에 쌓여 있으면 목록이 보이지 않으니 움직이지 않는다(홈과 같은 기준).
                 guard state.path.isEmpty else { return .none }
                 state.scrollToTopToken = UUID()
+                return .none
+
+            case .view(.notificationTapped):
+                guard
+                    state.isNotificationButtonVisible,
+                    let web = state.web,
+                    let url = NotificationInbox.url(base: web.url)
+                else { return .none }
+                // 연타로 알림함이 겹쳐 쌓이지 않게 한다.
+                guard !Self.isNotificationsDetail(state.path.last) else { return .none }
+                state.path.append(.communityDetail(.init(url: url, accessToken: web.accessToken)))
                 return .none
 
             // MARK: - 목록 웹
@@ -146,6 +162,15 @@ public struct CompetitionTabFeature: Sendable {
             case let .path(.element(id: _, action: .communityDetail(.delegate(delegate)))):
                 return .send(.delegate(.webSubview(delegate)))
 
+            // 알림함에서 읽은 알림을 점에 반영한다(홈과 같은 처리). forEach보다 먼저 실행돼 pop 대상이 아직 스택에 남아 있고,
+            // 알림함 위에 쌓인 상세까지 한 번에 닫히는 경우도 있어 pop 범위 전체를 본다.
+            case let .path(.popFrom(id)):
+                guard
+                    let index = state.path.ids.firstIndex(of: id),
+                    state.path.ids[index...].contains(where: { Self.isNotificationsDetail(state.path[id: $0]) })
+                else { return .none }
+                return .send(.delegate(.unreadNotificationRefreshRequested))
+
             case .path:
                 return .none
 
@@ -192,6 +217,11 @@ public struct CompetitionTabFeature: Sendable {
             return "\(url.host?.lowercased() ?? "")\(path)"
         }
         return key(lhs) == key(rhs)
+    }
+
+    private static func isNotificationsDetail(_ element: Path.State?) -> Bool {
+        guard case let .communityDetail(detail)? = element else { return false }
+        return NotificationInbox.isInbox(detail.url)
     }
 
     private static func subview(url: URL, title: String?, accessToken: String?) -> CommunityDetailFeature.State {

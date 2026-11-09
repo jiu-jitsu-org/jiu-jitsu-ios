@@ -12,9 +12,12 @@ import DesignSystem
 
 public struct CompetitionTabView: View {
     let store: StoreOf<CompetitionTabFeature>
+    // 알림함 종의 새 알림 점(#258). 홈이 조회해 둔 값 하나만 따라 그려, 두 탭의 점이 어긋나지 않게 한다.
+    let hasUnreadNotification: Bool
 
-    public init(store: StoreOf<CompetitionTabFeature>) {
+    public init(store: StoreOf<CompetitionTabFeature>, hasUnreadNotification: Bool) {
         self.store = store
+        self.hasUnreadNotification = hasUnreadNotification
     }
 
     public var body: some View {
@@ -34,18 +37,27 @@ public struct CompetitionTabView: View {
         .toolbar(.hidden, for: .navigationBar)
     }
 
-    // 홈 머리줄(높이 44 · 왼쪽 16 · 아래 구분선)과 같은 자리에 탭 이름을 둔다.
+    // 홈 머리줄(높이 44 · 왼쪽 16 · 오른쪽 8 · 아래 구분선)과 같은 자리에 탭 이름과 알림함 종을 둔다.
     private var header: some View {
         ZStack(alignment: .bottom) {
             Rectangle()
                 .fill(Color.component.navibar.container.divider)
                 .frame(height: 1)
 
-            Text("대회")
-                .font(Font.pretendard.title3)
-                .foregroundStyle(Color.component.header.text)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .padding(.leading, 16)
+            HStack(spacing: 0) {
+                Text("대회")
+                    .font(Font.pretendard.title3)
+                    .foregroundStyle(Color.component.header.text)
+                Spacer(minLength: 0)
+                if store.isNotificationButtonVisible {
+                    NotificationInboxButton(hasUnread: hasUnreadNotification) {
+                        store.send(.view(.notificationTapped))
+                    }
+                }
+            }
+            .frame(maxHeight: .infinity)
+            .padding(.leading, 16)
+            .padding(.trailing, 8)
         }
         .frame(height: 44)
         // 홈 머리줄과 같은 흰 바탕을 상태바까지 끌어올린다.
@@ -117,8 +129,9 @@ private struct CompetitionListWebView: View {
 
 #Preview {
     CompetitionTabView(
-        store: Store(initialState: CompetitionTabFeature.State(base: URL(string: "https://example.com"), accessToken: nil)) {
+        store: Store(initialState: CompetitionTabFeature.State(base: URL(string: "https://example.com"), accessToken: "preview")) {
             CompetitionTabFeature()
-        }
+        },
+        hasUnreadNotification: true
     )
 }
