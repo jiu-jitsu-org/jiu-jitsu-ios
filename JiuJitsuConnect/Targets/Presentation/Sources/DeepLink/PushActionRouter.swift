@@ -19,6 +19,12 @@ public enum PushActionType: String, Sendable {
     case boardDetail = "BOARD_DETAIL"
     /// 밸런스 게임 상세 → `/community/balance/{contentId}`
     case balanceDetail = "BALANCE_DETAIL"
+    // 관심 대회 마감 전날 알림(#256). data는 웹 대회 slug → `/competition/{slug}`(대회 탭 스택에 상세).
+    // 백엔드가 아직 정하지 않은 임시 이름이다 — 백엔드 PushActionType 값이 정해지면 그 값과 똑같이 맞춘다.
+    /// 얼리버드 접수 마감 전날
+    case competitionEarlyBirdDeadline = "COMPETITION_EARLY_BIRD_DEADLINE"
+    /// 접수 마감 전날
+    case competitionRegistrationDeadline = "COMPETITION_REGISTRATION_DEADLINE"
 }
 
 /// 푸시·알림함이 실어 보내는 이동 정보. 서버가 새 값을 추가해도 구버전 앱이 죽지 않도록
@@ -26,7 +32,7 @@ public enum PushActionType: String, Sendable {
 public struct PushActionPayload: Equatable, Sendable {
     /// 서버가 보낸 `type`/`actionType` 원문. 미지원 값도 로그를 위해 그대로 둔다.
     public let actionType: String?
-    /// 대상 contentId 문자열.
+    /// 대상 contentId 문자열(대회 마감 알림은 대회 slug).
     public let data: String?
 
     public init(actionType: String?, data: String?) {
@@ -51,7 +57,7 @@ public struct PushActionPayload: Equatable, Sendable {
 enum PushActionRouter {
     /// payload를 딥링크용 https URL로 바꾼다. 미지원 `actionType`·빈 `data`는 `nil` — 앱만 열리고
     /// 화면은 그대로 둔다(= 커뮤니티 홈). 여기서 만든 URL은 `DeepLinkParser`를 다시 통과하므로
-    /// contentId 형식 검증은 그쪽에 맡긴다.
+    /// 게시글·밸런스 게임의 contentId 형식 검증은 그쪽에 맡긴다. 대회 slug는 파서가 형식을 보지 않아 여기서 검사한다.
     static func makeURL(from payload: PushActionPayload) -> URL? {
         guard
             let rawType = payload.actionType,
@@ -79,6 +85,15 @@ enum PushActionRouter {
             url = origin
                 .appending(path: DeepLinkParser.communitySegment)
                 .appending(path: DeepLinkParser.balanceSegment)
+                .appending(path: contentId)
+        case .competitionEarlyBirdDeadline, .competitionRegistrationDeadline:
+            // slug는 숫자 id가 아니라 파서가 형식을 보지 않으므로, 다른 경로로 새는 값은 여기서 거른다.
+            guard DeepLinkParser.isCompetitionSlug(contentId) else {
+                Log.trace("푸시 액션 무시(대회 slug 형식 아님): \(rawType) \(contentId)", category: .system, level: .error)
+                return nil
+            }
+            url = origin
+                .appending(path: DeepLinkParser.competitionSegment)
                 .appending(path: contentId)
         }
         Log.trace("푸시 액션 → 딥링크: \(rawType) \(contentId) → \(url.absoluteString)", category: .system, level: .info)

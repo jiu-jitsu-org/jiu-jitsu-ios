@@ -44,6 +44,12 @@ enum DeepLinkParser {
     /// 대회 상세 경로의 첫 세그먼트. 웹 라우트 `src/app/competition/[id]`와 대응한다(#250).
     static let competitionSegment = "competition"
 
+    /// 대회 slug로 쓸 수 있는 값인지(#256, 푸시 → 대회 상세 주소). 웹 slug는 영문·숫자·`-`·`_`로만 만든다(예: seoul-open-championship).
+    /// 주소에 이어 붙이는 값이라 `/`·`..`·쿼리 문자처럼 다른 경로로 새는 값은 받지 않는다.
+    static func isCompetitionSlug(_ value: String) -> Bool {
+        !value.isEmpty && value.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }
+    }
+
     /// 웹 페이지 안의 '앱 열기' 버튼용 커스텀 스킴.
     /// Info.plist `CFBundleURLTypes`(Project.swift)·웹(FE#72)에 등록된 값과 반드시 같아야 한다.
     private static let customScheme = "bjjossapp"
