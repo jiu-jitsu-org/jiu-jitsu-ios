@@ -43,6 +43,8 @@ public struct AppTabFeature: Sendable {
         // 값이 있으면 로그인 성공 시 탭 전환 없이 그 탭에 머물러 행위를 복귀시키고,
         // 취소 시 그 웹에 AUTH_LOGIN_CANCELLED를 보내 대기 중 행위를 폐기시킨다.
         var pendingWebLoginTab: Tab?
+        // 비로그인으로 누른 대회 상세의 '내 기록에 남기기'(#250). 로그인하면 이 대회로 기록 추가를 이어서 연다.
+        var pendingCompetitionRecord: OpenCompetitionRecordPayload?
         // 세션 이벤트 구독을 onAppear 중복 호출에도 한 번만 시작하기 위한 가드.
         var didStartSessionObserver: Bool = false
         // 웹뷰 위임 토큰 갱신이 진행 중인지. 리스트·상세 여러 웹뷰가 동시에 만료를 감지해도
@@ -102,6 +104,8 @@ public struct AppTabFeature: Sendable {
             case tokenRefreshFailed
             // 토큰 갱신 불가(세션 만료) → 게스트로 전환 + 웹 세션 정리.
             case handleSessionExpired
+            // 대회 탭에서 연 기록 추가의 저장 결과(#250). id는 결과를 돌려줄 대회 탭 스택의 입력 화면.
+            case competitionRecordSaved(id: StackElementID, competition: Competition, TaskResult<CommunityProfile>)
         }
     }
 
@@ -111,6 +115,7 @@ public struct AppTabFeature: Sendable {
     @Dependency(\.authClient) var authClient
     @Dependency(\.authSessionEventClient) var authSessionEventClient
     @Dependency(\.notificationPermissionClient) var notificationPermissionClient
+    @Dependency(\.communityClient) var communityClient
 
     public var body: some ReducerOf<Self> {
         Scope(state: \.home, action: \.home) {
@@ -329,10 +334,53 @@ public struct AppTabFeature: Sendable {
                     }
                 }
 
+            // 대회 상세의 '커뮤니티에서 더 보기'(#250). 대회 스택과 홈에 쌓인 화면을 닫아 피드가 바로 보이게 한 뒤 홈으로 간다.
+            case .competition(.delegate(.homeFeedRequested)):
+                state.competition.path.removeAll()
+                state.home.path.removeAll()
+                state.home.detailCover = nil
+                state.home.coverPath.removeAll()
+                return .send(.view(.tabSelected(.home)))
+
+            // 끝난 대회의 '내 기록에 남기기'(#250). 웹은 비로그인이면 로그인 안내를 대신 보내지만, 웹과 앱의 로그인 상태가
+            // 어긋났을 때를 대비해 앱도 막는다 — 로그인 모달을 띄우고, 로그인하면 이 대회로 이어서 연다.
+            case let .competition(.delegate(.competitionRecordRequested(payload))):
+                guard !state.authInfo.isGuest else {
+                    state.pendingCompetitionRecord = payload
+                    state.pendingWebLoginTab = .competition
+                    return .send(.internal(.showLoginModal))
+                }
+                Self.pushCompetitionRecord(payload, into: &state)
+                return .none
+
+            // 기록 추가 저장(#250). MY와 같이 프로필의 대회 목록을 통째로 다시 저장한다.
+            // MY가 들고 있는 프로필은 앱을 켤 때 받은 값일 수 있어(로그인 직후엔 아직 받는 중), 저장 직전에 늘 새로 받아
+            // 그 위에 더한다 — 그 사이 다른 곳에서 남긴 기록이 지워지지 않게.
+            // 저장 결과를 보고 완료 화면('부문 추가')으로 넘어가야 하므로 입력 화면은 닫지 않는다.
+            case let .competition(.path(.element(id: id, action: .competitionInfo(.delegate(.didFinishAdding(competition)))))):
+                return .run { send in
+                    let result = await TaskResult {
+                        let profile = try await communityClient.fetchProfile()
+                        return try await communityClient.updateProfile(profile.addingCompetition(competition), .competition)
+                    }
+                    await send(.internal(.competitionRecordSaved(id: id, competition: competition, result)))
+                }
+
             // MARK: - DeepLink
 
+            case let .deepLink(.competitionDetail(url, _)):
+                // 대회 상세는 대회 탭 스택에 연다. 홈 상세 모달이 떠 있으면 탭을 바꿔도 가려지므로 닫는다.
+                // 탭 전환이 대회 웹을 다시 만들 수 있어(주소 미정이었던 경우) 전환을 마친 뒤 상세를 쌓는다.
+                state.home.detailCover = nil
+                state.home.coverPath.removeAll()
+                let accessToken = state.competition.web?.accessToken ?? state.home.accessToken
+                return .concatenate(
+                    state.selectedTab == .competition ? .none : .send(.view(.tabSelected(.competition))),
+                    .send(.competition(.openDetail(url: url, accessToken: accessToken)))
+                )
+
             case let .deepLink(link):
-                // 현재 딥링크 대상은 모두 커뮤니티 영역이라, 다른 탭에 있었다면 홈으로 되돌린 뒤 넘긴다.
+                // 대회 외의 딥링크 대상은 모두 커뮤니티 영역이라, 다른 탭에 있었다면 홈으로 되돌린 뒤 넘긴다.
                 // 탭바로 돌아올 때처럼 새 알림 점·내 사진도 다시 조회한다(탭 뷰가 유지돼 onAppear가 다시 오지 않음).
                 let isEnteringHome = state.selectedTab != .home
                 state.selectedTab = .home
@@ -340,6 +388,10 @@ public struct AppTabFeature: Sendable {
                     isEnteringHome ? .send(.home(.view(.tabEntered))) : .none,
                     .send(.home(.deepLink(link)))
                 )
+
+            // 테스트용 '딥링크로 열기'도 실제 링크와 같은 라우팅을 거친다.
+            case let .home(.delegate(.debugDeepLinkRequested(link))):
+                return .send(.deepLink(link))
 
             case .home, .competition, .myPage:
                 return .none
@@ -406,6 +458,21 @@ public struct AppTabFeature: Sendable {
                     .send(.competition(.session(.sessionExpired)))
                 )
 
+            case let .internal(.competitionRecordSaved(id, competition, .success(profile))):
+                // MY의 대회 기록 목록에도 바로 보이게 MY가 가진 프로필을 바꾼다.
+                // 저장 중 로그아웃·세션 만료로 게스트가 됐으면 이전 계정의 프로필을 다시 넣지 않는다.
+                guard !state.authInfo.isGuest else { return .none }
+                state.myPage.communityProfile = profile
+                // 저장 중 입력 화면이 닫혔으면(예외적) 돌려줄 곳이 없다.
+                guard case .competitionInfo? = state.competition.path[id: id] else { return .none }
+                return .send(.competition(.path(.element(id: id, action: .competitionInfo(.saveFinished(.succeeded(competition)))))))
+
+            case let .internal(.competitionRecordSaved(id, _, .failure(error))):
+                Log.trace("Failed to add competition from competition tab: \(error)", category: .network, level: .error)
+                // 입력 화면이 실패를 안내하고 입력값을 지켜 다시 저장하게 한다(MY와 같은 처리).
+                guard case .competitionInfo? = state.competition.path[id: id] else { return .none }
+                return .send(.competition(.path(.element(id: id, action: .competitionInfo(.saveFinished(.failed))))))
+
             case .view(.loginPromptLoginTapped):
                 state.isLoginPromptPresented = false
                 return .send(.internal(.showLoginModal))
@@ -427,6 +494,8 @@ public struct AppTabFeature: Sendable {
                     let isSignup = if case .didSignup = delegateAction { true } else { false }
                     let cameFromWeb = state.pendingWebLoginTab != nil
                     state.pendingWebLoginTab = nil
+                    let pendingCompetitionRecord = state.pendingCompetitionRecord
+                    state.pendingCompetitionRecord = nil
                     state.authInfo = newAuthInfo
                     state.myPage.authInfo = newAuthInfo
                     state.loginCover = nil
@@ -436,6 +505,11 @@ public struct AppTabFeature: Sendable {
                     state.myPage.isMoreMenuPresented = false
                     if !cameFromWeb {
                         state.selectedTab = isSignup ? .home : .myPage
+                    }
+                    // 비로그인으로 누른 '내 기록에 남기기'(#250)를 이어서 연다. 프로필은 아래 loadProfile로 아직 받는 중이라
+                    // 띠·체급 기본값 없이 열고, 저장 때 프로필이 없으면 그때 받아 온다.
+                    if let pendingCompetitionRecord {
+                        Self.pushCompetitionRecord(pendingCompetitionRecord, into: &state)
                     }
                     // 웹 세션 동기화: 새 access token을 커뮤니티·대회 웹뷰에 주입(있을 때만).
                     let syncWeb: Effect<Action> = newAuthInfo.accessToken.map {
@@ -475,6 +549,7 @@ public struct AppTabFeature: Sendable {
     private static func resetToGuest(_ state: inout State) {
         state.authInfo = .guest
         state.pendingWebLoginTab = nil
+        state.pendingCompetitionRecord = nil
         // 이전 계정으로 대회 탭에 쌓아 둔 상세·프로필도 닫는다.
         state.competition.path.removeAll()
         // MY 스택에 열어 둔 설정·웹 화면도 함께 닫힌다.
@@ -482,6 +557,21 @@ public struct AppTabFeature: Sendable {
         // 이전 계정으로 커뮤니티에 쌓아 둔 MY 화면도 닫는다(#197).
         CommunityFeature.closeMyProfiles(into: &state.home)
         state.selectedTab = .home
+    }
+
+    /// 대회 상세 위에 대회명·연도를 채운 기록 추가를 쌓는다(#250). 띠·체급 기본값은 MY와 같이 프로필에서 가져온다.
+    private static func pushCompetitionRecord(_ payload: OpenCompetitionRecordPayload, into state: inout State) {
+        // 연타·중복 전달로 입력 화면이 겹쳐 쌓이지 않게 한다.
+        if case .competitionInfo? = state.competition.path.last { return }
+        let profile = state.myPage.communityProfile
+        state.competition.path.append(.competitionInfo(
+            CompetitionInfoFeature.State(
+                prefilledName: payload.name,
+                year: payload.year,
+                currentBelt: profile?.beltRank,
+                recentWeightLimit: profile?.competitions.recentWeightLimit
+            )
+        ))
     }
 
     /// 네이티브 로그아웃을 홈·대회 웹 세션에도 알린다.
@@ -496,6 +586,7 @@ public struct AppTabFeature: Sendable {
     private static func cancelPendingWebLogin(_ state: inout State) -> Effect<Action> {
         let tab = state.pendingWebLoginTab
         state.pendingWebLoginTab = nil
+        state.pendingCompetitionRecord = nil
         switch tab {
         case .home:
             return .send(.home(.session(.loginCancelled)))

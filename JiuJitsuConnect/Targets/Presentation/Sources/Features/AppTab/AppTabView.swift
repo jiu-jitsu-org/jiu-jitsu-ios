@@ -61,6 +61,8 @@ public struct AppTabView: View {
                         CommunityDetailView(store: detailStore)
                     case let .userProfile(profileStore):
                         UserProfileView(store: profileStore)
+                    case let .competitionInfo(competitionInfoStore):
+                        CompetitionInfoView(store: competitionInfoStore)
                     }
                 }
             }
