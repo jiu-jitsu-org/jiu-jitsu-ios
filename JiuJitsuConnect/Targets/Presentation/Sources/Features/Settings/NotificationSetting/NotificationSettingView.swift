@@ -30,7 +30,7 @@ public struct NotificationSettingView: View {
 
                 ScrollView {
                     VStack(spacing: Style.sectionSpacing) {
-                        // 카테고리별 토글 (우선순위: 보안 > 공지 > 커뮤니티 > 마케팅)
+                        // 카테고리별 토글 (우선순위: 보안 > 공지 > 커뮤니티 > 관심 대회 > 마케팅)
                         // 마케팅은 정통망법상 옵트인 → 기본 false.
                         SettingsSection {
                             SettingsToggleRow(
@@ -65,6 +65,16 @@ public struct NotificationSettingView: View {
                             )
                             SettingsToggleRow(
                                 asset: Assets.Common.Icon.bell,
+                                text: "관심 대회 알림",
+                                subtitle: "얼리버드 · 접수 마감 전날",
+                                isLoading: !store.isLoaded,
+                                isOn: Binding(
+                                    get: { store.isCompetitionAlertEnabled },
+                                    set: { store.send(.view(.competitionAlertToggled($0))) }
+                                )
+                            )
+                            SettingsToggleRow(
+                                asset: Assets.Common.Icon.bell,
                                 text: "마케팅 정보 알림",
                                 subtitle: "이벤트, 혜택 안내",
                                 isLoading: !store.isLoaded,
@@ -89,6 +99,7 @@ public struct NotificationSettingView: View {
         .navigationBarHidden(true)
         .ignoresSafeArea(edges: .bottom)
         .onAppear { store.send(.view(.onAppear)) }
+        .onDisappear { store.send(.view(.onDisappear)) }
     }
 
     private var headerView: some View {
@@ -131,6 +142,7 @@ public struct NotificationSettingView: View {
                 NotificationSettingFeature()
             } withDependencies: {
                 $0.noticeClient = .previewValue
+                $0.competitionAlertSettingClient = .previewValue
             }
         )
     }

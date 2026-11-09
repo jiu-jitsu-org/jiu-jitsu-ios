@@ -39,6 +39,7 @@ public final class DependencyContainer {
     private let pushNotificationTapRelay = PushNotificationTapRelay()
     private let beltPromptStorage = BeltPromptStorage()
     private let greetingStorage = GreetingStorage()
+    private let competitionAlertSettingStorage = CompetitionAlertSettingStorage()
     private lazy var sharedNetworkService: NetworkService = DefaultNetworkService(
         tokenStorage: sharedTokenStorage,
         sessionEventBroadcaster: authSessionEventBroadcaster
@@ -187,6 +188,14 @@ public final class DependencyContainer {
         GreetingClient(
             shouldPlay: { self.greetingStorage.shouldPlay(now: $0) },
             markPlayed: { self.greetingStorage.markPlayed(now: $0) }
+        )
+    }
+
+    public func configureCompetitionAlertSettingClient() -> CompetitionAlertSettingClient {
+        CompetitionAlertSettingClient(
+            isEnabled: { self.competitionAlertSettingStorage.isEnabled() },
+            setEnabled: { self.competitionAlertSettingStorage.setEnabled($0) },
+            changes: { self.competitionAlertSettingStorage.changes() }
         )
     }
 

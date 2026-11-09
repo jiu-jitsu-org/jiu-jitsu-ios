@@ -15,7 +15,7 @@ public struct NotificationSettingFeature: Sendable {
     public init() {}
 
     // 연속 토글 시 마지막 상태만 서버에 반영하기 위한 debounce
-    private enum CancelID { case fetchSetting, updateSetting, toast }
+    private enum CancelID { case fetchSetting, updateSetting, toast, competitionAlertChanges }
 
     @ObservableState
     public struct State: Equatable, Sendable {
@@ -28,6 +28,8 @@ public struct NotificationSettingFeature: Sendable {
         var isCommunityNotificationEnabled: Bool = true
         // 정통망법상 마케팅 알림은 옵트인 → 기본 false
         var isMarketingNotificationEnabled: Bool = false
+        // 관심 대회 마감 전날 알림(#255). 서버 항목이 아직 없어 기기에 저장하고, 서버 저장(디바운스)과 따로 움직인다.
+        var isCompetitionAlertEnabled: Bool = false
 
         // 서버에 반영된 것으로 확인된 마지막 값. 저장 실패 시 토글을 이 값으로 되돌린다.
         var lastSavedSetting: NoticeSetting?
@@ -60,11 +62,13 @@ public struct NotificationSettingFeature: Sendable {
 
         public enum ViewAction: Sendable {
             case onAppear
+            case onDisappear
             case backButtonTapped
             case accountSecurityNotificationToggled(Bool)
             case serviceNoticeNotificationToggled(Bool)
             case communityNotificationToggled(Bool)
             case marketingNotificationToggled(Bool)
+            case competitionAlertToggled(Bool)
             case toastButtonTapped(ToastState.Action)
         }
 
@@ -72,12 +76,15 @@ public struct NotificationSettingFeature: Sendable {
             case fetchSettingResponse(TaskResult<NoticeSetting>)
             case updateSettingResponse(TaskResult<NoticeSetting>)
             case triggerUpdateSetting
+            // 다른 탭(웹의 '알림 받기' 등)에서 바뀐 관심 대회 알림 값
+            case competitionAlertChanged(Bool)
             case showToast(ToastState)
             case toastDismissed
         }
     }
 
     @Dependency(\.noticeClient) var noticeClient
+    @Dependency(\.competitionAlertSettingClient) var competitionAlertSettingClient
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.continuousClock) var clock
 
@@ -88,8 +95,26 @@ public struct NotificationSettingFeature: Sendable {
             // MARK: - View Actions
 
             case .view(.onAppear):
-                // 서버에서 카테고리별 수신 여부 초기값 로드
-                return fetchSetting()
+                // 서버에서 카테고리별 수신 여부 초기값 로드. 관심 대회 알림은 기기 값이라 바로 읽되,
+                // 다른 줄과 함께 보이도록 서버 조회가 끝날 때까지 같은 스켈레톤으로 둔다.
+                state.isCompetitionAlertEnabled = competitionAlertSettingClient.isEnabled()
+                // 탭이 살아 있어 이 화면이 열린 채 다른 탭에서 켤 수 있다 — 보이는 동안 바뀐 값을 따라간다.
+                return .merge(
+                    fetchSetting(),
+                    .run { [competitionAlertSettingClient] send in
+                        for await isEnabled in competitionAlertSettingClient.changes() {
+                            await send(.internal(.competitionAlertChanged(isEnabled)))
+                        }
+                    }
+                    .cancellable(id: CancelID.competitionAlertChanges, cancelInFlight: true)
+                )
+
+            case .view(.onDisappear):
+                return .cancel(id: CancelID.competitionAlertChanges)
+
+            case let .internal(.competitionAlertChanged(isEnabled)):
+                state.isCompetitionAlertEnabled = isEnabled
+                return .none
 
             case .view(.backButtonTapped):
                 return .run { _ in await self.dismiss() }
@@ -114,6 +139,12 @@ public struct NotificationSettingFeature: Sendable {
                 guard state.isLoaded else { return .none }
                 state.isMarketingNotificationEnabled = isOn
                 return .send(.internal(.triggerUpdateSetting))
+
+            case let .view(.competitionAlertToggled(isOn)):
+                // 기기에 바로 저장한다(서버 디바운스·되돌리기와 무관). 꺼도 대회별 알림 설정은 건드리지 않는다.
+                guard state.isLoaded else { return .none }
+                state.isCompetitionAlertEnabled = isOn
+                return .run { _ in competitionAlertSettingClient.setEnabled(isOn) }
 
             // MARK: - Internal Actions
 
