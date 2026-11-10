@@ -215,9 +215,9 @@ public struct AppTabView: View {
 
     private var bottomTabBar: some View {
         HStack(spacing: 0) {
-            tabBarButton(tab: .home, asset: Assets.Bottom.Icon.home, label: "홈")
-            tabBarButton(tab: .competition, asset: Assets.Bottom.Icon.competition, label: "대회")
-            tabBarButton(tab: .myPage, asset: Assets.Bottom.Icon.my, label: "MY")
+            tabBarButton(tab: .home, icon: .home, label: "홈")
+            tabBarButton(tab: .competition, icon: .competition, label: "대회")
+            tabBarButton(tab: .myPage, icon: .my, label: "MY")
         }
         .frame(height: Metrics.tabBarHeight)
         .padding(.horizontal, 20)
@@ -238,13 +238,10 @@ public struct AppTabView: View {
 
     private func tabBarButton(
         tab: AppTabFeature.Tab,
-        asset: ImageAsset,
+        icon: TabBarIconKind,
         label: String
     ) -> some View {
         let isSelected = store.selectedTab == tab
-        let iconColor: Color = isSelected
-            ? Color.component.navibar.selected.icon
-            : Color.component.navibar.unselected.icon
         let labelColor: Color = isSelected
             ? Color.component.navibar.selected.label
             : Color.component.navibar.unselected.label
@@ -253,12 +250,7 @@ public struct AppTabView: View {
             store.send(.view(.tabSelected(tab)))
         } label: {
             VStack(spacing: 4) {
-                asset.swiftUIImage
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 24, height: 24)
-                    .foregroundStyle(iconColor)
+                TabBarIcon(kind: icon, isSelected: isSelected)
                 Text(label)
                     .font(Font.pretendard.buttonS)
                     .foregroundStyle(labelColor)
