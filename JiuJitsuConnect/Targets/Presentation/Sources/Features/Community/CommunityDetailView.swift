@@ -20,6 +20,11 @@ public struct CommunityDetailView: View {
         self.store = store
     }
 
+    // 탈출용 뒤로가기는 웹 헤더가 없는 로딩/에러 상태에서만 보인다.
+    private var showsBackButton: Bool {
+        store.isLoading || store.hasError
+    }
+
     public var body: some View {
         // 외부 ZStack은 safe area를 존중 → 오버레이 뒤로가기를 상태바 아래에 둘 수 있다.
         // (안쪽 웹뷰 레이어만 ignoresSafeArea로 edge-to-edge 확장)
@@ -27,13 +32,19 @@ public struct CommunityDetailView: View {
             webViewLayer
             // 로딩/에러 오버레이 위에만 얹는다. 정상 화면의 뒤로가기는 웹 헤더가 그리므로
             // 여기서 겹쳐 그리면 버튼이 두 개가 된다.
-            if store.isLoading || store.hasError {
-                backButton
-                    .padding(.leading, 8)
-                    // 웹 앱바(높이 44)의 뒤로가기와 같은 자리에 둬 로딩 → 렌더 전환 시 버튼이
-                    // 튀지 않게 한다. 계약이 아니라 시각적 연속성용이라 어긋나도 동작엔 영향 없다.
-                    .padding(.top, 2)
-            }
+            // 덮개와 함께 옅어지며 걷히고, 걷히기 시작하면 바로 눌리지 않는다(#261, WebLoadingOverlay와 같은 방식).
+            backButton
+                .padding(.leading, 8)
+                // 웹 앱바(높이 44)의 뒤로가기와 같은 자리에 둬 로딩 → 렌더 전환 시 버튼이
+                // 튀지 않게 한다. 계약이 아니라 시각적 연속성용이라 어긋나도 동작엔 영향 없다.
+                .padding(.top, 2)
+                .opacity(showsBackButton ? 1 : 0)
+                .allowsHitTesting(showsBackButton)
+                .accessibilityHidden(!showsBackButton)
+                .animation(
+                    showsBackButton ? nil : .easeOut(duration: WebLoadingOverlay.fadeDuration),
+                    value: showsBackButton
+                )
         }
         // chromeless: 네이티브 내비게이션 바를 숨겨 웹 자체 헤더만 보이게 한다.
         .toolbar(.hidden, for: .navigationBar)
@@ -93,9 +104,7 @@ public struct CommunityDetailView: View {
                 onOutboundDelivered: { store.send(.internal(.outboundDelivered(id: $0))) }
             )
 
-            if store.isLoading {
-                loadingOverlay
-            }
+            WebLoadingOverlay(isLoading: store.isLoading)
 
             if store.hasError {
                 errorOverlay
@@ -131,13 +140,6 @@ public struct CommunityDetailView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-
-    private var loadingOverlay: some View {
-        ProgressView()
-            .controlSize(.large)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.component.background.default)
     }
 
     private var errorOverlay: some View {

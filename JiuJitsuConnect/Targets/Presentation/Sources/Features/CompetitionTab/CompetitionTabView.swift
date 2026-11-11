@@ -110,12 +110,7 @@ private struct CompetitionListWebView: View {
                 onOutboundDelivered: { store.send(.internal(.outboundDelivered(id: $0))) }
             )
 
-            if store.isLoading {
-                ProgressView()
-                    .controlSize(.large)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.component.background.default)
-            }
+            WebLoadingOverlay(isLoading: store.isLoading)
 
             if store.hasError {
                 VStack(spacing: 13) {

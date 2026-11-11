@@ -269,6 +269,14 @@ public struct CommunityDetailFeature: Sendable {
                 case .webViewReady:
                     return Self.syncSessionOnReady(into: &state)
 
+                case .pageReady:
+                    // 페이지가 그려졌으면 그림·글꼴을 다 받기(didFinish) 전에 덮개를 걷는다(#261).
+                    // 웹 헤더의 뒤로가기와 BACK_PRESSED 응답도 이 시점엔 살아 있어 가드를 다시 켜도 막히지 않는다.
+                    // 오류 화면 중엔 늦게 온 신호로 탈출용 뒤로가기를 거두지 않는다.
+                    guard !state.hasError else { return .none }
+                    state.isLoading = false
+                    return .none
+
                 case let .openSubview(payload):
                     // 동일 origin이 아니거나 URL을 만들 수 없으면 무시한다(세션 쿠키 유출 방지).
                     guard
