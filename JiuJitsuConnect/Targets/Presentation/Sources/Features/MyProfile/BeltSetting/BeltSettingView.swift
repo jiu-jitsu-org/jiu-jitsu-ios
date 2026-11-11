@@ -73,6 +73,14 @@ public struct BeltSettingView: View {
                 items: Array(BeltRank.allCases.reversed()),
                 selectedItem: store.selectedRank,
                 displayText: { $0.displayName },
+                // 대회 기록의 '출전 띠' 휠과 같이 글자 왼쪽에 띠 그림을 붙인다.
+                // 띠 그림 폭이 칸마다 달라도 글자가 흔들리지 않게 자리를 가장 큰 띠 폭(32)으로 고정한다.
+                iconView: { rank, isSelected in
+                    AnyView(
+                        BeltIcon(color: rank.selectButtonColor, size: isSelected ? .regular : .compact)
+                            .frame(width: 32)
+                    )
+                },
                 onSelect: { rank in
                     store.send(.view(.rankSelected(rank)))
                 }
