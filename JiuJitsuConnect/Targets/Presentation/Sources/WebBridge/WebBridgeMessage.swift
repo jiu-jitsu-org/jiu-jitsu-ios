@@ -153,6 +153,8 @@ private extension WebBridgeInboundMessage {
             return "COMPETITION_ALERTS_ENABLED  competitionId=\(competitionId ?? "-")"
         case let .competitionHeaderTint(hex):
             return "COMPETITION_HEADER_TINT  color=\(hex ?? "null")"
+        case let .competitionHeaderActions(payload):
+            return "COMPETITION_HEADER_ACTIONS  interestedOnly=\(payload.interestedOnly) mode=\(payload.mode.rawValue)"
         case let .unknown(type):
             return "\(type)  (unsupported)"
         }
@@ -185,6 +187,8 @@ private extension WebBridgeOutboundMessage {
             // base64 원문은 장당 수백 KB라 로그에는 개수와 크기만 남긴다.
             let sizes = files.map { "\($0.data.count / 1024)KB" }.joined(separator: ",")
             return "PHOTOS_PICKED  reqId=\(requestId) files=\(files.count) base64=[\(sizes)]"
+        case let .competitionHeaderAction(action):
+            return "COMPETITION_HEADER_ACTION  action=\(action.rawValue)"
         }
     }
 }
@@ -247,6 +251,8 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 대회 목록 맨 위 띠 색 그라데이션에 맞춰 앱 대회 탭 머리줄(상태바 포함)을 칠해 달라는 요청.
     /// hex는 `#RRGGBB`, nil이면 앱 기본 머리줄 색으로 돌린다. 스크롤하며 조금씩 옅어진 색을 여러 번 보낸다.
     case competitionHeaderTint(hex: String?)
+    /// 대회 목록의 '관심 대회만'·'목록/달력' 상태(#266). 붙을 때·바뀔 때마다 오며, 앱 머리줄 버튼은 이 값으로만 바뀐다.
+    case competitionHeaderActions(CompetitionHeaderActionsPayload)
     /// 계약에 없는 타입(상위 버전/오타 등) — 무시 대상.
     case unknown(type: String)
 
@@ -268,6 +274,7 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case openCompetitionRecord = "OPEN_COMPETITION_RECORD"
         case competitionAlertsEnabled = "COMPETITION_ALERTS_ENABLED"
         case competitionHeaderTint = "COMPETITION_HEADER_TINT"
+        case competitionHeaderActions = "COMPETITION_HEADER_ACTIONS"
     }
 
     /// `WKScriptMessage.body`를 파싱한다.
@@ -429,6 +436,8 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
                 $0.range(of: "^#[0-9A-Fa-f]{6}$", options: .regularExpression) != nil ? $0 : nil
             }
             return .competitionHeaderTint(hex: hex)
+        case .competitionHeaderActions:
+            return CompetitionHeaderActionsPayload(payload: payload).map(WebBridgeInboundMessage.competitionHeaderActions)
         case .none:
             return .unknown(type: rawType)
         }
@@ -646,6 +655,8 @@ enum WebBridgeCapability: String, Equatable, Sendable {
     case openCompetitionRecord = "OPEN_COMPETITION_RECORD"
     /// 대회 탭 목록 웹만 알린다. 목록이 없으면 웹은 머리줄 색을 보내지 않는다(앱 기본색 그대로).
     case competitionHeaderTint = "COMPETITION_HEADER_TINT"
+    /// 대회 탭 목록 웹만 알린다(#266). 목록이 없으면 웹은 상태를 보내지 않는다(앱 머리줄 버튼 없음).
+    case competitionHeaderActions = "COMPETITION_HEADER_ACTIONS"
 
     /// `window.AppBridgeCapabilities = [...]`를 정의하는 스크립트 소스. 직렬화 실패 시 nil.
     static func injectionScriptSource(for capabilities: [WebBridgeCapability]) -> String? {
@@ -707,6 +718,8 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
     case selectSheetResult(requestId: String, outcome: SelectSheetOutcome)
     /// PICK_PHOTOS의 결과. 고른 순서대로이며, 취소면 빈 배열이다.
     case photosPicked(requestId: String, files: [PickedPhoto])
+    /// 대회 탭 머리줄 ♡·달력 버튼 탭(#266). 웹이 처리한 뒤 COMPETITION_HEADER_ACTIONS로 새 상태를 돌려준다.
+    case competitionHeaderAction(CompetitionHeaderAction)
 
     private var type: String {
         switch self {
@@ -718,6 +731,7 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         case .confirmDialogResult: return "CONFIRM_DIALOG_RESULT"
         case .selectSheetResult: return "SELECT_SHEET_RESULT"
         case .photosPicked: return "PHOTOS_PICKED"
+        case .competitionHeaderAction: return "COMPETITION_HEADER_ACTION"
         }
     }
 
@@ -744,6 +758,8 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
                 "requestId": requestId,
                 "files": files.map { ["name": $0.name, "mimeType": $0.mimeType, "data": $0.data] }
             ]
+        case let .competitionHeaderAction(action):
+            return ["action": action.rawValue]
         }
     }
 

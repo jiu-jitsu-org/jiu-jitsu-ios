@@ -152,6 +152,8 @@ public struct CommunityDetailFeature: Sendable {
             case competitionAlertsEnabled(competitionId: String?)
             // 대회 목록 맨 위 색(COMPETITION_HEADER_TINT) → 대회 탭이 머리줄을 그 색으로 칠한다. nil이면 기본색.
             case competitionHeaderTintChanged(hex: String?)
+            // 대회 목록의 '관심 대회만'·'목록/달력' 상태(COMPETITION_HEADER_ACTIONS) → 대회 탭이 머리줄 버튼을 그 상태로 그린다.
+            case competitionHeaderActionsChanged(CompetitionHeaderActionsPayload)
         }
     }
 
@@ -360,6 +362,11 @@ public struct CommunityDetailFeature: Sendable {
                     guard state.capabilities.contains(.competitionHeaderTint) else { return .none }
                     return .send(.delegate(.competitionHeaderTintChanged(hex: hex)))
 
+                case let .competitionHeaderActions(payload):
+                    // 머리줄 버튼이 있는 대회 탭 목록 웹만 알린다. 다른 웹뷰에서 오면 그릴 버튼이 없어 무시한다.
+                    guard state.capabilities.contains(.competitionHeaderActions) else { return .none }
+                    return .send(.delegate(.competitionHeaderActionsChanged(payload)))
+
                 case let .unknown(type):
                     Log.trace("WebBridge 미지원 메시지 무시: \(type)", category: .network, level: .info)
                     return .none
@@ -397,6 +404,13 @@ public struct CommunityDetailFeature: Sendable {
             state.accessToken = nil
             enqueue(.authSessionExpired, into: &state)
         }
+    }
+
+    /// 대회 탭 머리줄의 ♡·달력 버튼 탭을 목록 웹에 넘긴다. 버튼 모양은 여기서 바꾸지 않는다 —
+    /// 비로그인이면 웹이 로그인 안내만 띄우고 상태를 그대로 두므로, 웹이 다시 알려 준 상태만 그린다.
+    static func sendCompetitionHeaderAction(_ action: CompetitionHeaderAction, into state: inout State) {
+        guard state.capabilities.contains(.competitionHeaderActions) else { return }
+        enqueue(.competitionHeaderAction(action), into: &state)
     }
 
     /// 웹 요청으로 띄운 네이티브 표면(알럿·시트·사진 피커)이 있는지. 한 번에 하나만 띄운다.

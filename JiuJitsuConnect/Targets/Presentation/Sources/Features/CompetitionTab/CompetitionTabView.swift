@@ -42,6 +42,7 @@ public struct CompetitionTabView: View {
     private var headerTint: Color? { store.headerTint.map { Color(hex: $0) } }
 
     // 홈 머리줄(높이 44 · 왼쪽 16 · 오른쪽 8 · 아래 구분선)과 같은 자리에 탭 이름과 알림함 종을 둔다.
+    // 종 앞에는 웹이 상태를 알려 온 동안만 ♡(관심 대회만)·달력/목록 버튼을 둔다(#266). 종은 홈처럼 맨 오른쪽에 남긴다.
     private var header: some View {
         ZStack(alignment: .bottom) {
             // 웹 그라데이션과 한 면으로 이어질 때는 구분선을 숨긴다.
@@ -56,6 +57,11 @@ public struct CompetitionTabView: View {
                     .font(Font.pretendard.title3)
                     .foregroundStyle(Color.component.header.text)
                 Spacer(minLength: 0)
+                if let actions = store.visibleHeaderActions {
+                    CompetitionHeaderActionButtons(actions: actions) {
+                        store.send(.view(.headerActionTapped($0)))
+                    }
+                }
                 if store.isNotificationButtonVisible {
                     NotificationInboxButton(hasUnread: hasUnreadNotification) {
                         store.send(.view(.notificationTapped))
@@ -80,6 +86,58 @@ public struct CompetitionTabView: View {
             .font(.pretendard.bodyM)
             .foregroundStyle(Color.component.errorState.default.titleText)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// 대회 탭 머리줄의 ♡(관심 대회만 보기)·달력/목록 전환 버튼(#266). 알림함 종과 같은 크기(아이콘 24 · 버튼 40)다.
+/// 누르면 웹에 넘기기만 하고, 모양은 웹이 다시 알려 준 상태(actions)로만 바뀐다.
+private struct CompetitionHeaderActionButtons: View {
+    let actions: CompetitionHeaderActionsPayload
+    let onTap: (CompetitionHeaderAction) -> Void
+
+    private enum Metrics {
+        static let iconSize: CGFloat = 24
+        static let buttonSize: CGFloat = 40
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button {
+                onTap(.toggleInterested)
+            } label: {
+                // 켜짐은 웹 관심 하트(reaction-bar active like-icon, #FF1D0D)와 같은 빨강으로 채운다.
+                icon(
+                    actions.interestedOnly ? Assets.Common.Icon.heartFill.swiftUIImage : Assets.Common.Icon.heart.swiftUIImage,
+                    color: actions.interestedOnly ? Color.primitive.red.r500 : Color.component.header.iconButton
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("관심 대회만 보기")
+            .accessibilityValue(actions.interestedOnly ? "켜짐" : "꺼짐")
+
+            Button {
+                onTap(.toggleMode)
+            } label: {
+                // 지금 모양이 아니라 눌렀을 때 갈 모양을 보여 준다(목록이면 달력, 달력이면 목록).
+                icon(
+                    actions.mode == .list ? Assets.Common.Icon.calendar.swiftUIImage : Assets.Common.Icon.list.swiftUIImage,
+                    color: Color.component.header.iconButton
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(actions.mode == .list ? "달력으로 보기" : "목록으로 보기")
+        }
+    }
+
+    // 웹 필터 줄과 같은 그림(웹 heart·calendar·list 아이콘을 옮긴 템플릿 SVG)을 종과 같은 24pt로 그린다.
+    private func icon(_ image: Image, color: Color) -> some View {
+        image
+            .resizable()
+            .scaledToFit()
+            .foregroundStyle(color)
+            .frame(width: Metrics.iconSize, height: Metrics.iconSize)
+            .frame(width: Metrics.buttonSize, height: Metrics.buttonSize)
+            .contentShape(Rectangle())
     }
 }
 

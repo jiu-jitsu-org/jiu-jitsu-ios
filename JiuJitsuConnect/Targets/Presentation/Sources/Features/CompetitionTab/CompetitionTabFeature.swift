@@ -25,6 +25,8 @@ public struct CompetitionTabFeature: Sendable {
         var scrollToTopToken: UUID?
         // 웹이 알린 목록 맨 위 색(`#RRGGBB`). 머리줄·상태바를 이 색으로 칠해 웹 그라데이션과 이음새가 없게 한다. nil이면 기본색.
         var headerTint: String?
+        // 웹이 알린 '관심 대회만'·'목록/달력' 상태. 받기 전·다시 불러오는 중·실패 후엔 nil이라 머리줄 ♡·달력 버튼을 숨긴다.
+        var headerActions: CompetitionHeaderActionsPayload?
 
         /// - Parameter base: 커뮤니티 웹과 같은 origin(테스트용 도메인 오버라이드 포함). 세션 쿠키를 가진 웹뷰에 다른 origin이 실리지 않게 한다.
         public init(base: URL?, accessToken: String?) {
@@ -34,8 +36,8 @@ public struct CompetitionTabFeature: Sendable {
                     accessToken: accessToken,
                     isTabRoot: true,
                     // 사진 고르기는 쌓인 상세 화면만 띄울 수 있어 목록에서는 알리지 않는다.
-                    // 머리줄 색은 이 탭 머리줄 아래 붙은 목록만 알린다.
-                    capabilities: [.competitionHeaderTint]
+                    // 머리줄 색·머리줄 버튼은 이 탭 머리줄 아래 붙은 목록만 알린다.
+                    capabilities: [.competitionHeaderTint, .competitionHeaderActions]
                 )
             }
         }
@@ -49,6 +51,12 @@ public struct CompetitionTabFeature: Sendable {
 
         // 머리줄의 알림함 종은 로그인한 사람만 본다(홈과 같은 알림함 정책, #258). 점 값은 홈이 가진 것을 받아 그린다.
         var isNotificationButtonVisible: Bool { web?.accessToken != nil }
+
+        // 머리줄 ♡·달력 버튼에 그릴 상태. 로딩 덮개·오류 화면이 웹을 가리는 동안엔 눌러도 웹이 받을 수 없어 숨긴다.
+        var visibleHeaderActions: CompetitionHeaderActionsPayload? {
+            guard let web, !web.isLoading, !web.hasError else { return nil }
+            return headerActions
+        }
 
         static func competitionURL(base: URL) -> URL? {
             URL(string: "/competition", relativeTo: base)?.absoluteURL
@@ -77,6 +85,8 @@ public struct CompetitionTabFeature: Sendable {
             case tabReselected
             // 머리줄의 알림함 종(#258) → 홈과 같은 알림함 웹을 이 탭 스택에 쌓는다.
             case notificationTapped
+            // 머리줄의 ♡(관심 대회만)·달력/목록 버튼 → 목록 웹에 넘긴다(#266).
+            case headerActionTapped(CompetitionHeaderAction)
         }
 
         public enum DelegateAction: Sendable {
@@ -114,6 +124,13 @@ public struct CompetitionTabFeature: Sendable {
                 state.path.append(.communityDetail(.init(url: url, accessToken: web.accessToken)))
                 return .none
 
+            case let .view(.headerActionTapped(action)):
+                // 상태는 바로 뒤집지 않는다. 웹이 처리하고 COMPETITION_HEADER_ACTIONS로 알려 준 값만 그린다.
+                guard state.visibleHeaderActions != nil, var web = state.web else { return .none }
+                CommunityDetailFeature.sendCompetitionHeaderAction(action, into: &web)
+                state.web = web
+                return .none
+
             // MARK: - 목록 웹
 
             case let .web(.delegate(.openSubviewRequested(payload))):
@@ -135,10 +152,21 @@ public struct CompetitionTabFeature: Sendable {
                 state.headerTint = hex
                 return .none
 
+            case let .web(.delegate(.competitionHeaderActionsChanged(payload))):
+                state.headerActions = payload
+                return .none
+
             case let .web(.delegate(delegate)):
                 return .send(.delegate(.webSubview(delegate)))
 
+            case .web(.internal(.loadingStarted)):
+                // 머리줄 버튼은 새로 그려진 웹이 다시 알려 줄 때까지 숨긴다. 이 메시지를 모르는 웹으로 바뀌어도 지난 상태가 남지 않게 한다.
+                state.headerActions = nil
+                return .none
+
             case .web(.internal(.loadingFailed)):
+                // 오류 화면 위에 웹이 받을 수 없는 머리줄 버튼이 남지 않게 숨긴다.
+                state.headerActions = nil
                 // 불러오기에 실패하면 오류 화면 위에 지난 색이 남지 않게 기본색으로 돌린다.
                 // 시작할 때 지우지 않는 건 당겨서 새로고침 동안 머리·밴드가 흰색으로 깜빡이지 않게 하려는 것 —
                 // 다시 그려진 웹은 붙자마자 색(또는 null)을 다시 보낸다.
