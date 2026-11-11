@@ -98,6 +98,9 @@ public final class DependencyContainer {
             hasValidToken: {
                 self.authRepository.hasValidToken()
             },
+            storedAccessToken: {
+                self.authRepository.storedAccessToken()
+            },
             refreshSession: {
                 try await self.authRepository.refreshSession()
             },

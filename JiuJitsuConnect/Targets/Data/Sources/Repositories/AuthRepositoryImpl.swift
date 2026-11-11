@@ -246,6 +246,12 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                tokenStorage.isAutoLoginEnabled()
     }
 
+    public func storedAccessToken() -> String? {
+        // 자동 로그인이 돌 조건(hasValidToken)일 때만 돌려준다 — 아니면 autoLogin이 토큰을 지운다.
+        guard hasValidToken() else { return nil }
+        return tokenStorage.getAccessToken()
+    }
+
     public func refreshSession() async throws -> String {
         // 실제 갱신은 NetworkService의 single-flight 코디네이터가 수행한다(401 인터셉터와 공유).
         // refresh 토큰이 회전되므로 인터셉터·웹 위임이 같은 코디네이터를 타야 경쟁이 없다.

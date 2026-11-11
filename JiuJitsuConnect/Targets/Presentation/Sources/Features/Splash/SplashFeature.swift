@@ -24,6 +24,7 @@ public struct SplashFeature: Sendable {
 
     @Dependency(\.continuousClock) var clock
     @Dependency(\.authClient) var authClient
+    @Dependency(\.homeFeedPreloadClient) var homeFeedPreload
 
     @ObservableState
     public struct State: Equatable {
@@ -64,6 +65,20 @@ public struct SplashFeature: Sendable {
                     // refresh 토큰은 서버에서 1회용으로 회전되므로, 늦게 도착한 재발급 응답의 새 토큰도
                     // autoLogin(AuthRepositoryImpl)이 저장해야 다음 실행의 자동 로그인이 깨지지 않는다.
                     let autoLoginTask = Task { try await self.authClient.autoLogin() }
+
+                    // 저장된 access token이 아직 유효하면 자동 로그인을 기다리지 않고 홈 피드를 미리 불러 둔다(#270).
+                    // 서버는 토큰을 갱신해도 이전 access token을 막지 않아 그대로 써도 된다.
+                    // 미리 불러 둘 수 없으면(로그인 전·토큰 만료) 웹킷만 데워 둔다(#207).
+                    // 자동 로그인과 1.5초 타이머를 먼저 시작해, 웹뷰를 만드는 동안 이 둘이 밀리지 않게 한다.
+                    let homeURL = CommunityFeature.makeCommunityURL()
+                    var isPreloading = false
+                    if let homeURL, let token = self.authClient.storedAccessToken(), !JWTDecoder.isExpired(token) {
+                        await self.homeFeedPreload.preload(homeURL, token)
+                        isPreloading = true
+                    } else {
+                        await self.homeFeedPreload.prewarm()
+                    }
+
                     let outcome = await withTaskGroup(of: AutoLoginOutcome.self) { group in
                         group.addTask {
                             // 비구조적 Task의 value를 기다리는 쪽이 취소돼도 Task 자체는 취소되지 않는다.
@@ -77,6 +92,18 @@ public struct SplashFeature: Sendable {
                         group.cancelAll()
                         return first
                     }
+
+                    // 홈으로 가면, 미리 불러 두지 못했어도 새 토큰으로 지금 시작한다 — 스플래시 남은 시간만큼 겹친다.
+                    // 로그인 화면으로 가면 미리 불러 둔 화면을 버린다.
+                    let authInfo: AuthInfo? = if case let .completed(.success(info)) = outcome { info } else { nil }
+                    if let accessToken = authInfo?.accessToken {
+                        if !isPreloading, let homeURL {
+                            await self.homeFeedPreload.preload(homeURL, accessToken)
+                        }
+                    } else {
+                        await self.homeFeedPreload.discard()
+                    }
+
                     _ = try await splashDelay
 
                     switch outcome {
