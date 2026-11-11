@@ -217,7 +217,7 @@ public struct AppTabView: View {
         HStack(spacing: 0) {
             tabBarButton(tab: .home, icon: .home, label: "홈")
             tabBarButton(tab: .competition, icon: .competition, label: "대회")
-            tabBarButton(tab: .myPage, icon: .my, label: "MY")
+            tabBarButton(tab: .myPage, icon: .myPage, label: "MY")
         }
         .frame(height: Metrics.tabBarHeight)
         .padding(.horizontal, 20)

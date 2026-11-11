@@ -10,7 +10,7 @@ import DesignSystem
 enum TabBarIconKind {
     case home
     case competition
-    case my
+    case myPage
 }
 
 /// 하단 탭바 아이콘(#262).
@@ -24,8 +24,6 @@ struct TabBarIcon: View {
     let isSelected: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// 바뀔 때마다 감기 움직임을 한 번 재생한다
-    @State private var wrapCount = 0
 
     private enum Metrics {
         static let size: CGFloat = 24
@@ -61,7 +59,7 @@ struct TabBarIcon: View {
         let shape = TabBarIconShape(kind: kind)
         let selectedColor = Color.component.navibar.selected.icon
 
-        KeyframeAnimator(initialValue: WrapPose(), trigger: wrapCount) { pose in
+        KeyframeAnimator(initialValue: WrapPose(), trigger: isSelected) { pose in
             Group {
                 if isSelected {
                     ZStack {
@@ -93,11 +91,15 @@ struct TabBarIcon: View {
             }
             .frame(width: Metrics.size, height: Metrics.size)
         } keyframes: { _ in
+            // 선택이 바뀐 바로 그 그림부터 움직임이 시작되도록 trigger를 isSelected에 직접 건다
+            // (onChange로 한 번 더 바꾸면 다 감긴 모습이 한 프레임 보였다가 처음부터 감긴다).
+            // 고를 때만 감는다. 벗어날 때(회색 선으로 바로 바뀜)와 '동작 줄이기'에서는 길이 0으로 끝 모습에 머문다.
+            let wraps = isSelected && !reduceMotion
             KeyframeTrack(\.progress) {
-                MoveKeyframe(0)
+                MoveKeyframe(wraps ? 0 : 1)
                 LinearKeyframe(
                     1,
-                    duration: Timing.draw,
+                    duration: wraps ? Timing.draw : 0,
                     timingCurve: .bezier(
                         startControlPoint: UnitPoint(x: 0.45, y: 0),
                         endControlPoint: UnitPoint(x: 0.2, y: 1)
@@ -105,20 +107,16 @@ struct TabBarIcon: View {
                 )
             }
             KeyframeTrack(\.fillOpacity) {
-                MoveKeyframe(0)
-                LinearKeyframe(0, duration: Timing.settleStart)
-                LinearKeyframe(Metrics.selectedFillOpacity, duration: Timing.fill, timingCurve: .easeOut)
+                MoveKeyframe(wraps ? 0 : Metrics.selectedFillOpacity)
+                LinearKeyframe(wraps ? 0 : Metrics.selectedFillOpacity, duration: wraps ? Timing.settleStart : 0)
+                LinearKeyframe(Metrics.selectedFillOpacity, duration: wraps ? Timing.fill : 0, timingCurve: .easeOut)
             }
             KeyframeTrack(\.scale) {
                 MoveKeyframe(1)
-                LinearKeyframe(1, duration: Timing.settleStart)
-                CubicKeyframe(Timing.settleScale, duration: Timing.scaleUp)
-                SpringKeyframe(1, duration: Timing.scaleBack, spring: .bouncy)
+                LinearKeyframe(1, duration: wraps ? Timing.settleStart : 0)
+                CubicKeyframe(wraps ? Timing.settleScale : 1, duration: wraps ? Timing.scaleUp : 0)
+                SpringKeyframe(1, duration: wraps ? Timing.scaleBack : 0, spring: .bouncy)
             }
-        }
-        .onChange(of: isSelected) { wasSelected, nowSelected in
-            guard !wasSelected, nowSelected, !reduceMotion else { return }
-            wrapCount += 1
         }
     }
 }
@@ -145,100 +143,100 @@ struct TabBarIconShape: Shape {
         switch kind {
         case .home: Self.home
         case .competition: Self.competition
-        case .my: Self.my
+        case .myPage: Self.myPage
         }
     }
 
     // MARK: - 24×24 격자 경로 (디자인 SVG를 그대로 옮김)
 
     /// 둥근 지붕 집
-    private static let home = Path { p in
-        p.move(to: pt(12, 4.44))
-        p.addCurve(to: pt(13.78, 5.12), control1: pt(12.62, 4.44), control2: pt(13.25, 4.66))
-        p.addLine(to: pt(18.12, 8.82))
-        p.addCurve(to: pt(19.5, 11.82), control1: pt(18.95, 9.53), control2: pt(19.5, 10.73))
-        p.addLine(to: pt(19.5, 18.42))
-        p.addCurve(to: pt(17.42, 20.5), control1: pt(19.5, 19.67), control2: pt(18.67, 20.5))
-        p.addLine(to: pt(6.58, 20.5))
-        p.addCurve(to: pt(4.5, 18.42), control1: pt(5.33, 20.5), control2: pt(4.5, 19.67))
-        p.addLine(to: pt(4.5, 11.82))
-        p.addCurve(to: pt(5.88, 8.82), control1: pt(4.5, 10.73), control2: pt(5.05, 9.53))
-        p.addLine(to: pt(10.22, 5.12))
-        p.addCurve(to: pt(12, 4.44), control1: pt(10.75, 4.66), control2: pt(11.38, 4.44))
-        p.closeSubpath()
+    private static let home = Path { path in
+        path.move(to: pt(12, 4.44))
+        path.addCurve(to: pt(13.78, 5.12), control1: pt(12.62, 4.44), control2: pt(13.25, 4.66))
+        path.addLine(to: pt(18.12, 8.82))
+        path.addCurve(to: pt(19.5, 11.82), control1: pt(18.95, 9.53), control2: pt(19.5, 10.73))
+        path.addLine(to: pt(19.5, 18.42))
+        path.addCurve(to: pt(17.42, 20.5), control1: pt(19.5, 19.67), control2: pt(18.67, 20.5))
+        path.addLine(to: pt(6.58, 20.5))
+        path.addCurve(to: pt(4.5, 18.42), control1: pt(5.33, 20.5), control2: pt(4.5, 19.67))
+        path.addLine(to: pt(4.5, 11.82))
+        path.addCurve(to: pt(5.88, 8.82), control1: pt(4.5, 10.73), control2: pt(5.05, 9.53))
+        path.addLine(to: pt(10.22, 5.12))
+        path.addCurve(to: pt(12, 4.44), control1: pt(10.75, 4.66), control2: pt(11.38, 4.44))
+        path.closeSubpath()
     }
 
     /// 트로피. 손잡이는 같은 곡선을 나갔다 되돌아와 가는 한 줄로 보인다
-    private static let competition = Path { p in
-        p.move(to: pt(12, 4))
-        p.addLine(to: pt(15.04, 4))
-        p.addQuadCurve(to: pt(16.6, 5.56), control: pt(16.6, 4))
-        p.addLine(to: pt(16.6, 5.6))
+    private static let competition = Path { path in
+        path.move(to: pt(12, 4))
+        path.addLine(to: pt(15.04, 4))
+        path.addQuadCurve(to: pt(16.6, 5.56), control: pt(16.6, 4))
+        path.addLine(to: pt(16.6, 5.6))
         // 오른쪽 손잡이: 나갔다가
-        p.addCurve(to: pt(20.4, 8.2), control1: pt(18.8, 5.2), control2: pt(20.4, 6.2))
-        p.addCurve(to: pt(17.6, 11.1), control1: pt(20.4, 10.2), control2: pt(19, 11.2))
+        path.addCurve(to: pt(20.4, 8.2), control1: pt(18.8, 5.2), control2: pt(20.4, 6.2))
+        path.addCurve(to: pt(17.6, 11.1), control1: pt(20.4, 10.2), control2: pt(19, 11.2))
         // 같은 곡선으로 되돌아온다
-        p.addCurve(to: pt(20.4, 8.2), control1: pt(19, 11.2), control2: pt(20.4, 10.2))
-        p.addCurve(to: pt(16.6, 5.6), control1: pt(20.4, 6.2), control2: pt(18.8, 5.2))
-        p.addLine(to: pt(16.6, 9.4))
-        p.addCurve(to: pt(13.5, 15.6), control1: pt(16.4, 12.8), control2: pt(15, 14.9))
-        p.addLine(to: pt(13.5, 17.6))
-        p.addCurve(to: pt(14.5, 18.6), control1: pt(13.5, 18.2), control2: pt(13.9, 18.6))
-        p.addLine(to: pt(15.4, 18.6))
-        p.addQuadCurve(to: pt(16.4, 19.6), control: pt(16.4, 18.6))
-        p.addLine(to: pt(16.4, 20.2))
-        p.addQuadCurve(to: pt(15.4, 21.2), control: pt(16.4, 21.2))
-        p.addLine(to: pt(8.6, 21.2))
-        p.addQuadCurve(to: pt(7.6, 20.2), control: pt(7.6, 21.2))
-        p.addLine(to: pt(7.6, 19.6))
-        p.addQuadCurve(to: pt(8.6, 18.6), control: pt(7.6, 18.6))
-        p.addLine(to: pt(9.5, 18.6))
-        p.addCurve(to: pt(10.5, 17.6), control1: pt(10.1, 18.6), control2: pt(10.5, 18.2))
-        p.addLine(to: pt(10.5, 15.6))
-        p.addCurve(to: pt(7.4, 9.4), control1: pt(9, 14.9), control2: pt(7.6, 12.8))
-        p.addLine(to: pt(7.4, 5.6))
+        path.addCurve(to: pt(20.4, 8.2), control1: pt(19, 11.2), control2: pt(20.4, 10.2))
+        path.addCurve(to: pt(16.6, 5.6), control1: pt(20.4, 6.2), control2: pt(18.8, 5.2))
+        path.addLine(to: pt(16.6, 9.4))
+        path.addCurve(to: pt(13.5, 15.6), control1: pt(16.4, 12.8), control2: pt(15, 14.9))
+        path.addLine(to: pt(13.5, 17.6))
+        path.addCurve(to: pt(14.5, 18.6), control1: pt(13.5, 18.2), control2: pt(13.9, 18.6))
+        path.addLine(to: pt(15.4, 18.6))
+        path.addQuadCurve(to: pt(16.4, 19.6), control: pt(16.4, 18.6))
+        path.addLine(to: pt(16.4, 20.2))
+        path.addQuadCurve(to: pt(15.4, 21.2), control: pt(16.4, 21.2))
+        path.addLine(to: pt(8.6, 21.2))
+        path.addQuadCurve(to: pt(7.6, 20.2), control: pt(7.6, 21.2))
+        path.addLine(to: pt(7.6, 19.6))
+        path.addQuadCurve(to: pt(8.6, 18.6), control: pt(7.6, 18.6))
+        path.addLine(to: pt(9.5, 18.6))
+        path.addCurve(to: pt(10.5, 17.6), control1: pt(10.1, 18.6), control2: pt(10.5, 18.2))
+        path.addLine(to: pt(10.5, 15.6))
+        path.addCurve(to: pt(7.4, 9.4), control1: pt(9, 14.9), control2: pt(7.6, 12.8))
+        path.addLine(to: pt(7.4, 5.6))
         // 왼쪽 손잡이: 나갔다가
-        p.addCurve(to: pt(3.6, 8.2), control1: pt(5.2, 5.2), control2: pt(3.6, 6.2))
-        p.addCurve(to: pt(6.4, 11.1), control1: pt(3.6, 10.2), control2: pt(5, 11.2))
+        path.addCurve(to: pt(3.6, 8.2), control1: pt(5.2, 5.2), control2: pt(3.6, 6.2))
+        path.addCurve(to: pt(6.4, 11.1), control1: pt(3.6, 10.2), control2: pt(5, 11.2))
         // 같은 곡선으로 되돌아온다
-        p.addCurve(to: pt(3.6, 8.2), control1: pt(5, 11.2), control2: pt(3.6, 10.2))
-        p.addCurve(to: pt(7.4, 5.6), control1: pt(3.6, 6.2), control2: pt(5.2, 5.2))
-        p.addLine(to: pt(7.4, 5.56))
-        p.addQuadCurve(to: pt(8.96, 4), control: pt(7.4, 4))
-        p.closeSubpath()
+        path.addCurve(to: pt(3.6, 8.2), control1: pt(5, 11.2), control2: pt(3.6, 10.2))
+        path.addCurve(to: pt(7.4, 5.6), control1: pt(3.6, 6.2), control2: pt(5.2, 5.2))
+        path.addLine(to: pt(7.4, 5.56))
+        path.addQuadCurve(to: pt(8.96, 4), control: pt(7.4, 4))
+        path.closeSubpath()
     }
 
     /// 머리에서 어깨로 한 줄로 이어지는 사람
-    private static let my = Path { p in
+    private static let myPage = Path { path in
         // 머리는 중심 (12, 8.4), 반지름 4인 원의 일부다.
         // y가 아래로 커지는 좌표라 clockwise: false가 화면에서는 시계 방향이다.
         let headCenter = pt(12, 8.4)
         let headRadius: CGFloat = 4
-        p.move(to: pt(12, 4.4))
+        path.move(to: pt(12, 4.4))
         // 위(-90°)에서 오른쪽을 돌아 목 오른쪽(60°, ≈(14, 11.86))까지
-        p.addArc(
+        path.addArc(
             center: headCenter,
             radius: headRadius,
             startAngle: .degrees(-90),
             endAngle: .degrees(60),
             clockwise: false
         )
-        p.addCurve(to: pt(19.4, 18), control1: pt(14.5, 13.1), control2: pt(19.4, 13))
-        p.addLine(to: pt(19.4, 19.82))
-        p.addQuadCurve(to: pt(18.62, 20.6), control: pt(19.4, 20.6))
-        p.addLine(to: pt(5.38, 20.6))
-        p.addQuadCurve(to: pt(4.6, 19.82), control: pt(4.6, 20.6))
-        p.addLine(to: pt(4.6, 18))
-        p.addCurve(to: pt(10, 11.86), control1: pt(4.6, 13), control2: pt(9.5, 13.1))
+        path.addCurve(to: pt(19.4, 18), control1: pt(14.5, 13.1), control2: pt(19.4, 13))
+        path.addLine(to: pt(19.4, 19.82))
+        path.addQuadCurve(to: pt(18.62, 20.6), control: pt(19.4, 20.6))
+        path.addLine(to: pt(5.38, 20.6))
+        path.addQuadCurve(to: pt(4.6, 19.82), control: pt(4.6, 20.6))
+        path.addLine(to: pt(4.6, 18))
+        path.addCurve(to: pt(10, 11.86), control1: pt(4.6, 13), control2: pt(9.5, 13.1))
         // 목 왼쪽(120°, ≈(10, 11.86))에서 왼쪽을 돌아 위(270°)로
-        p.addArc(
+        path.addArc(
             center: headCenter,
             radius: headRadius,
             startAngle: .degrees(120),
             endAngle: .degrees(270),
             clockwise: false
         )
-        p.closeSubpath()
+        path.closeSubpath()
     }
 
     private static func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
@@ -249,7 +247,7 @@ struct TabBarIconShape: Shape {
 // MARK: - Preview
 #Preview {
     @Previewable @State var selected: TabBarIconKind = .home
-    let kinds: [TabBarIconKind] = [.home, .competition, .my]
+    let kinds: [TabBarIconKind] = [.home, .competition, .myPage]
 
     HStack(spacing: 32) {
         ForEach(kinds, id: \.self) { kind in
