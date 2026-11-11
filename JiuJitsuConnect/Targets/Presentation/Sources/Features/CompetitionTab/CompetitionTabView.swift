@@ -94,6 +94,7 @@ private struct CompetitionListWebView: View {
                 overscrollBackground: Color.primitive.bw.white,
                 // 머리줄이 칠해져 있으면 맨 위에서 당길 때 드러나는 밴드도 같은 색으로 이어 준다.
                 pullToRefreshBackground: headerTint,
+                extendsUnderTabBar: true,
                 capabilities: store.capabilities,
                 onLoadingStarted: { store.send(.internal(.loadingStarted)) },
                 onLoadingFinished: { store.send(.internal(.loadingFinished)) },
@@ -101,8 +102,12 @@ private struct CompetitionListWebView: View {
                 onBridgeMessage: { store.send(.internal(.bridgeMessageReceived($0))) },
                 onOutboundDelivered: { store.send(.internal(.outboundDelivered(id: $0))) }
             )
+            // 목록이 떠 있는 탭 바 뒤로 비쳐 흐르게 바닥까지 그린다(#267).
+            .ignoresSafeArea(.container, edges: .bottom)
 
             WebLoadingOverlay(isLoading: store.isLoading)
+                // 웹이 탭 바 밑까지 그려지므로 덮개도 그 밑까지 덮어, 탭 바 자리에 웹 바탕(흰색)이 따로 비치지 않게 한다.
+                .ignoresSafeArea(.container, edges: .bottom)
 
             if store.hasError {
                 VStack(spacing: 13) {

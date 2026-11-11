@@ -13,8 +13,6 @@ import Domain
 // MARK: - Layout Metrics
 
 private enum Metrics {
-    // 아래 탭바 높이(AppTabView와 같은 값)
-    static let tabBarHeight: CGFloat = 58
     // 카드가 헤더와 겹치는 높이 — 도장명 유무에 따라 분기 적용
     enum Card {
         static let overlapWithButton: CGFloat = 46.49
@@ -35,6 +33,9 @@ public struct MyProfileView: View {
     // 대회 줄을 눌렀을 때 띄우는 시트(부문 수정 / 부문 추가 / 삭제). 화면 표시용 일시 상태라 Feature로 올리지 않고,
     // 고른 동작은 시트가 다 닫힌 뒤 한다 — 닫히는 중에 입력 화면을 push하거나 알럿을 띄우면 전환이 겹친다.
     @State private var competitionSheet: CompetitionSheetTarget?
+    // 탭의 MY면 스크롤을 알려 탭 바를 숨기고 꺼낸다(#267). 쌓인 MY에는 nil이 온다.
+    @Environment(\.tabRootScroll) private var tabRootScroll
+    @State private var isUserScrolling = false
     @State private var pendingCompetitionAction: (() -> Void)?
     // 삭제 확인 알럿에 띄울 대회(부문별 기록)
     @State private var competitionPendingDelete: [Competition]?
@@ -156,12 +157,24 @@ public struct MyProfileView: View {
 
                     // 배경 그라데이션 (디폴트 화면일 때만)
                     if showsDefaultScreen {
-                        // 탭의 MY는 아래 탭바(58) 밑까지 내린다. 커뮤니티에서 연 MY는 탭바가 없다(#197).
-                        backgroundGradient(bottomOffset: (store.isPushed ? 0 : Metrics.tabBarHeight) + safeAreaBottom)
+                        // 화면 맨 아래까지 내린다. 탭의 MY는 아래 안전 영역에 떠 있는 탭 바 자리까지 들어 있다(#267).
+                        backgroundGradient(bottomOffset: safeAreaBottom)
                     }
                 }
             }
             .scrollDisabled(false)
+            .onScrollPhaseChange { _, phase in
+                isUserScrolling = phase == .interacting || phase == .decelerating
+            }
+            .onScrollGeometryChange(for: ScrollReport.self) { geometry in
+                ScrollReport(
+                    offsetY: geometry.contentOffset.y + geometry.contentInsets.top,
+                    maxOffsetY: geometry.contentSize.height + geometry.contentInsets.top
+                        + geometry.contentInsets.bottom - geometry.containerSize.height
+                )
+            } action: { _, report in
+                tabRootScroll?.report(report.offsetY, report.maxOffsetY, isUserScrolling)
+            }
             .onAppear {
                 UIScrollView.appearance().bounces = false
                 store.send(.view(.onAppear))
@@ -348,6 +361,12 @@ public struct MyProfileView: View {
         .allowsHitTesting(false)
         .zIndex(-1)
     }
+}
+
+/// 스크롤 위치를 탭 바 숨김에 알릴 때 쓰는 값(#267).
+private struct ScrollReport: Equatable {
+    let offsetY: CGFloat
+    let maxOffsetY: CGFloat
 }
 
 // MARK: - View Modifiers
