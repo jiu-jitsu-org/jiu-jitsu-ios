@@ -30,6 +30,65 @@ public enum Assets {
       public static let setting = ImageAsset(name: "Bottom/Icon/setting")
     }
   }
+  public enum Character {
+    public enum Belt {
+      public enum Face {
+        public static let faceAngry = ImageAsset(name: "Character/Belt/Face/face-angry")
+        public static let faceBored = ImageAsset(name: "Character/Belt/Face/face-bored")
+        public static let faceCalm = ImageAsset(name: "Character/Belt/Face/face-calm")
+        public static let faceCross = ImageAsset(name: "Character/Belt/Face/face-cross")
+        public static let faceDizzy = ImageAsset(name: "Character/Belt/Face/face-dizzy")
+        public static let faceFocus = ImageAsset(name: "Character/Belt/Face/face-focus")
+        public static let faceGlare = ImageAsset(name: "Character/Belt/Face/face-glare")
+        public static let faceHappy = ImageAsset(name: "Character/Belt/Face/face-happy")
+        public static let faceHeart = ImageAsset(name: "Character/Belt/Face/face-heart")
+        public static let faceMoved = ImageAsset(name: "Character/Belt/Face/face-moved")
+        public static let facePain = ImageAsset(name: "Character/Belt/Face/face-pain")
+        public static let facePuzzled = ImageAsset(name: "Character/Belt/Face/face-puzzled")
+        public static let faceSad = ImageAsset(name: "Character/Belt/Face/face-sad")
+        public static let faceScared = ImageAsset(name: "Character/Belt/Face/face-scared")
+        public static let faceShock = ImageAsset(name: "Character/Belt/Face/face-shock")
+        public static let faceShy = ImageAsset(name: "Character/Belt/Face/face-shy")
+        public static let faceSide = ImageAsset(name: "Character/Belt/Face/face-side")
+        public static let faceSleepy = ImageAsset(name: "Character/Belt/Face/face-sleepy")
+        public static let faceSmug = ImageAsset(name: "Character/Belt/Face/face-smug")
+        public static let faceSquint = ImageAsset(name: "Character/Belt/Face/face-squint")
+        public static let faceStar = ImageAsset(name: "Character/Belt/Face/face-star")
+        public static let faceSus = ImageAsset(name: "Character/Belt/Face/face-sus")
+        public static let faceSweat = ImageAsset(name: "Character/Belt/Face/face-sweat")
+        public static let faceTeary = ImageAsset(name: "Character/Belt/Face/face-teary")
+        public static let faceWink = ImageAsset(name: "Character/Belt/Face/face-wink")
+        public static let faceWorry = ImageAsset(name: "Character/Belt/Face/face-worry")
+      }
+      public enum Pose {
+        public static let poseBow = ImageAsset(name: "Character/Belt/Pose/pose-bow")
+        public static let poseDroop = ImageAsset(name: "Character/Belt/Pose/pose-droop")
+        public static let poseFlinch = ImageAsset(name: "Character/Belt/Pose/pose-flinch")
+        public static let poseGreet = ImageAsset(name: "Character/Belt/Pose/pose-greet")
+        public static let poseHappyLean = ImageAsset(name: "Character/Belt/Pose/pose-happy-lean")
+        public static let poseHello = ImageAsset(name: "Character/Belt/Pose/pose-hello")
+        public static let poseLeanIn = ImageAsset(name: "Character/Belt/Pose/pose-lean-in")
+        public static let poseLookBack = ImageAsset(name: "Character/Belt/Pose/pose-look-back")
+        public static let poseNod = ImageAsset(name: "Character/Belt/Pose/pose-nod")
+        public static let posePeek = ImageAsset(name: "Character/Belt/Pose/pose-peek")
+        public static let poseProudFar = ImageAsset(name: "Character/Belt/Pose/pose-proud-far")
+        public static let poseShyBack = ImageAsset(name: "Character/Belt/Pose/pose-shy-back")
+        public static let poseShyLean = ImageAsset(name: "Character/Belt/Pose/pose-shy-lean")
+        public static let poseShyTurn = ImageAsset(name: "Character/Belt/Pose/pose-shy-turn")
+        public static let poseStandTall = ImageAsset(name: "Character/Belt/Pose/pose-stand-tall")
+        public static let poseStartle = ImageAsset(name: "Character/Belt/Pose/pose-startle")
+        public static let poseStiffBack = ImageAsset(name: "Character/Belt/Pose/pose-stiff-back")
+        public static let poseSulk = ImageAsset(name: "Character/Belt/Pose/pose-sulk")
+        public static let poseTilt = ImageAsset(name: "Character/Belt/Pose/pose-tilt")
+        public static let poseWave = ImageAsset(name: "Character/Belt/Pose/pose-wave")
+        public static let poseWhisper = ImageAsset(name: "Character/Belt/Pose/pose-whisper")
+        public static let poseWiggleSmall = ImageAsset(name: "Character/Belt/Pose/pose-wiggle-small")
+        public static let poseWiggle = ImageAsset(name: "Character/Belt/Pose/pose-wiggle")
+        public static let poseWilt = ImageAsset(name: "Character/Belt/Pose/pose-wilt")
+        public static let poseZigzag = ImageAsset(name: "Character/Belt/Pose/pose-zigzag")
+      }
+    }
+  }
   public enum Common {
     public enum Icon {
       public static let arrowLeft = ImageAsset(name: "Common/Icon/arrow-left")
