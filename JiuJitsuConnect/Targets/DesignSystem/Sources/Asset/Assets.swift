@@ -24,6 +24,9 @@ public typealias AssetImageTypeAlias = ImageAsset.Image
 public enum Assets {
   public enum Bottom {
     public enum Icon {
+      public static let competition = ImageAsset(name: "Bottom/Icon/competition")
+      public static let home = ImageAsset(name: "Bottom/Icon/home")
+      public static let my = ImageAsset(name: "Bottom/Icon/my")
       public static let setting = ImageAsset(name: "Bottom/Icon/setting")
     }
   }
