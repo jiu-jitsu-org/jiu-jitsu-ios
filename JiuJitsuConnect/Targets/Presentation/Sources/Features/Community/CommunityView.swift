@@ -41,15 +41,20 @@ public struct CommunityView: View {
                         outbox: store.outbox,
                         // 리스트 피드 웹 배경과 맞춰, 바운스 때 다른 색이 드러나지 않게 한다.
                         overscrollBackground: Color.primitive.bw.white,
+                        extendsUnderTabBar: true,
                         onLoadingStarted: { store.send(.internal(.loadingStarted)) },
                         onLoadingFinished: { store.send(.internal(.loadingFinished)) },
                         onLoadingFailed: { store.send(.internal(.loadingFailed)) },
                         onBridgeMessage: { store.send(.internal(.bridgeMessageReceived($0))) },
                         onOutboundDelivered: { store.send(.internal(.outboundDelivered(id: $0))) }
                     )
+                    // 피드가 떠 있는 탭 바 뒤로 비쳐 흐르게 바닥까지 그린다(#267).
+                    .ignoresSafeArea(.container, edges: .bottom)
                 }
 
                 WebLoadingOverlay(isLoading: store.isLoading)
+                    // 웹이 탭 바 밑까지 그려지므로 덮개도 그 밑까지 덮어, 탭 바 자리에 웹 바탕(흰색)이 따로 비치지 않게 한다.
+                    .ignoresSafeArea(.container, edges: .bottom)
 
                 if store.hasError {
                     errorOverlay

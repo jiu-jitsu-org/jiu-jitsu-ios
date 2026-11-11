@@ -40,6 +40,9 @@ struct BridgeWebView: UIViewRepresentable {
     var overscrollBackground: Color = Color.primitive.bw.trueWhite
     // 맨 위에서 당길 때 드러나는 풀다운 밴드의 바탕색. nil이면 기본 연파랑. 대회 목록만 머리줄 색과 맞추려고 넘긴다.
     var pullToRefreshBackground: Color?
+    // 탭 첫 화면 웹(홈 피드·대회 목록)만 켠다(#267). 웹뷰를 떠 있는 탭 바 밑까지 그리고, 탭 바가 가린 만큼을
+    // 웹에 알려 맨 아래 글·고정 버튼이 탭 바 위에서 멈추게 한다. 키보드가 뜨면 가린 영역이 없으므로 0으로 돌린다.
+    var extendsUnderTabBar: Bool = false
     // 이 웹뷰를 소유한 Feature가 실제로 처리하는 '사전 확인형' 메시지. 처리하지 않는 웹뷰가 지원한다고
     // 알리면 웹이 요청을 보내 놓고 응답 없이 기다리므로, 처리하는 화면만 넘긴다.
     var capabilities: [WebBridgeCapability] = []
@@ -141,6 +144,7 @@ struct BridgeWebView: UIViewRepresentable {
         // 본문만 스크롤된다. WKWebView는 viewport `interactive-widget=resizes-content` 지원이
         // 불안정해 레이아웃 뷰포트가 안 줄어들므로, 네이티브 프레임 리사이즈로 키보드를 처리한다.
         let container = KeyboardAvoidingWebContainer()
+        container.reportsBottomSafeAreaAsObscured = extendsUnderTabBar
         webView.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(webView)
         container.pinWebView(webView)
@@ -179,6 +183,9 @@ struct BridgeWebView: UIViewRepresentable {
         )
         context.coordinator.scrollToTop(token: scrollToTopToken)
         context.coordinator.setPullToRefreshBackground(pullToRefreshBackground.map { UIColor($0) })
+        // 탭 첫 화면 웹만 스크롤을 AppTabView에 알린다 — 탭 바 숨김·맨 위로 버튼(#267).
+        let tabRootScroll: TabRootScrollAction? = extendsUnderTabBar ? context.environment.tabRootScroll : nil
+        (container as? KeyboardAvoidingWebContainer)?.onScroll = tabRootScroll?.report
         // 토큰 변동(갱신) 시에도 세션 쿠키를 최신으로 유지한 뒤 (재)로드/플러시한다.
         let cookieStore = context.coordinator.webView?.configuration.websiteDataStore.httpCookieStore
             ?? WKWebsiteDataStore.default().httpCookieStore
@@ -521,8 +528,21 @@ struct BridgeWebView: UIViewRepresentable {
 /// (required)을 켜서 강제 복귀시킨다.
 private final class KeyboardAvoidingWebContainer: UIView {
     private var bottomToBottomEdge: NSLayoutConstraint?
+    private weak var webView: WKWebView?
+    private var offsetObservation: NSKeyValueObservation?
+    // 켜면 아래 안전 영역(떠 있는 탭 바 자리)을 웹뷰가 가려진 영역으로 알린다(#267).
+    var reportsBottomSafeAreaAsObscured = false
+    // 탭 바가 보일 때의 아래 안전 영역. 스크롤로 탭 바를 숨겨도 이 값을 그대로 둬,
+    // 웹의 글쓰기 버튼·마지막 글이 탭 바와 함께 들썩이지 않게 한다(움직이는 건 탭 바 하나).
+    private var tabBarObscuredBottom: CGFloat = 0
+    // 스크롤할 때마다 부른다(탭 첫 화면 웹만, #267).
+    var onScroll: (@MainActor (CGFloat, CGFloat, Bool) -> Void)?
 
-    func pinWebView(_ webView: UIView) {
+    func pinWebView(_ webView: WKWebView) {
+        self.webView = webView
+        offsetObservation = webView.scrollView.observe(\.contentOffset) { [weak self] scrollView, _ in
+            MainActor.assumeIsolated { self?.reportScroll(of: scrollView) }
+        }
         // 키보드가 떠 있는 동안 가이드가 키보드만 추적하도록(하단 safe area 미포함) 한다.
         keyboardLayoutGuide.usesBottomSafeArea = false
         // 항상 활성 → ① 가이드가 키보드를 추적하도록 engage ② 키보드 위로 웹뷰를 띄움.
@@ -547,9 +567,33 @@ private final class KeyboardAvoidingWebContainer: UIView {
         // 키보드 ↓이면 바닥 고정을 켜서 잔류 여백 없이 복귀시킨다.
         let distanceFromBottom = bounds.maxY - keyboardLayoutGuide.layoutFrame.minY
         let keyboardVisible = distanceFromBottom > safeAreaInsets.bottom + 8
+        if reportsBottomSafeAreaAsObscured, let webView {
+            if !keyboardVisible {
+                tabBarObscuredBottom = max(tabBarObscuredBottom, safeAreaInsets.bottom)
+            }
+            let obscuredBottom = keyboardVisible ? 0 : tabBarObscuredBottom
+            if webView.obscuredContentInsets.bottom != obscuredBottom {
+                webView.obscuredContentInsets = UIEdgeInsets(top: 0, left: 0, bottom: obscuredBottom, right: 0)
+                webView.scrollView.verticalScrollIndicatorInsets.bottom = obscuredBottom
+            }
+        }
         let shouldPinBottom = !keyboardVisible
         guard bottomToBottomEdge?.isActive != shouldPinBottom else { return }
         bottomToBottomEdge?.isActive = shouldPinBottom
+    }
+
+    private func reportScroll(of scrollView: UIScrollView) {
+        guard let onScroll else { return }
+        let inset = scrollView.adjustedContentInset
+        let offsetY = scrollView.contentOffset.y + inset.top
+        let maxOffsetY = scrollView.contentSize.height + inset.top + inset.bottom - scrollView.bounds.height
+        let isUserScrolling = scrollView.isTracking || scrollView.isDecelerating
+        onScroll(offsetY, maxOffsetY, isUserScrolling)
+    }
+
+    override func safeAreaInsetsDidChange() {
+        super.safeAreaInsetsDidChange()
+        if reportsBottomSafeAreaAsObscured { setNeedsLayout() }
     }
 }
 
