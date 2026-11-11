@@ -206,11 +206,14 @@ public struct AppTabView: View {
         for tab: AppTabFeature.Tab,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        let isActive = store.selectedTab == tab
-        content()
-            // 탭은 바로 보이고 사라진다.
-            .animation(nil) { $0.opacity(isActive ? 1 : 0) }
-            .allowsHitTesting(isActive)
+        // 띄울 차례가 아닌 탭은 만들지 않는다. 앱을 켤 때 대회 웹·MY 조회가 홈 피드와 서버를 나눠 쓰지 않게 한다(#271).
+        if store.mountedTabs.contains(tab) {
+            let isActive = store.selectedTab == tab
+            content()
+                // 탭은 바로 보이고 사라진다.
+                .animation(nil) { $0.opacity(isActive ? 1 : 0) }
+                .allowsHitTesting(isActive)
+        }
     }
 
     private var bottomTabBar: some View {

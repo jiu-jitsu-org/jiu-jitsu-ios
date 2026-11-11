@@ -99,7 +99,10 @@ public struct AppFeature: Sendable {
 
             case .view(.greetingFinished):
                 state.greeting = nil
-                return runDeferredLaunchSync(&state)
+                return .merge(
+                    runDeferredLaunchSync(&state),
+                    .send(.destination(.presented(.appTab(.greetingFinished))))
+                )
 
             case let .internal(.pushNotificationTapped(payload)):
                 // 푸시 payload를 공유 링크와 같은 URL로 바꿔 동일 파이프라인에 태운다.
@@ -111,10 +114,11 @@ public struct AppFeature: Sendable {
 
             case let .destination(.presented(.splash(.delegate(.finishedLaunch(authInfo))))):
                 if let authInfo = authInfo {
-                    state.destination = .appTab(.init(authInfo: authInfo))
                     // 공유 링크·푸시로 들어왔으면 그 글을 바로 보여줘야 해 인사를 건너뛰고,
                     // 오늘 이미 봤으면 다시 틀지 않는다(#223)
                     state.greeting = state.pendingDeepLink == nil && greetingClient.shouldPlay(now) ? .playing : nil
+                    // 인사 중에는 홈이 안 보이는 탭을 띄우지 않게 알려 둔다(#271)
+                    state.destination = .appTab(.init(authInfo: authInfo, isGreetingShowing: state.greeting != nil))
                     // 앱 진입 FCM sync: 로그인 상태일 때만 실행 (취소되지 않음).
                     // 처음 받는 사람에게는 알림 권한 창이 뜨므로, 인사 중이면 인사가 끝날 때까지 미룬다(#216)
                     if state.greeting != nil {
@@ -184,8 +188,12 @@ public struct AppFeature: Sendable {
             return .none
         }
         // 인사 중에 링크가 들어오면 인사를 접고 바로 그 화면을 보여준다
+        let wasGreeting = state.greeting != nil
         state.greeting = nil
-        return .send(.destination(.presented(.appTab(.deepLink(link)))))
+        return .concatenate(
+            wasGreeting ? .send(.destination(.presented(.appTab(.greetingFinished)))) : .none,
+            .send(.destination(.presented(.appTab(.deepLink(link)))))
+        )
     }
 
     /// 보관 중인 딥링크가 있으면 방금 만들어진 AppTab으로 흘려보낸다.
