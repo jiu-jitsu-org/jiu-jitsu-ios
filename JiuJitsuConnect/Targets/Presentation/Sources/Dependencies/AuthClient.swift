@@ -11,6 +11,8 @@ public struct AuthClient {
     public var signOut: @Sendable () async -> Void
     public var autoLogin: @Sendable () async throws -> Domain.AuthInfo?
     public var hasValidToken: @Sendable () -> Bool
+    /// 자동 로그인 대상일 때 기기에 저장된 access token(만료 여부는 보지 않음). 스플래시가 홈 피드를 미리 불러 둘 때 쓴다(#270).
+    public var storedAccessToken: @Sendable () -> String?
     /// 웹뷰 토큰 만료 위임용 — 저장된 refresh 토큰으로 갱신 후 새 accessToken 반환.
     public var refreshSession: @Sendable () async throws -> String
     /// 탈퇴 시 Apple 재인증으로 새 authorizationCode를 받아 반환(서버 revoke용). Apple 외 provider면 nil(#41).
@@ -25,6 +27,7 @@ public struct AuthClient {
         signOut: @Sendable @escaping () async -> Void,
         autoLogin: @Sendable @escaping () async throws -> Domain.AuthInfo?,
         hasValidToken: @Sendable @escaping () -> Bool,
+        storedAccessToken: @Sendable @escaping () -> String?,
         refreshSession: @Sendable @escaping () async throws -> String,
         appleAuthorizationCodeForWithdrawal: @Sendable @escaping () async throws -> String?
     ) {
@@ -36,6 +39,7 @@ public struct AuthClient {
         self.signOut = signOut
         self.autoLogin = autoLogin
         self.hasValidToken = hasValidToken
+        self.storedAccessToken = storedAccessToken
         self.refreshSession = refreshSession
         self.appleAuthorizationCodeForWithdrawal = appleAuthorizationCodeForWithdrawal
     }
@@ -79,6 +83,9 @@ extension AuthClient: DependencyKey {
         hasValidToken: {
             false
         },
+        storedAccessToken: {
+            nil
+        },
         refreshSession: {
             "test-access-token"
         },
@@ -121,6 +128,9 @@ extension AuthClient {
         },
         hasValidToken: {
             fatalError("unimplemented.hasValidToken is not implemented")
+        },
+        storedAccessToken: {
+            fatalError("unimplemented.storedAccessToken is not implemented")
         },
         refreshSession: {
             fatalError("unimplemented.refreshSession is not implemented")

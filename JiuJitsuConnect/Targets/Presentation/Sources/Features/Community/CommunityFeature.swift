@@ -890,7 +890,8 @@ public struct CommunityFeature: Sendable {
         WebEnvironment.webURLString
     }
 
-    private static func makeCommunityURL() -> URL? {
+    /// 홈 피드 웹 주소. 스플래시가 홈 피드를 미리 불러 둘 때(#270)도 같은 주소를 써야 홈 웹뷰가 이어받는다.
+    static func makeCommunityURL() -> URL? {
 #if DEBUG || BETA
         // 테스트용 도메인 오버라이드가 설정돼 있으면 WEB_URL보다 우선 사용한다.
         if let override = debugOverrideURL() {

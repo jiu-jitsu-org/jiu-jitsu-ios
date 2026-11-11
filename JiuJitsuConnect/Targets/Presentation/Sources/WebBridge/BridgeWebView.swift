@@ -65,10 +65,9 @@ struct BridgeWebView: UIViewRepresentable {
         )
     }
 
-    // 웹뷰를 컨테이너 UIView로 감싼다. 직접 WKWebView를 반환하지 않는 이유는
-    // 하단을 컨테이너의 keyboardLayoutGuide에 고정해 키보드만큼 높이를 줄이기 위해서다.
-    // (아래 makeUIView 주석 참고)
-    func makeUIView(context: Context) -> UIView {
+    /// 브릿지를 등록한 웹뷰를 만든다. 스플래시가 홈 피드를 미리 불러 둘 때(HomeFeedPreloader, #270)도
+    /// 홈 웹뷰와 같은 웹뷰가 되도록 설정을 한곳에 둔다.
+    static func makeWebView(capabilities: [WebBridgeCapability], messageHandler: WKScriptMessageHandler) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
         // 리스트·상세 웹뷰가 로그인 세션 쿠키(httpOnly 포함)를 공유하도록 영구 default 데이터스토어를 강제한다.
@@ -78,7 +77,7 @@ struct BridgeWebView: UIViewRepresentable {
         // WKUserContentController가 핸들러를 strong 참조하므로 약한 프록시를 끼워 누수를 막는다.
         let contentController = WKUserContentController()
         contentController.add(
-            WebBridgeScriptMessageProxy(delegate: context.coordinator),
+            WebBridgeScriptMessageProxy(delegate: messageHandler),
             name: WebBridge.appBridgeHandlerName
         )
         // 웹이 첫 사용자 탭 전에 지원 여부를 읽을 수 있도록 페이지 스크립트보다 먼저 주입한다.
@@ -91,8 +90,24 @@ struct BridgeWebView: UIViewRepresentable {
 
         // 시스템 기본 입력 액세서리 바(위/아래/완료 회색 바)를 제거한다. 웹이 자체 하단 툴바
         // (사진/태그)를 키보드 위에 띄우므로 시스템 바는 불필요하고, 없는 편이 깔끔하다.
-        let webView = ChromelessWebView(frame: .zero, configuration: config)
-        webView.navigationDelegate = context.coordinator
+        return ChromelessWebView(frame: .zero, configuration: config)
+    }
+
+    // 웹뷰를 컨테이너 UIView로 감싼다. 직접 WKWebView를 반환하지 않는 이유는
+    // 하단을 컨테이너의 keyboardLayoutGuide에 고정해 키보드만큼 높이를 줄이기 위해서다.
+    // (아래 makeUIView 주석 참고)
+    func makeUIView(context: Context) -> UIView {
+        // 스플래시 동안 미리 불러 둔 홈 피드가 있으면 새로 만들지 않고 이어받는다(#270).
+        let preload: HomeFeedPreload? = if case .list = source {
+            HomeFeedPreloader.take(url: url, capabilities: capabilities)
+        } else {
+            nil
+        }
+        let webView = preload?.webView ?? Self.makeWebView(capabilities: capabilities, messageHandler: context.coordinator)
+        // 이어받는 웹뷰는 받아 둔 이벤트를 다 넘긴 뒤에 대리자를 바꾼다(HomeFeedPreload.handOff).
+        if preload == nil {
+            webView.navigationDelegate = context.coordinator
+        }
         // 새 창 링크(target=_blank, window.open)와 JS alert/confirm/prompt는 uiDelegate가 없으면 무반응이다(#63).
         webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = allowsBackForwardNavigationGestures
@@ -130,16 +145,23 @@ struct BridgeWebView: UIViewRepresentable {
         container.addSubview(webView)
         container.pinWebView(webView)
 
-        // FE 세션 쿠키를 먼저 심고 나서 로드해, SSR 첫 네비게이션부터 인증되게 한다.
-        let cookieStore = config.websiteDataStore.httpCookieStore
         let coordinator = context.coordinator
-        let token = accessToken
-        Task { @MainActor in
-            await WebSessionCookie.sync(accessToken: token, for: url, into: cookieStore)
-            coordinator.load(url: url, token: loadToken)
+        if let preload {
+            // 이미 같은 주소를 불러 두었으니 다시 불러오지 않는다. 토큰이 그사이 갱신됐으면
+            // updateUIView가 쿠키를 맞추고, WEBVIEW_READY 때 새 토큰을 웹에 넘긴다.
+            coordinator.markLoaded(url: url, token: loadToken)
+            preload.handOff(to: coordinator)
+        } else {
+            // FE 세션 쿠키를 먼저 심고 나서 로드해, SSR 첫 네비게이션부터 인증되게 한다.
+            let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
+            let token = accessToken
+            Task { @MainActor in
+                await WebSessionCookie.sync(accessToken: token, for: url, into: cookieStore)
+                coordinator.load(url: url, token: loadToken)
+            }
         }
-        // 실제 웹뷰가 생겼으니 스플래시에서 미리 띄운 웹뷰는 더 붙잡을 이유가 없다
-        WebViewPrewarmer.release()
+        // 실제 웹뷰가 생겼으니 스플래시에서 미리 띄운 빈 웹뷰는 더 붙잡을 이유가 없다
+        HomeFeedPreloader.releaseWarmWebView()
         return container
     }
 
@@ -272,6 +294,12 @@ struct BridgeWebView: UIViewRepresentable {
             self.webView = webView
         }
 
+        /// 미리 불러 둔 웹뷰를 이어받았을 때 — 같은 주소·토큰으로 다시 불러오지 않게 표시해 둔다(#270).
+        func markLoaded(url: URL, token: UUID) {
+            lastLoadedURL = url
+            lastLoadToken = token
+        }
+
         // 고정 셸 화면에서 메인 문서 스크롤을 0에 고정한다. 키보드가 포커스된 입력칸을 보이려
         // 문서를 위로 스크롤(contentOffset.y>0)해 헤더가 화면 밖으로 밀리는 것을 되돌려 막는다.
         // (웹은 overflow:hidden이라 메인 문서는 스크롤될 일이 없고, 본문은 별도 스크롤러로 스크롤된다.)
@@ -346,10 +374,16 @@ struct BridgeWebView: UIViewRepresentable {
             _ userContentController: WKUserContentController,
             didReceive message: WKScriptMessage
         ) {
-            guard !isDeactivated, message.name == WebBridge.appBridgeHandlerName else { return }
+            guard message.name == WebBridge.appBridgeHandlerName else { return }
+            receiveBridgeMessage(message.body)
+        }
+
+        /// 웹이 보낸 브릿지 메시지를 처리한다. 미리 불러 둔 홈 피드가 받아 둔 메시지도 이리로 넘긴다(#270).
+        func receiveBridgeMessage(_ body: Any) {
+            guard !isDeactivated else { return }
             // 해석 결과와 별개로, 웹이 보낸 원본을 먼저 남긴다(파싱 실패·계약 위반도 추적 가능하도록).
-            WebBridge.logInboundRaw(message.body, source: source)
-            guard let inbound = WebBridgeInboundMessage.decode(from: message.body) else { return }
+            WebBridge.logInboundRaw(body, source: source)
+            guard let inbound = WebBridgeInboundMessage.decode(from: body) else { return }
             WebBridge.logInbound(inbound, source: source)
             onBridgeMessage(inbound)
         }

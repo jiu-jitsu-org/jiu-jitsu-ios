@@ -25,8 +25,7 @@ public struct SplashView: View {
         .ignoresSafeArea()
         .lightStatusBar()
         .onAppear {
-            // 그림이 멈춰 있는 동안 웹뷰 첫 생성 비용을 치러 둔다. 다음 장면이 움직이는 중에 치르면 끊긴다(#207)
-            WebViewPrewarmer.prewarm()
+            // 자동 로그인과 웹뷰 미리 만들기(#207, #270)는 SplashFeature가 정한 순서대로 시작한다
             store.send(.view(.onAppear))
         }
     }
