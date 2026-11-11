@@ -32,6 +32,12 @@ public struct AppTabFeature: Sendable {
     @ObservableState
     public struct State: Equatable {
         var selectedTab: Tab = .home
+        // 화면에 띄워 둔 탭. 앱을 켤 때 안 보이는 탭(대회 웹·MY)까지 한꺼번에 띄우면 그 요청이 홈 피드와 같은 순간에
+        // 서버로 몰리므로, 홈 피드가 보인 뒤나 그 탭에 처음 들어갈 때 띄운다(#271). 한 번 띄운 탭은 내리지 않는다.
+        var mountedTabs: Set<Tab> = [.home]
+        // 홈 위에 인사 장면이 떠 있는지. 떠 있는 동안은 안 보이는 탭을 띄우지 않는다 —
+        // 웹뷰를 만드는 비용이 인사 움직임을 끊지 않게 한다(#207).
+        var isGreetingShowing: Bool
 
         // 각 탭의 독립적인 State
         var home: CommunityFeature.State
@@ -58,8 +64,9 @@ public struct AppTabFeature: Sendable {
 
         var authInfo: AuthInfo
 
-        public init(authInfo: AuthInfo) {
+        public init(authInfo: AuthInfo, isGreetingShowing: Bool = false) {
             self.authInfo = authInfo
+            self.isGreetingShowing = isGreetingShowing
             // 이미 로그인 상태로 진입하면 WEBVIEW_READY 핸드셰이크 때 토큰을 주입하도록 전달.
             let home = CommunityFeature.State(accessToken: authInfo.accessToken)
             self.home = home
@@ -82,6 +89,8 @@ public struct AppTabFeature: Sendable {
 
         // 부모(AppFeature)가 파싱해 넘긴 유니버설 링크.
         case deepLink(DeepLink)
+        // 부모(AppFeature)가 홈을 덮던 인사 장면을 걷었다(끝남·건너뜀·딥링크로 접힘).
+        case greetingFinished
 
         @CasePathable
         public enum ViewAction: Sendable {
@@ -406,6 +415,10 @@ public struct AppTabFeature: Sendable {
             case let .home(.delegate(.debugDeepLinkRequested(link))):
                 return .send(.deepLink(link))
 
+            case .greetingFinished:
+                state.isGreetingShowing = false
+                return .none
+
             case .home, .competition, .myPage:
                 return .none
                 
@@ -581,6 +594,25 @@ public struct AppTabFeature: Sendable {
         .ifLet(\.$loginCover, action: \.loginCover) {
             LoginFeature()
         }
+
+        // 띄울 탭은 어떤 액션 뒤에든 다시 맞춘다. 고른 탭은 탭바·로그인 완료·딥링크 등 여러 곳에서 바뀌고,
+        // 홈 피드 덮개는 홈 웹의 신호로 걷힌다.
+        Reduce { state, _ in
+            Self.mountTabsIfNeeded(&state)
+            return .none
+        }
+    }
+
+    /// 고른 탭은 바로 띄우고, 홈 피드 덮개가 걷히면 나머지 탭도 띄운다(#271).
+    /// 불러오기가 실패해 덮개가 걷혀도 띄운다 — 홈이 할 일을 마쳤으니 다른 탭을 미룰 이유가 없다.
+    /// 인사 장면 중에는 미뤘다가 끝나면 띄운다(#207).
+    private static func mountTabsIfNeeded(_ state: inout State) {
+        if !state.mountedTabs.contains(state.selectedTab) {
+            state.mountedTabs.insert(state.selectedTab)
+        }
+        let allTabs = Set(Tab.allCases)
+        guard state.mountedTabs != allTabs, !state.home.isLoading, !state.isGreetingShowing else { return }
+        state.mountedTabs = allTabs
     }
 
     /// 설정 › 알림의 '관심 대회 알림'을 켜고 기기 알림 상태를 본다(#257).
