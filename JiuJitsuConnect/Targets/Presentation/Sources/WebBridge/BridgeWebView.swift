@@ -566,7 +566,9 @@ private final class KeyboardAvoidingWebContainer: UIView {
         // 키보드 ↑이면 바닥 고정을 풀어 웹뷰가 키보드 위로 따라 올라가게 하고,
         // 키보드 ↓이면 바닥 고정을 켜서 잔류 여백 없이 복귀시킨다.
         let distanceFromBottom = bounds.maxY - keyboardLayoutGuide.layoutFrame.minY
-        let keyboardVisible = distanceFromBottom > safeAreaInsets.bottom + 8
+        // 탭 첫 화면은 떠 있는 탭 바 자리만큼 아래 안전 영역이 커져 있어(#267), 기기 자체의 아래 안전 영역과 견준다.
+        let deviceBottomInset = window?.safeAreaInsets.bottom ?? safeAreaInsets.bottom
+        let keyboardVisible = distanceFromBottom > deviceBottomInset + 8
         if reportsBottomSafeAreaAsObscured, let webView {
             if !keyboardVisible {
                 tabBarObscuredBottom = max(tabBarObscuredBottom, safeAreaInsets.bottom)

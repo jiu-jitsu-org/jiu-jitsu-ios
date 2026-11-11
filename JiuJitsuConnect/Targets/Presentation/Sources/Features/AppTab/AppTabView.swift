@@ -129,8 +129,13 @@ public struct AppTabView: View {
             .ignoresSafeArea()
         }
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { deviceBottomInset = $0 }
-        // 탭을 바꾸면 탭 바는 늘 보이게 한다.
+        // 탭을 바꾸거나 쌓인 화면을 닫고 첫 화면으로 돌아오면 탭 바는 늘 보이게 한다.
         .onChange(of: store.selectedTab) { _, _ in
+            withAnimation(Self.tabBarAnimation) { isTabBarHidden = false }
+        }
+        .onChange(of: isTabRootInFront) { _, isInFront in
+            guard isInFront, isTabBarHidden else { return }
+            circleExit = .inPlace
             withAnimation(Self.tabBarAnimation) { isTabBarHidden = false }
         }
         .fullScreenCover(
@@ -262,7 +267,7 @@ public struct AppTabView: View {
     private func tabRootModifier(for tab: AppTabFeature.Tab) -> TabRootModifier {
         TabRootModifier(
             bottomReserve: max(dockReservedHeight - deviceBottomInset, 0),
-            action: TabRootScrollAction { offsetY, maxOffsetY, isUserScrolling in
+            action: TabRootScrollAction(key: tab) { offsetY, maxOffsetY, isUserScrolling in
                 handleScroll(tab: tab, offsetY: offsetY, maxOffsetY: maxOffsetY, isUserScrolling: isUserScrolling)
             }
         )
@@ -276,10 +281,10 @@ public struct AppTabView: View {
         maxOffsetY: CGFloat,
         isUserScrolling: Bool
     ) {
-        guard tab == store.selectedTab else { return }
         // 끝에서 튕기는 동안의 움직임은 방향으로 치지 않는다.
         let offsetY = min(max(rawOffsetY, 0), max(maxOffsetY, 0))
 
+        // 맨 위에서 먼지는 안 보이는 탭도 늘 맞춘다 — 다른 탭에 있는 동안 웹이 다시 불려 맨 위로 가도 돌아왔을 때 맞게.
         let isAwayFromTop = offsetY > ScrollMetrics.topButtonOffset
         if tabsAwayFromTop.contains(tab) != isAwayFromTop {
             // 탭 바가 숨은 채 맨 위로 문턱을 넘나들면 동그라미는 제자리에서 사라진다.
@@ -289,6 +294,8 @@ public struct AppTabView: View {
             }
         }
 
+        // 탭 바는 지금 보이는 탭의 첫 화면이 움직일 때만 숨기고 꺼낸다(쌓인 화면 밑에 가려진 첫 화면은 빼고).
+        guard tab == store.selectedTab, isTabRootInFront else { return }
         let lastOffsetY = scrollTracker.lastOffsetY[tab] ?? offsetY
         var shouldHide = isTabBarHidden
         if offsetY <= ScrollMetrics.revealZone {
