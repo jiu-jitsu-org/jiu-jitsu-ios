@@ -49,9 +49,7 @@ public struct CommunityView: View {
                     )
                 }
 
-                if store.isLoading {
-                    loadingOverlay
-                }
+                WebLoadingOverlay(isLoading: store.isLoading)
 
                 if store.hasError {
                     errorOverlay
@@ -203,13 +201,6 @@ public struct CommunityView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-
-    private var loadingOverlay: some View {
-        ProgressView()
-            .controlSize(.large)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.component.background.default)
     }
 
     private var errorOverlay: some View {
