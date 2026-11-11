@@ -121,6 +121,8 @@ private extension WebBridgeInboundMessage {
         switch self {
         case .webViewReady:
             return "WEBVIEW_READY"
+        case .pageReady:
+            return "PAGE_READY"
         case let .authLoginPrompt(reason):
             return "AUTH_LOGIN_PROMPT  reason=\(reason ?? "-")"
         case let .authLoginModal(reason):
@@ -196,6 +198,11 @@ private extension WebBridgeOutboundMessage {
 public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 웹뷰가 메시지 수신 준비를 마쳤음을 알리는 핸드셰이크.
     case webViewReady
+    /// 페이지 본문이 그려지고 손이 닿는 상태가 됨(#261). WEBVIEW_READY는 모든 페이지가 공유하는 껍데기가 보내
+    /// 페이지보다 먼저 올 수 있어(로딩 뼈대가 떠 있는 동안) 로딩 덮개를 걷는 기준으로 쓸 수 없다.
+    /// 이 신호는 페이지 자신이 그려진 뒤 보내므로 웹 헤더의 뒤로가기·BACK_PRESSED 응답이 살아 있다.
+    /// 덮개는 이 신호나 didFinish 중 먼저 온 쪽에 걷힌다 — 그림까지 다 받을 때를 기다리지 않는다. 보내지 않는 웹이면 didFinish.
+    case pageReady
     /// 비로그인 행위 시도 → "로그인이 필요해요" 안내 알럿 노출 요청.
     /// 사용자가 알럿에서 [로그인]을 선택해야 로그인 모달로 이어진다(소프트 유도).
     case authLoginPrompt(reason: String?)
@@ -245,6 +252,7 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
 
     private enum MessageType: String {
         case webViewReady = "WEBVIEW_READY"
+        case pageReady = "PAGE_READY"
         case authLoginPrompt = "AUTH_LOGIN_PROMPT"
         case authLoginModal = "AUTH_LOGIN_MODAL"
         case authLogoutRequest = "AUTH_LOGOUT_REQUEST"
@@ -280,6 +288,8 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         switch MessageType(rawValue: rawType) {
         case .webViewReady:
             return .webViewReady
+        case .pageReady:
+            return .pageReady
         case .authLoginPrompt:
             return .authLoginPrompt(reason: payload?["reason"] as? String)
         case .authLoginModal:

@@ -395,6 +395,12 @@ public struct CommunityFeature: Sendable {
                 case .webViewReady:
                     return Self.syncSessionOnReady(into: &state)
 
+                case .pageReady:
+                    // 피드 글이 그려졌으면 사진을 다 받기(didFinish) 전에 덮개를 걷는다(#261).
+                    guard !state.hasError else { return .none }
+                    state.isLoading = false
+                    return .none
+
                 case let .authLoginPrompt(reason):
                     return .send(.delegate(.loginPromptRequested(reason: reason)))
 
