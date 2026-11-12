@@ -19,7 +19,8 @@ public protocol AuthRepository: Sendable {
     func appleAuthorizationCodeForWithdrawal() async throws -> String?
     
     func serverLogin(user: SNSUser) async throws -> AuthInfo
-    func serverLogout() async throws -> Bool
+    /// `fcmToken`을 함께 보내면 서버가 이 기기의 푸시 토큰 연결을 지운다(#269).
+    func serverLogout(fcmToken: String?) async throws -> Bool
     
     func autoLogin() async throws -> AuthInfo?
     func hasValidToken() -> Bool
