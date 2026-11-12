@@ -468,7 +468,13 @@ private extension View {
                 item: store.scope(
                     state: \.sheet?.beltSetting,
                     action: \.sheet.beltSetting
-                )
+                ),
+                onDismiss: {
+                    // 다 내려간 뒤에야 승급 축하 덮개를 띄울 수 있다(#278). 제자리에서 나타나게 등장 움직임은 끈다.
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    store.wrappedValue.send(.view(.beltSheetDidDismiss), transaction: transaction)
+                }
             ) { beltSettingStore in
                 BeltSettingView(store: beltSettingStore)
                     .presentationDragIndicator(.hidden)

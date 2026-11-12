@@ -43,6 +43,9 @@ public struct MyProfileFeature: Sendable {
 
         /// 더 높은 띠로 바꿔 저장한 직후 축하 장면에 보여 줄 새 띠(#278). 있으면 MY 위를 덮는다.
         var promotedBelt: BeltRank?
+        /// 띠 고르기 시트가 내려가는 중인지. 내려가는 중엔 덮개를 띄울 수 없어, 저장이 먼저 끝나면 pendingPromotedBelt에 두었다가 다 내려간 뒤 띄운다.
+        var isBeltSheetClosing = false
+        var pendingPromotedBelt: BeltRank?
         
         // 우측 상단 "..." 메뉴 노출 여부 (관장 사범 인증 메뉴)
         var isMoreMenuPresented: Bool = false
@@ -167,6 +170,7 @@ public struct MyProfileFeature: Sendable {
             case styleCardEditTapped(MyStyleSettingType)  // 프로필 스타일 카드 탭 → 해당 타입 수정 모드 진입
             case toastButtonTapped(ToastState.Action)
             case beltPromotionDismissed     // 승급 축하 장면을 눌렀거나 시간이 다 됨 (#278)
+            case beltSheetDidDismiss        // 띠 고르기 시트가 다 내려감 (#278)
             case addCompetitionButtonTapped  // 대회 정보 추가 버튼 탭
             case competitionDetailTapped(Competition)  // 대회 정보 행 탭
             case addDivisionTapped([Competition])     // 저장한 대회에 부문 추가 (그 대회의 기록들)
@@ -464,6 +468,7 @@ public struct MyProfileFeature: Sendable {
                 // 벨트 등록·수정: API 호출하고 토스트 표시
                 Log.trace("벨트 수정 확인됨 - rank: \(rank.displayName), stripe: \(stripe.displayName)", category: .debug, level: .info)
                 state.sheet = nil
+                state.isBeltSheetClosing = true
                 return .send(.internal(.saveBeltInfoOnly(rank: rank, stripe: stripe)))
                 
             case let .internal(.saveBeltInfoOnly(rank, stripe)):
@@ -648,9 +653,12 @@ public struct MyProfileFeature: Sendable {
                    let oldIndex = BeltRank.allCases.firstIndex(of: oldRank),
                    let newIndex = BeltRank.allCases.firstIndex(of: newRank),
                    newIndex > oldIndex {
+                    // 띠 시트가 아직 내려가는 중이면 새 화면을 띄울 수 없다 → 다 내려간 뒤(beltSheetDidDismiss) 띄운다
+                    if state.isBeltSheetClosing {
+                        state.pendingPromotedBelt = newRank
+                        return .send(.delegate(.profileUpdated))
+                    }
                     return .merge(.send(.delegate(.profileUpdated)), .run { send in
-                        // 띠 시트가 내려가는 중에는 새 화면을 띄울 수 없어 잠깐 기다린다
-                        try await clock.sleep(for: .milliseconds(300))
                         // 아래에서 밀려 올라오지 않고 제자리에서 나타나게 기본 등장 움직임을 끈다
                         var transaction = Transaction()
                         transaction.disablesAnimations = true
@@ -709,6 +717,14 @@ public struct MyProfileFeature: Sendable {
 
             case .view(.beltPromotionDismissed):
                 state.promotedBelt = nil
+                return .none
+
+            case .view(.beltSheetDidDismiss):
+                state.isBeltSheetClosing = false
+                if let rank = state.pendingPromotedBelt {
+                    state.pendingPromotedBelt = nil
+                    state.promotedBelt = rank
+                }
                 return .none
                 
             case .view(.communityActivityTapped):
