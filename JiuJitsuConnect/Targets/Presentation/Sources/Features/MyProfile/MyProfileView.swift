@@ -185,6 +185,7 @@ public struct MyProfileView: View {
             .navigationDestinations(store: $store)
             .uploadingOverlay(isPresented: store.isUploadingInstructorVerification)
             .toastOverlay(store: store)
+            .beltPromotionPresentation(store: store)
             // picker 프레젠테이션은 시트 content 안쪽에서 적용된다
             // (iOS는 한 presenter에서 sheet + fullScreenCover 동시 제시를 막으므로
             //  picker가 시트 위에 stacking되려면 시트 자체가 presenter여야 한다)
@@ -427,6 +428,22 @@ private extension View {
             }
         }
         .animation(.easeInOut(duration: 0.15), value: isPresented)
+    }
+
+    /// 더 높은 띠로 바꿔 저장했을 때 탭 바까지 덮는 축하 장면(#278). 나타나고 사라지는 움직임은 장면 안에서 직접 한다.
+    func beltPromotionPresentation(store: StoreOf<MyProfileFeature>) -> some View {
+        self.fullScreenCover(
+            item: Binding(
+                get: { store.promotedBelt },
+                set: { if $0 == nil { store.send(.view(.beltPromotionDismissed)) } }
+            )
+        ) { belt in
+            BeltPromotionView(belt: belt) {
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                store.send(.view(.beltPromotionDismissed), transaction: transaction)
+            }
+        }
     }
 
     /// 토스트 오버레이

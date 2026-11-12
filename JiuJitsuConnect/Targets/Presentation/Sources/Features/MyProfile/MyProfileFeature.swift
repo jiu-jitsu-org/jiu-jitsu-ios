@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 import ComposableArchitecture
 import Domain
 import DesignSystem
@@ -39,6 +40,9 @@ public struct MyProfileFeature: Sendable {
         
         // 토스트 메시지 상태
         var toast: ToastState?
+
+        /// 더 높은 띠로 바꿔 저장한 직후 축하 장면에 보여 줄 새 띠(#278). 있으면 MY 위를 덮는다.
+        var promotedBelt: BeltRank?
         
         // 우측 상단 "..." 메뉴 노출 여부 (관장 사범 인증 메뉴)
         var isMoreMenuPresented: Bool = false
@@ -162,6 +166,7 @@ public struct MyProfileFeature: Sendable {
             case registerStyleButtonTapped
             case styleCardEditTapped(MyStyleSettingType)  // 프로필 스타일 카드 탭 → 해당 타입 수정 모드 진입
             case toastButtonTapped(ToastState.Action)
+            case beltPromotionDismissed     // 승급 축하 장면을 눌렀거나 시간이 다 됨 (#278)
             case addCompetitionButtonTapped  // 대회 정보 추가 버튼 탭
             case competitionDetailTapped(Competition)  // 대회 정보 행 탭
             case addDivisionTapped([Competition])     // 저장한 대회에 부문 추가 (그 대회의 기록들)
@@ -209,6 +214,7 @@ public struct MyProfileFeature: Sendable {
             
             case showToast(ToastState)
             case toastDismissed
+            case presentBeltPromotion(BeltRank)     // 더 높은 띠로 저장됨 → 축하 장면 띄우기 (#278)
 
             // 프로필 이미지 수정 흐름 — 시트/풀스크린 전환 사이에 짧은 딜레이를 두고 발화
             case presentImageCaptureSource(State.ImageCaptureSource)
@@ -635,7 +641,23 @@ public struct MyProfileFeature: Sendable {
                 let previousProfile = state.communityProfile
                 state.communityProfile = updatedProfile  // ← 업데이트된 프로필로 교체!
                 state.destination = nil  // 화면 닫기
-                
+
+                // 더 높은 띠로 바꿨으면 토스트 대신 축하 장면을 띄운다(#278). 같은 띠·낮은 띠·그랄만 바꾼 경우는 그대로 토스트.
+                if let oldRank = previousProfile?.beltRank,
+                   let newRank = updatedProfile.beltRank,
+                   let oldIndex = BeltRank.allCases.firstIndex(of: oldRank),
+                   let newIndex = BeltRank.allCases.firstIndex(of: newRank),
+                   newIndex > oldIndex {
+                    return .merge(.send(.delegate(.profileUpdated)), .run { send in
+                        // 띠 시트가 내려가는 중에는 새 화면을 띄울 수 없어 잠깐 기다린다
+                        try await clock.sleep(for: .milliseconds(300))
+                        // 아래에서 밀려 올라오지 않고 제자리에서 나타나게 기본 등장 움직임을 끈다
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        await send(.internal(.presentBeltPromotion(newRank)), transaction: transaction)
+                    })
+                }
+
                 // 어떤 섹션이 업데이트되었는지에 따라 다른 메시지 표시
                 let message: String
                 if previousProfile?.beltRank == nil && updatedProfile.beltRank != nil {
@@ -680,6 +702,14 @@ public struct MyProfileFeature: Sendable {
                 
             case .view(.toastButtonTapped):
                 return .send(.internal(.toastDismissed))
+
+            case let .internal(.presentBeltPromotion(rank)):
+                state.promotedBelt = rank
+                return .none
+
+            case .view(.beltPromotionDismissed):
+                state.promotedBelt = nil
+                return .none
                 
             case .view(.communityActivityTapped):
                 return .send(.delegate(.communityActivityRequested))
