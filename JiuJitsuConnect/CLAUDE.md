@@ -582,7 +582,13 @@ tuist install && tuist generate     # mise exec 아님
 ## 부록 A. CI / 자동화
 
 `.github/workflows/Project Automation.yml` — 이슈/PR ↔ GitHub Project V2 자동 동기화 (라벨, 상태, 우선순위, Epic, 플랫폼 라벨링).
-빌드/테스트/배포 자동화 job은 현재 미구성.
+빌드/테스트 자동화 job은 현재 미구성.
+
+**TestFlight 배포 (Xcode Cloud):** `main`에 PR이 머지되면 Xcode Cloud가 `App-Beta` 스킴(Beta 구성, dev 서버)을 Archive해 TestFlight 내부 테스트로 올린다. `main`은 develop → main 릴리스 PR 전용.
+- `ci_scripts/ci_post_clone.sh`: 시크릿 파일 복원 → tuist(§10.5 버전) 설치 → `tuist install && tuist generate`
+- 시크릿은 Xcode Cloud 워크플로 환경 변수 `SECRETS_XCCONFIG_BASE64`, `GOOGLE_SERVICE_INFO_PLIST_BASE64`(Secret)에 base64로 넣는다. 시크릿 파일이 바뀌면 이 값도 갱신한다.
+- 빌드 번호는 Xcode Cloud가 매긴다. 다음 번호는 App Store Connect > Xcode Cloud 설정에서 바꾼다.
+- `Tuist/Package.resolved`는 커밋한다. 의존성을 올릴 때만 `tuist install --update` 후 함께 커밋한다.
 
 ## 부록 B. AI 도구 설정
 
