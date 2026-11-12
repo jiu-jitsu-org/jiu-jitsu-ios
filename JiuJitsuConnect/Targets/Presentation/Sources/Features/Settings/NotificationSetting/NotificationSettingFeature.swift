@@ -35,6 +35,9 @@ public struct NotificationSettingFeature: Sendable {
         var lastSavedSetting: NoticeSetting?
         // 저장 요청이 디바운스 대기·응답 대기 중인지. 그동안 다시 조회한 값이 화면 값을 덮지 않게 한다.
         var isSaving = false
+        // 저장을 시작하거나 끝낼 때마다 1씩 오른다. 다시 조회는 시작할 때의 값을 들고 가, 응답이 올 때 값이 다르면
+        // 그 사이 저장이 오갔다는 뜻이라 늦게 온 옛 응답으로 화면·마지막 저장값을 되돌리지 않게 버린다.
+        var saveGeneration = 0
 
         var toast: ToastState?
 
@@ -85,7 +88,8 @@ public struct NotificationSettingFeature: Sendable {
         }
 
         public enum InternalAction: Sendable {
-            case fetchSettingResponse(TaskResult<NoticeSetting>)
+            // generation: 조회를 시작할 때의 saveGeneration
+            case fetchSettingResponse(generation: Int, TaskResult<NoticeSetting>)
             // 보낸 요청과 그 결과. 관심 대회 알림을 보냈는지 보고 켬 안내·서버 값 맞추기를 정한다.
             case updateSettingResponse(NoticeSettingUpdate, TaskResult<NoticeSetting>)
             case triggerUpdateSetting
@@ -112,11 +116,11 @@ public struct NotificationSettingFeature: Sendable {
             case .view(.onAppear):
                 // 서버에서 카테고리별 수신 여부를 읽는다. 처음 열 때와, 위에 쌓인 화면을 닫고 돌아와 다시 나타날 때 불린다.
                 // 이 화면이 열린 채 다른 탭(웹의 '알림 받기')에서 켠 값은 부모가 브리지를 받아 settingRefreshRequested로 다시 읽힌다(#281).
-                return fetchSetting()
+                return fetchSetting(generation: state.saveGeneration)
 
             case .settingRefreshRequested:
                 // 웹이 관심 대회 알림을 서버에 저장했다는 브리지(#281) → 부모가 열려 있는 이 화면에 알린다.
-                return fetchSetting()
+                return fetchSetting(generation: state.saveGeneration)
 
             case .view(.backButtonTapped):
                 return .run { _ in await self.dismiss() }
@@ -155,6 +159,7 @@ public struct NotificationSettingFeature: Sendable {
                 // 연속 토글 시 마지막 상태만 반영 (300ms debounce)
                 let update = state.settingUpdate
                 state.isSaving = true
+                state.saveGeneration += 1
                 return .run { send in
                     try await self.clock.sleep(for: .milliseconds(300))
                     await send(.internal(.updateSettingResponse(
@@ -164,7 +169,12 @@ public struct NotificationSettingFeature: Sendable {
                 }
                 .cancellable(id: CancelID.updateSetting, cancelInFlight: true)
 
-            case let .internal(.fetchSettingResponse(.success(setting))):
+            case let .internal(.fetchSettingResponse(generation, .success(setting))):
+                // 첫 로딩은 그대로 쓴다. 이미 불러온 뒤 조회 중에 저장이 오갔으면 이 응답은 옛 값일 수 있어 버린다.
+                if state.isLoaded, generation != state.saveGeneration {
+                    Log.trace("알림 설정 다시 조회 응답 버림(조회 중 저장이 오감)", category: .network, level: .info)
+                    return .none
+                }
                 // 저장 대기·진행 중인 변경은 다시 조회한 값으로 덮지 않는다. 웹이 바꿨을 수 있는 관심 대회 알림만,
                 // 이 화면에서 건드리지 않았을 때 서버 값으로 맞춘다(#281).
                 if state.isLoaded, let lastSaved = state.lastSavedSetting,
@@ -185,7 +195,7 @@ public struct NotificationSettingFeature: Sendable {
                 state.isLoaded = true
                 return .none
 
-            case let .internal(.fetchSettingResponse(.failure(error))):
+            case let .internal(.fetchSettingResponse(_, .failure(error))):
                 Log.trace("알림 설정 조회 실패: \(error)", category: .network, level: .error)
                 // 이미 불러온 뒤 다시 조회(재진입·브리지)가 실패하면 보이는 값이 그대로 쓸 만하니 로그만 남긴다.
                 guard !state.isLoaded else { return .none }
@@ -198,6 +208,7 @@ public struct NotificationSettingFeature: Sendable {
 
             case let .internal(.updateSettingResponse(update, .success(setting))):
                 state.isSaving = false
+                state.saveGeneration += 1
                 // 관심 대회 알림을 보내지 않았으면 응답 값은 웹이 바꾼 서버 값일 수 있다 — 이 화면에서 건드리지 않았다면 그 값으로 맞춘다.
                 if update.competitionEnabled == nil,
                    state.isCompetitionAlertEnabled == state.lastSavedSetting?.competitionEnabled {
@@ -211,6 +222,7 @@ public struct NotificationSettingFeature: Sendable {
 
             case let .internal(.updateSettingResponse(_, .failure(error))):
                 state.isSaving = false
+                state.saveGeneration += 1
                 Log.trace("알림 설정 저장 실패: \(error)", category: .network, level: .error)
                 // 화면 값과 서버 값이 어긋나지 않도록 마지막으로 저장된 값으로 되돌린다(#61).
                 if let lastSaved = state.lastSavedSetting {
@@ -238,14 +250,15 @@ public struct NotificationSettingFeature: Sendable {
             case .view(.toastButtonTapped):
                 // 버튼이 있는 토스트는 조회 실패 안내뿐이라, 아직 못 불러온 상태면 다시 조회한다.
                 guard !state.isLoaded else { return .send(.internal(.toastDismissed)) }
-                return .merge(.send(.internal(.toastDismissed)), fetchSetting())
+                return .merge(.send(.internal(.toastDismissed)), fetchSetting(generation: state.saveGeneration))
             }
         }
     }
 
-    private func fetchSetting() -> Effect<Action> {
+    private func fetchSetting(generation: Int) -> Effect<Action> {
         .run { send in
             await send(.internal(.fetchSettingResponse(
+                generation: generation,
                 await TaskResult { try await noticeClient.fetchSetting() }
             )))
         }
