@@ -85,8 +85,8 @@ public final class DependencyContainer {
             serverLogin: { user in
                 try await self.authRepository.serverLogin(user: user)
             },
-            serverLogout: {
-                try await self.authRepository.serverLogout()
+            serverLogout: { fcmToken in
+                try await self.authRepository.serverLogout(fcmToken: fcmToken)
             },
             signOut: {
                 await self.authRepository.signOut()

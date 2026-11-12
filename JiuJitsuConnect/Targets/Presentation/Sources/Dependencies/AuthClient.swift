@@ -7,7 +7,8 @@ public struct AuthClient {
     public var loginWithApple: @Sendable () async throws -> Domain.SNSUser
     public var loginWithKakao: @Sendable () async throws -> Domain.SNSUser
     public var serverLogin: @Sendable (Domain.SNSUser) async throws -> Domain.AuthInfo
-    public var serverLogout: @Sendable () async throws -> Bool
+    /// 인자는 이 기기의 FCM 토큰 — 서버가 그 연결을 지운다(#269).
+    public var serverLogout: @Sendable (String?) async throws -> Bool
     public var signOut: @Sendable () async -> Void
     public var autoLogin: @Sendable () async throws -> Domain.AuthInfo?
     public var hasValidToken: @Sendable () -> Bool
@@ -23,7 +24,7 @@ public struct AuthClient {
         loginWithApple: @Sendable @escaping () async throws -> Domain.SNSUser,
         loginWithKakao: @Sendable @escaping () async throws -> Domain.SNSUser,
         serverLogin: @Sendable @escaping (Domain.SNSUser) async throws -> Domain.AuthInfo,
-        serverLogout: @Sendable @escaping () async throws -> Bool,
+        serverLogout: @Sendable @escaping (String?) async throws -> Bool,
         signOut: @Sendable @escaping () async -> Void,
         autoLogin: @Sendable @escaping () async throws -> Domain.AuthInfo?,
         hasValidToken: @Sendable @escaping () -> Bool,
@@ -69,7 +70,7 @@ extension AuthClient: DependencyKey {
                             isNewUser: true,
                             userInfo: nil)
         },
-        serverLogout: {
+        serverLogout: { _ in
             true
         },
         signOut: {},
@@ -117,7 +118,7 @@ extension AuthClient {
         serverLogin: { _ in
             fatalError("unimplemented.serverLogin is not implemented")
         },
-        serverLogout: {
+        serverLogout: { _ in
             fatalError("unimplemented.serverLogout is not implemented")
         },
         signOut: {

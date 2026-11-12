@@ -218,14 +218,7 @@ public struct AppTabFeature: Sendable {
                     // 뒤늦은 signOut이 지우거나, 새 로그인이 폐기 직전의 FCM 토큰을 등록할 수 있다.
                     .run { send in
                         await authClient.signOut()
-                        // 탈퇴 기기로 푸시가 가지 않게 FCM 토큰을 폐기한다. 캐시를 남기면 다음 로그인
-                        // (syncAfterLoginSuccess)이 폐기된 토큰을 서버에 다시 등록하므로 함께 지운다.
-                        firebaseClient.clearCachedToken()
-                        do {
-                            try await firebaseClient.deleteFCMToken()
-                        } catch {
-                            Log.trace("FCM token deletion after withdrawal failed: \(error)", category: .system, level: .error)
-                        }
+                        await Self.discardDeviceFCMToken(firebaseClient, context: "withdrawal")
                         await send(.internal(.showLoginModal))
                     }
                 )
@@ -465,9 +458,15 @@ public struct AppTabFeature: Sendable {
 
             case .internal(.performWebLogout):
                 // 서버 세션 정리 실패는 로컬 로그아웃을 막지 않는다(토큰은 signOut으로 정리).
+                // 게스트 전환(webLogoutCompleted)은 FCM 토큰 폐기까지 끝낸 뒤에 한다. 먼저 전환하면
+                // 그 사이 새 로그인이 폐기 직전의 토큰을 새 계정에 등록할 수 있다(#269).
                 return .run { send in
-                    _ = try? await authClient.serverLogout()
+                    // 서버가 이 기기의 토큰 연결을 지우도록 함께 보낸다.
+                    let fcmToken = firebaseClient.loadCachedToken().flatMap { $0.isEmpty ? nil : $0 }
+                    _ = try? await authClient.serverLogout(fcmToken)
                     await authClient.signOut()
+                    // 서버 요청이 실패해(오프라인 등) 연결이 남아도 이전 계정 푸시가 오지 않게 기기 토큰도 폐기한다.
+                    await Self.discardDeviceFCMToken(firebaseClient, context: "logout")
                     await send(.internal(.webLogoutCompleted))
                 }
 
@@ -674,6 +673,17 @@ public struct AppTabFeature: Sendable {
                 recentWeightLimit: profile?.competitions.recentWeightLimit
             )
         ))
+    }
+
+    /// 로그아웃·탈퇴 — 이 기기로 이전 계정 푸시가 가지 않게 FCM 토큰을 폐기한다.
+    /// 캐시를 남기면 다음 로그인(syncAfterLoginSuccess)이 폐기된 토큰을 서버에 다시 등록하므로 함께 지운다.
+    private static func discardDeviceFCMToken(_ firebaseClient: FirebaseClient, context: String) async {
+        firebaseClient.clearCachedToken()
+        do {
+            try await firebaseClient.deleteFCMToken()
+        } catch {
+            Log.trace("FCM token deletion after \(context) failed: \(error)", category: .system, level: .error)
+        }
     }
 
     /// 네이티브 로그아웃을 홈·대회 웹 세션에도 알린다.

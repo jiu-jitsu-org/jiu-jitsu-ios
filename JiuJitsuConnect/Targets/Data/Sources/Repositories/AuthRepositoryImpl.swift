@@ -169,14 +169,18 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
         }
     }
     
-    public func serverLogout() async throws -> Bool {
+    public func serverLogout(fcmToken: String?) async throws -> Bool {
         do {
             guard let accessToken = tokenStorage.getAccessToken(),
                   let refreshToken = tokenStorage.getRefreshToken() else {
                 return false
             }
             
-            let requestDTO = LogoutRequestDTO(accessToken: accessToken, refreshToken: refreshToken)
+            let requestDTO = LogoutRequestDTO(
+                accessToken: accessToken,
+                refreshToken: refreshToken,
+                fcmToken: fcmToken
+            )
             let endpoint = AuthEndpoint.serverLogout(requestDTO)
             let responseDTO: SuccessResponseDTO = try await networkService.request(endpoint: endpoint)
             
