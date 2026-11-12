@@ -513,9 +513,13 @@ public struct AppTabFeature: Sendable {
             case .internal(.handleSessionExpired):
                 state.isRefreshingWebToken = false
                 // refresh 토큰까지 만료 — 로컬 토큰만 정리하고 게스트로 전환한다(서버 세션은 이미 죽음).
+                // 서버에 토큰 연결을 지워 달라고 할 수 없으니, 이전 계정 푸시가 오지 않게 기기 토큰을 폐기한다(#269).
                 Self.resetToGuest(&state)
                 return .merge(
-                    .run { _ in await authClient.signOut() },
+                    .run { _ in
+                        await authClient.signOut()
+                        await Self.discardDeviceFCMToken(firebaseClient, context: "session expiry")
+                    },
                     .cancel(id: CancelID.competitionAlerts),
                     .send(.home(.session(.sessionExpired))),
                     .send(.competition(.session(.sessionExpired)))
@@ -682,15 +686,16 @@ public struct AppTabFeature: Sendable {
 
     /// 로그아웃·탈퇴 — 이 기기로 이전 계정 푸시가 가지 않게 FCM 토큰을 폐기한다.
     /// 캐시를 남기면 다음 로그인(syncAfterLoginSuccess)이 폐기된 토큰을 서버에 다시 등록하므로 함께 지운다.
-    /// 폐기 중 토큰 콜백이 캐시를 다시 채울 수 있어 캐시는 폐기 뒤에 지운다. 폐기가 실패하면
-    /// 앱 진입·복귀와 다음 토큰 발급 때 다시 시도한다(`FirebaseClientFactory`).
+    /// 캐시는 폐기보다 먼저 지운다 — 세션 만료는 게스트 전환이 먼저라, 폐기 중 시작된 새 로그인이
+    /// 캐시의 옛 토큰을 등록하면 안 된다(폐기 때 SDK는 토큰 콜백에 nil을 넘겨 캐시가 다시 채워지지 않는다).
+    /// 폐기가 실패하면 앱 진입·복귀와 다음 토큰 발급 때 다시 시도한다(`FirebaseClientFactory`).
     private static func discardDeviceFCMToken(_ firebaseClient: FirebaseClient, context: String) async {
+        firebaseClient.clearCachedToken()
         do {
             try await firebaseClient.deleteFCMToken()
         } catch {
             Log.trace("FCM token deletion after \(context) failed: \(error)", category: .system, level: .error)
         }
-        firebaseClient.clearCachedToken()
     }
 
     /// 네이티브 로그아웃을 홈·대회 웹 세션에도 알린다.
