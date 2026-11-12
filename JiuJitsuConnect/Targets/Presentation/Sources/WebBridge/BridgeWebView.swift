@@ -171,6 +171,8 @@ struct BridgeWebView: UIViewRepresentable {
     }
 
     func updateUIView(_ container: UIView, context: Context) {
+        // 탭 바 높이는 안 보이는 동안(회전 등)에도 최신으로 둔다 — 다시 보일 때 옛 값이 한 번 쓰이지 않게.
+        (container as? KeyboardAvoidingWebContainer)?.tabBarObscuredBottom = context.environment.tabBarReservedHeight
         guard isActive else {
             context.coordinator.deactivate()
             return
@@ -188,7 +190,6 @@ struct BridgeWebView: UIViewRepresentable {
         let tabRootScroll: TabRootScrollAction? = extendsUnderTabBar ? context.environment.tabRootScroll : nil
         let keyboardAvoidingContainer = container as? KeyboardAvoidingWebContainer
         keyboardAvoidingContainer?.onScroll = tabRootScroll?.report
-        keyboardAvoidingContainer?.tabBarObscuredBottom = context.environment.tabBarReservedHeight
         // 토큰 변동(갱신) 시에도 세션 쿠키를 최신으로 유지한 뒤 (재)로드/플러시한다.
         let cookieStore = context.coordinator.webView?.configuration.websiteDataStore.httpCookieStore
             ?? WKWebsiteDataStore.default().httpCookieStore
