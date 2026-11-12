@@ -58,11 +58,12 @@ struct MedalCharacter: Equatable {
     var aspectRatio: CGFloat {
         guard !hasMedal else { return layout.aspectRatio }
         switch belt {
-        case .white: return 342.0 / 870.0
-        case .blue: return 270.0 / 870.0
-        case .purple: return 270.0 / 870.0
-        case .brown: return 224.0 / 870.0
-        case .black: return 223.0 / 870.0
+        // 참가 그림은 세로 1200px(#285).
+        case .white: return 472.0 / 1200.0
+        case .blue: return 373.0 / 1200.0
+        case .purple: return 373.0 / 1200.0
+        case .brown: return 309.0 / 1200.0
+        case .black: return 307.0 / 1200.0
         }
     }
 

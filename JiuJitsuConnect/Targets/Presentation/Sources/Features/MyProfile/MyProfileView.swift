@@ -430,15 +430,15 @@ private extension View {
         .animation(.easeInOut(duration: 0.15), value: isPresented)
     }
 
-    /// 더 높은 띠로 바꿔 저장했을 때 탭 바까지 덮는 축하 장면(#278). 나타나고 사라지는 움직임은 장면 안에서 직접 한다.
+    /// 띠나 그랄을 올려 저장했을 때 탭 바까지 덮는 축하 장면(#278, #286). 나타나고 사라지는 움직임은 장면 안에서 직접 한다.
     func beltPromotionPresentation(store: StoreOf<MyProfileFeature>) -> some View {
         self.fullScreenCover(
             item: Binding(
-                get: { store.promotedBelt },
+                get: { store.promotion },
                 set: { if $0 == nil { store.send(.view(.beltPromotionDismissed)) } }
             )
-        ) { belt in
-            BeltPromotionView(belt: belt) {
+        ) { promotion in
+            BeltPromotionView(promotion: promotion) {
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
                 store.send(.view(.beltPromotionDismissed), transaction: transaction)
