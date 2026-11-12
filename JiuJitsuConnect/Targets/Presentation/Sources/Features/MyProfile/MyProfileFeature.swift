@@ -469,6 +469,8 @@ public struct MyProfileFeature: Sendable {
                 Log.trace("벨트 수정 확인됨 - rank: \(rank.displayName), stripe: \(stripe.displayName)", category: .debug, level: .info)
                 state.sheet = nil
                 state.isBeltSheetClosing = true
+                // 지난 저장에서 시트 닫힘을 기다리던 축하가 남아 있으면 이번 저장 뒤에 엉뚱하게 뜨지 않게 비운다.
+                state.pendingPromotion = nil
                 return .send(.internal(.saveBeltInfoOnly(rank: rank, stripe: stripe)))
                 
             case let .internal(.saveBeltInfoOnly(rank, stripe)):
