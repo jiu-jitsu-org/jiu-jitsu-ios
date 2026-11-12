@@ -86,6 +86,7 @@ final class WebPullToRefreshBand: UIView {
         static let labelFadeStart: CGFloat = 24
         static let labelFadeLength: CGFloat = 32
     }
+
     private let stack = UIStackView()
     private let iconView = UIImageView()
     private let label = UILabel()
