@@ -2,7 +2,7 @@
 //  WebPullToRefresh.swift
 //  Presentation
 //
-//  BridgeWebView(커뮤니티 리스트)용 커스텀 풀다운 리프레시.
+//  BridgeWebView(피드·대회 목록·게시글 상세)용 커스텀 풀다운 리프레시.
 //  시스템 UIRefreshControl(단색 스피너)로는 디자인의 "연파랑 밴드 + 샤카 손/랜덤 멘트 →
 //  놓으면 샤카 손이 팡 터짐 → 완료 시 안내"를 표현할 수 없어 직접 구성한다.
 //
@@ -361,6 +361,12 @@ final class WebPullToRefreshController {
         // 완료 안내 문구 노출 시간.
         static let successDisplay: Duration = .milliseconds(800)
     }
+
+    /// 손을 뗀 뒤 띠가 로딩 높이로 내려앉기까지 걸리는 시간(약간 여유를 둠). 고정 셸 화면은 이만큼 기다렸다 다시 불러온다(#432).
+    static var settleDuration: TimeInterval { Timing.insetAnimation + 0.05 }
+
+    /// 띠가 로딩 높이로 내려앉아 있거나(새로고침 중) 완료 안내 뒤 접히는 중인지. 이때 위쪽 inset을 띠가 쥐고 있다.
+    var holdsInset: Bool { phase == .refreshing || phase == .success }
 
     private weak var scrollView: UIScrollView?
     private let band: WebPullToRefreshBand

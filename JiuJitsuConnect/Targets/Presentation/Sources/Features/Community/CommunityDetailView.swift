@@ -89,8 +89,9 @@ public struct CommunityDetailView: View {
                 outbox: store.outbox,
                 // 웹 헤더의 뒤로가기(CLOSE_SUBVIEW)로 닫으므로 좌우 스와이프 제스처는 끈다.
                 allowsBackForwardNavigationGestures: false,
-                // 상세는 스크롤/상태 보존을 위해 풀다운 리프레시를 끈다.
-                enablesPullToRefresh: false,
+                // 맨 위에서 당기면 피드와 같은 띠로 다시 불러온다(#432). 댓글을 쓰는 중(키보드 ↑)엔 막히고,
+                // 다시 불러오면 쓰던 글이 날아가는 글쓰기·수정 화면엔 붙이지 않는다.
+                enablesPullToRefresh: !CommunityDetailFeature.State.isWriteOrEditScreen(store.url),
                 // 키보드가 문서를 밀어올려 고정 헤더가 화면 밖으로 나가는 것을 막는다.
                 locksDocumentScroll: true,
                 // 글쓰기·수정은 서브뷰로만 열리므로 사진 선택은 상세 웹뷰만 처리한다.

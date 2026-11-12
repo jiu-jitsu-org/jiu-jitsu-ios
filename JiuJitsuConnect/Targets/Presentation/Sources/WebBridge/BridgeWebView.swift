@@ -30,7 +30,7 @@ struct BridgeWebView: UIViewRepresentable {
     // 좌우 스와이프 백/포워드 제스처 허용 여부. 상세 서브뷰는 웹 자체 헤더로 뒤로가기를
     // 처리하므로 false로 두어 제스처 충돌을 피한다.
     var allowsBackForwardNavigationGestures: Bool = true
-    // 풀다운 리프레시 사용 여부. 상세 서브뷰는 스크롤/상태 보존을 위해 끈다.
+    // 풀다운 리프레시 사용 여부. 글쓰기·수정처럼 다시 불러오면 쓰던 내용이 날아가는 화면은 끈다.
     var enablesPullToRefresh: Bool = true
     // 고정 셸(h-dvh + overflow:hidden) 화면에서, 키보드가 메인 문서를 위로 스크롤해 헤더가
     // 화면 밖으로 밀리는 것을 막기 위해 메인 스크롤뷰 세로 오프셋을 0으로 고정한다.
@@ -230,11 +230,14 @@ struct BridgeWebView: UIViewRepresentable {
         // 로드·아웃바운드 주입·리프레시 등에서 공용으로 쓰는 webView 약한 참조.
         // (컨테이너로 감싸 makeUIView가 webView를 직접 반환하지 않으므로 직접 보관한다.)
         private(set) weak var webView: WKWebView?
-        // 커스텀 풀다운 리프레시 컨트롤러. 리스트 웹뷰에서만 생성된다.
+        // 커스텀 풀다운 리프레시 컨트롤러. enablesPullToRefresh인 웹뷰에서만 생성된다.
         private var pullToRefresh: WebPullToRefreshController?
         // 현재 로드가 풀다운 리프레시로 시작됐는지. true면 전면 로딩 오버레이를
         // 띄우지 않고 리프레시 밴드만 유지한다.
         private var isRefreshing = false
+        // 당겨서 새로고침이 부른 reload의 navigation. 그 전에 진행 중이던 로드의 완료·실패 알림이
+        // 새로고침을 끝낸 것으로 잘못 읽히지 않게, 이 navigation의 결과로만 새로고침을 끝낸다(#432).
+        private var refreshNavigation: WKNavigation?
         // 고정 셸(상세) 웹뷰에서 키보드가 메인 문서를 위로 스크롤해 헤더가 화면 밖으로 밀리는 것을
         // 막기 위해, 메인 스크롤뷰의 세로 오프셋을 0으로 고정할지 여부.
         private var locksDocumentScroll = false
@@ -316,24 +319,37 @@ struct BridgeWebView: UIViewRepresentable {
         // 고정 셸 화면에서 메인 문서 스크롤을 0에 고정한다. 키보드가 포커스된 입력칸을 보이려
         // 문서를 위로 스크롤(contentOffset.y>0)해 헤더가 화면 밖으로 밀리는 것을 되돌려 막는다.
         // (웹은 overflow:hidden이라 메인 문서는 스크롤될 일이 없고, 본문은 별도 스크롤러로 스크롤된다.)
+        // 위로 당기는 쪽(y<0)은 당겨서 새로고침이 붙은 화면에서만 풀어 두되, 키보드가 떠 있으면
+        // 쓰던 댓글이 새로고침에 날아가지 않게 그쪽도 막는다(#432).
         func enableDocumentScrollLock(on scrollView: UIScrollView) {
             locksDocumentScroll = true
             scrollView.delegate = self
         }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
-            if locksDocumentScroll, scrollView.contentOffset.y != 0 {
+            if locksDocumentScroll, isDocumentScrollBlocked(scrollView) {
                 scrollView.contentOffset.y = 0
                 return
             }
             pullToRefresh?.scrollViewDidScroll(scrollView)
         }
 
+        private func isDocumentScrollBlocked(_ scrollView: UIScrollView) -> Bool {
+            let offsetY = scrollView.contentOffset.y
+            if offsetY > 0 { return true }
+            guard offsetY < 0 else { return false }
+            // 당겨서 새로고침이 없는 화면(글쓰기·수정)은 예전처럼 위로도 0에 묶는다.
+            guard let pullToRefresh else { return true }
+            // 띠가 inset을 쥐고 있는 동안(새로고침 중·접히는 중)엔 키보드가 올라와도 되돌리지 않는다 — 화면이 튄다.
+            if isRefreshing || pullToRefresh.holdsInset { return false }
+            return (webView?.superview as? KeyboardAvoidingWebContainer)?.isKeyboardVisible ?? false
+        }
+
         func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
             pullToRefresh?.scrollViewDidEndDragging(scrollView)
         }
 
-        // 커스텀 풀다운 리프레시를 스크롤뷰에 부착한다. (리스트 웹뷰 전용)
+        // 커스텀 풀다운 리프레시를 스크롤뷰에 부착한다.
         func setupPullToRefresh(on scrollView: UIScrollView, style: WebPullToRefreshStyle) {
             scrollView.delegate = self
             pullToRefresh = WebPullToRefreshController(scrollView: scrollView, style: style) { [weak self] in
@@ -351,12 +367,35 @@ struct BridgeWebView: UIViewRepresentable {
             // 리프레시로 웹 컨텍스트가 재초기화되므로 전달 기록을 비워
             // 재로드 후 WEBVIEW_READY 핸드셰이크에서 상태가 다시 동기화되게 한다.
             deliveredOutboundIDs.removeAll()
-            webView.reload()
+            refreshNavigation = nil
+            guard locksDocumentScroll else {
+                reloadForRefresh(webView)
+                return
+            }
+            // 고정 셸(상세)은 띠가 로딩 높이로 내려앉는 걸 웹이 본 뒤에 다시 불러온다. 곧바로 부르면
+            // 웹이 손 뗀 순간의 당김 값에서 멈춰, 띠와 화면 사이에 빈 틈이 벌어진다(#432).
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(WebPullToRefreshController.settleDuration))
+                guard let self, !self.isDeactivated, self.isRefreshing, let webView = self.webView else { return }
+                self.reloadForRefresh(webView)
+            }
         }
 
-        private func endRefreshing(success: Bool) {
-            guard isRefreshing else { return }
+        private func reloadForRefresh(_ webView: WKWebView) {
+            refreshNavigation = webView.reload()
+            // 다시 불러올 페이지가 없으면 기다릴 결과도 없으니 띠를 바로 닫는다.
+            guard refreshNavigation == nil else { return }
             isRefreshing = false
+            pullToRefresh?.finishRefreshing(success: false)
+        }
+
+        /// 새로고침이 부른 reload의 결과일 때만 띠를 닫는다. reload를 아직 부르지 않았거나 다른 로드의
+        /// 알림이면 무시한다. `navigation`이 nil이면 navigation 구분 없이 reload 뒤의 실패로 본다.
+        private func endRefreshing(success: Bool, navigation: WKNavigation?) {
+            guard isRefreshing, let refreshNavigation else { return }
+            if let navigation, navigation !== refreshNavigation { return }
+            isRefreshing = false
+            self.refreshNavigation = nil
             pullToRefresh?.finishRefreshing(success: success)
         }
 
@@ -408,7 +447,7 @@ struct BridgeWebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            endRefreshing(success: true)
+            endRefreshing(success: true, navigation: navigation)
             onLoadingFinished()
             // 웹이 로드되며 overscroll-behavior로 바운스를 끌 수 있어 풀다운 여지를 재확보한다.
             pullToRefresh?.enforceVerticalBounce()
@@ -416,14 +455,22 @@ struct BridgeWebView: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
             Log.trace("Bridge webview didFail: \(error)", category: .network, level: .error)
-            endRefreshing(success: false)
+            endRefreshing(success: false, navigation: navigation)
+            guard !isCancelledByRefresh(error) else { return }
             onLoadingFailed()
         }
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
             Log.trace("Bridge webview didFailProvisionalNavigation: \(error)", category: .network, level: .error)
-            endRefreshing(success: false)
+            endRefreshing(success: false, navigation: navigation)
+            guard !isCancelledByRefresh(error) else { return }
             onLoadingFailed()
+        }
+
+        /// 새로고침의 reload가 앞서 진행 중이던 로드를 취소한 알림인지. 그 로드는 실패가 아니라
+        /// 새로고침에 자리를 내준 것이라 실패 화면을 띄우지 않는다.
+        private func isCancelledByRefresh(_ error: Error) -> Bool {
+            isRefreshing && (error as NSError).code == NSURLErrorCancelled
         }
 
         // HTTP 4xx/5xx는 WKWebView 관점에서 "정상 로드"라 didFail이 호출되지 않는다.
@@ -440,7 +487,7 @@ struct BridgeWebView: UIViewRepresentable {
             {
                 Log.trace("Bridge webview HTTP error: \(http.statusCode)", category: .network, level: .error)
                 decisionHandler(.cancel)
-                endRefreshing(success: false)
+                endRefreshing(success: false, navigation: nil)
                 onLoadingFailed()
                 return
             }
@@ -546,6 +593,8 @@ private final class KeyboardAvoidingWebContainer: UIView {
     }
     // 스크롤할 때마다 부른다(탭 첫 화면 웹만, #267).
     var onScroll: (@MainActor (CGFloat, CGFloat, Bool) -> Void)?
+    // 키보드가 떠 있는지. 고정 셸(상세)이 댓글을 쓰는 중에 당겨서 새로고침되지 않게 본다(#432).
+    private(set) var isKeyboardVisible = false
 
     func pinWebView(_ webView: WKWebView) {
         self.webView = webView
@@ -578,6 +627,7 @@ private final class KeyboardAvoidingWebContainer: UIView {
         // 탭 첫 화면은 떠 있는 탭 바 자리만큼 아래 안전 영역이 커져 있어(#267), 기기 자체의 아래 안전 영역과 견준다.
         let deviceBottomInset = window?.safeAreaInsets.bottom ?? safeAreaInsets.bottom
         let keyboardVisible = distanceFromBottom > deviceBottomInset + 8
+        isKeyboardVisible = keyboardVisible
         if reportsTabBarAsObscured, let webView {
             let obscuredBottom = keyboardVisible ? 0 : tabBarObscuredBottom
             if webView.obscuredContentInsets.bottom != obscuredBottom {
