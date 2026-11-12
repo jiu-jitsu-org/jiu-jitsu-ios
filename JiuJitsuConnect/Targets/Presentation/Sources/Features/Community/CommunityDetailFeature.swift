@@ -166,6 +166,8 @@ public struct CommunityDetailFeature: Sendable {
         case loginCancelled
         case loggedOut
         case sessionExpired
+        /// MY에서 프로필을 저장함 — 세션 변화는 아니지만 열린 웹뷰 모두에 알리는 같은 통로를 쓴다.
+        case profileUpdated
     }
 
     @Dependency(\.dismiss) var dismiss
@@ -396,6 +398,8 @@ public struct CommunityDetailFeature: Sendable {
         case .sessionExpired:
             state.accessToken = nil
             enqueue(.authSessionExpired, into: &state)
+        case .profileUpdated:
+            enqueue(.profileUpdated, into: &state)
         }
     }
 

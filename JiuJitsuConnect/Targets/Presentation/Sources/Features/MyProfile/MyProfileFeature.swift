@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 import ComposableArchitecture
 import Domain
 import DesignSystem
@@ -39,6 +40,12 @@ public struct MyProfileFeature: Sendable {
         
         // 토스트 메시지 상태
         var toast: ToastState?
+
+        /// 더 높은 띠로 바꿔 저장한 직후 축하 장면에 보여 줄 새 띠(#278). 있으면 MY 위를 덮는다.
+        var promotedBelt: BeltRank?
+        /// 띠 고르기 시트가 내려가는 중인지. 내려가는 중엔 덮개를 띄울 수 없어, 저장이 먼저 끝나면 pendingPromotedBelt에 두었다가 다 내려간 뒤 띄운다.
+        var isBeltSheetClosing = false
+        var pendingPromotedBelt: BeltRank?
         
         // 우측 상단 "..." 메뉴 노출 여부 (관장 사범 인증 메뉴)
         var isMoreMenuPresented: Bool = false
@@ -139,6 +146,8 @@ public struct MyProfileFeature: Sendable {
             case webSubview(CommunityDetailFeature.Action.DelegateAction)
             // 프로필 이미지 업로드·삭제가 서버에 반영됨(삭제 시 nil) → 부모가 커뮤니티 헤더의 내 사진에 바로 반영한다.
             case profileImageChanged(String?)
+            // 띠·도장 등 프로필 저장이 서버에 반영됨 → 부모가 열린 웹뷰 모두에 PROFILE_UPDATED를 보낸다(jiu-jitsu-frontend#413).
+            case profileUpdated
             // 비로그인 MY의 '로그인하기'(#242) → 부모가 로그인 화면을 띄운다.
             case loginRequested
             // MY 스택에 연 설정의 위임(로그아웃·탈퇴·로그인·차단한 회원) → 부모가 설정 탭이던 때와 같이 처리한다.
@@ -160,6 +169,8 @@ public struct MyProfileFeature: Sendable {
             case registerStyleButtonTapped
             case styleCardEditTapped(MyStyleSettingType)  // 프로필 스타일 카드 탭 → 해당 타입 수정 모드 진입
             case toastButtonTapped(ToastState.Action)
+            case beltPromotionDismissed     // 승급 축하 장면을 눌렀거나 시간이 다 됨 (#278)
+            case beltSheetDidDismiss        // 띠 고르기 시트가 다 내려감 (#278)
             case addCompetitionButtonTapped  // 대회 정보 추가 버튼 탭
             case competitionDetailTapped(Competition)  // 대회 정보 행 탭
             case addDivisionTapped([Competition])     // 저장한 대회에 부문 추가 (그 대회의 기록들)
@@ -207,6 +218,7 @@ public struct MyProfileFeature: Sendable {
             
             case showToast(ToastState)
             case toastDismissed
+            case presentBeltPromotion(BeltRank)     // 더 높은 띠로 저장됨 → 축하 장면 띄우기 (#278)
 
             // 프로필 이미지 수정 흐름 — 시트/풀스크린 전환 사이에 짧은 딜레이를 두고 발화
             case presentImageCaptureSource(State.ImageCaptureSource)
@@ -456,6 +468,7 @@ public struct MyProfileFeature: Sendable {
                 // 벨트 등록·수정: API 호출하고 토스트 표시
                 Log.trace("벨트 수정 확인됨 - rank: \(rank.displayName), stripe: \(stripe.displayName)", category: .debug, level: .info)
                 state.sheet = nil
+                state.isBeltSheetClosing = true
                 return .send(.internal(.saveBeltInfoOnly(rank: rank, stripe: stripe)))
                 
             case let .internal(.saveBeltInfoOnly(rank, stripe)):
@@ -633,7 +646,26 @@ public struct MyProfileFeature: Sendable {
                 let previousProfile = state.communityProfile
                 state.communityProfile = updatedProfile  // ← 업데이트된 프로필로 교체!
                 state.destination = nil  // 화면 닫기
-                
+
+                // 더 높은 띠로 바꿨으면 토스트 대신 축하 장면을 띄운다(#278). 같은 띠·낮은 띠·그랄만 바꾼 경우는 그대로 토스트.
+                if let oldRank = previousProfile?.beltRank,
+                   let newRank = updatedProfile.beltRank,
+                   let oldIndex = BeltRank.allCases.firstIndex(of: oldRank),
+                   let newIndex = BeltRank.allCases.firstIndex(of: newRank),
+                   newIndex > oldIndex {
+                    // 띠 시트가 아직 내려가는 중이면 새 화면을 띄울 수 없다 → 다 내려간 뒤(beltSheetDidDismiss) 띄운다
+                    if state.isBeltSheetClosing {
+                        state.pendingPromotedBelt = newRank
+                        return .send(.delegate(.profileUpdated))
+                    }
+                    return .merge(.send(.delegate(.profileUpdated)), .run { send in
+                        // 아래에서 밀려 올라오지 않고 제자리에서 나타나게 기본 등장 움직임을 끈다
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        await send(.internal(.presentBeltPromotion(newRank)), transaction: transaction)
+                    })
+                }
+
                 // 어떤 섹션이 업데이트되었는지에 따라 다른 메시지 표시
                 let message: String
                 if previousProfile?.beltRank == nil && updatedProfile.beltRank != nil {
@@ -654,7 +686,10 @@ public struct MyProfileFeature: Sendable {
                     message = "프로필 수정을 완료했어요"
                 }
                 
-                return .send(.internal(.showToast(.init(message: message, status: .success))))
+                return .merge(
+                    .send(.delegate(.profileUpdated)),
+                    .send(.internal(.showToast(.init(message: message, status: .success))))
+                )
                 
             case let .internal(.updateProfileResponse(.failure(error))):
                 state.isLoadingProfile = false
@@ -675,6 +710,22 @@ public struct MyProfileFeature: Sendable {
                 
             case .view(.toastButtonTapped):
                 return .send(.internal(.toastDismissed))
+
+            case let .internal(.presentBeltPromotion(rank)):
+                state.promotedBelt = rank
+                return .none
+
+            case .view(.beltPromotionDismissed):
+                state.promotedBelt = nil
+                return .none
+
+            case .view(.beltSheetDidDismiss):
+                state.isBeltSheetClosing = false
+                if let rank = state.pendingPromotedBelt {
+                    state.pendingPromotedBelt = nil
+                    state.promotedBelt = rank
+                }
+                return .none
                 
             case .view(.communityActivityTapped):
                 return .send(.delegate(.communityActivityRequested))

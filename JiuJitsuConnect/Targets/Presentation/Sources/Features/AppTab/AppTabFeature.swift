@@ -309,6 +309,14 @@ public struct AppTabFeature: Sendable {
             case let .myPage(.delegate(.profileImageChanged(url))):
                 return .send(.home(.myProfileImageChanged(url.flatMap(URL.init(string:)))))
 
+            // MY(탭이든 커뮤니티에 쌓인 것이든)에서 프로필을 저장하면 열린 웹뷰 모두가 내 프로필을 다시 불러오게 한다(jiu-jitsu-frontend#413).
+            case .myPage(.delegate(.profileUpdated)), .home(.delegate(.profileUpdated)):
+                return .merge(
+                    .send(.home(.session(.profileUpdated))),
+                    .send(.competition(.session(.profileUpdated))),
+                    .send(.myPage(.session(.profileUpdated)))
+                )
+
             // MY 탭 웹 서브뷰는 로그인한 사람만 여는 화면(커뮤니티 활동·차단한 회원)이라 웹의 대기 중 행위를 되살릴 일이 없어
             // 웹발 로그인(pendingWebLoginTab)으로 표시하지 않는다.
             case .myPage(.delegate(.webSubview(.loginPromptRequested))):
