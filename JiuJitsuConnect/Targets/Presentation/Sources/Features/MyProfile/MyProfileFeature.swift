@@ -139,6 +139,8 @@ public struct MyProfileFeature: Sendable {
             case webSubview(CommunityDetailFeature.Action.DelegateAction)
             // 프로필 이미지 업로드·삭제가 서버에 반영됨(삭제 시 nil) → 부모가 커뮤니티 헤더의 내 사진에 바로 반영한다.
             case profileImageChanged(String?)
+            // 띠·도장 등 프로필 저장이 서버에 반영됨 → 부모가 열린 웹뷰 모두에 PROFILE_UPDATED를 보낸다(jiu-jitsu-frontend#413).
+            case profileUpdated
             // 비로그인 MY의 '로그인하기'(#242) → 부모가 로그인 화면을 띄운다.
             case loginRequested
             // MY 스택에 연 설정의 위임(로그아웃·탈퇴·로그인·차단한 회원) → 부모가 설정 탭이던 때와 같이 처리한다.
@@ -654,7 +656,10 @@ public struct MyProfileFeature: Sendable {
                     message = "프로필 수정을 완료했어요"
                 }
                 
-                return .send(.internal(.showToast(.init(message: message, status: .success))))
+                return .merge(
+                    .send(.delegate(.profileUpdated)),
+                    .send(.internal(.showToast(.init(message: message, status: .success))))
+                )
                 
             case let .internal(.updateProfileResponse(.failure(error))):
                 state.isLoadingProfile = false

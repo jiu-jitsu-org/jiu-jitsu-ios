@@ -204,6 +204,8 @@ public struct CommunityFeature: Sendable {
             case debugDeepLinkRequested(DeepLink)
             // 홈 웹(피드·글 상세·알림함)의 관심 대회 '알림 받기'(#257) → 부모가 알림 설정을 켜고 기기 알림 상태를 본다.
             case competitionAlertsEnabled(competitionId: String?)
+            // 이 스택에 쌓인 MY에서 프로필을 저장함 → 부모가 열린 웹뷰 모두에 PROFILE_UPDATED를 보낸다.
+            case profileUpdated
         }
 
         /// 부모가 세션 상태 변화를 알려주면 그에 맞는 아웃바운드 메시지를 웹에 주입한다.
@@ -215,6 +217,8 @@ public struct CommunityFeature: Sendable {
             case loginCancelled
             case loggedOut
             case sessionExpired
+            /// MY에서 프로필을 저장함 → PROFILE_UPDATED
+            case profileUpdated
         }
     }
 
@@ -531,6 +535,11 @@ public struct CommunityFeature: Sendable {
                 Self.broadcastToDetails(.sessionExpired, into: &state)
                 return .merge(.cancel(id: CancelID.unreadNotification), .cancel(id: CancelID.myProfileImage))
 
+            case .session(.profileUpdated):
+                Self.enqueue(.profileUpdated, into: &state)
+                Self.broadcastToDetails(.profileUpdated, into: &state)
+                return .none
+
             // MARK: - 내 사진 변경 (부모 주입)
 
             case let .myProfileImageChanged(url):
@@ -590,6 +599,10 @@ public struct CommunityFeature: Sendable {
             case let .path(.element(id: _, action: .myProfile(.delegate(.profileImageChanged(url))))),
                  let .coverPath(.element(id: _, action: .myProfile(.delegate(.profileImageChanged(url))))):
                 return .send(.myProfileImageChanged(url.flatMap(URL.init(string:))))
+
+            case .path(.element(id: _, action: .myProfile(.delegate(.profileUpdated)))),
+                 .coverPath(.element(id: _, action: .myProfile(.delegate(.profileUpdated)))):
+                return .send(.delegate(.profileUpdated))
 
             // 알림함에서 읽은 알림을 점에 반영한다. forEach보다 먼저 실행돼 pop 대상이 아직 스택에 남아 있다.
             // 알림함 위에 쌓인 상세까지 한 번에 닫히는 경우도 있어 pop 범위 전체를 본다.

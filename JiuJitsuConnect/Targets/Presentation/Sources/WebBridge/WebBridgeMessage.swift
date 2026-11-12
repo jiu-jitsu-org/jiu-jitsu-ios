@@ -185,6 +185,8 @@ private extension WebBridgeOutboundMessage {
             // base64 원문은 장당 수백 KB라 로그에는 개수와 크기만 남긴다.
             let sizes = files.map { "\($0.data.count / 1024)KB" }.joined(separator: ",")
             return "PHOTOS_PICKED  reqId=\(requestId) files=\(files.count) base64=[\(sizes)]"
+        case .profileUpdated:
+            return "PROFILE_UPDATED"
         }
     }
 }
@@ -707,6 +709,8 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
     case selectSheetResult(requestId: String, outcome: SelectSheetOutcome)
     /// PICK_PHOTOS의 결과. 고른 순서대로이며, 취소면 빈 배열이다.
     case photosPicked(requestId: String, files: [PickedPhoto])
+    /// MY에서 프로필(띠 등)을 저장함 → 웹이 들고 있는 내 프로필을 다시 불러온다(jiu-jitsu-frontend#413).
+    case profileUpdated
 
     private var type: String {
         switch self {
@@ -718,6 +722,7 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         case .confirmDialogResult: return "CONFIRM_DIALOG_RESULT"
         case .selectSheetResult: return "SELECT_SHEET_RESULT"
         case .photosPicked: return "PHOTOS_PICKED"
+        case .profileUpdated: return "PROFILE_UPDATED"
         }
     }
 
@@ -725,7 +730,7 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         switch self {
         case let .authLoginSuccess(accessToken):
             return ["accessToken": accessToken]
-        case .authLoginCancelled, .authSessionExpired, .authLogout, .backPressed:
+        case .authLoginCancelled, .authSessionExpired, .authLogout, .backPressed, .profileUpdated:
             return nil
         case let .confirmDialogResult(requestId, outcome):
             return ["requestId": requestId, "result": outcome.rawValue]
