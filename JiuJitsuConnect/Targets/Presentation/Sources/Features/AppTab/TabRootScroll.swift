@@ -28,4 +28,8 @@ struct TabRootScrollAction: Equatable {
 
 extension EnvironmentValues {
     @Entry var tabRootScroll: TabRootScrollAction?
+    /// 화면 바닥에서 떠 있는 탭 바 윗변(+ 글쓰기 버튼과의 간격)까지의 높이(#284).
+    /// 탭 바 밑까지 그리는 웹뷰가 이만큼을 가려진 영역으로 알린다. SwiftUI의 `.safeAreaInset`은
+    /// UIKit 안전 영역으로 넘어가지 않아(웹뷰는 기기 안전 영역 34만 봄) 값으로 직접 건넨다.
+    @Entry var tabBarReservedHeight: CGFloat = 0
 }
