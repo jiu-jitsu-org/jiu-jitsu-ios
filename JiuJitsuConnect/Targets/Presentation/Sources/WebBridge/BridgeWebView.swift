@@ -144,7 +144,8 @@ struct BridgeWebView: UIViewRepresentable {
         // 본문만 스크롤된다. WKWebView는 viewport `interactive-widget=resizes-content` 지원이
         // 불안정해 레이아웃 뷰포트가 안 줄어들므로, 네이티브 프레임 리사이즈로 키보드를 처리한다.
         let container = KeyboardAvoidingWebContainer()
-        container.reportsBottomSafeAreaAsObscured = extendsUnderTabBar
+        container.reportsTabBarAsObscured = extendsUnderTabBar
+        container.tabBarObscuredBottom = context.environment.tabBarReservedHeight
         webView.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(webView)
         container.pinWebView(webView)
@@ -185,7 +186,9 @@ struct BridgeWebView: UIViewRepresentable {
         context.coordinator.setPullToRefreshBackground(pullToRefreshBackground.map { UIColor($0) })
         // 탭 첫 화면 웹만 스크롤을 AppTabView에 알린다 — 탭 바 숨김·맨 위로 버튼(#267).
         let tabRootScroll: TabRootScrollAction? = extendsUnderTabBar ? context.environment.tabRootScroll : nil
-        (container as? KeyboardAvoidingWebContainer)?.onScroll = tabRootScroll?.report
+        let keyboardAvoidingContainer = container as? KeyboardAvoidingWebContainer
+        keyboardAvoidingContainer?.onScroll = tabRootScroll?.report
+        keyboardAvoidingContainer?.tabBarObscuredBottom = context.environment.tabBarReservedHeight
         // 토큰 변동(갱신) 시에도 세션 쿠키를 최신으로 유지한 뒤 (재)로드/플러시한다.
         let cookieStore = context.coordinator.webView?.configuration.websiteDataStore.httpCookieStore
             ?? WKWebsiteDataStore.default().httpCookieStore
@@ -530,11 +533,14 @@ private final class KeyboardAvoidingWebContainer: UIView {
     private var bottomToBottomEdge: NSLayoutConstraint?
     private weak var webView: WKWebView?
     private var offsetObservation: NSKeyValueObservation?
-    // 켜면 아래 안전 영역(떠 있는 탭 바 자리)을 웹뷰가 가려진 영역으로 알린다(#267).
-    var reportsBottomSafeAreaAsObscured = false
-    // 탭 바가 보일 때의 아래 안전 영역. 스크롤로 탭 바를 숨겨도 이 값을 그대로 둬,
-    // 웹의 글쓰기 버튼·마지막 글이 탭 바와 함께 들썩이지 않게 한다(움직이는 건 탭 바 하나).
-    private var tabBarObscuredBottom: CGFloat = 0
+    // 켜면 떠 있는 탭 바 자리(tabBarObscuredBottom)를 웹뷰가 가려진 영역으로 알린다(#267).
+    var reportsTabBarAsObscured = false
+    // 화면 바닥에서 탭 바 윗변까지(AppTabView가 환경값으로 건넴, #284). 아래 안전 영역은 SwiftUI의
+    // `.safeAreaInset`이 넘어오지 않아 기기 홈 막대 자리(34)뿐이라 쓰지 않는다. 탭 바가 숨어도 같은 값이라
+    // 웹의 글쓰기 버튼·마지막 글이 탭 바와 함께 들썩이지 않는다(움직이는 건 탭 바 하나).
+    var tabBarObscuredBottom: CGFloat = 0 {
+        didSet { if reportsTabBarAsObscured, oldValue != tabBarObscuredBottom { setNeedsLayout() } }
+    }
     // 스크롤할 때마다 부른다(탭 첫 화면 웹만, #267).
     var onScroll: (@MainActor (CGFloat, CGFloat, Bool) -> Void)?
 
@@ -569,10 +575,7 @@ private final class KeyboardAvoidingWebContainer: UIView {
         // 탭 첫 화면은 떠 있는 탭 바 자리만큼 아래 안전 영역이 커져 있어(#267), 기기 자체의 아래 안전 영역과 견준다.
         let deviceBottomInset = window?.safeAreaInsets.bottom ?? safeAreaInsets.bottom
         let keyboardVisible = distanceFromBottom > deviceBottomInset + 8
-        if reportsBottomSafeAreaAsObscured, let webView {
-            if !keyboardVisible {
-                tabBarObscuredBottom = max(tabBarObscuredBottom, safeAreaInsets.bottom)
-            }
+        if reportsTabBarAsObscured, let webView {
             let obscuredBottom = keyboardVisible ? 0 : tabBarObscuredBottom
             if webView.obscuredContentInsets.bottom != obscuredBottom {
                 webView.obscuredContentInsets = UIEdgeInsets(top: 0, left: 0, bottom: obscuredBottom, right: 0)
@@ -591,11 +594,6 @@ private final class KeyboardAvoidingWebContainer: UIView {
         let maxOffsetY = scrollView.contentSize.height + inset.top + inset.bottom - scrollView.bounds.height
         let isUserScrolling = scrollView.isTracking || scrollView.isDecelerating
         onScroll(offsetY, maxOffsetY, isUserScrolling)
-    }
-
-    override func safeAreaInsetsDidChange() {
-        super.safeAreaInsetsDidChange()
-        if reportsBottomSafeAreaAsObscured { setNeedsLayout() }
     }
 }
 

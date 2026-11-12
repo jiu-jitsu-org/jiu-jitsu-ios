@@ -267,6 +267,7 @@ public struct AppTabView: View {
     private func tabRootModifier(for tab: AppTabFeature.Tab) -> TabRootModifier {
         TabRootModifier(
             bottomReserve: max(dockReservedHeight - deviceBottomInset, 0),
+            reservedHeight: dockReservedHeight,
             action: TabRootScrollAction(key: tab) { offsetY, maxOffsetY, isUserScrolling in
                 handleScroll(tab: tab, offsetY: offsetY, maxOffsetY: maxOffsetY, isUserScrolling: isUserScrolling)
             }
@@ -551,6 +552,7 @@ private final class TabScrollTracker {
 /// 탭 첫 화면에 다는 것(#267) — 떠 있는 탭 바 자리만큼 아래를 비우고, 스크롤을 알리는 길을 단다.
 private struct TabRootModifier: ViewModifier {
     let bottomReserve: CGFloat
+    let reservedHeight: CGFloat
     let action: TabRootScrollAction
 
     func body(content: Content) -> some View {
@@ -561,6 +563,7 @@ private struct TabRootModifier: ViewModifier {
                     .allowsHitTesting(false)
             }
             .environment(\.tabRootScroll, action)
+            .environment(\.tabBarReservedHeight, reservedHeight)
     }
 }
 
