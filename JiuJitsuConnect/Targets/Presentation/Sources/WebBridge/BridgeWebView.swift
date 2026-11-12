@@ -235,6 +235,9 @@ struct BridgeWebView: UIViewRepresentable {
         // 현재 로드가 풀다운 리프레시로 시작됐는지. true면 전면 로딩 오버레이를
         // 띄우지 않고 리프레시 밴드만 유지한다.
         private var isRefreshing = false
+        // 당겨서 새로고침이 부른 reload의 navigation. 그 전에 진행 중이던 로드의 완료·실패 알림이
+        // 새로고침을 끝낸 것으로 잘못 읽히지 않게, 이 navigation의 결과로만 새로고침을 끝낸다(#432).
+        private var refreshNavigation: WKNavigation?
         // 고정 셸(상세) 웹뷰에서 키보드가 메인 문서를 위로 스크롤해 헤더가 화면 밖으로 밀리는 것을
         // 막기 위해, 메인 스크롤뷰의 세로 오프셋을 0으로 고정할지 여부.
         private var locksDocumentScroll = false
@@ -351,12 +354,25 @@ struct BridgeWebView: UIViewRepresentable {
             // 리프레시로 웹 컨텍스트가 재초기화되므로 전달 기록을 비워
             // 재로드 후 WEBVIEW_READY 핸드셰이크에서 상태가 다시 동기화되게 한다.
             deliveredOutboundIDs.removeAll()
-            webView.reload()
+            refreshNavigation = nil
+            reloadForRefresh(webView)
         }
 
-        private func endRefreshing(success: Bool) {
-            guard isRefreshing else { return }
+        private func reloadForRefresh(_ webView: WKWebView) {
+            refreshNavigation = webView.reload()
+            // 다시 불러올 페이지가 없으면 기다릴 결과도 없으니 띠를 바로 닫는다.
+            guard refreshNavigation == nil else { return }
             isRefreshing = false
+            pullToRefresh?.finishRefreshing(success: false)
+        }
+
+        /// 새로고침이 부른 reload의 결과일 때만 띠를 닫는다. reload를 아직 부르지 않았거나 다른 로드의
+        /// 알림이면 무시한다. `navigation`이 nil이면 navigation 구분 없이 reload 뒤의 실패로 본다.
+        private func endRefreshing(success: Bool, navigation: WKNavigation?) {
+            guard isRefreshing, let refreshNavigation else { return }
+            if let navigation, navigation !== refreshNavigation { return }
+            isRefreshing = false
+            self.refreshNavigation = nil
             pullToRefresh?.finishRefreshing(success: success)
         }
 
@@ -408,7 +424,7 @@ struct BridgeWebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            endRefreshing(success: true)
+            endRefreshing(success: true, navigation: navigation)
             onLoadingFinished()
             // 웹이 로드되며 overscroll-behavior로 바운스를 끌 수 있어 풀다운 여지를 재확보한다.
             pullToRefresh?.enforceVerticalBounce()
@@ -416,13 +432,13 @@ struct BridgeWebView: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
             Log.trace("Bridge webview didFail: \(error)", category: .network, level: .error)
-            endRefreshing(success: false)
+            endRefreshing(success: false, navigation: navigation)
             onLoadingFailed()
         }
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
             Log.trace("Bridge webview didFailProvisionalNavigation: \(error)", category: .network, level: .error)
-            endRefreshing(success: false)
+            endRefreshing(success: false, navigation: navigation)
             onLoadingFailed()
         }
 
@@ -440,7 +456,7 @@ struct BridgeWebView: UIViewRepresentable {
             {
                 Log.trace("Bridge webview HTTP error: \(http.statusCode)", category: .network, level: .error)
                 decisionHandler(.cancel)
-                endRefreshing(success: false)
+                endRefreshing(success: false, navigation: nil)
                 onLoadingFailed()
                 return
             }
