@@ -9,6 +9,7 @@
 //  `DependencyContainer`는 본 파일이 만든 단일 인스턴스를 lazy 보유하여 재사용한다.
 //
 
+import CoreKit
 import Foundation
 import UIKit
 import UserNotifications
@@ -19,6 +20,8 @@ import Presentation
 enum FirebaseClientFactory {
 
     private static let cacheKey = "jj.fcm.cached_token"
+    /// 로그아웃·탈퇴 때 FCM 토큰 폐기가 실패했음(오프라인 등)을 남긴다(#269).
+    private static let pendingDeletionKey = "jj.fcm.pending_token_deletion"
 
     /// Live `FirebaseClient`를 생성한다. `DependencyContainer.sharedFirebaseClient`에서 한 번만 호출된다.
     static func make() -> FirebaseClient {
@@ -58,6 +61,19 @@ enum FirebaseClientFactory {
                     throw FirebaseError.permissionDenied
                 }
 
+                // 폐기하지 못한 토큰이 남아 있으면 먼저 폐기한다. SDK는 로컬 토큰만 지운 상태라,
+                // 그대로 발급받으면 FCM이 같은 토큰을 돌려줘 이전 계정 푸시가 계속 올 수 있다.
+                if defaults.bool(forKey: pendingDeletionKey) {
+                    do {
+                        try await deleteToken()
+                        defaults.removeObject(forKey: pendingDeletionKey)
+                        // 재시도 전에 SDK 콜백이 캐시에 넣었을 수 있는 폐기된 토큰도 지운다.
+                        defaults.removeObject(forKey: cacheKey)
+                    } catch {
+                        Log.trace("[FCM] 미뤄 둔 토큰 폐기 재시도 실패: \(error)", category: .system, level: .error)
+                    }
+                }
+
                 await MainActor.run {
                     UIApplication.shared.registerForRemoteNotifications()
                 }
@@ -77,14 +93,13 @@ enum FirebaseClientFactory {
                 }
             },
             deleteFCMToken: {
-                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                    Messaging.messaging().deleteToken { error in
-                        if let error {
-                            continuation.resume(throwing: error)
-                        } else {
-                            continuation.resume(returning: ())
-                        }
-                    }
+                do {
+                    try await deleteToken()
+                    defaults.removeObject(forKey: pendingDeletionKey)
+                } catch {
+                    // 다음 토큰 발급(getFCMToken) 전에 다시 시도한다.
+                    defaults.set(true, forKey: pendingDeletionKey)
+                    throw error
                 }
             },
             loadCachedToken: {
@@ -97,5 +112,17 @@ enum FirebaseClientFactory {
                 defaults.removeObject(forKey: cacheKey)
             }
         )
+    }
+
+    private static func deleteToken() async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            Messaging.messaging().deleteToken { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: ())
+                }
+            }
+        }
     }
 }
