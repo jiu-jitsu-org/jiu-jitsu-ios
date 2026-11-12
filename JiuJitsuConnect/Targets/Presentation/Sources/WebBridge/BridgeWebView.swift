@@ -339,8 +339,9 @@ struct BridgeWebView: UIViewRepresentable {
             if offsetY > 0 { return true }
             guard offsetY < 0 else { return false }
             // 당겨서 새로고침이 없는 화면(글쓰기·수정)은 예전처럼 위로도 0에 묶는다.
-            guard pullToRefresh != nil else { return true }
-            if isRefreshing { return false }
+            guard let pullToRefresh else { return true }
+            // 띠가 inset을 쥐고 있는 동안(새로고침 중·접히는 중)엔 키보드가 올라와도 되돌리지 않는다 — 화면이 튄다.
+            if isRefreshing || pullToRefresh.holdsInset { return false }
             return (webView?.superview as? KeyboardAvoidingWebContainer)?.isKeyboardVisible ?? false
         }
 
@@ -455,13 +456,21 @@ struct BridgeWebView: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
             Log.trace("Bridge webview didFail: \(error)", category: .network, level: .error)
             endRefreshing(success: false, navigation: navigation)
+            guard !isCancelledByRefresh(error) else { return }
             onLoadingFailed()
         }
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
             Log.trace("Bridge webview didFailProvisionalNavigation: \(error)", category: .network, level: .error)
             endRefreshing(success: false, navigation: navigation)
+            guard !isCancelledByRefresh(error) else { return }
             onLoadingFailed()
+        }
+
+        /// 새로고침의 reload가 앞서 진행 중이던 로드를 취소한 알림인지. 그 로드는 실패가 아니라
+        /// 새로고침에 자리를 내준 것이라 실패 화면을 띄우지 않는다.
+        private func isCancelledByRefresh(_ error: Error) -> Bool {
+            isRefreshing && (error as NSError).code == NSURLErrorCancelled
         }
 
         // HTTP 4xx/5xx는 WKWebView 관점에서 "정상 로드"라 didFail이 호출되지 않는다.

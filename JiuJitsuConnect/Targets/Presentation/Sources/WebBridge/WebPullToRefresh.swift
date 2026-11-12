@@ -365,6 +365,9 @@ final class WebPullToRefreshController {
     /// 손을 뗀 뒤 띠가 로딩 높이로 내려앉기까지 걸리는 시간(약간 여유를 둠). 고정 셸 화면은 이만큼 기다렸다 다시 불러온다(#432).
     static var settleDuration: TimeInterval { Timing.insetAnimation + 0.05 }
 
+    /// 띠가 로딩 높이로 내려앉아 있거나(새로고침 중) 완료 안내 뒤 접히는 중인지. 이때 위쪽 inset을 띠가 쥐고 있다.
+    var holdsInset: Bool { phase == .refreshing || phase == .success }
+
     private weak var scrollView: UIScrollView?
     private let band: WebPullToRefreshBand
     // 웹뷰 위에 얹는 터짐 효과. 스크롤과 함께 움직이지 않게 스크롤뷰 바깥(웹뷰)에 둔다.
