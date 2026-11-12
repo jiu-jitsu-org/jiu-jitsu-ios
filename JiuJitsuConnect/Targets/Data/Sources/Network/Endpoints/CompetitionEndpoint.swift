@@ -6,7 +6,7 @@
 import Foundation
 
 enum CompetitionEndpoint {
-    /// 등록된 대회 검색 (GET `/api/community/competitions?keyword=`)
+    /// 등록된 대회 검색 (GET `/api/competitions/autocomplete?keyword=`)
     /// 서버가 공백·대소문자를 무시해 부분 일치로 찾고, 정렬해서 최대 20개를 준다.
     case search(keyword: String)
 }
@@ -21,7 +21,7 @@ extension CompetitionEndpoint: Endpoint {
 
     var path: String {
         switch self {
-        case .search: return "/api/community/competitions"
+        case .search: return "/api/competitions/autocomplete"
         }
     }
 

@@ -9,7 +9,7 @@ import ComposableArchitecture
 import Domain
 
 public struct CompetitionClient: Sendable {
-    /// 대회명 일부로 등록된 대회 검색 (GET `/api/community/competitions?keyword=`)
+    /// 대회명 일부로 등록된 대회 검색 (GET `/api/competitions/autocomplete?keyword=`)
     public var searchCompetitions: @Sendable (String) async throws -> [RegisteredCompetition]
 
     public init(

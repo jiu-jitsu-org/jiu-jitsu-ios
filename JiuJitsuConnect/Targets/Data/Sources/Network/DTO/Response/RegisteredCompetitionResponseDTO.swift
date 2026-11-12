@@ -6,7 +6,7 @@
 import Foundation
 import Domain
 
-/// 등록된 대회 검색 결과 항목(`GET /api/community/competitions?keyword=`).
+/// 등록된 대회 검색 결과 항목(`GET /api/competitions/autocomplete?keyword=`).
 struct RegisteredCompetitionResponseDTO: Decodable, Sendable {
     let competitionId: Int
     let name: String
