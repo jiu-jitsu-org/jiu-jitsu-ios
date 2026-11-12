@@ -136,6 +136,45 @@ public struct BeltIcon: View {
     }
 }
 
+// MARK: - Belt Illustration
+
+/// 띠를 화면의 주인공으로 크게 그릴 때 — 칩의 `large` 띠 모양을 폭에 맞춰 그대로 키운다. 도형이라 커져도 흐려지지 않는다.
+///
+/// 그랄을 막 감은 모습을 보여 줄 때는 `newStripes`(새로 감은 그랄 수)와 `newStripeProgress`(0이면 비어 있고 1이면 다 감김)를 넘긴다.
+/// 그랄은 띠 끝 쪽부터 감으므로 새 그랄은 단의 안쪽(왼쪽)에 생긴다.
+public struct BeltIllustration: View {
+    private let color: BeltSelectButton.BeltColor
+    private let stripes: Int
+    private let width: CGFloat
+    private let newStripes: Int
+    private let newStripeProgress: CGFloat
+
+    public init(
+        color: BeltSelectButton.BeltColor,
+        stripes: Int,
+        width: CGFloat,
+        newStripes: Int = 0,
+        newStripeProgress: CGFloat = 1
+    ) {
+        self.color = color
+        self.stripes = min(max(stripes, 0), 4)
+        self.width = width
+        self.newStripes = min(max(newStripes, 0), self.stripes)
+        self.newStripeProgress = newStripeProgress
+    }
+
+    public var body: some View {
+        let large = BeltMetrics(BeltSelectButton.Size.large)
+        BeltShape(
+            color: color,
+            stripes: stripes,
+            metrics: large.scaled(by: width / large.beltSize.width),
+            newStripes: newStripes,
+            newStripeProgress: newStripeProgress
+        )
+    }
+}
+
 // MARK: - Button Style (Private)
 
 /// 누르는 동안 바탕을 한 단계 진하게 — 다른 앱 버튼과 같은 눌림 반응.
@@ -162,39 +201,85 @@ private struct BeltSelectButtonStyle: ButtonStyle {
 private struct BeltShape: View {
     let color: BeltSelectButton.BeltColor
     let stripes: Int
-    let size: BeltSelectButton.Size
+    let metrics: BeltMetrics
+    let newStripes: Int
+    let newStripeProgress: CGFloat
+
+    init(color: BeltSelectButton.BeltColor, stripes: Int, size: BeltSelectButton.Size) {
+        self.init(color: color, stripes: stripes, metrics: BeltMetrics(size))
+    }
+
+    init(color: BeltSelectButton.BeltColor, stripes: Int, metrics: BeltMetrics, newStripes: Int = 0, newStripeProgress: CGFloat = 1) {
+        self.color = color
+        self.stripes = stripes
+        self.metrics = metrics
+        self.newStripes = newStripes
+        self.newStripeProgress = newStripeProgress
+    }
 
     var body: some View {
-        RoundedRectangle(cornerRadius: size.beltCornerRadius)
+        RoundedRectangle(cornerRadius: metrics.beltCornerRadius)
             .fill(color.fill)
             .overlay(alignment: .trailing) {
                 Rectangle()
                     .fill(color.rankBar)
                     .overlay {
-                        HStack(spacing: size.stripeSpacing) {
-                            ForEach(0..<stripes, id: \.self) { _ in
+                        HStack(spacing: metrics.stripeSpacing) {
+                            ForEach(0..<stripes, id: \.self) { index in
                                 Rectangle()
                                     .fill(Color.component.beltSelectButton.belt.stripe)
-                                    .frame(width: size.stripeWidth)
+                                    .frame(width: metrics.stripeWidth)
+                                    // 새 그랄은 위에서 아래로 감긴다
+                                    .scaleEffect(x: 1, y: index < newStripes ? newStripeProgress : 1, anchor: .top)
                             }
                         }
                     }
-                    .frame(width: size.rankBarWidth)
-                    .padding(.trailing, size.rankBarInset)
+                    .frame(width: metrics.rankBarWidth)
+                    .padding(.trailing, metrics.rankBarInset)
             }
-            .clipShape(RoundedRectangle(cornerRadius: size.beltCornerRadius))
+            .clipShape(RoundedRectangle(cornerRadius: metrics.beltCornerRadius))
             .overlay {
                 if color == .white {
-                    RoundedRectangle(cornerRadius: size.beltCornerRadius)
+                    RoundedRectangle(cornerRadius: metrics.beltCornerRadius)
                         .strokeBorder(Color.component.beltSelectButton.belt.whiteEdge, lineWidth: 1)
                 }
             }
-            .frame(width: size.beltSize.width, height: size.beltSize.height)
+            .frame(width: metrics.beltSize.width, height: metrics.beltSize.height)
             .accessibilityHidden(true)
     }
 }
 
 // MARK: - Size Metrics
+
+/// 띠 한 토막의 치수. 칩 크기마다 정해 두고, 크게 그릴 때는 같은 비율로 키운다.
+private struct BeltMetrics {
+    var beltSize: CGSize
+    var beltCornerRadius: CGFloat
+    var rankBarWidth: CGFloat
+    var rankBarInset: CGFloat
+    var stripeWidth: CGFloat
+    var stripeSpacing: CGFloat
+
+    init(_ size: BeltSelectButton.Size) {
+        beltSize = size.beltSize
+        beltCornerRadius = size.beltCornerRadius
+        rankBarWidth = size.rankBarWidth
+        rankBarInset = size.rankBarInset
+        stripeWidth = size.stripeWidth
+        stripeSpacing = size.stripeSpacing
+    }
+
+    func scaled(by factor: CGFloat) -> BeltMetrics {
+        var metrics = self
+        metrics.beltSize = CGSize(width: beltSize.width * factor, height: beltSize.height * factor)
+        metrics.beltCornerRadius *= factor
+        metrics.rankBarWidth *= factor
+        metrics.rankBarInset *= factor
+        metrics.stripeWidth *= factor
+        metrics.stripeSpacing *= factor
+        return metrics
+    }
+}
 
 private extension BeltSelectButton.Size {
     var height: CGFloat {
@@ -306,6 +391,7 @@ private extension BeltSelectButton.BeltColor {
             BeltSelectButton(color: .purple, title: "퍼플", stripes: 2, size: .large, isSelected: true) {}
             BeltSelectButton(color: .black, title: "블랙", stripes: 4, size: .large, isSelected: false) {}
         }
+        BeltIllustration(color: .purple, stripes: 2, width: 300)
     }
     .padding(20)
 }

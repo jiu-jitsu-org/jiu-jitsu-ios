@@ -41,11 +41,11 @@ public struct MyProfileFeature: Sendable {
         // 토스트 메시지 상태
         var toast: ToastState?
 
-        /// 더 높은 띠로 바꿔 저장한 직후 축하 장면에 보여 줄 새 띠(#278). 있으면 MY 위를 덮는다.
-        var promotedBelt: BeltRank?
-        /// 띠 고르기 시트가 내려가는 중인지. 내려가는 중엔 덮개를 띄울 수 없어, 저장이 먼저 끝나면 pendingPromotedBelt에 두었다가 다 내려간 뒤 띄운다.
+        /// 띠나 그랄을 올려 저장한 직후 보여 줄 축하(#278, #286). 있으면 MY 위를 덮는다.
+        var promotion: BeltPromotion?
+        /// 띠 고르기 시트가 내려가는 중인지. 내려가는 중엔 덮개를 띄울 수 없어, 저장이 먼저 끝나면 pendingPromotion에 두었다가 다 내려간 뒤 띄운다.
         var isBeltSheetClosing = false
-        var pendingPromotedBelt: BeltRank?
+        var pendingPromotion: BeltPromotion?
         
         // 우측 상단 "..." 메뉴 노출 여부 (관장 사범 인증 메뉴)
         var isMoreMenuPresented: Bool = false
@@ -169,7 +169,7 @@ public struct MyProfileFeature: Sendable {
             case registerStyleButtonTapped
             case styleCardEditTapped(MyStyleSettingType)  // 프로필 스타일 카드 탭 → 해당 타입 수정 모드 진입
             case toastButtonTapped(ToastState.Action)
-            case beltPromotionDismissed     // 승급 축하 장면을 눌렀거나 시간이 다 됨 (#278)
+            case beltPromotionDismissed     // 띠·그랄 축하 장면을 눌렀거나 시간이 다 됨 (#278, #286)
             case beltSheetDidDismiss        // 띠 고르기 시트가 다 내려감 (#278)
             case addCompetitionButtonTapped  // 대회 정보 추가 버튼 탭
             case competitionDetailTapped(Competition)  // 대회 정보 행 탭
@@ -218,7 +218,7 @@ public struct MyProfileFeature: Sendable {
             
             case showToast(ToastState)
             case toastDismissed
-            case presentBeltPromotion(BeltRank)     // 더 높은 띠로 저장됨 → 축하 장면 띄우기 (#278)
+            case presentBeltPromotion(BeltPromotion)     // 더 높은 띠·그랄로 저장됨 → 축하 장면 띄우기 (#278, #286)
 
             // 프로필 이미지 수정 흐름 — 시트/풀스크린 전환 사이에 짧은 딜레이를 두고 발화
             case presentImageCaptureSource(State.ImageCaptureSource)
@@ -647,22 +647,19 @@ public struct MyProfileFeature: Sendable {
                 state.communityProfile = updatedProfile  // ← 업데이트된 프로필로 교체!
                 state.destination = nil  // 화면 닫기
 
-                // 더 높은 띠로 바꿨으면 토스트 대신 축하 장면을 띄운다(#278). 같은 띠·낮은 띠·그랄만 바꾼 경우는 그대로 토스트.
-                if let oldRank = previousProfile?.beltRank,
-                   let newRank = updatedProfile.beltRank,
-                   let oldIndex = BeltRank.allCases.firstIndex(of: oldRank),
-                   let newIndex = BeltRank.allCases.firstIndex(of: newRank),
-                   newIndex > oldIndex {
+                // 더 높은 띠로 바꿨거나 같은 띠에서 그랄을 올렸으면 토스트 대신 축하 장면을 띄운다(#278, #286).
+                // 낮은 띠, 그랄을 내리거나 그대로 둔 경우는 그대로 토스트.
+                if let promotion = BeltPromotion(from: previousProfile, to: updatedProfile) {
                     // 띠 시트가 아직 내려가는 중이면 새 화면을 띄울 수 없다 → 다 내려간 뒤(beltSheetDidDismiss) 띄운다
                     if state.isBeltSheetClosing {
-                        state.pendingPromotedBelt = newRank
+                        state.pendingPromotion = promotion
                         return .send(.delegate(.profileUpdated))
                     }
                     return .merge(.send(.delegate(.profileUpdated)), .run { send in
                         // 아래에서 밀려 올라오지 않고 제자리에서 나타나게 기본 등장 움직임을 끈다
                         var transaction = Transaction()
                         transaction.disablesAnimations = true
-                        await send(.internal(.presentBeltPromotion(newRank)), transaction: transaction)
+                        await send(.internal(.presentBeltPromotion(promotion)), transaction: transaction)
                     })
                 }
 
@@ -711,19 +708,19 @@ public struct MyProfileFeature: Sendable {
             case .view(.toastButtonTapped):
                 return .send(.internal(.toastDismissed))
 
-            case let .internal(.presentBeltPromotion(rank)):
-                state.promotedBelt = rank
+            case let .internal(.presentBeltPromotion(promotion)):
+                state.promotion = promotion
                 return .none
 
             case .view(.beltPromotionDismissed):
-                state.promotedBelt = nil
+                state.promotion = nil
                 return .none
 
             case .view(.beltSheetDidDismiss):
                 state.isBeltSheetClosing = false
-                if let rank = state.pendingPromotedBelt {
-                    state.pendingPromotedBelt = nil
-                    state.promotedBelt = rank
+                if let promotion = state.pendingPromotion {
+                    state.pendingPromotion = nil
+                    state.promotion = promotion
                 }
                 return .none
                 
