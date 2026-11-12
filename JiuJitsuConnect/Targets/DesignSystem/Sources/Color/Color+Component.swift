@@ -326,9 +326,10 @@ public struct ComponentColors {
             public let label = Color.semantic.interactive.primary
         }
 
+        // 떠 있는 유리 탭 바는 뒤 화면이 비쳐 옅은 회색(300)이 거의 안 보였다(#295). 보조 글자와 같은 500으로 둔다.
         public struct Unselected {
-            public let icon = Color.semantic.icon.tertiary
-            public let label = Color.semantic.text.tertiary
+            public let icon = Color.semantic.icon.secondary
+            public let label = Color.semantic.text.secondary
         }
     }
 
