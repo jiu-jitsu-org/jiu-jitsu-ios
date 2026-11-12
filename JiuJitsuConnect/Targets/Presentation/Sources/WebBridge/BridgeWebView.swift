@@ -40,6 +40,8 @@ struct BridgeWebView: UIViewRepresentable {
     var overscrollBackground: Color = Color.primitive.bw.trueWhite
     // 맨 위에서 당길 때 드러나는 풀다운 밴드의 바탕색. nil이면 기본 연파랑. 대회 목록만 머리줄 색과 맞추려고 넘긴다.
     var pullToRefreshBackground: Color?
+    // 당겨서 새로고침 꾸밈(손 색·문구). 대회 목록만 .competition.
+    var pullToRefreshStyle: WebPullToRefreshStyle = .feed
     // 탭 첫 화면 웹(홈 피드·대회 목록)만 켠다(#267). 웹뷰를 떠 있는 탭 바 밑까지 그리고, 탭 바가 가린 만큼을
     // 웹에 알려 맨 아래 글·고정 버튼이 탭 바 위에서 멈추게 한다. 키보드가 뜨면 가린 영역이 없으므로 0으로 돌린다.
     var extendsUnderTabBar: Bool = false
@@ -135,7 +137,7 @@ struct BridgeWebView: UIViewRepresentable {
         // 풀다운 리프레시: 페이지를 가리는 전면 로딩 오버레이 대신, 디자인 밴드(연파랑 + 새로고침
         // 안내 → 완료 안내)를 오버스크롤 영역에 노출한다. (커스텀 컨트롤러가 contentInset으로 제어)
         if enablesPullToRefresh {
-            context.coordinator.setupPullToRefresh(on: webView.scrollView)
+            context.coordinator.setupPullToRefresh(on: webView.scrollView, style: pullToRefreshStyle)
         }
 
         // 키보드가 뜨면 웹뷰 프레임 자체를 키보드 높이만큼 줄여(웹뷰를 키보드 위로 리사이즈)
@@ -332,9 +334,9 @@ struct BridgeWebView: UIViewRepresentable {
         }
 
         // 커스텀 풀다운 리프레시를 스크롤뷰에 부착한다. (리스트 웹뷰 전용)
-        func setupPullToRefresh(on scrollView: UIScrollView) {
+        func setupPullToRefresh(on scrollView: UIScrollView, style: WebPullToRefreshStyle) {
             scrollView.delegate = self
-            pullToRefresh = WebPullToRefreshController(scrollView: scrollView) { [weak self] in
+            pullToRefresh = WebPullToRefreshController(scrollView: scrollView, style: style) { [weak self] in
                 self?.beginRefresh()
             }
         }

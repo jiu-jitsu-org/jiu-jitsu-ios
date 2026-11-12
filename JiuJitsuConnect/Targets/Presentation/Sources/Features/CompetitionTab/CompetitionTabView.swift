@@ -94,6 +94,7 @@ private struct CompetitionListWebView: View {
                 overscrollBackground: Color.primitive.bw.white,
                 // 머리줄이 칠해져 있으면 맨 위에서 당길 때 드러나는 밴드도 같은 색으로 이어 준다.
                 pullToRefreshBackground: headerTint,
+                pullToRefreshStyle: .competition,
                 extendsUnderTabBar: true,
                 capabilities: store.capabilities,
                 onLoadingStarted: { store.send(.internal(.loadingStarted)) },
