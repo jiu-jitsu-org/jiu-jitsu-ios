@@ -84,7 +84,7 @@ public struct CompetitionTabFeature: Sendable {
             case webSubview(CommunityDetailFeature.Action.DelegateAction)
             case myTabRequested
             // 관심 대회 첫 등록 시트의 '알림 받기'(#257) → 부모가 알림 설정을 켜고 기기 알림 상태를 본다.
-            case competitionAlertsEnabled(competitionId: String?)
+            case competitionAlertsEnabled(competitionId: Int?)
             // 이 탭에서 연 알림함을 닫음(#258) → 부모가 홈의 새 알림 점을 다시 조회시킨다(이 탭의 종도 같은 값을 그린다).
             case unreadNotificationRefreshRequested
             // 대회 상세의 '커뮤니티에서 더 보기'(#250) → 부모가 이 스택을 닫고 홈 탭으로 바꾼다.

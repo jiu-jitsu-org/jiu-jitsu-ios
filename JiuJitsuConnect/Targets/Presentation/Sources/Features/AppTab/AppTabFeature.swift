@@ -138,7 +138,6 @@ public struct AppTabFeature: Sendable {
     @Dependency(\.authSessionEventClient) var authSessionEventClient
     @Dependency(\.notificationPermissionClient) var notificationPermissionClient
     @Dependency(\.communityClient) var communityClient
-    @Dependency(\.competitionAlertSettingClient) var competitionAlertSettingClient
     @Dependency(\.openURL) var openURL
 
     public var body: some ReducerOf<Self> {
@@ -341,16 +340,19 @@ public struct AppTabFeature: Sendable {
                 return .send(.internal(.showLoginModal))
 
             // 관심 대회 첫 등록 시트의 '알림 받기'(#257). 웹은 홈 피드(글 속 대회 카드)·글 상세·알림함·대회 화면 어디서든 보내므로
-            // 모든 탭의 웹을 한곳에서 받는다.
+            // 모든 탭의 웹을 한곳에서 받는다. 설정 값은 웹이 서버에 저장했으니(#281) 열려 있는 설정 › 알림만 다시 읽힌다.
             case let .competition(.delegate(.competitionAlertsEnabled(competitionId))),
                  let .home(.delegate(.competitionAlertsEnabled(competitionId))),
                  let .myPage(.delegate(.webSubview(.competitionAlertsEnabled(competitionId)))):
-                return enableCompetitionAlerts(competitionId: competitionId, state: state)
+                return .merge(
+                    enableCompetitionAlerts(competitionId: competitionId),
+                    Self.refreshOpenNotificationSetting(state)
+                )
 
             // 설정 › 알림에서 '관심 대회 알림'을 켬(#257). 웹의 '알림 받기'와 같이 기기 알림 상태를 보고 안내한다.
             // 안내 알럿은 이 화면의 최상위 덮개라 MY 스택에 쌓인 설정 화면 위에도 그려진다.
             case .myPage(.delegate(.settings(.competitionAlertTurnedOn))):
-                return enableCompetitionAlerts(competitionId: nil, state: state)
+                return enableCompetitionAlerts(competitionId: nil)
 
             // 대회 탭에서 연 알림함을 닫음(#258) → 홈의 새 알림 점을 다시 조회한다. 대회 탭의 종도 같은 값을 그린다.
             case .competition(.delegate(.unreadNotificationRefreshRequested)):
@@ -631,15 +633,12 @@ public struct AppTabFeature: Sendable {
         state.mountedTabs = allTabs
     }
 
-    /// 설정 › 알림의 '관심 대회 알림'을 켜고 기기 알림 상태를 본다(#257).
+    /// '관심 대회 알림'을 켰을 때 기기 알림 상태를 본다(#257). 설정 값은 서버에 있어(#281) 웹·설정 화면이 저장하고, 여기서는 안내만 한다.
     /// 이미 허용이면 할 일이 없고, 거절(또는 기기 설정에서 끔)이면 앱이 다시 물을 수 없어 설정 앱으로 안내한다.
     /// 한 번도 묻지 않았으면 iOS 설정에 알림 줄조차 없으니 여기서 시스템 권한 창을 띄운다.
-    private func enableCompetitionAlerts(competitionId: String?, state: State) -> Effect<Action> {
-        Log.trace("관심 대회 알림 켬: competitionId=\(competitionId ?? "-")", category: .view, level: .info)
-        // 회원별 설정이라 지금 로그인한 회원에 저장한다(비로그인이면 저장하지 않는다).
-        let userId = state.authInfo.isGuest ? nil : state.authInfo.userInfo?.userId
+    private func enableCompetitionAlerts(competitionId: Int?) -> Effect<Action> {
+        Log.trace("관심 대회 알림 켬: competitionId=\(competitionId.map(String.init) ?? "-")", category: .view, level: .info)
         return .run { send in
-            competitionAlertSettingClient.setEnabled(true, userId)
             switch await notificationPermissionClient.status() {
             case .granted:
                 return
@@ -669,6 +668,21 @@ public struct AppTabFeature: Sendable {
         state.selectedTab = .home
     }
 
+    /// 웹이 관심 대회 알림을 서버에 저장함(#281) → MY 스택에 설정 › 알림이 열려 있으면 서버 값을 다시 읽힌다.
+    private static func refreshOpenNotificationSetting(_ state: State) -> Effect<Action> {
+        for id in state.myPage.path.ids {
+            guard
+                case let .settings(settings)? = state.myPage.path[id: id],
+                case .notificationSetting? = settings.destination
+            else { continue }
+            return .send(.myPage(.path(.element(
+                id: id,
+                action: .settings(.destination(.presented(.notificationSetting(.settingRefreshRequested))))
+            ))))
+        }
+        return .none
+    }
+
     /// 대회 상세 위에 대회명·연도를 채운 기록 추가를 쌓는다(#250). 띠·체급 기본값은 MY와 같이 프로필에서 가져온다.
     private static func pushCompetitionRecord(_ payload: OpenCompetitionRecordPayload, into state: inout State) {
         // 연타·중복 전달로 입력 화면이 겹쳐 쌓이지 않게 한다.
@@ -678,6 +692,7 @@ public struct AppTabFeature: Sendable {
             CompetitionInfoFeature.State(
                 prefilledName: payload.name,
                 year: payload.year,
+                competitionId: payload.competitionId,
                 currentBelt: profile?.beltRank,
                 recentWeightLimit: profile?.competitions.recentWeightLimit
             )

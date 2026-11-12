@@ -203,7 +203,7 @@ public struct CommunityFeature: Sendable {
             // 테스트용 '딥링크로 열기'(DEBUG/BETA) → 부모가 실제 유니버설 링크와 같은 경로(.deepLink)로 보낸다.
             case debugDeepLinkRequested(DeepLink)
             // 홈 웹(피드·글 상세·알림함)의 관심 대회 '알림 받기'(#257) → 부모가 알림 설정을 켜고 기기 알림 상태를 본다.
-            case competitionAlertsEnabled(competitionId: String?)
+            case competitionAlertsEnabled(competitionId: Int?)
             // 이 스택에 쌓인 MY에서 프로필을 저장함 → 부모가 열린 웹뷰 모두에 PROFILE_UPDATED를 보낸다.
             case profileUpdated
         }

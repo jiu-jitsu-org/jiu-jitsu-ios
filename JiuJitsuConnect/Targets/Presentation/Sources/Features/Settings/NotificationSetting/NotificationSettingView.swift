@@ -67,7 +67,7 @@ public struct NotificationSettingView: View {
                                 asset: Assets.Common.Icon.bell,
                                 text: "관심 대회 알림",
                                 subtitle: "얼리버드 · 접수 마감 전날",
-                                isLoading: !store.isCompetitionAlertLoaded,
+                                isLoading: !store.isLoaded,
                                 isOn: Binding(
                                     get: { store.isCompetitionAlertEnabled },
                                     set: { store.send(.view(.competitionAlertToggled($0))) }
@@ -99,7 +99,6 @@ public struct NotificationSettingView: View {
         .navigationBarHidden(true)
         .ignoresSafeArea(edges: .bottom)
         .onAppear { store.send(.view(.onAppear)) }
-        .onDisappear { store.send(.view(.onDisappear)) }
     }
 
     private var headerView: some View {
@@ -138,11 +137,10 @@ public struct NotificationSettingView: View {
 #Preview("Notification Setting View") {
     NavigationStack {
         NotificationSettingView(
-            store: Store(initialState: NotificationSettingFeature.State(userId: 1)) {
+            store: Store(initialState: NotificationSettingFeature.State()) {
                 NotificationSettingFeature()
             } withDependencies: {
                 $0.noticeClient = .previewValue
-                $0.competitionAlertSettingClient = .previewValue
             }
         )
     }

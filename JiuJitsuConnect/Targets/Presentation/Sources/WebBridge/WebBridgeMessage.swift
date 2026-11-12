@@ -148,9 +148,9 @@ private extension WebBridgeInboundMessage {
         case .openHomeFeed:
             return "OPEN_HOME_FEED"
         case let .openCompetitionRecord(payload):
-            return "OPEN_COMPETITION_RECORD  competitionId=\(payload.competitionId) year=\(payload.year)"
+            return "OPEN_COMPETITION_RECORD  competitionId=\(payload.competitionId.map(String.init) ?? "-") year=\(payload.year)"
         case let .competitionAlertsEnabled(competitionId):
-            return "COMPETITION_ALERTS_ENABLED  competitionId=\(competitionId ?? "-")"
+            return "COMPETITION_ALERTS_ENABLED  competitionId=\(competitionId.map(String.init) ?? "-")"
         case let .competitionHeaderTint(hex):
             return "COMPETITION_HEADER_TINT  color=\(hex ?? "null")"
         case let .unknown(type):
@@ -243,9 +243,9 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 끝난 대회 배너의 '내 기록에 남기기'(#250). 대회 이름·연도를 채운 채 내 대회 기록 추가 흐름을 열어 달라는 요청이다.
     case openCompetitionRecord(OpenCompetitionRecordPayload)
     /// 관심 대회 첫 등록 시트에서 '알림 받기'를 고름(#257). 웹은 앱 안이면 늘 보낸다(capability 확인 없음).
-    /// 네이티브는 '관심 대회 알림' 설정을 켜고, 기기 알림이 꺼져 있으면 설정 앱으로 안내한다.
-    /// competitionId는 웹 대회 slug(`/competition/{id}`)로 로그에만 남긴다 — 없어도 설정은 켠다.
-    case competitionAlertsEnabled(competitionId: String?)
+    /// '관심 대회 알림' 설정은 웹이 서버에 저장하고(#281), 네이티브는 기기 알림이 꺼져 있으면 설정 앱으로 안내한다.
+    /// competitionId는 서버 대회 id(숫자)로 로그에만 남긴다 — 없어도 안내는 한다.
+    case competitionAlertsEnabled(competitionId: Int?)
     /// 대회 목록 맨 위 띠 색 그라데이션에 맞춰 앱 대회 탭 머리줄(상태바 포함)을 칠해 달라는 요청.
     /// hex는 `#RRGGBB`, nil이면 앱 기본 머리줄 색으로 돌린다. 스크롤하며 조금씩 옅어진 색을 여러 번 보낸다.
     case competitionHeaderTint(hex: String?)
@@ -423,7 +423,7 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             }
             return .openCompetitionRecord(record)
         case .competitionAlertsEnabled:
-            let competitionId = (payload?["competitionId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            let competitionId = OpenCompetitionRecordPayload.parseCompetitionId(payload?["competitionId"])
             return .competitionAlertsEnabled(competitionId: competitionId)
         case .competitionHeaderTint:
             // `#RRGGBB`만 받는다. 형식이 어긋나면 null과 같이 기본색으로 돌린다(엉뚱한 색이 남지 않게).

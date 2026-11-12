@@ -31,12 +31,13 @@ public final class NoticeService: Sendable {
         return response.toDomain()
     }
 
-    public func updateSetting(_ setting: NoticeSetting) async throws -> NoticeSetting {
+    public func updateSetting(_ setting: NoticeSettingUpdate) async throws -> NoticeSetting {
         let request = NoticeSettingRequestDTO(
             securityEnabled: setting.securityEnabled,
             serviceEnabled: setting.serviceEnabled,
             communityEnabled: setting.communityEnabled,
-            marketingEnabled: setting.marketingEnabled
+            marketingEnabled: setting.marketingEnabled,
+            competitionEnabled: setting.competitionEnabled
         )
         let response: NoticeSettingResponseDTO = try await networkService.request(
             endpoint: NoticeEndpoint.updateSetting(request: request)
