@@ -21,7 +21,6 @@ public struct AppView: View {
         ZStack {
           if store.greeting != nil {
             GreetingSceneView(
-              onStart: { store.send(.view(.greetingStarted)) },
               onCover: { store.send(.view(.greetingCoverStarted), animation: Self.coverAnimation) },
               onFinish: { store.send(.view(.greetingFinished)) }
             )

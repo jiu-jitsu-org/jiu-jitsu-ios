@@ -9,7 +9,6 @@ import DesignSystem
 /// 화면 어디든 누르면 기다리지 않고 지금 모습에서 바로 덮기 시작한다.
 /// 시안 기준 화면은 393×852이며, 캐릭터 크기·위치는 화면 폭에 비례해 맞춘다.
 struct GreetingSceneView: View {
-    let onStart: () -> Void
     let onCover: () -> Void
     let onFinish: () -> Void
 
@@ -43,7 +42,6 @@ struct GreetingSceneView: View {
             // 느린 기기에서도 글자·그래픽이 중간부터 튀어 나오지 않는다(#207)
             await DisplayFrame.next()
             start = .now
-            onStart()
             guard await pause(Timing.cover) else { return }
             beginCover()
         }
@@ -311,5 +309,5 @@ private struct SayBubble: View {
 }
 
 #Preview("Greeting Scene") {
-    GreetingSceneView(onStart: {}, onCover: {}, onFinish: {})
+    GreetingSceneView(onCover: {}, onFinish: {})
 }
