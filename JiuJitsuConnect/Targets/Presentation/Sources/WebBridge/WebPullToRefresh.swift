@@ -4,7 +4,7 @@
 //
 //  BridgeWebView(커뮤니티 리스트)용 커스텀 풀다운 리프레시.
 //  시스템 UIRefreshControl(단색 스피너)로는 디자인의 "연파랑 밴드 + 샤카 손/랜덤 멘트 →
-//  놓으면 샤카 손이 팡 터짐 → 완료 시 '오쓰! 최신 소식을 가져왔어요' 안내"를 표현할 수 없어 직접 구성한다.
+//  놓으면 샤카 손이 팡 터짐 → 완료 시 안내"를 표현할 수 없어 직접 구성한다.
 //
 //  밴드는 순수 UIKit UIView(WebPullToRefreshBand)로 그린다. WKWebView 스크롤뷰 내부에
 //  UIHostingController를 부모 VC 없이 얹으면 사이즈(intrinsicContentSize)·라이프사이클이 불안정해
@@ -27,6 +27,55 @@ enum WebRefreshPhase: Equatable {
     case success     // reload 완료 안내 문구 노출
 }
 
+/// 화면마다 다른 새로고침 꾸밈. 대회 탭은 머리줄이 내 띠 색으로 칠해져 있어 당길 때 보이는 손까지
+/// 파랑이면 블루띠를 뜻하는 것처럼 읽히므로(#287) 그 손 하나만 흰 손으로, 문구는 대회 문구로 둔다.
+/// 놓을 때 터지는 손들(ShakaBurstView)은 두 화면 모두 여러 색 그대로.
+enum WebPullToRefreshStyle: Equatable {
+    case feed
+    case competition
+
+    // 당길 때마다 하나를 골라 보여 준다.
+    var pullingLines: [String] {
+        switch self {
+        case .feed:
+            return [
+                "OSS! 새 글 스윕 중",
+                "샤카~ 오늘도 매트 위로",
+                "탭 치기 전에 새로고침",
+                "롤링 한 판 더 불러오는 중",
+                "가드 다시 세우는 중",
+                "숨 고르고, OSS",
+                "띠 꽉 묶고 불러올게요",
+                "오늘 수련 후기 도착 중"
+            ]
+        case .competition:
+            return [
+                "새 대회 찾는 중",
+                "접수 일정 다시 확인하는 중",
+                "다음 매트 찾는 중",
+                "띠 꽉 묶고 대회 불러올게요"
+            ]
+        }
+    }
+
+    var armed: String { "놓으면 OSS!" }
+
+    var success: String {
+        switch self {
+        case .feed: return "오쓰! 최신 소식을 가져왔어요"
+        case .competition: return "OSS! 대회 소식을 새로 가져왔어요"
+        }
+    }
+
+    // 밴드 가운데 손 아이콘.
+    var icon: UIImage {
+        switch self {
+        case .feed: return Assets.Common.Shaka.icon.image
+        case .competition: return Assets.Common.Shaka.burstWhite.image
+        }
+    }
+}
+
 /// 오버스크롤 영역에 노출되는 연파랑 밴드. 단계에 따라 랜덤 멘트/완료 안내를 그린다.
 @MainActor
 final class WebPullToRefreshBand: UIView {
@@ -37,35 +86,22 @@ final class WebPullToRefreshBand: UIView {
         static let labelFadeStart: CGFloat = 24
         static let labelFadeLength: CGFloat = 32
     }
-    private enum Strings {
-        // 당길 때마다 하나를 골라 보여 준다.
-        static let pullingLines = [
-            "OSS! 새 글 스윕 중",
-            "샤카~ 오늘도 매트 위로",
-            "탭 치기 전에 새로고침",
-            "롤링 한 판 더 불러오는 중",
-            "가드 다시 세우는 중",
-            "숨 고르고, OSS",
-            "띠 꽉 묶고 불러올게요",
-            "오늘 수련 후기 도착 중"
-        ]
-        static let armed = "놓으면 OSS!"
-        static let success = "오쓰! 최신 소식을 가져왔어요"
-    }
-
     private let stack = UIStackView()
     private let iconView = UIImageView()
     private let label = UILabel()
     private var isWaving = false
-    private var pullingLine = Strings.pullingLines[0]
+    private let style: WebPullToRefreshStyle
+    private var pullingLine: String
     // 문구 투명도 계산용. 컨트롤러가 밴드를 늘릴 때와 같은 기준이다.
     private let triggerThreshold: CGFloat
 
     // 디자인 가이드: 배경 Color/Blue/50, 글자·아이콘 Color/Blue/500
     static let defaultBackground = UIColor(Color.semantic.surface.primarySubtle)
 
-    init(triggerThreshold: CGFloat) {
+    init(triggerThreshold: CGFloat, style: WebPullToRefreshStyle) {
         self.triggerThreshold = triggerThreshold
+        self.style = style
+        self.pullingLine = style.pullingLines[0]
         super.init(frame: .zero)
         backgroundColor = Self.defaultBackground
         clipsToBounds = true
@@ -74,7 +110,7 @@ final class WebPullToRefreshBand: UIView {
 
         let tint = UIColor(Color.semantic.primary.primary)
         // 디자인: 광택 있는 파란 샤카 손(OSS 브랜딩). 당길수록 커지며 바로 서고, 로딩 중엔 흔든다.
-        iconView.image = Assets.Common.Shaka.icon.image
+        iconView.image = style.icon
         iconView.contentMode = .scaleAspectFit
         iconView.translatesAutoresizingMaskIntoConstraints = false
 
@@ -103,7 +139,7 @@ final class WebPullToRefreshBand: UIView {
 
     /// 새 당김이 시작될 때 이번에 보여 줄 멘트를 고른다.
     func prepareNewPull() {
-        pullingLine = Strings.pullingLines.randomElement() ?? pullingLine
+        pullingLine = style.pullingLines.randomElement() ?? pullingLine
     }
 
     /// 단계/당김 진행도에 맞춰 표시를 갱신한다.
@@ -114,7 +150,7 @@ final class WebPullToRefreshBand: UIView {
             iconView.isHidden = true
             iconView.transform = .identity
             label.alpha = 1
-            label.text = Strings.success
+            label.text = style.success
         case .refreshing:
             iconView.isHidden = false
             iconView.alpha = 1
@@ -132,7 +168,7 @@ final class WebPullToRefreshBand: UIView {
             iconView.alpha = progress
             let opened = progress * triggerThreshold
             label.alpha = min(1, max(0, (opened - Metrics.labelFadeStart) / Metrics.labelFadeLength))
-            label.text = progress >= 1 ? Strings.armed : pullingLine
+            label.text = progress >= 1 ? style.armed : pullingLine
         }
     }
 
@@ -326,7 +362,7 @@ final class WebPullToRefreshController {
     }
 
     private weak var scrollView: UIScrollView?
-    private let band = WebPullToRefreshBand(triggerThreshold: Metrics.triggerThreshold)
+    private let band: WebPullToRefreshBand
     // 웹뷰 위에 얹는 터짐 효과. 스크롤과 함께 움직이지 않게 스크롤뷰 바깥(웹뷰)에 둔다.
     private let burstView = ShakaBurstView()
     private let armedFeedback = UIImpactFeedbackGenerator(style: .light)
@@ -339,8 +375,9 @@ final class WebPullToRefreshController {
     // 인셋/프레임을 코드로 애니메이션하는 동안에는 스크롤 콜백이 밴드 높이를 덮어쓰지 않게 한다.
     private var isAdjustingInset = false
 
-    init(scrollView: UIScrollView, onRefresh: @escaping () -> Void) {
+    init(scrollView: UIScrollView, style: WebPullToRefreshStyle = .feed, onRefresh: @escaping () -> Void) {
         self.scrollView = scrollView
+        self.band = WebPullToRefreshBand(triggerThreshold: Metrics.triggerThreshold, style: style)
         self.onRefresh = onRefresh
         // 콘텐츠 원점(0) 바로 위에 두어, 오버스크롤 시에만 보이게 한다.
         scrollView.addSubview(band)
