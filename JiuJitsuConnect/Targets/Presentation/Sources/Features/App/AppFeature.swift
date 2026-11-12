@@ -45,6 +45,8 @@ public struct AppFeature: Sendable {
 
         public enum ViewAction: Sendable {
             case onAppear
+            /// 앱이 다시 활성화됐다(포그라운드 복귀, 제어 센터 닫힘 등).
+            case sceneBecameActive
             /// 유니버설 링크 수신(`NSUserActivityTypeBrowsingWeb`).
             case deepLinkReceived(URL)
             /// 인사가 끝났거나 눌러서 건너뛰어 홈이 아래에서 올라오기 시작한다.
@@ -82,6 +84,11 @@ public struct AppFeature: Sendable {
                     // 로그인 여부와 관계없이 앱 진입 때 다시 폐기한다(#269).
                     .run { _ in await firebaseClient.retryPendingTokenDeletion() }
                 )
+
+            case .view(.sceneBecameActive):
+                // 오프라인 로그아웃으로 폐기하지 못한 토큰을 네트워크가 돌아온 뒤 복귀 때 다시 폐기한다(#269).
+                // 로그인 화면에 머문 게스트도 받도록 탭 화면이 아닌 앱 루트에서 한다.
+                return .run { _ in await firebaseClient.retryPendingTokenDeletion() }
 
             case let .view(.deepLinkReceived(url)):
                 return .merge(Self.route(url, into: &state), runDeferredLaunchSync(&state))

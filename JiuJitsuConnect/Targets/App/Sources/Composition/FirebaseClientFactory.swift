@@ -127,10 +127,18 @@ enum FirebaseClientFactory {
         }
     }
 
+    /// SDK 내부 오류 코드 `kFIRMessagingErrorCodeRegistrarFailedToCheckIn`. 공개 enum에 없어 값으로 비교한다.
+    private static let failedToCheckInCode = 6
+
     private static func deleteToken() async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             Messaging.messaging().deleteToken { error in
-                if let error {
+                if let error = error as NSError?,
+                   error.domain == MessagingErrorDomain, error.code == failedToCheckInCode {
+                    // checkin 정보가 없으면 이 설치는 토큰을 발급받은 적이 없어 폐기할 것도 없다(알림 권한 거절 등).
+                    // 실패로 두면 폐기 표시가 영영 남아 이후 토큰 발급이 막힌다.
+                    continuation.resume(returning: ())
+                } else if let error {
                     continuation.resume(throwing: error)
                 } else {
                     continuation.resume(returning: ())

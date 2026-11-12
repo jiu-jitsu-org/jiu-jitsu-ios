@@ -201,11 +201,9 @@ public struct AppTabFeature: Sendable {
                 return refreshUnread
 
             case .view(.sceneBecameActive):
-                // 오프라인 로그아웃으로 폐기하지 못한 토큰을 네트워크가 돌아온 뒤 복귀 때 다시 폐기한다(#269).
-                let retryTokenDeletion: Effect<Action> = .run { _ in await firebaseClient.retryPendingTokenDeletion() }
                 // MY 탭을 보고 있을 때만 포그라운드 복귀 재조회 (#69)
-                guard state.selectedTab == .myPage, !state.authInfo.isGuest else { return retryTokenDeletion }
-                return .merge(retryTokenDeletion, .send(.myPage(.view(.sceneBecameActive))))
+                guard state.selectedTab == .myPage, !state.authInfo.isGuest else { return .none }
+                return .send(.myPage(.view(.sceneBecameActive)))
 
             // MARK: - 설정 (MY 스택에서 연다, #241)
 
@@ -685,7 +683,7 @@ public struct AppTabFeature: Sendable {
     /// 로그아웃·탈퇴 — 이 기기로 이전 계정 푸시가 가지 않게 FCM 토큰을 폐기한다.
     /// 캐시를 남기면 다음 로그인(syncAfterLoginSuccess)이 폐기된 토큰을 서버에 다시 등록하므로 함께 지운다.
     /// 폐기 중 토큰 콜백이 캐시를 다시 채울 수 있어 캐시는 폐기 뒤에 지운다. 폐기가 실패하면
-    /// 다음 토큰 발급 때 다시 시도한다(`FirebaseClientFactory`).
+    /// 앱 진입·복귀와 다음 토큰 발급 때 다시 시도한다(`FirebaseClientFactory`).
     private static func discardDeviceFCMToken(_ firebaseClient: FirebaseClient, context: String) async {
         do {
             try await firebaseClient.deleteFCMToken()
