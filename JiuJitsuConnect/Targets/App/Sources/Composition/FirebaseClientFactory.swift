@@ -62,17 +62,9 @@ enum FirebaseClientFactory {
                 }
 
                 // 폐기하지 못한 토큰이 남아 있으면 먼저 폐기한다. SDK는 로컬 토큰만 지운 상태라,
-                // 그대로 발급받으면 FCM이 같은 토큰을 돌려줘 이전 계정 푸시가 계속 올 수 있다.
-                if defaults.bool(forKey: pendingDeletionKey) {
-                    do {
-                        try await deleteToken()
-                        defaults.removeObject(forKey: pendingDeletionKey)
-                        // 재시도 전에 SDK 콜백이 캐시에 넣었을 수 있는 폐기된 토큰도 지운다.
-                        defaults.removeObject(forKey: cacheKey)
-                    } catch {
-                        Log.trace("[FCM] 미뤄 둔 토큰 폐기 재시도 실패: \(error)", category: .system, level: .error)
-                    }
-                }
+                // 그대로 발급받으면 FCM이 같은 토큰을 돌려줘 새 계정에 이전 계정 토큰이 등록될 수 있다.
+                // 폐기에 실패하면 발급도 하지 않는다 — 다음 시도(앱 진입·복귀·로그인)까지 이 기기는 푸시를 받지 않는다.
+                try await deletePendingToken()
 
                 await MainActor.run {
                     UIApplication.shared.registerForRemoteNotifications()
@@ -90,6 +82,14 @@ enum FirebaseClientFactory {
                             continuation.resume(throwing: FirebaseError.tokenNotAvailable)
                         }
                     }
+                }
+            },
+            retryPendingTokenDeletion: {
+                guard defaults.bool(forKey: pendingDeletionKey) else { return }
+                do {
+                    try await deletePendingToken()
+                } catch {
+                    Log.trace("[FCM] 미뤄 둔 토큰 폐기 재시도 실패: \(error)", category: .system, level: .error)
                 }
             },
             deleteFCMToken: {
@@ -114,6 +114,19 @@ enum FirebaseClientFactory {
         )
     }
 
+    private static let pendingDeletion = PendingDeletion()
+
+    private static func deletePendingToken() async throws {
+        try await pendingDeletion.run {
+            let defaults = UserDefaults.standard
+            guard defaults.bool(forKey: pendingDeletionKey) else { return }
+            try await deleteToken()
+            defaults.removeObject(forKey: pendingDeletionKey)
+            // 폐기 전에 SDK 콜백이 캐시에 넣었을 수 있는 폐기된 토큰도 지운다.
+            defaults.removeObject(forKey: cacheKey)
+        }
+    }
+
     private static func deleteToken() async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             Messaging.messaging().deleteToken { error in
@@ -124,5 +137,22 @@ enum FirebaseClientFactory {
                 }
             }
         }
+    }
+}
+
+/// 미뤄 둔 폐기를 한 번에 하나만 돌린다. 앱 진입 재시도와 토큰 발급(getFCMToken)이 겹치면,
+/// 늦게 끝난 폐기가 그 사이 새로 발급된 토큰을 지울 수 있다.
+private actor PendingDeletion {
+    private var tail: Task<Void, Error>?
+
+    func run(_ operation: @Sendable @escaping () async throws -> Void) async throws {
+        // 앞 폐기가 끝난 뒤 시작한다. 앞 폐기가 성공했으면 표시가 지워져 있어 operation은 바로 끝난다.
+        let previous = tail
+        let task = Task {
+            _ = try? await previous?.value
+            try await operation()
+        }
+        tail = task
+        try await task.value
     }
 }

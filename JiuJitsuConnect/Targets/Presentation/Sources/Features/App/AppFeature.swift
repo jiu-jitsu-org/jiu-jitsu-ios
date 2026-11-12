@@ -71,12 +71,17 @@ public struct AppFeature: Sendable {
             case .view(.onAppear):
                 // 푸시 탭은 AppDelegate에서 오므로 View 이벤트가 아닌 릴레이 구독으로 받는다.
                 // 콜드 스타트 탭은 릴레이가 보관했다가 이 구독에 바로 흘려준다.
-                return .run { send in
-                    for await payload in pushNotificationClient.taps() {
-                        await send(.internal(.pushNotificationTapped(payload)))
+                return .merge(
+                    .run { send in
+                        for await payload in pushNotificationClient.taps() {
+                            await send(.internal(.pushNotificationTapped(payload)))
+                        }
                     }
-                }
-                .cancellable(id: CancelID.pushTapObserver, cancelInFlight: true)
+                    .cancellable(id: CancelID.pushTapObserver, cancelInFlight: true),
+                    // 오프라인 로그아웃으로 폐기하지 못한 토큰은 게스트로 남아도 이전 계정 푸시를 받으므로
+                    // 로그인 여부와 관계없이 앱 진입 때 다시 폐기한다(#269).
+                    .run { _ in await firebaseClient.retryPendingTokenDeletion() }
+                )
 
             case let .view(.deepLinkReceived(url)):
                 return .merge(Self.route(url, into: &state), runDeferredLaunchSync(&state))

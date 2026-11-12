@@ -201,9 +201,11 @@ public struct AppTabFeature: Sendable {
                 return refreshUnread
 
             case .view(.sceneBecameActive):
+                // 오프라인 로그아웃으로 폐기하지 못한 토큰을 네트워크가 돌아온 뒤 복귀 때 다시 폐기한다(#269).
+                let retryTokenDeletion: Effect<Action> = .run { _ in await firebaseClient.retryPendingTokenDeletion() }
                 // MY 탭을 보고 있을 때만 포그라운드 복귀 재조회 (#69)
-                guard state.selectedTab == .myPage, !state.authInfo.isGuest else { return .none }
-                return .send(.myPage(.view(.sceneBecameActive)))
+                guard state.selectedTab == .myPage, !state.authInfo.isGuest else { return retryTokenDeletion }
+                return .merge(retryTokenDeletion, .send(.myPage(.view(.sceneBecameActive))))
 
             // MARK: - 설정 (MY 스택에서 연다, #241)
 
