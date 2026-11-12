@@ -104,7 +104,7 @@ public struct SettingsFeature: Sendable {
             case logoutConfirmed
             case didWithdrawSuccessfully
             // 알림 화면을 나갈 때 서버에 아직 안 간 값 → 부모(MY)가 대신 저장한다. 설정까지 바로 닫아도 저장이 끊기지 않게 한다.
-            case notificationSettingSaveRequested(NoticeSetting)
+            case notificationSettingSaveRequested(NoticeSettingUpdate)
             case loginRequested
             // '차단한 회원' 탭 → 부모가 커뮤니티와 같은 origin·최신 토큰으로 서브뷰를 MY 스택(설정 위)에 push한다.
             case blockedUsersRequested
@@ -130,7 +130,7 @@ public struct SettingsFeature: Sendable {
 
             case .view(.notificationButtonTapped):
                 guard !state.authInfo.isGuest else { return .none }
-                state.destination = .notificationSetting(NotificationSettingFeature.State(userId: state.authInfo.userInfo?.userId))
+                state.destination = .notificationSetting(NotificationSettingFeature.State())
                 return .none
 
             case .view(.termsButtonTapped):

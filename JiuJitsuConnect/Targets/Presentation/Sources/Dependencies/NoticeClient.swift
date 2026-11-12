@@ -13,13 +13,13 @@ public struct NoticeClient: Sendable {
     public var hasUnread: @Sendable () async throws -> Bool
     /// 알림 수신 설정 조회 (GET `/api/notice/setting`)
     public var fetchSetting: @Sendable () async throws -> NoticeSetting
-    /// 알림 수신 설정 변경 (POST `/api/notice/setting`)
-    public var updateSetting: @Sendable (NoticeSetting) async throws -> NoticeSetting
+    /// 알림 수신 설정 변경 (POST `/api/notice/setting`). 응답은 서버에 저장된 전체 설정이다.
+    public var updateSetting: @Sendable (NoticeSettingUpdate) async throws -> NoticeSetting
 
     public init(
         hasUnread: @Sendable @escaping () async throws -> Bool,
         fetchSetting: @Sendable @escaping () async throws -> NoticeSetting,
-        updateSetting: @Sendable @escaping (NoticeSetting) async throws -> NoticeSetting
+        updateSetting: @Sendable @escaping (NoticeSettingUpdate) async throws -> NoticeSetting
     ) {
         self.hasUnread = hasUnread
         self.fetchSetting = fetchSetting
@@ -39,10 +39,19 @@ extension NoticeClient: DependencyKey {
                 securityEnabled: true,
                 serviceEnabled: true,
                 communityEnabled: true,
-                marketingEnabled: false
+                marketingEnabled: false,
+                competitionEnabled: true
             )
         },
-        updateSetting: { setting in setting }
+        updateSetting: { update in
+            NoticeSetting(
+                securityEnabled: update.securityEnabled,
+                serviceEnabled: update.serviceEnabled,
+                communityEnabled: update.communityEnabled,
+                marketingEnabled: update.marketingEnabled,
+                competitionEnabled: update.competitionEnabled ?? true
+            )
+        }
     )
 }
 

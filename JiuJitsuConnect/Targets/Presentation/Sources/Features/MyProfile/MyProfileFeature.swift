@@ -743,7 +743,11 @@ public struct MyProfileFeature: Sendable {
             case let .path(.element(id: _, action: .settings(.delegate(.notificationSettingSaveRequested(setting))))):
                 return .run { send in
                     do {
-                        _ = try await noticeClient.updateSetting(setting)
+                        let saved = try await noticeClient.updateSetting(setting)
+                        // 관심 대회 알림을 켠 채 바로 나갔으면 여기서 저장되므로, 저장 뒤 기기 알림 안내를 부모(AppTab)에 넘긴다(#281).
+                        if setting.competitionEnabled == true, saved.competitionEnabled {
+                            await send(.delegate(.settings(.competitionAlertTurnedOn)))
+                        }
                     } catch {
                         Log.trace("알림 화면 이탈 후 설정 저장 실패: \(error)", category: .network, level: .error)
                         await send(.internal(.showToast(.init(message: "알림 설정을 저장하지 못했어요. 다시 시도해주세요", status: .error))))

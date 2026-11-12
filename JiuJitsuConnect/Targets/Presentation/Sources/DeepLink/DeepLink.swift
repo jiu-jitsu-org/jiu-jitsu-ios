@@ -23,7 +23,7 @@ public enum DeepLink: Equatable, Sendable {
     case communityPost(url: URL, postId: String)
     /// 밸런스 게임 상세(`/community/balance/{contentId}`). `url` 취급은 `communityPost`와 같다.
     case balanceGame(url: URL, contentId: String)
-    /// 대회 상세(`/competition/{id}`, #250). 대회 탭 스택에 연다. id는 웹 slug(문자열)다.
+    /// 대회 상세(`/competition/{id}`, #250). 대회 탭 스택에 연다. id는 서버 대회 id(숫자 문자열)다.
     case competitionDetail(url: URL, competitionId: String)
 
     public var url: URL {
@@ -44,10 +44,10 @@ enum DeepLinkParser {
     /// 대회 상세 경로의 첫 세그먼트. 웹 라우트 `src/app/competition/[id]`와 대응한다(#250).
     static let competitionSegment = "competition"
 
-    /// 대회 slug로 쓸 수 있는 값인지(#256, 푸시 → 대회 상세 주소). 웹 slug는 영문·숫자·`-`·`_`로만 만든다(예: seoul-open-championship).
+    /// 대회 id로 쓸 수 있는 값인지(#256·#280, 푸시 → 대회 상세 주소). 서버 대회 id는 숫자 문자열이다(예: "3").
     /// 주소에 이어 붙이는 값이라 `/`·`..`·쿼리 문자처럼 다른 경로로 새는 값은 받지 않는다.
-    static func isCompetitionSlug(_ value: String) -> Bool {
-        !value.isEmpty && value.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }
+    static func isCompetitionId(_ value: String) -> Bool {
+        !value.isEmpty && value.allSatisfy { $0.isASCII && $0.isNumber }
     }
 
     /// 웹 페이지 안의 '앱 열기' 버튼용 커스텀 스킴.
@@ -116,11 +116,15 @@ enum DeepLinkParser {
 
         // pathComponents는 선행 "/"를 원소로 포함하므로 걸러낸 뒤 세그먼트 수를 본다.
         let segments = url.pathComponents.filter { $0 != "/" }
-        // `/competition/{id}` — 대회 id는 숫자가 아닌 slug라 contentId 검사를 거치지 않는다.
+        // `/competition/{id}` — 대회 id는 숫자만 받는다(#280). 없는 대회는 웹 상세가 처리한다.
         // 목록(`/competition`)만 있는 링크는 상세가 아니라 처리하지 않는다(앱만 열린다).
         if segments.first == competitionSegment {
-            guard segments.count == 2, !segments[1].isEmpty else {
+            guard segments.count == 2 else {
                 Log.trace("딥링크 무시(지원하지 않는 경로): \(url.absoluteString)", category: .system, level: .info)
+                return nil
+            }
+            guard isCompetitionId(segments[1]) else {
+                Log.trace("딥링크 무시(대회 id 형식 아님): \(url.absoluteString)", category: .system, level: .info)
                 return nil
             }
             // pathComponents는 이미 퍼센트 디코딩된 값이다.

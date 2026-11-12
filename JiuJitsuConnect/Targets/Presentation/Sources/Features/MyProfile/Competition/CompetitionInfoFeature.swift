@@ -221,15 +221,20 @@ public struct CompetitionInfoFeature: Sendable {
         }
 
         /// 대회 상세 웹의 '내 기록에 남기기'(#250)에서 진입. 웹이 넘긴 대회명·연도를 미리 채워
-        /// 대부분 메달만 고르고 넘어가게 한다. 웹 대회 id는 문자열이라 등록 대회와 묶지 않는다.
+        /// 대부분 메달만 고르고 넘어가게 한다. 대회 id가 있으면 그 대회에 연결해 저장한다(#281) —
+        /// 서버가 대회명·연도를 그 대회 값으로 맞춘다. 자동완성에서 고른 것과 같이 이름·연도를 바꾸면 연결을 끊는다.
         public init(
             prefilledName: String,
             year: Int,
+            competitionId: Int? = nil,
             currentBelt: BeltRank? = nil,
             recentWeightLimit: CompetitionWeightLimit? = nil
         ) {
             self.init(mode: .add, currentBelt: currentBelt, recentWeightLimit: recentWeightLimit)
             self.name = prefilledName
+            self.linkedCompetition = competitionId.map {
+                LinkedCompetition(id: $0, name: prefilledName, year: year)
+            }
             self.preselectYear(year)
         }
     }

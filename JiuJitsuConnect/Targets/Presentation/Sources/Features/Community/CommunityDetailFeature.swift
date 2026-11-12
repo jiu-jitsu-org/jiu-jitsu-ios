@@ -149,7 +149,7 @@ public struct CommunityDetailFeature: Sendable {
             // 끝난 대회의 '내 기록에 남기기'(OPEN_COMPETITION_RECORD) → 부모가 이름·연도를 채운 대회 기록 추가를 연다. (#250)
             case competitionRecordRequested(OpenCompetitionRecordPayload)
             // 관심 대회 첫 등록 시트의 '알림 받기'(COMPETITION_ALERTS_ENABLED) → 부모가 알림 설정을 켜고 기기 알림 상태를 본다. (#257)
-            case competitionAlertsEnabled(competitionId: String?)
+            case competitionAlertsEnabled(competitionId: Int?)
             // 대회 목록 맨 위 색(COMPETITION_HEADER_TINT) → 대회 탭이 머리줄을 그 색으로 칠한다. nil이면 기본색.
             case competitionHeaderTintChanged(hex: String?)
         }
