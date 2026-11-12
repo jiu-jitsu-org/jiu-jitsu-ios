@@ -41,6 +41,8 @@ Derived/
 .build/
 Packages/
 *.resolved
+# CI(Xcode Cloud)와 팀원이 같은 의존성 버전으로 빌드하도록 Tuist 의존성 잠금 파일은 커밋한다
+!Tuist/Package.resolved
 
 # Carthage (사용하지 않지만, 만약을 위해)
 Carthage/
