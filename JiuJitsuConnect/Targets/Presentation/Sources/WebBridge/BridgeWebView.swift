@@ -15,6 +15,11 @@ import DesignSystem
 import CoreKit
 
 struct BridgeWebView: UIViewRepresentable {
+    /// 웹 문서 요청 제한 시간(#303). 기본값 60초는 서버 · 터널이 멈췄을 때 빈 화면 · 스피너가 너무 오래 이어진다.
+    /// 전체 소요 시간이 아니라 데이터가 오지 않는 간격 기준이다 — 첫 응답 전이든 받는 도중이든 이만큼 아무것도 오지
+    /// 않으면 실패(오류 화면 · 다시 시도)로 간다. 당겨서 새로고침(reload)도 처음 요청의 값을 이어받는다.
+    static let documentRequestTimeout: TimeInterval = 20
+
     // 이 웹뷰가 리스트인지 상세 서브뷰인지. 브릿지 로그에 찍혀 "어느 웹뷰의 트래픽인지"를 구분한다.
     let source: WebBridgeSource
     let url: URL
@@ -313,7 +318,7 @@ struct BridgeWebView: UIViewRepresentable {
             // 재로드 후 다시 WEBVIEW_READY가 오면 초기 동기화가 새로 일어난다.
             deliveredOutboundIDs.removeAll()
             WebEntryTrace.mark(.load, token: token)
-            webView.load(URLRequest(url: url))
+            webView.load(URLRequest(url: url, timeoutInterval: BridgeWebView.documentRequestTimeout))
         }
 
         // 로드·아웃바운드·키보드 처리에 쓸 webView를 보관한다.
