@@ -187,7 +187,9 @@ public struct AppFeature: Sendable {
         // AppTab이 이미 살아 있으면 바로 흘려보내고, 스플래시·로그인 중이면 진입 직후 소비한다.
         guard case .appTab? = state.destination else {
             state.pendingDeepLink = link
-            return .none
+            // 스플래시 중이면 최소 노출 시간을 채우지 않고 자동 로그인만 기다려 바로 넘어가게 알린다(#300).
+            guard case .splash? = state.destination else { return .none }
+            return .send(.destination(.presented(.splash(.deepLinkPending))))
         }
         // 인사 중에 링크가 들어오면 인사를 접고 바로 그 화면을 보여준다
         let wasGreeting = state.greeting != nil

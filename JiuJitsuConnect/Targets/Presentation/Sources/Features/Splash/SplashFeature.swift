@@ -9,6 +9,7 @@ public struct SplashFeature: Sendable {
 
     private enum CancelID: Hashable, Sendable {
         case onAppearLaunch
+        case minimumDisplay
     }
 
     // 스플래시 최소 노출 시간
@@ -29,20 +30,37 @@ public struct SplashFeature: Sendable {
     @ObservableState
     public struct State: Equatable {
         var isLaunching = false
+        // 최소 노출 시간이 지났거나, 공유 링크·푸시로 들어와 더 기다릴 필요가 없음(#300).
+        var isMinimumDisplayElapsed = false
+        // 자동 로그인을 다 기다림. 결과가 비로그인(nil)인 것과 아직 기다리는 중을 가르려고 감싼다.
+        var autoLoginResult: AutoLoginResult?
+        var hasFinished = false
         @Presents public var alert: AlertState<Alert>?
 
         public init() {}
     }
     
+    struct AutoLoginResult: Equatable {
+        let authInfo: AuthInfo?
+    }
+
     public enum Action: Sendable {
         case view(ViewAction)
+        case `internal`(InternalAction)
         case delegate(DelegateAction)
         case alert(PresentationAction<Alert>)
-        
+        /// 스플래시 중에 공유 링크·푸시가 보관됐다. 그 글을 빨리 보여 주려고 최소 노출 시간을 기다리지 않는다(#300).
+        case deepLinkPending
+
         public enum ViewAction: Sendable {
             case onAppear
         }
-        
+
+        public enum InternalAction: Sendable {
+            case minimumDisplayElapsed
+            case autoLoginFinished(AuthInfo?)
+        }
+
         public enum DelegateAction: Sendable {
             case finishedLaunch(authInfo: AuthInfo?)
         }
@@ -58,9 +76,15 @@ public struct SplashFeature: Sendable {
             case .view(.onAppear):
                 guard !state.isLaunching else { return .none }
                 state.isLaunching = true
-                return .run { send in
-                    async let splashDelay: Void = self.clock.sleep(for: Self.minimumDisplayDuration)
-
+                // 링크가 스플래시보다 먼저 와 있으면 최소 노출 시간을 재지 않는다.
+                let minimumDisplay: Effect<Action> = state.isMinimumDisplayElapsed
+                    ? .none
+                    : .run { send in
+                        try await self.clock.sleep(for: Self.minimumDisplayDuration)
+                        await send(.internal(.minimumDisplayElapsed))
+                    }
+                    .cancellable(id: CancelID.minimumDisplay, cancelInFlight: true)
+                return .merge(minimumDisplay, .run { send in
                     // 자동 로그인은 비구조적 Task로 돌려, 10초에 기다림을 끊어도 요청은 취소되지 않게 한다.
                     // refresh 토큰은 서버에서 1회용으로 회전되므로, 늦게 도착한 재발급 응답의 새 토큰도
                     // autoLogin(AuthRepositoryImpl)이 저장해야 다음 실행의 자동 로그인이 깨지지 않는다.
@@ -69,7 +93,7 @@ public struct SplashFeature: Sendable {
                     // 저장된 access token이 아직 유효하면 자동 로그인을 기다리지 않고 홈 피드를 미리 불러 둔다(#270).
                     // 서버는 토큰을 갱신해도 이전 access token을 막지 않아 그대로 써도 된다.
                     // 미리 불러 둘 수 없으면(로그인 전·토큰 만료) 웹킷만 데워 둔다(#207).
-                    // 자동 로그인과 1.5초 타이머를 먼저 시작해, 웹뷰를 만드는 동안 이 둘이 밀리지 않게 한다.
+                    // 자동 로그인을 먼저 시작해, 웹뷰를 만드는 동안 밀리지 않게 한다(최소 노출 타이머는 위에서 따로 시작).
                     let homeURL = CommunityFeature.makeCommunityURL()
                     var isPreloading = false
                     if let homeURL, let token = self.authClient.storedAccessToken(), !JWTDecoder.isExpired(token) {
@@ -104,23 +128,33 @@ public struct SplashFeature: Sendable {
                         await self.homeFeedPreload.discard()
                     }
 
-                    _ = try await splashDelay
-
                     switch outcome {
                     case let .completed(.success(authInfo)):
                         Log.trace("✅ Auto login check completed. AuthInfo: \(authInfo != nil)", category: .debug, level: .info)
-                        await send(.delegate(.finishedLaunch(authInfo: authInfo)))
+                        await send(.internal(.autoLoginFinished(authInfo)))
                     case let .completed(.failure(error)):
                         Log.trace("⚠️ Auto login failed: \(error)", category: .debug, level: .error)
-                        await send(.delegate(.finishedLaunch(authInfo: nil)))
+                        await send(.internal(.autoLoginFinished(nil)))
                     case .timedOut:
                         // 정책 문의 '자동 로그인 네트워크 실패 시 처리'(#21) 결정 전까지 네트워크 실패와 같게 처리한다.
                         // 저장된 토큰은 지우지 않는다(진행 중인 재발급이 끝나면 갱신됨).
                         Log.trace("⚠️ Auto login timed out after \(Self.maximumWaitDuration)", category: .debug, level: .error)
-                        await send(.delegate(.finishedLaunch(authInfo: nil)))
+                        await send(.internal(.autoLoginFinished(nil)))
                     }
                 }
-                .cancellable(id: CancelID.onAppearLaunch, cancelInFlight: true)
+                .cancellable(id: CancelID.onAppearLaunch, cancelInFlight: true))
+
+            case .deepLinkPending:
+                state.isMinimumDisplayElapsed = true
+                return .merge(.cancel(id: CancelID.minimumDisplay), Self.finishIfReady(&state))
+
+            case .internal(.minimumDisplayElapsed):
+                state.isMinimumDisplayElapsed = true
+                return Self.finishIfReady(&state)
+
+            case let .internal(.autoLoginFinished(authInfo)):
+                state.autoLoginResult = AutoLoginResult(authInfo: authInfo)
+                return Self.finishIfReady(&state)
 
             case .alert(.presented(.goToUpdateTapped)):
                 // TODO: - 추후 업데이트 로직 구현 필요
@@ -131,5 +165,12 @@ public struct SplashFeature: Sendable {
             }
         }
         .ifLet(\.$alert, action: \.alert)
+    }
+
+    /// 자동 로그인을 다 기다렸고 최소 노출 시간도 채웠으면(또는 링크로 들어와 건너뛰면) 한 번만 넘어간다.
+    private static func finishIfReady(_ state: inout State) -> Effect<Action> {
+        guard !state.hasFinished, state.isMinimumDisplayElapsed, let result = state.autoLoginResult else { return .none }
+        state.hasFinished = true
+        return .send(.delegate(.finishedLaunch(authInfo: result.authInfo)))
     }
 }
