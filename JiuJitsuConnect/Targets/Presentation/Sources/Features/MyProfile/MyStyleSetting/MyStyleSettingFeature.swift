@@ -333,6 +333,9 @@ public struct MyStyleSettingFeature: Sendable {
         
         // 설정 타입 (포지션/서브미션/기술)
         var settingType: MyStyleSettingType
+
+        // 부모(MY)가 저장 중. 끝날 때까지 '완료' · 뒤로가기 · 나중에 하기 버튼을 막는다(#155). 스와이프 백은 허용.
+        var isSaving = false
         
         // 특기(best*)는 화면에서 고르지 않는다(#118). 저장할 때 키가 빠지면 서버의 기존 특기가
         // 지워질 수 있어, 받은 값을 그대로 들고 있다가 다시 보낸다.
@@ -445,7 +448,7 @@ public struct MyStyleSettingFeature: Sendable {
                 return .none
                 
             case .view(.completeButtonTapped):
-                guard state.canComplete else { return .none }
+                guard state.canComplete, !state.isSaving else { return .none }
 
                 // register 모드면 부모가 다음 스타일 단계로, edit 모드면 화면을 닫음
                 let bestKey = state.selectedBestStyle?.rawValue
@@ -457,9 +460,11 @@ public struct MyStyleSettingFeature: Sendable {
                 )))
                 
             case .view(.backButtonTapped):
+                guard !state.isSaving else { return .none }
                 return .send(.delegate(.cancel))
                 
             case .view(.resetButtonTapped):
+                guard !state.isSaving else { return .none }
                 return .send(.delegate(.cancel))
                 
             case .delegate:
