@@ -81,6 +81,13 @@ public struct MyStyleSettingView: View {
             completeButton
         }
         .background(Color.component.background.default)
+        // 아래 '완료' 버튼을 가리지 않도록 버튼 위에 띄운다.
+        .toast(
+            store.toast,
+            bottomPadding: 120,
+            onSwipe: { store.send(.view(.toastSwiped)) },
+            onButtonTapped: { _ in store.send(.view(.toastSwiped)) }
+        )
         // 특기/최애 탭이 없어져(#118) 무엇을 고르는 화면인지 제목에서 알린다
         .navigationTitle("최애 \(store.settingType.title)")
         .navigationBarTitleDisplayMode(.inline)

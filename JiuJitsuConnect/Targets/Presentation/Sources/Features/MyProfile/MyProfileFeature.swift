@@ -365,6 +365,8 @@ public struct MyProfileFeature: Sendable {
                 
             case .view(.gymInfoButtonTapped):
                 guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
+                // 프로필을 못 불러왔으면 저장할 기준이 없다 — 화면을 열기 전에 알린다.
+                guard state.communityProfile != nil else { return Self.profileUnavailableToast() }
                 // 도장 정보 입력 화면으로 네비게이션
                 let currentAcademyName = state.communityProfile?.academyName ?? ""
                 let mode: MyAcademySettingFeature.Mode = currentAcademyName.isEmpty ? .add : .edit
@@ -532,9 +534,12 @@ public struct MyProfileFeature: Sendable {
             // MARK: - API 호출: 프로필 섹션 업데이트
 
             case let .internal(.updateProfileSection(section, value)):
-                guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
-                guard let profile = state.communityProfile else {
-                    return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
+                // 진입에서 막아 보통은 닿지 않지만, 도장 화면이 결과를 기다리며 잠기지 않게 실패로 돌려준다.
+                guard !state.isLoadingProfile, let profile = state.communityProfile else {
+                    if case .academySetting? = state.destination {
+                        return .send(.destination(.presented(.academySetting(.saveFailed))))
+                    }
+                    return state.isLoadingProfile ? Self.savingInProgressToast() : Self.profileUnavailableToast()
                 }
 
                 // 섹션별로 업데이트할 필드 설정
@@ -731,13 +736,17 @@ public struct MyProfileFeature: Sendable {
                 
             case let .internal(.updateProfileResponse(.failure(error))):
                 state.isLoadingProfile = false
-                // 스타일 화면은 실패 토스트 뒤에 남아 다시 저장할 수 있어야 한다.
-                if case var .myStyleSetting(styleState)? = state.destination {
-                    styleState.isSaving = false
-                    state.destination = .myStyleSetting(styleState)
-                }
                 Log.trace("Failed to update profile: \(error)", category: .network, level: .error)
-                return .send(.internal(.showToast(.init(message: "저장에 실패했어요. 다시 시도해주세요", status: .error))))
+                // 도장 · 스타일 화면이 떠 있으면 MY 토스트는 가려지므로 그 화면이 직접 알리고 다시 저장하게 한다(#156).
+                // 저장 중엔 다른 저장 화면이 열리지 않아(#155) 떠 있는 화면이 곧 실패한 저장의 화면이다.
+                switch state.destination {
+                case .academySetting?:
+                    return .send(.destination(.presented(.academySetting(.saveFailed))))
+                case .myStyleSetting?:
+                    return .send(.destination(.presented(.myStyleSetting(.saveFailed))))
+                default:
+                    return .send(.internal(.showToast(.init(message: "저장에 실패했어요. 다시 시도해주세요", status: .error))))
+                }
                 
             case let .internal(.showToast(toastState)):
                 state.toast = toastState
