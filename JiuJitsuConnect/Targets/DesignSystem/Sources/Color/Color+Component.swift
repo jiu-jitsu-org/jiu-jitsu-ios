@@ -432,6 +432,8 @@ public struct ComponentColors {
             public let purple = Color(hex: "#CD57FF")
             public let brwon = Color(hex: "#A66040")
             public let black = Color(hex: "#2D2D2D")
+            /// 검은띠의 빨간 바 색 — 앱 띠 그림의 빨간 바에서 뽑았다. 경고용 Red-500은 넓은 바탕에 깔면 눈이 아파 쓰지 않는다.
+            public let blackBeltBar = Color(hex: "#AC2828")
         }
     }
     

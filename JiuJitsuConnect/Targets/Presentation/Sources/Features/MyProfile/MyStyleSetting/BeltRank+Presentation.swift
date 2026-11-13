@@ -41,7 +41,7 @@ extension BeltRank {
 
     /// 벨트 등급에 따른 헤더 배경색
     /// 띠 몸 색으로 칠하되, 몸 색이 너무 밝거나(흰띠) 어두우면(검은띠) 그 띠의 바 색으로 칠한다 —
-    /// 흰띠는 검은 바(먹색), 검은띠는 빨간 바. 웹 대회 탭 위 그라데이션도 같은 규칙이다.
+    /// 흰띠는 검은 바(먹색), 검은띠는 빨간 바.
     var headerBackgroundColor: Color {
         switch self {
         case .white:
@@ -53,13 +53,9 @@ extension BeltRank {
         case .brown:
             return Color.component.myProfileHeader.bg.brwon
         case .black:
-            return Self.blackBeltBarRed
+            return Color.component.myProfileHeader.bg.blackBeltBar
         }
     }
-
-    /// 검은띠의 빨간 바 색 — 앱 띠 그림(웹 public/images/characters/belts/black.webp)의 빨간 바에서 뽑았다(웹 토큰 red-belt-bar).
-    /// 경고에 쓰는 Red-500(#FF1D0D)은 넓은 머리 바탕에 깔면 눈이 아파, 실제 띠처럼 깊고 차분한 빨강을 쓴다.
-    private static let blackBeltBarRed = Color(hex: "AC2828")
 }
 
 extension Optional where Wrapped == BeltRank {
