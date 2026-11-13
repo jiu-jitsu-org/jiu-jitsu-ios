@@ -40,10 +40,12 @@ extension BeltRank {
     }
 
     /// 벨트 등급에 따른 헤더 배경색
+    /// 띠 몸 색으로 칠하되, 몸 색이 너무 밝거나(흰띠) 어두우면(검은띠) 그 띠의 바 색으로 칠한다 —
+    /// 흰띠는 검은 바(먹색), 검은띠는 빨간 바.
     var headerBackgroundColor: Color {
         switch self {
         case .white:
-            return Color.component.myProfileHeader.bg.white
+            return Color.component.myProfileHeader.bg.black
         case .blue:
             return Color.component.myProfileHeader.bg.blue
         case .purple:
@@ -51,7 +53,7 @@ extension BeltRank {
         case .brown:
             return Color.component.myProfileHeader.bg.brwon
         case .black:
-            return Color.component.myProfileHeader.bg.black
+            return Color.component.myProfileHeader.bg.blackBeltBar
         }
     }
 }
