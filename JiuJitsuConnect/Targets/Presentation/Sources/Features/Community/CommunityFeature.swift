@@ -206,6 +206,10 @@ public struct CommunityFeature: Sendable {
             case competitionAlertsEnabled(competitionId: Int?)
             // 이 스택에 쌓인 MY에서 프로필을 저장함 → 부모가 열린 웹뷰 모두에 PROFILE_UPDATED를 보낸다.
             case profileUpdated
+            // 홈에 쌓인 대회 상세의 '커뮤니티에서 더 보기'(#304) → 부모가 홈에 쌓인 화면을 닫아 피드를 보인다.
+            case homeFeedRequested
+            // 홈에 쌓인 끝난 대회 상세의 '내 기록에 남기기'(#304) → 부모가 프로필을 보고 기록 추가를 그 상세 위에 쌓는다.
+            case competitionRecordRequested(OpenCompetitionRecordPayload)
         }
 
         /// 부모가 세션 상태 변화를 알려주면 그에 맞는 아웃바운드 메시지를 웹에 주입한다.
@@ -228,6 +232,26 @@ public struct CommunityFeature: Sendable {
         case userProfile(UserProfileFeature)
         /// 커뮤니티에서 내 사진·이름을 눌러 연 MY 화면(#197). 탭의 MY와 같은 화면이고 왼쪽 위에 뒤로가기가 붙는다.
         case myProfile(MyProfileFeature)
+        /// 홈에서 연 대회 상세의 '내 기록에 남기기'로 여는 대회 기록 추가(#304). 저장은 프로필을 아는 부모(AppTab)가 한다.
+        case competitionInfo(CompetitionInfoFeature)
+    }
+
+    /// 홈에 쌓이는 웹이 알리는 기능. 피드·글 상세·알림함에서 연 대회 상세도 대회 탭과 같이
+    /// '커뮤니티에서 더 보기'·'내 기록에 남기기'를 네이티브가 받는다(#304).
+    static let subviewCapabilities: [WebBridgeCapability] = [
+        .pickPhotos,
+        .openHomeFeed,
+        .openCompetitionRecord
+    ]
+
+    static func subview(url: URL, title: String? = nil, accessToken: String?) -> CommunityDetailFeature.State {
+        CommunityDetailFeature.State(
+            url: url,
+            title: title,
+            accessToken: accessToken,
+            isTabRoot: false,
+            capabilities: subviewCapabilities
+        )
     }
 
     /// 중첩 서브뷰가 어느 컨테이너(푸시 스택 / 모달 내부 스택)에서 올라왔는지 구분한다.
@@ -270,7 +294,7 @@ public struct CommunityFeature: Sendable {
                     let base = state.url,
                     let url = NotificationInbox.url(base: base)
                 else { return .none }
-                state.path.append(.detail(.init(url: url, accessToken: state.accessToken)))
+                state.path.append(.detail(Self.subview(url: url, accessToken: state.accessToken)))
                 return .none
 
             // 앱 다른 곳에서 내 사진은 MY를 뜻하므로 커뮤니티 헤더도 MY 화면을 연다. 커뮤니티 활동은
@@ -707,8 +731,12 @@ public struct CommunityFeature: Sendable {
             return .send(.openUserProfile(userId: userId))
         case let .competitionAlertsEnabled(competitionId):
             return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
-        case .homeFeedRequested, .competitionRecordRequested, .competitionHeaderTintChanged:
-            // 커뮤니티 상세는 이 신호들을 알리지 않아 상세가 이미 무시했다(#250). 홈은 이미 피드 탭이기도 하다.
+        case .homeFeedRequested:
+            return .send(.delegate(.homeFeedRequested))
+        case let .competitionRecordRequested(payload):
+            return .send(.delegate(.competitionRecordRequested(payload)))
+        case .competitionHeaderTintChanged:
+            // 대회 탭 목록만 알리는 신호라 쌓인 상세는 이미 무시했다.
             return .none
         }
     }
@@ -716,7 +744,7 @@ public struct CommunityFeature: Sendable {
     /// MY 화면의 '커뮤니티 활동'(내 글·댓글 웹)을 그 MY가 놓인 스택에 쌓는다(#197).
     private static func pushMyActivity(from container: SubviewContainer, into state: inout State) -> Effect<Action> {
         guard let base = state.url, let url = myActivityURL(base: base) else { return .none }
-        let detail = CommunityDetailFeature.State(url: url, accessToken: state.accessToken)
+        let detail = subview(url: url, accessToken: state.accessToken)
         switch container {
         case .push: state.path.append(.detail(detail))
         case .modal: state.coverPath.append(.detail(detail))
@@ -737,12 +765,38 @@ public struct CommunityFeature: Sendable {
         }
     }
 
-    /// 로그아웃·탈퇴 때 이전 계정으로 연 MY 화면을 닫는다(#197). 그 위에 쌓인 화면도 MY에서 연 것이라 함께 닫는다.
-    public static func closeMyProfiles(into state: inout State) {
-        if let index = state.path.firstIndex(where: { if case .myProfile = $0 { true } else { false } }) {
+    /// 홈에서 연 대회 상세 위에 기록 추가를 쌓는다(#304). 상세 모달이 떠 있으면 그 안 스택에 쌓는다 —
+    /// 버튼을 누를 수 있는 상세는 맨 위 화면뿐이라, 모달이 있으면 그 상세는 모달 안에 있다.
+    /// 연타·중복 전달로 입력 화면이 겹쳐 쌓이지 않게 맨 위가 이미 기록 추가면 그대로 둔다(대회 탭과 같은 방식).
+    public static func pushCompetitionRecord(_ record: CompetitionInfoFeature.State, into state: inout State) {
+        let top = state.detailCover != nil ? state.coverPath.last : state.path.last
+        if case .competitionInfo? = top { return }
+        if state.detailCover != nil {
+            state.coverPath.append(.competitionInfo(record))
+        } else {
+            state.path.append(.competitionInfo(record))
+        }
+    }
+
+    /// 홈에 쌓인 화면(푸시 스택·상세 모달·모달 안 스택)을 모두 닫아 피드 첫 화면이 바로 보이게 한다(#250, #304).
+    public static func closeToFeed(into state: inout State) {
+        state.path.removeAll()
+        state.detailCover = nil
+        state.coverPath.removeAll()
+    }
+
+    /// 로그아웃·탈퇴 때 이전 계정으로 연 MY 화면(#197)과 대회 기록 추가(#304)를 닫는다. 그 위에 쌓인 화면도 함께 닫는다.
+    public static func closeAccountScreens(into state: inout State) {
+        func isAccountScreen(_ element: Path.State) -> Bool {
+            switch element {
+            case .myProfile, .competitionInfo: true
+            case .detail, .userProfile: false
+            }
+        }
+        if let index = state.path.firstIndex(where: isAccountScreen) {
             state.path.removeSubrange(index...)
         }
-        if let index = state.coverPath.firstIndex(where: { if case .myProfile = $0 { true } else { false } }) {
+        if let index = state.coverPath.firstIndex(where: isAccountScreen) {
             state.coverPath.removeSubrange(index...)
         }
     }
@@ -787,7 +841,7 @@ public struct CommunityFeature: Sendable {
             return .none
         }
 
-        let detail = CommunityDetailFeature.State(
+        let detail = subview(
             url: target,
             title: payload.title,
             accessToken: state.accessToken
@@ -825,7 +879,7 @@ public struct CommunityFeature: Sendable {
             return .none
         }
 
-        let detail = CommunityDetailFeature.State(url: link.url, accessToken: state.accessToken)
+        let detail = subview(url: link.url, accessToken: state.accessToken)
         switch container {
         case .push:
             state.path.append(.detail(detail))

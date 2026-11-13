@@ -77,6 +77,8 @@ public struct AppTabView: View {
                         UserProfileView(store: profileStore)
                     case let .myProfile(myStore):
                         MyProfileView(store: myStore)
+                    case let .competitionInfo(competitionInfoStore):
+                        CompetitionInfoView(store: competitionInfoStore)
                     }
                 }
             }
@@ -160,6 +162,8 @@ public struct AppTabView: View {
                     UserProfileView(store: profileStore)
                 case let .myProfile(myStore):
                     MyProfileView(store: myStore)
+                case let .competitionInfo(competitionInfoStore):
+                    CompetitionInfoView(store: competitionInfoStore)
                 }
             }
             // 모달 안 웹의 '알림 받기'(#257)면 아래 탭 화면의 알럿이 모달에 가려지므로 모달 위에 그린다.
