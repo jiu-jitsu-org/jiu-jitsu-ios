@@ -51,7 +51,8 @@ enum HomeFeedPreloader {
             )
             // 쿠키를 심는 사이 로그인 화면으로 가 버려졌으면 불러오지 않는다
             guard !preload.isDiscarded else { return }
-            webView.load(URLRequest(url: url))
+            // 이어받은 홈 웹뷰와 같은 제한 시간 — 앱을 켤 때 서버가 멈춰 있으면 대개 이 요청이 걸린다
+            webView.load(URLRequest(url: url, timeoutInterval: BridgeWebView.documentRequestTimeout))
         }
         scheduleRelease()
     }
