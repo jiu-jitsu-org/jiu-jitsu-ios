@@ -371,9 +371,10 @@ public struct AppTabFeature: Sendable {
 
             // 홈(피드·글 상세·알림함)에서 연 대회 상세의 '커뮤니티에서 더 보기'(#304). 이미 홈 탭이라 홈에 쌓인 화면만 닫는다.
             // 대회 탭 스택은 그 탭에서 보던 화면이라 건드리지 않는다.
+            // 알림함을 거쳐 왔으면 뒤로가기(popFrom)를 거치지 않고 닫히므로, 새 알림 점을 여기서 다시 조회한다.
             case .home(.delegate(.homeFeedRequested)):
                 CommunityFeature.closeToFeed(into: &state.home)
-                return .none
+                return .send(.home(.unreadNotificationRefreshRequested))
 
             // 끝난 대회의 '내 기록에 남기기'(#250). 웹은 비로그인이면 로그인 안내를 대신 보내지만, 웹과 앱의 로그인 상태가
             // 어긋났을 때를 대비해 앱도 막는다 — 로그인 모달을 띄우고, 로그인하면 이 대회로 이어서 연다.
