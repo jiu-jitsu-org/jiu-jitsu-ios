@@ -30,8 +30,8 @@ public struct SplashFeature: Sendable {
     @ObservableState
     public struct State: Equatable {
         var isLaunching = false
-        // 최소 노출 시간이 지났거나, 공유 링크·푸시로 들어와 더 기다릴 필요가 없음(#300).
-        var isMinimumDisplayElapsed = false
+        // 최소 노출 조건을 채움 — 시간이 지났거나, 공유 링크·푸시로 들어와 기다리지 않아도 됨(#300).
+        var isMinimumDisplaySatisfied = false
         // 자동 로그인을 다 기다림. 결과가 비로그인(nil)인 것과 아직 기다리는 중을 가르려고 감싼다.
         var autoLoginResult: AutoLoginResult?
         var hasFinished = false
@@ -77,14 +77,14 @@ public struct SplashFeature: Sendable {
                 guard !state.isLaunching else { return .none }
                 state.isLaunching = true
                 // 링크가 스플래시보다 먼저 와 있으면 최소 노출 시간을 재지 않는다.
-                let minimumDisplay: Effect<Action> = state.isMinimumDisplayElapsed
+                let minimumDisplay: Effect<Action> = state.isMinimumDisplaySatisfied
                     ? .none
                     : .run { send in
                         try await self.clock.sleep(for: Self.minimumDisplayDuration)
                         await send(.internal(.minimumDisplayElapsed))
                     }
                     .cancellable(id: CancelID.minimumDisplay, cancelInFlight: true)
-                return .merge(minimumDisplay, .run { send in
+                let autoLogin: Effect<Action> = .run { send in
                     // 자동 로그인은 비구조적 Task로 돌려, 10초에 기다림을 끊어도 요청은 취소되지 않게 한다.
                     // refresh 토큰은 서버에서 1회용으로 회전되므로, 늦게 도착한 재발급 응답의 새 토큰도
                     // autoLogin(AuthRepositoryImpl)이 저장해야 다음 실행의 자동 로그인이 깨지지 않는다.
@@ -93,7 +93,7 @@ public struct SplashFeature: Sendable {
                     // 저장된 access token이 아직 유효하면 자동 로그인을 기다리지 않고 홈 피드를 미리 불러 둔다(#270).
                     // 서버는 토큰을 갱신해도 이전 access token을 막지 않아 그대로 써도 된다.
                     // 미리 불러 둘 수 없으면(로그인 전·토큰 만료) 웹킷만 데워 둔다(#207).
-                    // 자동 로그인을 먼저 시작해, 웹뷰를 만드는 동안 밀리지 않게 한다(최소 노출 타이머는 위에서 따로 시작).
+                    // 자동 로그인을 먼저 시작해, 웹뷰를 만드는 동안 밀리지 않게 한다.
                     let homeURL = CommunityFeature.makeCommunityURL()
                     var isPreloading = false
                     if let homeURL, let token = self.authClient.storedAccessToken(), !JWTDecoder.isExpired(token) {
@@ -118,6 +118,7 @@ public struct SplashFeature: Sendable {
                     }
 
                     // 홈으로 가면, 미리 불러 두지 못했어도 새 토큰으로 지금 시작한다 — 스플래시 남은 시간만큼 겹친다.
+                    // 링크로 들어오면 남은 시간이 없어 이 대기만큼 늦게 넘어간다(순서 조정은 #301).
                     // 로그인 화면으로 가면 미리 불러 둔 화면을 버린다.
                     let authInfo: AuthInfo? = if case let .completed(.success(info)) = outcome { info } else { nil }
                     if let accessToken = authInfo?.accessToken {
@@ -142,14 +143,15 @@ public struct SplashFeature: Sendable {
                         await send(.internal(.autoLoginFinished(nil)))
                     }
                 }
-                .cancellable(id: CancelID.onAppearLaunch, cancelInFlight: true))
+                .cancellable(id: CancelID.onAppearLaunch, cancelInFlight: true)
+                return .merge(minimumDisplay, autoLogin)
 
             case .deepLinkPending:
-                state.isMinimumDisplayElapsed = true
+                state.isMinimumDisplaySatisfied = true
                 return .merge(.cancel(id: CancelID.minimumDisplay), Self.finishIfReady(&state))
 
             case .internal(.minimumDisplayElapsed):
-                state.isMinimumDisplayElapsed = true
+                state.isMinimumDisplaySatisfied = true
                 return Self.finishIfReady(&state)
 
             case let .internal(.autoLoginFinished(authInfo)):
@@ -169,7 +171,7 @@ public struct SplashFeature: Sendable {
 
     /// 자동 로그인을 다 기다렸고 최소 노출 시간도 채웠으면(또는 링크로 들어와 건너뛰면) 한 번만 넘어간다.
     private static func finishIfReady(_ state: inout State) -> Effect<Action> {
-        guard !state.hasFinished, state.isMinimumDisplayElapsed, let result = state.autoLoginResult else { return .none }
+        guard !state.hasFinished, state.isMinimumDisplaySatisfied, let result = state.autoLoginResult else { return .none }
         state.hasFinished = true
         return .send(.delegate(.finishedLaunch(authInfo: result.authInfo)))
     }
