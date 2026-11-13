@@ -30,9 +30,9 @@ public struct CommunityDetailView: View {
         // (안쪽 웹뷰 레이어만 ignoresSafeArea로 edge-to-edge 확장)
         ZStack(alignment: .topLeading) {
             webViewLayer
-            // 로딩/에러 오버레이 위에만 얹는다. 정상 화면의 뒤로가기는 웹 헤더가 그리므로
-            // 여기서 겹쳐 그리면 버튼이 두 개가 된다.
-            // 덮개와 함께 옅어지며 걷히고, 걷히기 시작하면 바로 눌리지 않는다(#261, WebLoadingOverlay와 같은 방식).
+            // 로딩 중·오류 화면에만 얹는다. 정상 화면의 뒤로가기는 웹 헤더가 그리므로 여기서 겹쳐 그리면 버튼이 두 개가 된다.
+            // 로딩 덮개는 두지 않는다(#299) — 로딩 모습은 웹(스켈레톤)이 맡는다. 다만 웹 헤더의 뒤로가기는 첫 응답 전·
+            // 하이드레이션 전엔 없거나 눌리지 않아, 그때까지 빠져나갈 수 있게 이 버튼만 얹는다.
             backButton
                 .padding(.leading, 8)
                 // 웹 앱바(높이 44)의 뒤로가기와 같은 자리에 둬 로딩 → 렌더 전환 시 버튼이
@@ -41,10 +41,6 @@ public struct CommunityDetailView: View {
                 .opacity(showsBackButton ? 1 : 0)
                 .allowsHitTesting(showsBackButton)
                 .accessibilityHidden(!showsBackButton)
-                .animation(
-                    showsBackButton ? nil : .easeOut(duration: WebLoadingOverlay.fadeDuration),
-                    value: showsBackButton
-                )
         }
         // chromeless: 네이티브 내비게이션 바를 숨겨 웹 자체 헤더만 보이게 한다.
         .toolbar(.hidden, for: .navigationBar)
@@ -105,8 +101,6 @@ public struct CommunityDetailView: View {
                 onBridgeMessage: { store.send(.internal(.bridgeMessageReceived($0))) },
                 onOutboundDelivered: { store.send(.internal(.outboundDelivered(id: $0))) }
             )
-
-            WebLoadingOverlay(isLoading: store.isLoading)
 
             if store.hasError {
                 errorOverlay
