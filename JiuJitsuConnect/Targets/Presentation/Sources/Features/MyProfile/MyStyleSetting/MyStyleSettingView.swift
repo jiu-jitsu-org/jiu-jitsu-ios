@@ -159,6 +159,7 @@ public struct MyStyleSettingView: View {
                     store.send(.view(.completeButtonTapped))
                 }
             )
+            .disabled(store.isSaving)
             .padding(.horizontal, 20)
             .padding(.bottom, 8)
         }
@@ -181,6 +182,7 @@ public struct MyStyleSettingView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(store.isSaving)
     }
     
     private var resetButton: some View {
@@ -195,6 +197,7 @@ public struct MyStyleSettingView: View {
                 .frame(height: 32)
         }
         .buttonStyle(.plain)
+        .disabled(store.isSaving)
     }
     
     // MARK: - Selected Styles Preview

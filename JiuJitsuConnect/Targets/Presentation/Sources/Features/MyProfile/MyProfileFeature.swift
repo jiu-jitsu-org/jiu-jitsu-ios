@@ -29,7 +29,14 @@ public struct MyProfileFeature: Sendable {
         
         // 커뮤니티 프로필 정보
         var communityProfile: CommunityProfile?
+        // 프로필 불러오기 · 저장 중(사진 제외). 저장은 한 번에 하나만 진행한다 — 응답이 프로필 전체를 바꾸므로
+        // 겹치면 늦게 온 응답이 앞 저장을 화면에서 되돌린다(#155).
         var isLoadingProfile: Bool = false
+        // 몇 번째 저장인지. 재조회 응답이 그사이 시작된 저장보다 오래된 값이면 버리는 데 쓴다(#155).
+        var profileSaveGeneration = 0
+        // 프로필 사진 업로드 · 삭제 중. 다른 저장과 서버 자원이 달라 따로 둔다 — 사진 스피너가 다른 저장의
+        // 응답에 꺼지거나, 사진 업로드 중에 대회 · 띠 저장이 막히지 않게(#155).
+        var isUploadingProfileImage: Bool = false
         // 탭 재진입·포그라운드 복귀 시 백그라운드 재조회 중 (#69). 헤더 스피너와 묶인
         // isLoadingProfile과 분리해, 재조회 중에도 기존 화면을 깜빡임 없이 유지한다.
         var isRefreshingProfile: Bool = false
@@ -194,20 +201,21 @@ public struct MyProfileFeature: Sendable {
             // community 프로필과 독립적으로 처리해 한쪽 실패가 다른 쪽을 막지 않게 한다.
             case userProfileResponse(TaskResult<UserProfile>)
             case refreshProfile
-            case refreshProfileResponse(TaskResult<CommunityProfile>)
+            case refreshProfileResponse(TaskResult<CommunityProfile>, saveGeneration: Int)
             case refreshUserProfileResponse(TaskResult<UserProfile>)
             case updateProfileSection(ProfileSection, String?)
             case saveBeltInfoOnly(rank: BeltRank, stripe: BeltStripe)
             // 스타일 저장 (특기 + 최애 한 번에)
-            case savePosition(best: PositionType?, favorite: PositionType?)
-            case saveSubmission(best: SubmissionType?, favorite: SubmissionType?)
-            case saveTechnique(best: TechniqueType?, favorite: TechniqueType?)
+            // mode: 저장을 시작한 화면의 모드. 응답이 올 때 화면이 이미 닫혔을 수 있어 그때 값으로 분기한다(#155).
+            case savePosition(best: PositionType?, favorite: PositionType?, mode: MyStyleSettingFeature.Mode)
+            case saveSubmission(best: SubmissionType?, favorite: SubmissionType?, mode: MyStyleSettingFeature.Mode)
+            case saveTechnique(best: TechniqueType?, favorite: TechniqueType?, mode: MyStyleSettingFeature.Mode)
 
             // 응답 처리
             case updateProfileResponse(TaskResult<CommunityProfile>)
-            case positionSaved(CommunityProfile)    // 포지션 저장 → register 시 기술 단계로
-            case submissionSaved(CommunityProfile)  // 서브미션 저장 → 프로필 화면으로 복귀
-            case techniqueSaved(CommunityProfile)   // 기술 저장 → register 시 서브미션 단계로
+            case positionSaved(CommunityProfile, mode: MyStyleSettingFeature.Mode)    // 포지션 저장 → register 시 기술 단계로
+            case submissionSaved(CommunityProfile, mode: MyStyleSettingFeature.Mode)  // 서브미션 저장 → 프로필 화면으로 복귀
+            case techniqueSaved(CommunityProfile, mode: MyStyleSettingFeature.Mode)   // 기술 저장 → register 시 서브미션 단계로
             case competitionAdded(CommunityProfile, Competition)   // 대회 정보 추가 저장 완료
             case competitionAddFailed                              // 대회 정보 추가 저장 실패
             case competitionUpdated(CommunityProfile) // 대회 정보 수정 저장 완료
@@ -285,21 +293,23 @@ public struct MyProfileFeature: Sendable {
                 // 저장·업로드 중이면 그 결과가 화면의 최신값이므로 재조회하지 않는다.
                 guard !state.authInfo.isGuest,
                       !state.isLoadingProfile,
+                      !state.isUploadingProfileImage,
                       !state.isUploadingInstructorVerification,
                       !state.isRefreshingProfile else { return .none }
                 state.isRefreshingProfile = true
+                let saveGeneration = state.profileSaveGeneration
                 return .run { send in
                     async let communityResult = TaskResult { try await communityClient.fetchProfile() }
                     async let userResult = TaskResult { try await userClient.fetchUserProfile() }
-                    await send(.internal(.refreshProfileResponse(communityResult)))
+                    await send(.internal(.refreshProfileResponse(communityResult, saveGeneration: saveGeneration)))
                     await send(.internal(.refreshUserProfileResponse(userResult)))
                 }
                 .cancellable(id: CancelID.profileRefresh, cancelInFlight: true)
 
-            case let .internal(.refreshProfileResponse(result)):
+            case let .internal(.refreshProfileResponse(result, saveGeneration)):
                 state.isRefreshingProfile = false
-                // 응답을 기다리는 사이 저장이 시작됐으면 오래된 값으로 덮어쓰지 않는다.
-                guard !state.isLoadingProfile else { return .none }
+                // 응답을 기다리는 사이 저장이 시작됐으면(이미 끝났어도) 저장 전 값이라 덮어쓰지 않는다.
+                guard !state.isLoadingProfile, saveGeneration == state.profileSaveGeneration else { return .none }
                 switch result {
                 case let .success(profile):
                     state.communityProfile = profile
@@ -310,7 +320,7 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case let .internal(.refreshUserProfileResponse(result)):
-                guard !state.isUploadingInstructorVerification else { return .none }
+                guard !state.isUploadingInstructorVerification, !state.isUploadingProfileImage else { return .none }
                 switch result {
                 case let .success(profile):
                     state.userProfile = profile
@@ -338,6 +348,8 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case let .internal(.userProfileResponse(.success(profile))):
+                // 사진을 바꾸는 중이면 업로드 전 값이라 덮지 않는다 — 업로드 응답이 최신값을 넣는다.
+                guard !state.isUploadingProfileImage else { return .none }
                 state.userProfile = profile
                 return .none
 
@@ -352,6 +364,7 @@ public struct MyProfileFeature: Sendable {
                 return .send(.internal(.showToast(.init(message: "프로필을 불러오는데 실패했어요", status: .error))))
                 
             case .view(.gymInfoButtonTapped):
+                guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
                 // 도장 정보 입력 화면으로 네비게이션
                 let currentAcademyName = state.communityProfile?.academyName ?? ""
                 let mode: MyAcademySettingFeature.Mode = currentAcademyName.isEmpty ? .add : .edit
@@ -361,6 +374,7 @@ public struct MyProfileFeature: Sendable {
                 return .none
                 
             case .view(.nicknameEditButtonTapped):
+                guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
                 // 닉네임 수정 화면으로 네비게이션
                 let currentNickname = state.communityProfile?.nickname ?? ""
                 state.destination = .nicknameSetting(
@@ -369,6 +383,8 @@ public struct MyProfileFeature: Sendable {
                 return .none
                 
             case .view(.registerBeltButtonTapped), .view(.beltTapped):
+                // 저장 중엔 저장 화면을 열지 않는다 — 열린 화면 위에선 안내가 안 보이고, 고른 값이 거절돼 사라진다(#155).
+                guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
                 // 벨트 시트 노출. 등록·수정 모두 벨트만 받고 바로 저장한다(프로필 체급은 받지 않음, #188)
                 state.sheet = .beltSetting(
                     BeltSettingFeature.State(
@@ -379,6 +395,9 @@ public struct MyProfileFeature: Sendable {
                 return .none
                 
             case .view(.registerStyleButtonTapped):
+                guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
+                // 프로필을 못 불러왔으면 저장할 기준이 없다 — 화면을 열기 전에 알린다.
+                guard state.communityProfile != nil else { return Self.profileUnavailableToast() }
                 // 포지션 설정 화면으로 네비게이션 (스타일 설정의 첫 단계)
                 state.destination = .myStyleSetting(
                     MyStyleSettingFeature.State(
@@ -395,6 +414,9 @@ public struct MyProfileFeature: Sendable {
                 return .none
                 
             case let .view(.styleCardEditTapped(type)):
+                guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
+                // 프로필을 못 불러왔으면 저장할 기준이 없다 — 화면을 열기 전에 알린다.
+                guard state.communityProfile != nil else { return Self.profileUnavailableToast() }
                 // 프로필 카드 탭 → 해당 타입만 수정하는 edit 모드로 진입
                 state.destination = .myStyleSetting(
                     MyStyleSettingFeature.State(
@@ -430,6 +452,8 @@ public struct MyProfileFeature: Sendable {
                 // 저장은 닉네임 화면이 끝낸 상태. 성공했을 때만 화면을 닫는다(실패는 화면에서 안내, #66).
                 state.destination = nil
                 state.communityProfile = state.communityProfile?.updatingNickname(nickname)
+                // 닉네임 화면이 이미 저장했다. 그 전에 나간 재조회 응답이 옛 닉네임으로 덮지 않게 세대를 올린다.
+                state.profileSaveGeneration += 1
                 return .send(.internal(.showToast(.init(
                     message: "닉네임 수정을 완료했어요", status: .success
                 ))))
@@ -440,21 +464,29 @@ public struct MyProfileFeature: Sendable {
                 
             case let .destination(.presented(.myStyleSetting(.delegate(.didConfirmStyle(type, bestKey, favoriteKey))))):
                 // 스타일 저장 (최애 + 받아 둔 특기) → register 시 다음 단계, edit 시 화면 닫기
+                // 저장 화면은 저장 중엔 열리지 않으므로, 여기 걸리는 건 같은 화면의 '완료' 연타뿐이다(#155).
+                guard !state.isLoadingProfile, state.communityProfile != nil,
+                      case var .myStyleSetting(styleState)? = state.destination else { return .none }
+                let mode = styleState.mode
+                // 저장이 끝날 때까지 '완료' · 뒤로가기 버튼을 막는다 — 응답 전에 다른 선택으로 다시 저장하지 않게.
+                // 스와이프로 나가는 건 허용한다. 닫힌 뒤 온 응답은 값만 반영하고 다른 화면을 열지 않는다.
+                styleState.isSaving = true
+                state.destination = .myStyleSetting(styleState)
                 switch type {
                 case .position:
                     let best = bestKey.flatMap { PositionType(rawValue: $0) }
                     let favorite = favoriteKey.flatMap { PositionType(rawValue: $0) }
-                    return .send(.internal(.savePosition(best: best, favorite: favorite)))
+                    return .send(.internal(.savePosition(best: best, favorite: favorite, mode: mode)))
 
                 case .submission:
                     let best = bestKey.flatMap { SubmissionType(rawValue: $0) }
                     let favorite = favoriteKey.flatMap { SubmissionType(rawValue: $0) }
-                    return .send(.internal(.saveSubmission(best: best, favorite: favorite)))
+                    return .send(.internal(.saveSubmission(best: best, favorite: favorite, mode: mode)))
 
                 case .technique:
                     let best = bestKey.flatMap { TechniqueType(rawValue: $0) }
                     let favorite = favoriteKey.flatMap { TechniqueType(rawValue: $0) }
-                    return .send(.internal(.saveTechnique(best: best, favorite: favorite)))
+                    return .send(.internal(.saveTechnique(best: best, favorite: favorite, mode: mode)))
                 }
                 
             case .destination(.presented(.myStyleSetting(.delegate(.cancel)))):
@@ -474,6 +506,7 @@ public struct MyProfileFeature: Sendable {
                 return .send(.internal(.saveBeltInfoOnly(rank: rank, stripe: stripe)))
                 
             case let .internal(.saveBeltInfoOnly(rank, stripe)):
+                guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
                 guard let profile = state.communityProfile else {
                     return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
@@ -485,7 +518,7 @@ public struct MyProfileFeature: Sendable {
                 
                 Log.trace("API 요청할 프로필: \(updatedProfile.beltRank?.displayName ?? "없음") \(updatedProfile.beltStripe?.displayName ?? "")", category: .debug, level: .info)
                 
-                state.isLoadingProfile = true
+                Self.beginProfileSave(&state)
                 
                 return .run { send in
                     await send(.internal(.updateProfileResponse(
@@ -499,6 +532,7 @@ public struct MyProfileFeature: Sendable {
             // MARK: - API 호출: 프로필 섹션 업데이트
 
             case let .internal(.updateProfileSection(section, value)):
+                guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
                 guard let profile = state.communityProfile else {
                     return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
@@ -514,7 +548,7 @@ public struct MyProfileFeature: Sendable {
                     return .none
                 }
                 
-                state.isLoadingProfile = true
+                Self.beginProfileSave(&state)
                 
                 return .run { [section] send in
                     await send(.internal(.updateProfileResponse(
@@ -527,13 +561,13 @@ public struct MyProfileFeature: Sendable {
                 
             // MARK: - API 호출: 스타일 정보 저장 (특기 + 최애 한 번에)
 
-            case let .internal(.savePosition(best, favorite)):
+            case let .internal(.savePosition(best, favorite, mode)):
                 guard let profile = state.communityProfile else {
                     return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
 
                 let updatedProfile = profile.updatingPosition(best: best, favorite: favorite)
-                state.isLoadingProfile = true
+                Self.beginProfileSave(&state)
 
                 return .run { send in
                     let result = await TaskResult {
@@ -542,19 +576,19 @@ public struct MyProfileFeature: Sendable {
 
                     switch result {
                     case .success(let updatedProfile):
-                        await send(.internal(.positionSaved(updatedProfile)))
+                        await send(.internal(.positionSaved(updatedProfile, mode: mode)))
                     case .failure(let error):
                         await send(.internal(.updateProfileResponse(.failure(error))))
                     }
                 }
 
-            case let .internal(.saveSubmission(best, favorite)):
+            case let .internal(.saveSubmission(best, favorite, mode)):
                 guard let profile = state.communityProfile else {
                     return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
 
                 let updatedProfile = profile.updatingSubmission(best: best, favorite: favorite)
-                state.isLoadingProfile = true
+                Self.beginProfileSave(&state)
 
                 return .run { send in
                     let result = await TaskResult {
@@ -563,19 +597,19 @@ public struct MyProfileFeature: Sendable {
 
                     switch result {
                     case .success(let updatedProfile):
-                        await send(.internal(.submissionSaved(updatedProfile)))
+                        await send(.internal(.submissionSaved(updatedProfile, mode: mode)))
                     case .failure(let error):
                         await send(.internal(.updateProfileResponse(.failure(error))))
                     }
                 }
 
-            case let .internal(.saveTechnique(best, favorite)):
+            case let .internal(.saveTechnique(best, favorite, mode)):
                 guard let profile = state.communityProfile else {
                     return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
 
                 let updatedProfile = profile.updatingTechnique(best: best, favorite: favorite)
-                state.isLoadingProfile = true
+                Self.beginProfileSave(&state)
 
                 return .run { send in
                     let result = await TaskResult {
@@ -584,7 +618,7 @@ public struct MyProfileFeature: Sendable {
 
                     switch result {
                     case .success(let updatedProfile):
-                        await send(.internal(.techniqueSaved(updatedProfile)))
+                        await send(.internal(.techniqueSaved(updatedProfile, mode: mode)))
                     case .failure(let error):
                         await send(.internal(.updateProfileResponse(.failure(error))))
                     }
@@ -592,51 +626,56 @@ public struct MyProfileFeature: Sendable {
 
             // MARK: - 저장 성공 후 처리
 
-            case let .internal(.positionSaved(profile)):
+            // 응답이 올 때 화면이 닫혔을 수 있다(저장 중 뒤로가기). 그때는 값만 반영하고 다음 단계를 열지 않는다(#155).
+            case let .internal(.positionSaved(profile, mode)):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
-                if case let .myStyleSetting(styleState) = state.destination, styleState.mode == .edit {
-                    state.destination = nil
+                let isShowing = Self.isShowingStyleSetting(.position, mode: mode, in: state)
+                if mode == .edit {
+                    if isShowing { state.destination = nil }
                     return .send(.internal(.showToast(.init(message: "포지션을 저장했어요", status: .success))))
-                } else {
-                    // register 플로우: 다음 단계(기술)로 이동
-                    state.destination = .myStyleSetting(
-                        MyStyleSettingFeature.State(
-                            settingType: .technique,
-                            mode: .register,
-                            bestTechnique: profile.bestTechnique,
-                            favoriteTechnique: profile.favoriteTechnique
-                        )
-                    )
                 }
+                guard isShowing else { return .none }
+                // register 플로우: 다음 단계(기술)로 이동
+                state.destination = .myStyleSetting(
+                    MyStyleSettingFeature.State(
+                        settingType: .technique,
+                        mode: .register,
+                        bestTechnique: profile.bestTechnique,
+                        favoriteTechnique: profile.favoriteTechnique
+                    )
+                )
                 return .none
 
-            case let .internal(.techniqueSaved(profile)):
+            case let .internal(.techniqueSaved(profile, mode)):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
-                if case let .myStyleSetting(styleState) = state.destination, styleState.mode == .edit {
-                    state.destination = nil
+                let isShowing = Self.isShowingStyleSetting(.technique, mode: mode, in: state)
+                if mode == .edit {
+                    if isShowing { state.destination = nil }
                     return .send(.internal(.showToast(.init(message: "기술을 저장했어요", status: .success))))
-                } else {
-                    // register 플로우: 다음 단계(서브미션)로 이동
-                    state.destination = .myStyleSetting(
-                        MyStyleSettingFeature.State(
-                            settingType: .submission,
-                            mode: .register,
-                            bestSubmission: profile.bestSubmission,
-                            favoriteSubmission: profile.favoriteSubmission
-                        )
-                    )
                 }
+                guard isShowing else { return .none }
+                // register 플로우: 다음 단계(서브미션)로 이동
+                state.destination = .myStyleSetting(
+                    MyStyleSettingFeature.State(
+                        settingType: .submission,
+                        mode: .register,
+                        bestSubmission: profile.bestSubmission,
+                        favoriteSubmission: profile.favoriteSubmission
+                    )
+                )
                 return .none
 
-            case let .internal(.submissionSaved(profile)):
+            case let .internal(.submissionSaved(profile, mode)):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
-                if case let .myStyleSetting(styleState) = state.destination, styleState.mode == .edit {
-                    state.destination = nil
+                let isShowing = Self.isShowingStyleSetting(.submission, mode: mode, in: state)
+                if mode == .edit {
+                    if isShowing { state.destination = nil }
                     return .send(.internal(.showToast(.init(message: "서브미션을 저장했어요", status: .success))))
                 }
+                guard isShowing else { return .none }
                 // register 플로우 마지막 단계: 프로필 화면으로 복귀
                 state.destination = nil
                 return .send(.internal(.showToast(.init(message: "모든 스타일 설정을 완료했어요", status: .success))))
@@ -692,6 +731,11 @@ public struct MyProfileFeature: Sendable {
                 
             case let .internal(.updateProfileResponse(.failure(error))):
                 state.isLoadingProfile = false
+                // 스타일 화면은 실패 토스트 뒤에 남아 다시 저장할 수 있어야 한다.
+                if case var .myStyleSetting(styleState)? = state.destination {
+                    styleState.isSaving = false
+                    state.destination = .myStyleSetting(styleState)
+                }
                 Log.trace("Failed to update profile: \(error)", category: .network, level: .error)
                 return .send(.internal(.showToast(.init(message: "저장에 실패했어요. 다시 시도해주세요", status: .error))))
                 
@@ -795,6 +839,7 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case .view(.addCompetitionButtonTapped):
+                guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
                 // 출전 띠는 지금 띠로(#122), 체급은 지난 기록의 체급으로 미리 골라 둔다(#190).
                 state.destination = .competitionInfo(
                     CompetitionInfoFeature.State(
@@ -817,7 +862,7 @@ public struct MyProfileFeature: Sendable {
                 )
                 let updatedProfile = profile.addingCompetition(competition)
                 // 저장 결과를 보고 완료 화면('부문 추가')으로 넘어가야 하므로 입력 화면은 닫지 않는다(#123).
-                state.isLoadingProfile = true
+                Self.beginProfileSave(&state)
                 return .run { send in
                     let result = await TaskResult {
                         try await communityClient.updateProfile(updatedProfile, .competition)
@@ -843,7 +888,7 @@ public struct MyProfileFeature: Sendable {
                 )
                 let updatedProfile = profile.updatingCompetition(original: original, with: updated)
                 state.destination = nil
-                state.isLoadingProfile = true
+                Self.beginProfileSave(&state)
                 return .run { send in
                     let result = await TaskResult {
                         try await communityClient.updateProfile(updatedProfile, .competition)
@@ -866,7 +911,7 @@ public struct MyProfileFeature: Sendable {
 
             case let .view(.deleteCompetitionConfirmed(entries)):
                 // 앞선 저장이 끝나기 전에 목록 전체를 다시 저장하면 그 저장을 덮어쓴다.
-                guard !state.isLoadingProfile else { return .none }
+                guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
                 guard let profile = state.communityProfile else {
                     return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
@@ -900,7 +945,7 @@ public struct MyProfileFeature: Sendable {
                 return .send(.internal(.showToast(.init(message: "대회 정보를 삭제했어요", status: .success))))
 
             case let .view(.addDivisionTapped(entries)):
-                guard !state.isLoadingProfile else { return .none }
+                guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
                 state.destination = .competitionInfo(
                     CompetitionInfoFeature.State(
                         addingDivisionTo: entries,
@@ -912,7 +957,8 @@ public struct MyProfileFeature: Sendable {
 
             case let .view(.competitionPinToggled(entries)):
                 // 저장 중에 또 누르면 저장 전 목록 기준으로 한 번 더 저장해 앞의 변경을 덮으므로 막는다.
-                guard let profile = state.communityProfile, !entries.isEmpty, !state.isLoadingProfile else { return .none }
+                guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
+                guard let profile = state.communityProfile, !entries.isEmpty else { return .none }
                 // 묶인 줄은 부문 하나라도 고정돼 있으면 고정으로 보이므로(CompetitionGroup.isPinned) 같은 기준으로 푼다.
                 let isPinning = !entries.contains(where: \.isPinned)
                 if isPinning {
@@ -925,7 +971,7 @@ public struct MyProfileFeature: Sendable {
                     }
                 }
                 let updatedProfile = profile.settingCompetitionsPinned(entries, isPinned: isPinning)
-                state.isLoadingProfile = true
+                Self.beginProfileSave(&state)
                 return .run { send in
                     let result = await TaskResult {
                         try await communityClient.updateProfile(updatedProfile, .competition)
@@ -940,12 +986,13 @@ public struct MyProfileFeature: Sendable {
 
             case let .view(.competitionsReordered(groups)):
                 // 끌어 옮긴 뒤 머리줄 '완료'에서 순서가 바뀐 묶음만 한 번에 저장한다. 저장 중에는 '완료'가 막혀 있다.
-                guard let profile = state.communityProfile, !state.isLoadingProfile else { return .none }
+                guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
+                guard let profile = state.communityProfile else { return .none }
                 let updatedProfile = profile.reorderingCompetitions(groups)
                 guard updatedProfile != profile else { return .none }
                 // 끌어 놓은 순서가 저장을 기다리는 동안 원래 자리로 튀었다 돌아오지 않게 먼저 화면에 반영한다.
                 state.communityProfile = updatedProfile
-                state.isLoadingProfile = true
+                Self.beginProfileSave(&state)
                 return .run { send in
                     let result = await TaskResult {
                         try await communityClient.updateProfile(updatedProfile, .competition)
@@ -975,6 +1022,7 @@ public struct MyProfileFeature: Sendable {
                 return .send(.internal(.showToast(.init(message: message, status: .success))))
 
             case let .view(.competitionDetailTapped(competition)):
+                guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
                 state.destination = .competitionInfo(
                     CompetitionInfoFeature.State(mode: .edit(original: competition))
                 )
@@ -1024,6 +1072,10 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case .view(.profileImageEditButtonTapped):
+                // 업로드 중에 또 바꾸면 앞 업로드 응답이 새 사진을 덮을 수 있다(#155).
+                guard !state.isUploadingProfileImage else {
+                    return .send(.internal(.showToast(.init(message: "사진을 바꾸는 중이에요. 잠시 후 다시 시도해주세요", status: .info))))
+                }
                 // 프로필 이미지 수정 옵션 바텀시트 노출
                 // 실제로 이미지가 렌더링되는 상태일 때만 '삭제' 옵션 노출
                 let canDelete = state.userProfile?.hasProfileImage ?? false
@@ -1062,7 +1114,7 @@ public struct MyProfileFeature: Sendable {
                     ))))
                 }
                 let updatedProfile = profile.updatingProfileImage(url: nil, fileId: nil)
-                state.isLoadingProfile = true
+                state.isUploadingProfileImage = true
                 // Optimistic UX — 헤더를 즉시 기본 아이콘으로 전환
                 state.isProfileImageDeleting = true
                 Log.trace("프로필 이미지 - 삭제 요청 (imageFileId=\(imageFileId))", category: .network, level: .info)
@@ -1150,7 +1202,7 @@ public struct MyProfileFeature: Sendable {
                         message: "프로필 정보를 불러올 수 없어요", status: .error
                     ))))
                 }
-                state.isLoadingProfile = true
+                state.isUploadingProfileImage = true
                 // Optimistic UX — 크롭 결과를 헤더에 즉시 노출 (네트워크와 무관하게)
                 state.pendingProfileImageData = croppedData
                 Log.trace(
@@ -1175,7 +1227,7 @@ public struct MyProfileFeature: Sendable {
 
             case let .internal(.profileImageUploadResponse(.success(registeredImage))):
                 guard let profile = state.userProfile else {
-                    state.isLoadingProfile = false
+                    state.isUploadingProfileImage = false
                     state.pendingProfileImageData = nil
                     return .send(.internal(.showToast(.init(
                         message: "프로필 정보를 불러올 수 없어요", status: .error
@@ -1196,7 +1248,7 @@ public struct MyProfileFeature: Sendable {
                 .cancellable(id: CancelID.profileImageUpload)
 
             case let .internal(.profileImageUploadResponse(.failure(error))):
-                state.isLoadingProfile = false
+                state.isUploadingProfileImage = false
                 // 업로드 실패 → 미리보기 롤백
                 state.pendingProfileImageData = nil
                 Log.trace("Failed to upload profile image: \(error)", category: .network, level: .error)
@@ -1253,7 +1305,7 @@ public struct MyProfileFeature: Sendable {
                 ))))
 
             case let .internal(.profileImageUpdateResponse(.success(updatedProfile))):
-                state.isLoadingProfile = false
+                state.isUploadingProfileImage = false
                 state.userProfile = updatedProfile
                 state.isProfileImageDeleting = false
                 // 업로드 성공 시에는 pendingProfileImageData를 유지한다.
@@ -1273,7 +1325,7 @@ public struct MyProfileFeature: Sendable {
                 )
 
             case let .internal(.profileImageUpdateResponse(.failure(error))):
-                state.isLoadingProfile = false
+                state.isUploadingProfileImage = false
                 // BE 반영 실패 → 미리보기/삭제 표시 롤백
                 state.pendingProfileImageData = nil
                 state.isProfileImageDeleting = false
@@ -1299,19 +1351,41 @@ public struct MyProfileFeature: Sendable {
         .forEach(\.path, action: \.path)
     }
 
+    /// 프로필 저장을 시작한다. 진행 중이던 재조회 응답은 저장 전 값이라 버려지게 세대를 올린다(#155).
+    private static func beginProfileSave(_ state: inout State) {
+        state.isLoadingProfile = true
+        state.profileSaveGeneration += 1
+    }
+
+    /// 앞 저장(또는 처음 불러오기)이 끝나기 전에 새 저장 · 저장 화면 진입을 막을 때의 안내(#155).
+    private static func savingInProgressToast() -> Effect<Action> {
+        .send(.internal(.showToast(.init(message: "아직 처리 중이에요. 잠시 후 다시 시도해주세요", status: .info))))
+    }
+
+    private static func profileUnavailableToast() -> Effect<Action> {
+        .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
+    }
+
+    /// 저장을 시작한 그 스타일 설정 화면이 아직 떠 있는지 — 저장 응답이 올 때 화면을 닫거나 다음 단계로 넘어갈지 정한다.
+    private static func isShowingStyleSetting(_ type: MyStyleSettingType, mode: MyStyleSettingFeature.Mode, in state: State) -> Bool {
+        guard case let .myStyleSetting(styleState)? = state.destination else { return false }
+        return styleState.settingType == type && styleState.mode == mode
+    }
+
     /// 대회 기록을 지우고 프로필을 저장한다 — 수정 화면의 '삭제'(부문 하나)와 대회 시트의 '삭제'(그 대회 부문 전부)가 함께 쓴다.
     private func deleteCompetitions(
         _ entries: [Competition],
         from profile: CommunityProfile,
         state: inout State
     ) -> Effect<Action> {
+        guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
         Log.trace("대회 삭제 요청: \(entries.map(\.competitionName))", category: .debug, level: .info)
         let updatedProfile = entries.reduce(profile) { $0.removingCompetition($1) }
         // 지울 기록을 못 찾았으면(그사이 프로필이 바뀜) 저장하지 않는다 — 성공 토스트가 거짓이 된다.
         guard updatedProfile.competitions.count < profile.competitions.count else {
             return .send(.internal(.showToast(.init(message: "삭제하지 못했어요. 다시 시도해주세요", status: .error))))
         }
-        state.isLoadingProfile = true
+        Self.beginProfileSave(&state)
         return .run { send in
             let result = await TaskResult {
                 try await communityClient.updateProfile(updatedProfile, .competition)

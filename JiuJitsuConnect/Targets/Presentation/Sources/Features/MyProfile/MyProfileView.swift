@@ -242,7 +242,7 @@ public struct MyProfileView: View {
             // Optimistic Update — 업로드/삭제 진행 중 헤더 이미지 미리보기·로딩 표시
             pendingProfileImageData: store.pendingProfileImageData,
             isProfileImageDeleting: store.isProfileImageDeleting,
-            isProfileImageBusy: store.isLoadingProfile
+            isProfileImageBusy: store.isUploadingProfileImage
                 && (store.pendingProfileImageData != nil || store.isProfileImageDeleting),
             onNicknameEditTapped: { store.send(.view(.nicknameEditButtonTapped)) },
             onGymInfoTapped: { store.send(.view(.gymInfoButtonTapped)) },
