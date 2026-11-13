@@ -97,6 +97,7 @@ public struct CommunityDetailView: View {
                 // 글쓰기·수정은 서브뷰로만 열리므로 사진 선택은 상세 웹뷰만 처리한다.
                 // 대회 탭에 쌓인 화면은 대회 상세 신호도 알린다(#250).
                 capabilities: store.capabilities,
+                entryOrigin: store.entryOrigin,
                 isActive: !store.isClosing,
                 onLoadingStarted: { store.send(.internal(.loadingStarted)) },
                 onLoadingFinished: { store.send(.internal(.loadingFinished)) },

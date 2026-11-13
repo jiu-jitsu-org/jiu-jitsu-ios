@@ -48,6 +48,8 @@ struct BridgeWebView: UIViewRepresentable {
     // 이 웹뷰를 소유한 Feature가 실제로 처리하는 '사전 확인형' 메시지. 처리하지 않는 웹뷰가 지원한다고
     // 알리면 웹이 요청을 보내 놓고 응답 없이 기다리므로, 처리하는 화면만 넘긴다.
     var capabilities: [WebBridgeCapability] = []
+    // 진입 시간 측정의 시작 시각·경로(#298). 위에 쌓이는 상세만 넘기고, nil이면 재지 않는다.
+    var entryOrigin: WebEntryTrace.Origin?
     // false가 되면 로딩을 멈추고 이후 콜백을 보내지 않는다. 화면을 닫는 도중(상태는 이미 지워졌는데
     // 웹뷰는 닫힘 애니메이션 동안 살아 있음) 늦게 온 로딩 완료가 없어진 화면으로 가지 않게 한다(#152).
     var isActive: Bool = true
@@ -109,6 +111,10 @@ struct BridgeWebView: UIViewRepresentable {
             nil
         }
         let webView = preload?.webView ?? Self.makeWebView(capabilities: capabilities, messageHandler: context.coordinator)
+        if let entryOrigin {
+            WebEntryTrace.begin(token: loadToken, origin: entryOrigin, url: url)
+            WebEntryTrace.mark(.webView, token: loadToken)
+        }
         // 이어받는 웹뷰는 받아 둔 이벤트를 다 넘긴 뒤에 대리자를 바꾼다(HomeFeedPreload.handOff).
         if preload == nil {
             webView.navigationDelegate = context.coordinator
@@ -129,6 +135,7 @@ struct BridgeWebView: UIViewRepresentable {
         #endif
 
         context.coordinator.attach(webView: webView)
+        context.coordinator.entryTraceToken = entryOrigin == nil ? nil : loadToken
         // 고정 셸(상세): 키보드가 문서를 위로 스크롤해 헤더가 화면 밖으로 밀리는 것을 막는다.
         if locksDocumentScroll {
             context.coordinator.enableDocumentScrollLock(on: webView.scrollView)
@@ -243,6 +250,8 @@ struct BridgeWebView: UIViewRepresentable {
         private var locksDocumentScroll = false
         // deactivate() 이후에는 웹뷰가 아직 살아 있어도 store로 아무것도 보내지 않는다.
         private var isDeactivated = false
+        // 진입 시간 측정의 키(#298). 웹뷰를 만들 때의 loadToken — 다시 시도로 토큰이 바뀌어도 첫 진입 기록을 끝맺는다.
+        var entryTraceToken: UUID?
 
         init(
             source: WebBridgeSource,
@@ -278,6 +287,7 @@ struct BridgeWebView: UIViewRepresentable {
         func deactivate() {
             guard !isDeactivated else { return }
             isDeactivated = true
+            if let entryTraceToken { WebEntryTrace.end(.closed, token: entryTraceToken) }
             webView?.stopLoading()
             webView?.navigationDelegate = nil
             webView?.uiDelegate = nil
@@ -302,6 +312,7 @@ struct BridgeWebView: UIViewRepresentable {
             // 재로드(재시도) 시 웹 컨텍스트가 초기화되므로 전달 기록도 비운다.
             // 재로드 후 다시 WEBVIEW_READY가 오면 초기 동기화가 새로 일어난다.
             deliveredOutboundIDs.removeAll()
+            WebEntryTrace.mark(.load, token: token)
             webView.load(URLRequest(url: url))
         }
 
@@ -382,6 +393,8 @@ struct BridgeWebView: UIViewRepresentable {
         }
 
         private func reloadForRefresh(_ webView: WKWebView) {
+            // 첫 로드를 끊고 다시 불러오면 그 뒤 값은 첫 진입 시간이 아니다(#298).
+            if let entryTraceToken { WebEntryTrace.end(.refreshed, token: entryTraceToken) }
             refreshNavigation = webView.reload()
             // 다시 불러올 페이지가 없으면 기다릴 결과도 없으니 띠를 바로 닫는다.
             guard refreshNavigation == nil else { return }
@@ -437,6 +450,13 @@ struct BridgeWebView: UIViewRepresentable {
             WebBridge.logInboundRaw(body, source: source)
             guard let inbound = WebBridgeInboundMessage.decode(from: body) else { return }
             WebBridge.logInbound(inbound, source: source)
+            if let entryTraceToken {
+                switch inbound {
+                case .webViewReady: WebEntryTrace.mark(.ready, token: entryTraceToken)
+                case .pageReady: WebEntryTrace.mark(.page, token: entryTraceToken)
+                default: break
+                }
+            }
             onBridgeMessage(inbound)
         }
 
@@ -446,7 +466,13 @@ struct BridgeWebView: UIViewRepresentable {
             onLoadingStarted()
         }
 
+        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+            // 첫 응답이 와서 문서를 그리기 시작한 시점. 진입 시간 측정에만 쓴다(#298).
+            if let entryTraceToken { WebEntryTrace.mark(.commit, token: entryTraceToken) }
+        }
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            if let entryTraceToken { WebEntryTrace.mark(.finish, token: entryTraceToken) }
             endRefreshing(success: true, navigation: navigation)
             onLoadingFinished()
             // 웹이 로드되며 overscroll-behavior로 바운스를 끌 수 있어 풀다운 여지를 재확보한다.
@@ -457,6 +483,7 @@ struct BridgeWebView: UIViewRepresentable {
             Log.trace("Bridge webview didFail: \(error)", category: .network, level: .error)
             endRefreshing(success: false, navigation: navigation)
             guard !isCancelledByRefresh(error) else { return }
+            if let entryTraceToken { WebEntryTrace.end(.failed, token: entryTraceToken) }
             onLoadingFailed()
         }
 
@@ -464,6 +491,7 @@ struct BridgeWebView: UIViewRepresentable {
             Log.trace("Bridge webview didFailProvisionalNavigation: \(error)", category: .network, level: .error)
             endRefreshing(success: false, navigation: navigation)
             guard !isCancelledByRefresh(error) else { return }
+            if let entryTraceToken { WebEntryTrace.end(.failed, token: entryTraceToken) }
             onLoadingFailed()
         }
 

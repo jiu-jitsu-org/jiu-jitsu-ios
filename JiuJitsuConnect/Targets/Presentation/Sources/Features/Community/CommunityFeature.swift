@@ -879,7 +879,8 @@ public struct CommunityFeature: Sendable {
             return .none
         }
 
-        let detail = subview(url: link.url, accessToken: state.accessToken)
+        var detail = subview(url: link.url, accessToken: state.accessToken)
+        detail.entryOrigin?.via = .deeplink
         switch container {
         case .push:
             state.path.append(.detail(detail))

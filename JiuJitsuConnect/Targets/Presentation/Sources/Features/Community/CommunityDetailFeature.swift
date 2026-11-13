@@ -58,6 +58,8 @@ public struct CommunityDetailFeature: Sendable {
         let isTabRoot: Bool
         // 이 웹뷰가 window.AppBridgeCapabilities로 알릴 '사전 확인형' 메시지. 처리하는 화면만 넣는다.
         let capabilities: [WebBridgeCapability]
+        // 진입 시간 측정의 시작 시각·경로(#298). 위에 쌓이는 화면만 재므로 탭 첫 화면은 nil.
+        var entryOrigin: WebEntryTrace.Origin?
 
         public init(url: URL, title: String? = nil, accessToken: String? = nil) {
             self.init(url: url, title: title, accessToken: accessToken, isTabRoot: false, capabilities: [.pickPhotos])
@@ -76,6 +78,9 @@ public struct CommunityDetailFeature: Sendable {
             self.leaveGuardEnabled = Self.isWriteOrEditScreen(url)
             self.isTabRoot = isTabRoot
             self.capabilities = capabilities
+            #if DEBUG || BETA
+            self.entryOrigin = isTabRoot ? nil : WebEntryTrace.Origin()
+            #endif
         }
 
         /// 글쓰기(`/community/write`)·글 수정(`/community/{id}/edit`) 화면인지.

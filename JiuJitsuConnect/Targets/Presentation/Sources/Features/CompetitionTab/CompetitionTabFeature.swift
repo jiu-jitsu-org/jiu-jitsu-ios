@@ -210,7 +210,9 @@ public struct CompetitionTabFeature: Sendable {
                     Log.trace("대회 딥링크 무시(이미 최상단): \(url.absoluteString)", category: .view, level: .info)
                     return .none
                 }
-                state.path.append(.communityDetail(Self.subview(url: url, title: nil, accessToken: accessToken)))
+                var detail = Self.subview(url: url, title: nil, accessToken: accessToken)
+                detail.entryOrigin?.via = .deeplink
+                state.path.append(.communityDetail(detail))
                 return .none
 
             case .delegate:
