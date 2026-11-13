@@ -317,6 +317,8 @@ extension TechniqueType: StyleSelectable {
 @Reducer
 public struct MyStyleSettingFeature: Sendable {
     public init() {}
+
+    private enum CancelID { case toast }
     
     /// 화면 진입 모드
     /// - register: 최초 등록 플로우 (포지션 → 기술 → 서브미션 순차 진행)
@@ -336,6 +338,9 @@ public struct MyStyleSettingFeature: Sendable {
 
         // 부모(MY)가 저장 중. 끝날 때까지 '완료' · 뒤로가기 · 나중에 하기 버튼을 막는다(#155). 스와이프 백은 허용.
         var isSaving = false
+
+        // 이 화면은 MY 위에 push돼 MY 토스트가 가려지므로 저장 실패는 여기서 띄운다(#156).
+        var toast: ToastState?
         
         // 특기(best*)는 화면에서 고르지 않는다(#118). 저장할 때 키가 빠지면 서버의 기존 특기가
         // 지워질 수 있어, 받은 값을 그대로 들고 있다가 다시 보낸다.
@@ -411,15 +416,23 @@ public struct MyStyleSettingFeature: Sendable {
     
     public enum Action: Sendable {
         case view(ViewAction)
+        case `internal`(InternalAction)
         case delegate(DelegateAction)
+        /// 부모(MY)의 저장이 실패했다. 고른 값은 그대로 두고 다시 '완료'할 수 있게 한다(#156).
+        case saveFailed
         
         public enum ViewAction: Sendable {
             case styleCardTapped(any StyleSelectable)
+            case toastSwiped
             case completeButtonTapped
             case backButtonTapped
             case resetButtonTapped
         }
         
+        public enum InternalAction: Sendable {
+            case toastDismissed
+        }
+
         public enum DelegateAction: Sendable {
             /// 최애 저장 요청 (특기는 받은 값 그대로 함께 보낸다)
             /// - register 모드: 다음 스타일 단계로 진행
@@ -429,6 +442,8 @@ public struct MyStyleSettingFeature: Sendable {
         }
     }
     
+    @Dependency(\.continuousClock) var clock
+
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
@@ -453,11 +468,13 @@ public struct MyStyleSettingFeature: Sendable {
                 // register 모드면 부모가 다음 스타일 단계로, edit 모드면 화면을 닫음
                 let bestKey = state.selectedBestStyle?.rawValue
                 let favoriteKey = state.selectedFavoriteStyle?.rawValue
-                return .send(.delegate(.didConfirmStyle(
+                // 다시 시도하는 동안 앞 실패 안내가 남아 또 실패한 것처럼 보이지 않게 거둔다.
+                state.toast = nil
+                return .merge(.cancel(id: CancelID.toast), .send(.delegate(.didConfirmStyle(
                     type: state.settingType,
                     best: bestKey,
                     favorite: favoriteKey
-                )))
+                ))))
                 
             case .view(.backButtonTapped):
                 guard !state.isSaving else { return .none }
@@ -467,6 +484,20 @@ public struct MyStyleSettingFeature: Sendable {
                 guard !state.isSaving else { return .none }
                 return .send(.delegate(.cancel))
                 
+            case .saveFailed:
+                state.isSaving = false
+                let toast = ToastState(message: "저장에 실패했어요. 다시 시도해주세요", status: .error)
+                state.toast = toast
+                return .run { [clock] send in
+                    try await clock.sleep(for: toast.duration)
+                    await send(.internal(.toastDismissed))
+                }
+                .cancellable(id: CancelID.toast, cancelInFlight: true)
+
+            case .view(.toastSwiped), .internal(.toastDismissed):
+                state.toast = nil
+                return .cancel(id: CancelID.toast)
+
             case .delegate:
                 return .none
             }

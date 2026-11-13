@@ -37,6 +37,13 @@ public struct MyAcademySettingView: View {
             store.send(.view(.viewTapped))
         }
         .alert($store.scope(state: \.alert, action: \.alert))
+        // 아래 확인 버튼을 가리지 않도록 버튼 위에 띄운다.
+        .toast(
+            store.toast,
+            bottomPadding: 120,
+            onSwipe: { store.send(.view(.toastSwiped)) },
+            onButtonTapped: { _ in store.send(.view(.toastSwiped)) }
+        )
         .navigationBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
     }
@@ -83,6 +90,7 @@ private extension MyAcademySettingView {
                         .frame(width: 53, height: 32)
                         .contentShape(Rectangle())
                 }
+                .disabled(store.isSaving)
                 .buttonStyle(.plain)
             } else {
                 Rectangle()
@@ -136,6 +144,8 @@ private extension MyAcademySettingView {
                 tintColor: store.isTextFieldActive ? Color.component.textfieldDisplay.focus.text : .clear,
                 onSubmit: { store.send(.view(.doneButtonTapped)) }
             )
+            // 저장 중엔 키보드를 내리고 입력을 막는다 — UIKit 필드라 disabled만으로는 터치가 막히지 않는다.
+            .allowsHitTesting(!store.isSaving)
         }
         .padding(.horizontal, 30)
     }
@@ -150,7 +160,7 @@ private extension MyAcademySettingView {
                 store.send(.view(.doneButtonTapped))
             }
         )
-        .disabled(!store.isCtaButtonEnabled)
+        .disabled(!store.isCtaButtonEnabled || store.isSaving)
     }
 }
 
