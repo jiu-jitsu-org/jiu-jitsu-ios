@@ -11,6 +11,7 @@
 
 import SwiftUI
 import WebKit
+import SafariServices
 import DesignSystem
 import CoreKit
 
@@ -565,7 +566,7 @@ struct BridgeWebView: UIViewRepresentable {
 
         // MARK: WKUIDelegate
 
-        // 새 창 요청. 커뮤니티 도메인이면 현재 웹뷰에서 이어 열고, 외부 도메인은 Safari로 넘긴다.
+        // 새 창 요청. 커뮤니티 도메인이면 현재 웹뷰에서 이어 열고, 외부 도메인은 앱 위 브라우저로 띄운다(#316).
         // 새 WKWebView를 만들지 않으므로 nil을 반환한다.
         func webView(
             _ webView: WKWebView,
@@ -577,7 +578,7 @@ struct BridgeWebView: UIViewRepresentable {
             if url.host() == lastLoadedURL?.host() {
                 webView.load(navigationAction.request)
             } else if url.scheme == "http" || url.scheme == "https" {
-                UIApplication.shared.open(url)
+                openExternal(url, from: webView)
             } else {
                 Log.trace("Bridge webview 새 창 요청 무시(지원하지 않는 scheme): \(url)", category: .view, level: .info)
             }
@@ -625,18 +626,43 @@ struct BridgeWebView: UIViewRepresentable {
             present(alert, from: webView, onFailure: { completionHandler(nil) })
         }
 
-        /// 웹뷰가 속한 윈도우의 최상단 화면에서 알럿을 띄운다. (SwiftUI 시트·커버 위에서도 보이도록)
-        private func present(_ alert: UIAlertController, from webView: WKWebView, onFailure: () -> Void) {
+        /// 바깥 주소를 앱 위 브라우저(SFSafariViewController)로 띄운다(#316). 닫으면(완료·아래로 쓸기) 웹뷰 화면이 그대로 남는다.
+        /// 다른 앱이 맡는 유니버설 링크는 지금처럼 그 앱으로 넘기고, 아닐 때만 앱 안에서 연다.
+        private func openExternal(_ url: URL, from webView: WKWebView) {
+            UIApplication.shared.open(url, options: [.universalLinksOnly: true]) { [weak self, weak webView] openedInApp in
+                // 완료 콜백은 메인 액터 보장이 없으므로 UIKit 작업은 메인 액터에서 한다.
+                Task { @MainActor [weak self, weak webView] in
+                    // 그 사이 화면을 떠났으면(윈도우에서 빠짐) 아무것도 띄우지 않는다.
+                    guard !openedInApp, let self, let webView, webView.window != nil else { return }
+                    // 이미 브라우저가 떠 있으면(빠른 연타 등) 겹쳐 띄우지 않는다.
+                    guard !(self.topViewController(of: webView) is SFSafariViewController) else { return }
+                    let safari = SFSafariViewController(url: url)
+                    // 아래로 쓸어 닫을 수 있는 시트로 띄워, 뒤의 웹뷰 화면을 덮어 내리지 않는다.
+                    safari.modalPresentationStyle = .pageSheet
+                    self.present(safari, from: webView) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+            }
+        }
+
+        /// 웹뷰가 속한 윈도우의 최상단 화면. 닫히는 중인 화면은 건너뛰어, 사라질 화면 위에 띄우다 조용히 실패하지 않게 한다.
+        private func topViewController(of webView: WKWebView) -> UIViewController? {
             var presenter = webView.window?.rootViewController
-            while let presented = presenter?.presentedViewController {
+            while let presented = presenter?.presentedViewController, !presented.isBeingDismissed {
                 presenter = presented
             }
-            guard let presenter else {
-                Log.trace("Bridge webview JS 패널을 띄울 화면이 없음", category: .view, level: .error)
+            return presenter
+        }
+
+        /// 웹뷰가 속한 윈도우의 최상단 화면에서 알럿·브라우저를 띄운다. (SwiftUI 시트·커버 위에서도 보이도록)
+        private func present(_ viewController: UIViewController, from webView: WKWebView, onFailure: () -> Void) {
+            guard let presenter = topViewController(of: webView) else {
+                Log.trace("Bridge webview 화면을 띄울 곳이 없음", category: .view, level: .error)
                 onFailure()
                 return
             }
-            presenter.present(alert, animated: true)
+            presenter.present(viewController, animated: true)
         }
     }
 }
