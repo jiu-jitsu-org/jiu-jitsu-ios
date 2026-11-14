@@ -149,8 +149,9 @@ public struct MyProfileHeaderView: View {
                 height: 32,
                 onEditTapped: onGymInfoTapped
             )
+            .padding(.top, NameEditMetrics.academyRowGap)
 
-            Spacer().frame(height: 84)
+            Spacer().frame(height: 84 - NameEditMetrics.academyRowGap)
         }
 
         // "도장 정보 입력하기" 버튼 (도장명이 없을 때만)
@@ -339,7 +340,64 @@ private struct ProfileImageView: View {
     }
 }
 
-// MARK: - NicknameEditRow
+// MARK: - 이름 줄(닉네임·도장명) + 수정 버튼
+
+/// 이름 줄 치수(#313)
+private enum NameEditMetrics {
+    static let pencilSize: CGFloat = 16
+    static let pencilGap: CGFloat = 4
+    /// 두 줄의 캡슐이 붙지 않게 닉네임과 도장명 사이를 벌리는 만큼. 아래 여백에서 같은 만큼 빼 벨트 카드 자리는 그대로 둔다.
+    static let academyRowGap: CGFloat = 8
+    /// 글자 양옆에 비워 둘 폭 — 긴 이름이어도 캡슐이 화면 끝에 붙지 않게
+    static let sideReserve: CGFloat = 40
+}
+
+/// 이름 한 줄 + 연필을 옅은 면 캡슐 하나(한 버튼)로 묶는다(#313).
+/// 글자만 가운데에 두고 연필을 옆에 붙이면 줄이 오른쪽으로, 줄 전체를 가운데에 두면 글자가 왼쪽으로 쏠려 보인다.
+/// 캡슐은 바깥 모양이 좌우 대칭이라 이름 길이와 상관없이 가운데로 보이고, 누르면 고치는 버튼임이 분명해진다.
+/// 글자·연필 어디를 눌러도 같은 수정 화면을 연다(정책 2.1, #66).
+private struct NameEditRow: View {
+    let text: String
+    let font: Font
+    let textColor: Color
+    let showsOwnerBadge: Bool
+    let height: CGFloat
+    let capsuleHeight: CGFloat
+    let onEditTapped: () -> Void
+
+    var body: some View {
+        Button(action: onEditTapped) {
+            HStack(spacing: 0) {
+                if showsOwnerBadge {
+                    Assets.MyProfile.Icon.badgeCheckLight.swiftUIImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
+                        .padding(.trailing, 5)
+                }
+                Text(text)
+                    .font(font)
+                    .foregroundStyle(textColor)
+                    .lineLimit(1)
+                Assets.Common.Icon.pencil.swiftUIImage
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: NameEditMetrics.pencilSize, height: NameEditMetrics.pencilSize)
+                    .foregroundStyle(Color.white.opacity(0.7))
+                    .padding(.leading, NameEditMetrics.pencilGap)
+            }
+            // 연필 쪽이 가벼워 오른쪽 안쪽 여백을 조금 덜 준다 — 캡슐 안에서 글자 덩어리가 가운데로 보이게
+            .padding(.leading, capsuleHeight * 0.42)
+            .padding(.trailing, capsuleHeight * 0.34)
+            .frame(height: capsuleHeight)
+            .background(Capsule().fill(Color.white.opacity(0.16)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, NameEditMetrics.sideReserve)
+        .frame(height: height)
+    }
+}
 
 /// 닉네임 + 수정 버튼 행
 private struct NicknameEditRow: View {
@@ -350,36 +408,15 @@ private struct NicknameEditRow: View {
     let onEditTapped: () -> Void
 
     var body: some View {
-        HStack(alignment: .center, spacing: 0) {
-            if isOwner {
-                Assets.MyProfile.Icon.badgeCheckLight.swiftUIImage
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 24, height: 24)
-                    .padding(.trailing, 5)
-            }
-
-            // 닉네임 텍스트도 수정 진입 영역(정책 2.1, #66)
-            Button(action: onEditTapped) {
-                Text(nickname)
-                    .font(Font.pretendard.title3)
-                    .foregroundStyle(Color.component.list.setting.background)
-            }
-            .buttonStyle(.plain)
-
-            Button(action: onEditTapped) {
-                ZStack {
-                    Assets.Common.Icon.pencil.swiftUIImage
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 16, height: 16)
-                        .foregroundStyle(Color.white.opacity(0.5))
-                }
-                .frame(width: 32, height: 32)
-            }
-            .buttonStyle(.plain)
-        }
-        .frame(height: height)
+        NameEditRow(
+            text: nickname,
+            font: Font.pretendard.title3,
+            textColor: Color.component.list.setting.background,
+            showsOwnerBadge: isOwner,
+            height: height,
+            capsuleHeight: 34,
+            onEditTapped: onEditTapped
+        )
     }
 }
 
@@ -392,24 +429,15 @@ private struct AcademyNameEditRow: View {
     let onEditTapped: () -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
-            Text(academyName)
-                .font(Font.pretendard.bodyS)
-                .foregroundStyle(Color.component.list.setting.background.opacity(0.7))
-
-            Button(action: onEditTapped) {
-                ZStack {
-                    Assets.Common.Icon.pencil.swiftUIImage
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 16, height: 16)
-                        .foregroundStyle(Color.white.opacity(0.5))
-                }
-                .frame(width: 32, height: 32)
-            }
-            .buttonStyle(.plain)
-        }
-        .frame(height: height)
+        NameEditRow(
+            text: academyName,
+            font: Font.pretendard.bodyS,
+            textColor: Color.component.list.setting.background.opacity(0.7),
+            showsOwnerBadge: false,
+            height: height,
+            capsuleHeight: 26,
+            onEditTapped: onEditTapped
+        )
     }
 }
 
