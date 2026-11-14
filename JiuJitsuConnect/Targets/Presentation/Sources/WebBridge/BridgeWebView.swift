@@ -69,13 +69,16 @@ struct BridgeWebView: UIViewRepresentable {
     let onLoadingStarted: () -> Void
     let onLoadingFinished: () -> Void
     let onLoadingFailed: () -> Void
+    // 첫 응답이 와서 문서를 그리기 시작함(didCommit). 그 전까지는 웹이 아무것도 그릴 수 없어, 그 사이만 네이티브가
+    // 로딩을 알리는 화면(상세)이 받는다. 당겨서 새로고침 중엔 띠가 로딩을 알리므로 보내지 않는다.
+    var onLoadingCommitted: (() -> Void)?
     // 웹 → 네이티브 인바운드 메시지(AppBridge) 수신 콜백.
     let onBridgeMessage: (WebBridgeInboundMessage) -> Void
     // 아웃바운드 메시지를 evaluateJavaScript로 실제 전달한 뒤 호출.
     let onOutboundDelivered: (UUID) -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(
+        let coordinator = Coordinator(
             source: source,
             onLoadingStarted: onLoadingStarted,
             onLoadingFinished: onLoadingFinished,
@@ -83,6 +86,8 @@ struct BridgeWebView: UIViewRepresentable {
             onBridgeMessage: onBridgeMessage,
             onOutboundDelivered: onOutboundDelivered
         )
+        coordinator.onLoadingCommitted = onLoadingCommitted
+        return coordinator
     }
 
     /// 브릿지를 등록한 웹뷰를 만든다. 스플래시가 홈 피드를 미리 불러 둘 때(HomeFeedPreloader, #270)도
@@ -222,6 +227,7 @@ struct BridgeWebView: UIViewRepresentable {
             onBridgeMessage: onBridgeMessage,
             onOutboundDelivered: onOutboundDelivered
         )
+        context.coordinator.onLoadingCommitted = onLoadingCommitted
         context.coordinator.scrollToTop(token: scrollToTopToken)
         context.coordinator.setPullToRefreshBackground(pullToRefreshBackground.map { UIColor($0) })
         // 탭 첫 화면 웹만 스크롤을 AppTabView에 알린다 — 탭 바 숨김·맨 위로 버튼(#267).
@@ -262,6 +268,7 @@ struct BridgeWebView: UIViewRepresentable {
         private var onLoadingFailed: () -> Void
         private var onBridgeMessage: (WebBridgeInboundMessage) -> Void
         private var onOutboundDelivered: (UUID) -> Void
+        var onLoadingCommitted: (() -> Void)?
 
         private var lastLoadedURL: URL?
         private var lastLoadToken: UUID?
@@ -540,12 +547,14 @@ struct BridgeWebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-            // 첫 응답이 와서 문서를 그리기 시작한 시점. 진입 시간 측정에만 쓴다(#298).
+            // 첫 응답이 와서 문서를 그리기 시작한 시점(진입 시간 측정 #298).
             if let entryTraceToken { WebEntryTrace.mark(.commit, token: entryTraceToken) }
             // 새 문서에는 시트가 없다 — 시트를 연 채 문서가 바뀌었으면 탭 바를 돌려놓는다.
             setWebSheetOpen(false)
             // 새 문서는 웹뷰를 만들 때의 값으로 시작한다(문서 시작 스크립트). 그 뒤 바뀐 값이 있으면 다시 넣는다.
             if let appliedSafeArea { webView.evaluateJavaScript(appliedSafeArea.applyScript) }
+            // 여기부터는 웹(스켈레톤)이 로딩 모습을 그린다. 새로고침은 시작도 알리지 않았으니 끝도 알리지 않는다.
+            if !isRefreshing { onLoadingCommitted?() }
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {

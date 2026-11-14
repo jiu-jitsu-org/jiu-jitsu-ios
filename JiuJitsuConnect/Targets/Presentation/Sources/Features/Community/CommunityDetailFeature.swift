@@ -29,6 +29,9 @@ public struct CommunityDetailFeature: Sendable {
         // 같은 URL로 재시도 시 View가 reload를 인지하도록 토큰을 갱신한다.
         var loadToken: UUID = UUID()
         var isLoading: Bool = true
+        // 문서 요청을 보내고 첫 응답(didCommit)을 기다리는 중. 이 동안은 웹이 아무것도 그리지 못해 빈 화면이라
+        // 네이티브가 스피너를 띄운다. 첫 응답부터는 웹 스켈레톤이 로딩 모습을 맡는다(#299 이후).
+        var isAwaitingFirstResponse: Bool = true
         var hasError: Bool = false
         // 스스로 닫기 시작함(뒤로가기·CLOSE_SUBVIEW). 닫힘 애니메이션 동안 살아 있는 웹뷰가
         // 늦은 로딩 완료를 보내지 않도록 dismiss 전에 웹뷰를 먼저 멈춘다(#152).
@@ -127,6 +130,7 @@ public struct CommunityDetailFeature: Sendable {
 
         public enum InternalAction: Sendable {
             case loadingStarted
+            case loadingCommitted
             case loadingFinished
             case loadingFailed
             // 웹뷰가 AppBridge로 보내온 인바운드 메시지(WKScriptMessageHandler 경유).
@@ -183,6 +187,7 @@ public struct CommunityDetailFeature: Sendable {
             case .view(.retryTapped):
                 state.hasError = false
                 state.isLoading = true
+                state.isAwaitingFirstResponse = true
                 state.loadToken = UUID()
                 return .none
 
@@ -252,6 +257,7 @@ public struct CommunityDetailFeature: Sendable {
 
             case .internal(.loadingStarted):
                 state.isLoading = true
+                state.isAwaitingFirstResponse = true
                 state.hasError = false
                 // 문서를 새로 불러오면 직전 페이지의 가드는 의미가 없다. 웹은 언마운트 때 false를 보내지만
                 // 페이지 자체가 교체될 땐 그 정리가 돌지 않아, 남은 true가 BACK_PRESSED에 답하지 않는 페이지의
@@ -259,13 +265,19 @@ public struct CommunityDetailFeature: Sendable {
                 state.leaveGuardEnabled = State.isWriteOrEditScreen(state.url)
                 return .none
 
+            case .internal(.loadingCommitted):
+                state.isAwaitingFirstResponse = false
+                return .none
+
             case .internal(.loadingFinished):
                 state.isLoading = false
+                state.isAwaitingFirstResponse = false
                 state.hasError = false
                 return .none
 
             case .internal(.loadingFailed):
                 state.isLoading = false
+                state.isAwaitingFirstResponse = false
                 state.hasError = true
                 return .none
 

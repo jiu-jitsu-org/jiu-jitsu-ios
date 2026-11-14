@@ -100,9 +100,16 @@ public struct CommunityDetailView: View {
                 onLoadingStarted: { store.send(.internal(.loadingStarted)) },
                 onLoadingFinished: { store.send(.internal(.loadingFinished)) },
                 onLoadingFailed: { store.send(.internal(.loadingFailed)) },
+                onLoadingCommitted: { store.send(.internal(.loadingCommitted)) },
                 onBridgeMessage: { store.send(.internal(.bridgeMessageReceived($0))) },
                 onOutboundDelivered: { store.send(.internal(.outboundDelivered(id: $0))) }
             )
+
+            // 덮개 없이(#299) 첫 응답 전엔 웹이 아무것도 못 그려 빈 흰 화면만 보이므로, 그동안만 스피너를 얹는다.
+            // 첫 응답부터는 웹 스켈레톤이 이어받으므로 옅어지지 않고 바로 걷는다.
+            if store.isAwaitingFirstResponse && !store.hasError {
+                WebFirstResponseSpinner()
+            }
 
             if store.hasError {
                 errorOverlay
