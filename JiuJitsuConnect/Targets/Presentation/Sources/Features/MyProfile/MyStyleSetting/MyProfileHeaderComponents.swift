@@ -391,7 +391,8 @@ private struct NameEditRow: View {
             .padding(.trailing, capsuleHeight * 0.34)
             .frame(height: capsuleHeight)
             .background(Capsule().fill(Color.white.opacity(0.16)))
-            .contentShape(Capsule())
+            // 도장명 캡슐(26)은 낮아 누르는 칸을 위아래로 넓힌다 — 전 연필 버튼(32)보다 작아지지 않게
+            .contentShape(Capsule().inset(by: -4))
         }
         .buttonStyle(.plain)
         .padding(.horizontal, NameEditMetrics.sideReserve)
