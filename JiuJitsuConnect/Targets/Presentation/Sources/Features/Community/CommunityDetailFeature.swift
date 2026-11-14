@@ -367,6 +367,10 @@ public struct CommunityDetailFeature: Sendable {
                     guard state.capabilities.contains(.competitionHeaderTint) else { return .none }
                     return .send(.delegate(.competitionHeaderTintChanged(hex: hex)))
 
+                case .setSheetOpen:
+                    // BridgeWebView가 받아 탭 바만 숨긴다(#314). 여기까지 오지 않는다.
+                    return .none
+
                 case let .unknown(type):
                     Log.trace("WebBridge 미지원 메시지 무시: \(type)", category: .network, level: .info)
                     return .none

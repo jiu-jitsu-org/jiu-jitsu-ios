@@ -20,6 +20,8 @@ struct TabRootScrollAction: Equatable {
         _ maxOffsetY: CGFloat,
         _ isUserScrolling: Bool
     ) -> Void
+    /// 탭 첫 화면 웹의 바텀 시트가 열리고 닫힐 때(#314). 열린 동안 탭 바를 숨긴다.
+    let reportSheetOpen: @MainActor (_ isOpen: Bool) -> Void
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.key == rhs.key

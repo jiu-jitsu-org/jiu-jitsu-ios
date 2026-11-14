@@ -153,6 +153,8 @@ private extension WebBridgeInboundMessage {
             return "COMPETITION_ALERTS_ENABLED  competitionId=\(competitionId.map(String.init) ?? "-")"
         case let .competitionHeaderTint(hex):
             return "COMPETITION_HEADER_TINT  color=\(hex ?? "null")"
+        case let .setSheetOpen(open):
+            return "SET_SHEET_OPEN  open=\(open)"
         case let .unknown(type):
             return "\(type)  (unsupported)"
         }
@@ -249,6 +251,10 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 대회 목록 맨 위 띠 색 그라데이션에 맞춰 앱 대회 탭 머리줄(상태바 포함)을 칠해 달라는 요청.
     /// hex는 `#RRGGBB`, nil이면 앱 기본 머리줄 색으로 돌린다. 스크롤하며 조금씩 옅어진 색을 여러 번 보낸다.
     case competitionHeaderTint(hex: String?)
+    /// 웹 바텀 시트가 떠 있는지(#314 · jiu-jitsu-frontend#465). 탭 첫 화면 웹만 알린다 — 열린 동안 떠 있는 탭 바를 숨기고
+    /// 가린 높이를 0으로 돌려, 시트가 탭 바 자리까지 내려오게 한다(안 그러면 그 자리를 WebKit이 시트 가장자리 색으로 채운다).
+    /// 화면 표시만 바꾸는 신호라 BridgeWebView가 받아 처리하고 Feature로는 넘기지 않는다.
+    case setSheetOpen(Bool)
     /// 계약에 없는 타입(상위 버전/오타 등) — 무시 대상.
     case unknown(type: String)
 
@@ -270,6 +276,7 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case openCompetitionRecord = "OPEN_COMPETITION_RECORD"
         case competitionAlertsEnabled = "COMPETITION_ALERTS_ENABLED"
         case competitionHeaderTint = "COMPETITION_HEADER_TINT"
+        case setSheetOpen = "SET_SHEET_OPEN"
     }
 
     /// `WKScriptMessage.body`를 파싱한다.
@@ -431,6 +438,9 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
                 $0.range(of: "^#[0-9A-Fa-f]{6}$", options: .regularExpression) != nil ? $0 : nil
             }
             return .competitionHeaderTint(hex: hex)
+        case .setSheetOpen:
+            // 값이 어긋나면 닫힘으로 본다 — 탭 바가 숨은 채 갇히지 않게.
+            return .setSheetOpen((payload?["open"] as? Bool) ?? false)
         case .none:
             return .unknown(type: rawType)
         }
@@ -648,6 +658,8 @@ enum WebBridgeCapability: String, Equatable, Sendable {
     case openCompetitionRecord = "OPEN_COMPETITION_RECORD"
     /// 대회 탭 목록 웹만 알린다. 목록이 없으면 웹은 머리줄 색을 보내지 않는다(앱 기본색 그대로).
     case competitionHeaderTint = "COMPETITION_HEADER_TINT"
+    /// 탭 첫 화면 웹(떠 있는 탭 바 밑까지 그리는 웹뷰)만 알린다(#314). 목록이 없으면 웹은 시트 열림을 보내지 않는다.
+    case setSheetOpen = "SET_SHEET_OPEN"
 
     /// `window.AppBridgeCapabilities = [...]`를 정의하는 스크립트 소스. 직렬화 실패 시 nil.
     static func injectionScriptSource(for capabilities: [WebBridgeCapability]) -> String? {
