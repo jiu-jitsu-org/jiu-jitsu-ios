@@ -51,6 +51,9 @@ struct BridgeWebView: UIViewRepresentable {
     // 탭 첫 화면 웹(홈 피드·대회 목록)만 켠다(#267). 웹뷰를 떠 있는 탭 바 밑까지 그리고, 탭 바가 가린 만큼을
     // 웹에 알려 맨 아래 글·고정 버튼이 탭 바 위에서 멈추게 한다. 키보드가 뜨면 가린 영역이 없으므로 0으로 돌린다.
     var extendsUnderTabBar: Bool = false
+    // 웹뷰를 상태바 밑까지 그리는지(상세처럼 웹이 자기 헤더로 상태바 자리를 칠하는 화면). 웹에 처음 알리는 위쪽
+    // 안전 영역을 정한다 — 머리줄 아래 놓이는 탭 첫 화면 웹은 0. 화면에 붙은 뒤에는 실제 자리로 다시 잰다.
+    var coversStatusBar: Bool = false
     // 이 웹뷰를 소유한 Feature가 실제로 처리하는 '사전 확인형' 메시지. 처리하지 않는 웹뷰가 지원한다고
     // 알리면 웹이 요청을 보내 놓고 응답 없이 기다리므로, 처리하는 화면만 넘긴다.
     var capabilities: [WebBridgeCapability] = []
@@ -84,7 +87,11 @@ struct BridgeWebView: UIViewRepresentable {
 
     /// 브릿지를 등록한 웹뷰를 만든다. 스플래시가 홈 피드를 미리 불러 둘 때(HomeFeedPreloader, #270)도
     /// 홈 웹뷰와 같은 웹뷰가 되도록 설정을 한곳에 둔다.
-    static func makeWebView(capabilities: [WebBridgeCapability], messageHandler: WKScriptMessageHandler) -> WKWebView {
+    static func makeWebView(
+        capabilities: [WebBridgeCapability],
+        safeArea: WebSafeAreaInsets,
+        messageHandler: WKScriptMessageHandler
+    ) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
         // 리스트·상세 웹뷰가 로그인 세션 쿠키(httpOnly 포함)를 공유하도록 영구 default 데이터스토어를 강제한다.
@@ -103,6 +110,8 @@ struct BridgeWebView: UIViewRepresentable {
                 WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true)
             )
         }
+        // env(safe-area-inset-*)가 늦게 채워져 첫 화면이 밀리지 않게, 안전 영역을 문서 시작 때 CSS 변수로 넣는다.
+        contentController.addUserScript(safeArea.documentStartScript)
         config.userContentController = contentController
 
         // 시스템 기본 입력 액세서리 바(위/아래/완료 회색 바)를 제거한다. 웹이 자체 하단 툴바
@@ -120,7 +129,13 @@ struct BridgeWebView: UIViewRepresentable {
         } else {
             nil
         }
-        let webView = preload?.webView ?? Self.makeWebView(capabilities: injectedCapabilities, messageHandler: context.coordinator)
+        let expectedSafeArea = WebSafeAreaInsets.expected(coversStatusBar: coversStatusBar)
+        let webView = preload?.webView ?? Self.makeWebView(
+            capabilities: injectedCapabilities,
+            safeArea: expectedSafeArea,
+            messageHandler: context.coordinator
+        )
+        context.coordinator.markSafeAreaInjected(expectedSafeArea)
         if let entryOrigin {
             WebEntryTrace.begin(token: loadToken, origin: entryOrigin, url: url)
             WebEntryTrace.mark(.webView, token: loadToken)
@@ -165,6 +180,10 @@ struct BridgeWebView: UIViewRepresentable {
         let container = KeyboardAvoidingWebContainer()
         container.reportsTabBarAsObscured = extendsUnderTabBar
         container.tabBarObscuredBottom = context.environment.tabBarReservedHeight
+        // 화면에 붙은 뒤 실제로 겹치는 안전 영역이 처음 짐작과 다르면(키보드로 줄어듦 등) 웹에 다시 알린다.
+        (webView as? ChromelessWebView)?.onSafeAreaMeasured = { [weak coordinator = context.coordinator] insets in
+            coordinator?.applySafeArea(insets)
+        }
         webView.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(webView)
         container.pinWebView(webView)
@@ -269,6 +288,8 @@ struct BridgeWebView: UIViewRepresentable {
         private var isDeactivated = false
         // 웹 시트 열림·닫힘을 받는 곳(#314). 탭 바 밑까지 그리는 웹뷰만 updateUIView가 넣는다.
         var onSheetOpenChanged: (@MainActor (Bool) -> Void)?
+        // 웹에 마지막으로 알린 안전 영역(WebSafeAreaInsets).
+        private var appliedSafeArea: WebSafeAreaInsets?
         // 웹이 마지막으로 알린 시트 열림. 시트를 연 채 문서가 바뀌면(새로고침·이동) 닫힘을 못 받으니 직접 푼다.
         private var isWebSheetOpen = false
         // 진입 시간 측정의 키(#298). 웹뷰를 만들 때의 loadToken — 다시 시도로 토큰이 바뀌어도 첫 진입 기록을 끝맺는다.
@@ -435,6 +456,18 @@ struct BridgeWebView: UIViewRepresentable {
             pullToRefresh?.finishRefreshing(success: success)
         }
 
+        /// 웹뷰를 만들 때 문서 시작 스크립트로 넣은 안전 영역. 같은 값이면 다시 보내지 않는다.
+        func markSafeAreaInjected(_ insets: WebSafeAreaInsets) {
+            appliedSafeArea = insets
+        }
+
+        /// 지금 문서에 안전 영역을 알린다. 값이 바뀔 때만 보낸다.
+        func applySafeArea(_ insets: WebSafeAreaInsets) {
+            guard !isDeactivated, insets != appliedSafeArea else { return }
+            appliedSafeArea = insets
+            webView?.evaluateJavaScript(insets.applyScript)
+        }
+
         // 대기열의 아웃바운드 메시지를 순서대로 웹에 주입한다.
         func flushOutbox(_ outbox: [WebBridgeOutboundEnvelope]) {
             guard !isDeactivated, let webView else { return }
@@ -511,6 +544,8 @@ struct BridgeWebView: UIViewRepresentable {
             if let entryTraceToken { WebEntryTrace.mark(.commit, token: entryTraceToken) }
             // 새 문서에는 시트가 없다 — 시트를 연 채 문서가 바뀌었으면 탭 바를 돌려놓는다.
             setWebSheetOpen(false)
+            // 새 문서는 웹뷰를 만들 때의 값으로 시작한다(문서 시작 스크립트). 그 뒤 바뀐 값이 있으면 다시 넣는다.
+            if let appliedSafeArea { webView.evaluateJavaScript(appliedSafeArea.applyScript) }
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -747,10 +782,4 @@ private final class KeyboardAvoidingWebContainer: UIView {
         let isUserScrolling = scrollView.isTracking || scrollView.isDecelerating
         onScroll(offsetY, maxOffsetY, isUserScrolling)
     }
-}
-
-/// 시스템 기본 입력 액세서리 바(키보드 위 위/아래/완료 회색 폼 어시스턴트)를 제거한 WKWebView.
-/// 웹이 자체 하단 툴바(사진/태그)를 키보드 위에 띄우므로 시스템 바는 불필요하고, 없는 편이 깔끔하다.
-private final class ChromelessWebView: WKWebView {
-    override var inputAccessoryView: UIView? { nil }
 }

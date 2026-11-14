@@ -90,6 +90,8 @@ public struct CommunityDetailView: View {
                 enablesPullToRefresh: !CommunityDetailFeature.State.isWriteOrEditScreen(store.url),
                 // 키보드가 문서를 밀어올려 고정 헤더가 화면 밖으로 나가는 것을 막는다.
                 locksDocumentScroll: true,
+                // 웹 헤더가 상태바 자리까지 칠한다 — 위쪽 안전 영역을 처음부터 웹에 알린다.
+                coversStatusBar: true,
                 // 글쓰기·수정은 서브뷰로만 열리므로 사진 선택은 상세 웹뷰만 처리한다.
                 // 대회 탭에 쌓인 화면은 대회 상세 신호도 알린다(#250).
                 capabilities: store.capabilities,

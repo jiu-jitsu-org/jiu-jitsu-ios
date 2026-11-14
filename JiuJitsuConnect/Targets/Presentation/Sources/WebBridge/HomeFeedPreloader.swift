@@ -115,7 +115,12 @@ final class HomeFeedPreload {
         let recorder = HomeFeedPreloadRecorder()
         self.recorder = recorder
         // 홈 웹뷰와 같은 설정으로 만든다(홈은 탭 바 밑까지 그리는 웹이라 시트 열림 알림만 쓴다, #314)
-        webView = BridgeWebView.makeWebView(capabilities: HomeFeedPreloader.capabilities, messageHandler: recorder)
+        // 홈 웹은 머리줄 아래 놓여 상태바를 덮지 않는다 — 홈 웹뷰(BridgeWebView)가 짐작하는 값과 같아야 한다.
+        webView = BridgeWebView.makeWebView(
+            capabilities: HomeFeedPreloader.capabilities,
+            safeArea: .expected(coversStatusBar: false),
+            messageHandler: recorder
+        )
         webView.navigationDelegate = recorder
     }
 
