@@ -306,6 +306,8 @@ struct BridgeWebView: UIViewRepresentable {
         /// 화면이 닫히는 중이거나 해제될 때 — 로딩을 멈추고 이후 콜백을 끊는다. 여러 번 불려도 된다.
         func deactivate() {
             guard !isDeactivated else { return }
+            // 시트를 연 채 멈추면 닫힘 신호가 오지 않는다 — 탭 바가 숨은 채 남지 않게 먼저 푼다(#314).
+            setWebSheetOpen(false)
             isDeactivated = true
             if let entryTraceToken { WebEntryTrace.end(.closed, token: entryTraceToken) }
             webView?.stopLoading()
