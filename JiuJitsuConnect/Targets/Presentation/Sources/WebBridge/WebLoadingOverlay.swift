@@ -2,7 +2,8 @@
 //  WebLoadingOverlay.swift
 //  Presentation
 //
-//  웹뷰를 덮는 로딩 덮개(홈 피드·대회 탭 공용, #261). 쌓이는 웹 화면은 덮개 없이 웹 스켈레톤을 보인다(#299).
+//  웹뷰를 덮는 로딩 덮개(홈 피드·대회 탭 공용, #261). 쌓이는 웹 화면은 덮개 없이 웹 스켈레톤을 보이고(#299),
+//  스켈레톤이 오기 전(첫 응답 전)에만 덮지 않는 스피너(WebFirstResponseSpinner)를 얹는다.
 //
 
 import SwiftUI
@@ -34,4 +35,33 @@ struct WebLoadingOverlay: View {
         .accessibilityHidden(!isLoading)
         .animation(isLoading ? nil : .easeOut(duration: Self.fadeDuration), value: isLoading)
     }
+}
+
+/// 첫 응답 전 빈 웹 위에 얹는 스피너. 덮개와 달리 웹을 가리거나 탭을 막지 않는다.
+///
+/// - `appearDelay` 뒤에 나타난다 — 빨리 오는 응답에서 스피너가 번쩍이지 않게(웹 Spinner와 같은 0.15초).
+/// - 걷힐 때는 화면에서 바로 빠진다. 다시 나타날 때마다 새로 만들어져 늦춤도 다시 적용된다.
+struct WebFirstResponseSpinner: View {
+    static let appearDelay: Duration = .milliseconds(150)
+    static let fadeInDuration: Double = 0.15
+
+    @State private var isVisible = false
+
+    var body: some View {
+        ProgressView()
+            .controlSize(.large)
+            .opacity(isVisible ? 1 : 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .allowsHitTesting(false)
+            .task {
+                try? await Task.sleep(for: Self.appearDelay)
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeIn(duration: Self.fadeInDuration)) { isVisible = true }
+            }
+    }
+}
+
+#Preview("첫 응답 전 스피너") {
+    WebFirstResponseSpinner()
+        .background(Color.primitive.bw.trueWhite)
 }
