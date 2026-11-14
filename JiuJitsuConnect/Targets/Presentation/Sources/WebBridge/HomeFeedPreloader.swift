@@ -57,12 +57,15 @@ enum HomeFeedPreloader {
         scheduleRelease()
     }
 
+    /// 홈 피드 웹뷰의 브릿지 기능 목록. 탭 바 밑까지 그리는 웹은 BridgeWebView가 시트 열림 알림을 덧붙인다(#314).
+    static let capabilities: [WebBridgeCapability] = [.setSheetOpen]
+
     /// 홈 웹뷰가 미리 불러 둔 화면을 이어받는다. 주소·설정이 다르면 이어받지 않고 새로 만들게 둔다.
     static func take(url: URL, capabilities: [WebBridgeCapability]) -> HomeFeedPreload? {
         guard let preload = pending else { return nil }
         pending = nil
-        // 미리 부를 때는 브릿지 기능 알림 스크립트를 넣지 않으므로, 그런 설정이 필요한 웹뷰는 이어받을 수 없다
-        guard preload.url == url, capabilities.isEmpty else {
+        // 미리 부를 때는 홈 피드와 같은 기능 알림만 넣으므로, 다른 설정이 필요한 웹뷰는 이어받을 수 없다
+        guard preload.url == url, capabilities == Self.capabilities else {
             discard(preload)
             return nil
         }
@@ -111,8 +114,8 @@ final class HomeFeedPreload {
         self.url = url
         let recorder = HomeFeedPreloadRecorder()
         self.recorder = recorder
-        // 홈 웹뷰와 같은 설정으로 만든다(홈은 브릿지 기능 알림 스크립트를 쓰지 않는다)
-        webView = BridgeWebView.makeWebView(capabilities: [], messageHandler: recorder)
+        // 홈 웹뷰와 같은 설정으로 만든다(홈은 탭 바 밑까지 그리는 웹이라 시트 열림 알림만 쓴다, #314)
+        webView = BridgeWebView.makeWebView(capabilities: HomeFeedPreloader.capabilities, messageHandler: recorder)
         webView.navigationDelegate = recorder
     }
 

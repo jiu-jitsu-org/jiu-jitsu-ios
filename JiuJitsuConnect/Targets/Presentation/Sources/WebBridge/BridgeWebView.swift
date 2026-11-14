@@ -53,6 +53,10 @@ struct BridgeWebView: UIViewRepresentable {
     // 이 웹뷰를 소유한 Feature가 실제로 처리하는 '사전 확인형' 메시지. 처리하지 않는 웹뷰가 지원한다고
     // 알리면 웹이 요청을 보내 놓고 응답 없이 기다리므로, 처리하는 화면만 넘긴다.
     var capabilities: [WebBridgeCapability] = []
+    // 웹에 실제로 알리는 목록. 탭 바 밑까지 그리는 웹은 시트 열림을 이 웹뷰가 직접 처리하므로 덧붙인다(#314).
+    private var injectedCapabilities: [WebBridgeCapability] {
+        extendsUnderTabBar ? capabilities + [.setSheetOpen] : capabilities
+    }
     // 진입 시간 측정의 시작 시각·경로(#298). 위에 쌓이는 상세만 넘기고, nil이면 재지 않는다.
     var entryOrigin: WebEntryTrace.Origin?
     // false가 되면 로딩을 멈추고 이후 콜백을 보내지 않는다. 화면을 닫는 도중(상태는 이미 지워졌는데
@@ -111,11 +115,11 @@ struct BridgeWebView: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
         // 스플래시 동안 미리 불러 둔 홈 피드가 있으면 새로 만들지 않고 이어받는다(#270).
         let preload: HomeFeedPreload? = if case .list = source {
-            HomeFeedPreloader.take(url: url, capabilities: capabilities)
+            HomeFeedPreloader.take(url: url, capabilities: injectedCapabilities)
         } else {
             nil
         }
-        let webView = preload?.webView ?? Self.makeWebView(capabilities: capabilities, messageHandler: context.coordinator)
+        let webView = preload?.webView ?? Self.makeWebView(capabilities: injectedCapabilities, messageHandler: context.coordinator)
         if let entryOrigin {
             WebEntryTrace.begin(token: loadToken, origin: entryOrigin, url: url)
             WebEntryTrace.mark(.webView, token: loadToken)
@@ -204,6 +208,13 @@ struct BridgeWebView: UIViewRepresentable {
         let tabRootScroll: TabRootScrollAction? = extendsUnderTabBar ? context.environment.tabRootScroll : nil
         let keyboardAvoidingContainer = container as? KeyboardAvoidingWebContainer
         keyboardAvoidingContainer?.onScroll = tabRootScroll?.report
+        // 웹 시트가 열린 동안 가린 높이를 0으로 돌리고 탭 바를 숨긴다(#314).
+        context.coordinator.onSheetOpenChanged = extendsUnderTabBar
+            ? { [weak keyboardAvoidingContainer] isOpen in
+                keyboardAvoidingContainer?.isSheetOpen = isOpen
+                tabRootScroll?.reportSheetOpen(isOpen)
+            }
+            : nil
         // 토큰 변동(갱신) 시에도 세션 쿠키를 최신으로 유지한 뒤 (재)로드/플러시한다.
         let cookieStore = context.coordinator.webView?.configuration.websiteDataStore.httpCookieStore
             ?? WKWebsiteDataStore.default().httpCookieStore
@@ -255,6 +266,10 @@ struct BridgeWebView: UIViewRepresentable {
         private var locksDocumentScroll = false
         // deactivate() 이후에는 웹뷰가 아직 살아 있어도 store로 아무것도 보내지 않는다.
         private var isDeactivated = false
+        // 웹 시트 열림·닫힘을 받는 곳(#314). 탭 바 밑까지 그리는 웹뷰만 updateUIView가 넣는다.
+        var onSheetOpenChanged: (@MainActor (Bool) -> Void)?
+        // 웹이 마지막으로 알린 시트 열림. 시트를 연 채 문서가 바뀌면(새로고침·이동) 닫힘을 못 받으니 직접 푼다.
+        private var isWebSheetOpen = false
         // 진입 시간 측정의 키(#298). 웹뷰를 만들 때의 loadToken — 다시 시도로 토큰이 바뀌어도 첫 진입 기록을 끝맺는다.
         var entryTraceToken: UUID?
 
@@ -455,6 +470,10 @@ struct BridgeWebView: UIViewRepresentable {
             WebBridge.logInboundRaw(body, source: source)
             guard let inbound = WebBridgeInboundMessage.decode(from: body) else { return }
             WebBridge.logInbound(inbound, source: source)
+            if case let .setSheetOpen(isOpen) = inbound {
+                setWebSheetOpen(isOpen)
+                return
+            }
             if let entryTraceToken {
                 switch inbound {
                 case .webViewReady: WebEntryTrace.mark(.ready, token: entryTraceToken)
@@ -463,6 +482,19 @@ struct BridgeWebView: UIViewRepresentable {
                 }
             }
             onBridgeMessage(inbound)
+        }
+
+        private func setWebSheetOpen(_ isOpen: Bool) {
+            // 받을 곳이 아직 없으면(미리 불러 둔 홈 피드를 넘겨받는 중 등) 기록하지 않는다 — 적용 안 된 열림이 남아
+            // 다음 열림을 같은 값이라며 버리지 않게.
+            guard let onSheetOpenChanged, isWebSheetOpen != isOpen else { return }
+            isWebSheetOpen = isOpen
+            onSheetOpenChanged(isOpen)
+        }
+
+        func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            // 웹 프로세스가 죽으면 닫힘 신호도 새 문서(didCommit)도 오지 않을 수 있다 — 시트가 열린 채였으면 탭 바를 돌려놓는다.
+            setWebSheetOpen(false)
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
@@ -474,6 +506,8 @@ struct BridgeWebView: UIViewRepresentable {
         func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
             // 첫 응답이 와서 문서를 그리기 시작한 시점. 진입 시간 측정에만 쓴다(#298).
             if let entryTraceToken { WebEntryTrace.mark(.commit, token: entryTraceToken) }
+            // 새 문서에는 시트가 없다 — 시트를 연 채 문서가 바뀌었으면 탭 바를 돌려놓는다.
+            setWebSheetOpen(false)
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -624,6 +658,10 @@ private final class KeyboardAvoidingWebContainer: UIView {
     var tabBarObscuredBottom: CGFloat = 0 {
         didSet { if reportsTabBarAsObscured, oldValue != tabBarObscuredBottom { setNeedsLayout() } }
     }
+    // 웹 바텀 시트가 떠 있는지(#314). 떠 있으면 탭 바가 숨으므로 가린 영역이 없다 — 시트·딤이 화면 맨 아래까지 온다.
+    var isSheetOpen = false {
+        didSet { if reportsTabBarAsObscured, oldValue != isSheetOpen { setNeedsLayout() } }
+    }
     // 스크롤할 때마다 부른다(탭 첫 화면 웹만, #267).
     var onScroll: (@MainActor (CGFloat, CGFloat, Bool) -> Void)?
     // 키보드가 떠 있는지. 고정 셸(상세)이 댓글을 쓰는 중에 당겨서 새로고침되지 않게 본다(#432).
@@ -662,7 +700,7 @@ private final class KeyboardAvoidingWebContainer: UIView {
         let keyboardVisible = distanceFromBottom > deviceBottomInset + 8
         isKeyboardVisible = keyboardVisible
         if reportsTabBarAsObscured, let webView {
-            let obscuredBottom = keyboardVisible ? 0 : tabBarObscuredBottom
+            let obscuredBottom = keyboardVisible || isSheetOpen ? 0 : tabBarObscuredBottom
             if webView.obscuredContentInsets.bottom != obscuredBottom {
                 webView.obscuredContentInsets = UIEdgeInsets(top: 0, left: 0, bottom: obscuredBottom, right: 0)
                 webView.scrollView.verticalScrollIndicatorInsets.bottom = obscuredBottom

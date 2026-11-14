@@ -30,6 +30,8 @@ public struct AppTabView: View {
     // 맨 위로 동그라미가 어디로 들어가는지 — 탭 바가 올라오면 그 맨 위로 칸으로, 아니면 제자리에서 사라진다.
     // 나타날 땐 늘 화면 아래에서 올라온다.
     @State private var circleExit: CircleMotion = .inPlace
+    // 웹 바텀 시트가 떠 있는 탭(#314). 그 탭을 보는 동안 탭 바·맨 위로 버튼을 숨겨 시트가 화면 맨 아래까지 오게 한다.
+    @State private var webSheetOpenTab: AppTabFeature.Tab?
 
     private enum ScrollMetrics {
         // 이보다 위(맨 위 가까이)에선 늘 탭 바를 보인다.
@@ -272,9 +274,15 @@ public struct AppTabView: View {
         TabRootModifier(
             bottomReserve: max(dockReservedHeight - deviceBottomInset, 0),
             reservedHeight: dockReservedHeight,
-            action: TabRootScrollAction(key: tab) { offsetY, maxOffsetY, isUserScrolling in
-                handleScroll(tab: tab, offsetY: offsetY, maxOffsetY: maxOffsetY, isUserScrolling: isUserScrolling)
-            }
+            action: TabRootScrollAction(
+                key: tab,
+                report: { offsetY, maxOffsetY, isUserScrolling in
+                    handleScroll(tab: tab, offsetY: offsetY, maxOffsetY: maxOffsetY, isUserScrolling: isUserScrolling)
+                },
+                reportSheetOpen: { isOpen in
+                    handleWebSheet(tab: tab, isOpen: isOpen)
+                }
+            )
         )
     }
 
@@ -318,6 +326,19 @@ public struct AppTabView: View {
         withAnimation(Self.tabBarAnimation) { isTabBarHidden = shouldHide }
     }
 
+    /// 웹 시트가 열리면 탭 바를 내리고, 닫히면 시트를 열기 전 모습(스크롤로 숨겨 둔 상태 포함)으로 돌린다.
+    /// 시트는 0.5초에 걸쳐 올라오므로 탭 바도 같은 0.5초로 내려간다.
+    private func handleWebSheet(tab: AppTabFeature.Tab, isOpen: Bool) {
+        let next: AppTabFeature.Tab? = isOpen ? tab : (webSheetOpenTab == tab ? nil : webSheetOpenTab)
+        guard next != webSheetOpenTab else { return }
+        circleExit = .inPlace
+        withAnimation(Self.tabBarAnimation) { webSheetOpenTab = next }
+    }
+
+    private var isWebSheetOpen: Bool {
+        webSheetOpenTab == store.selectedTab
+    }
+
     /// 지금 탭의 첫 화면이 맨 앞에 보이는지(위에 쌓인 화면이 없는지)
     private var isTabRootInFront: Bool {
         switch store.selectedTab {
@@ -343,11 +364,11 @@ public struct AppTabView: View {
     }
 
     private var isBarShown: Bool {
-        isTabRootInFront && !isTabBarHidden
+        isTabRootInFront && !isTabBarHidden && !isWebSheetOpen
     }
 
     private var isCircleShown: Bool {
-        isTabRootInFront && isTabBarHidden && isAwayFromTopOnListTab
+        isTabRootInFront && isTabBarHidden && isAwayFromTopOnListTab && !isWebSheetOpen
     }
 
     /// 화면 바닥에서 탭 바 윗변 + 웹 글쓰기 버튼과의 간격까지 — 탭 첫 화면이 이만큼 아래를 비워 둔다.
