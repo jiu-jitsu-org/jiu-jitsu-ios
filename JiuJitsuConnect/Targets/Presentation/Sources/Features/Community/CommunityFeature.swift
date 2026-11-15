@@ -185,7 +185,7 @@ public struct CommunityFeature: Sendable {
             case logoutRequested
             // 웹뷰 토큰 만료 → 부모가 네이티브 refresh로 갱신 후 결과를 웹에 주입한다.
             case tokenRefreshRequested
-            // 헤더의 내 사진 버튼(#128)·웹에서 내 이름 탭(#116) → 부모가 MY 화면을 이 스택에 push한다(#197).
+            // 웹에서 내 이름 탭(#116) → 부모가 MY 화면을 이 스택에 push한다(#197).
             // MY 화면을 만들려면 로그인 정보(authInfo)가 필요해 부모(AppTab)가 직접 쌓는다.
             case myProfileRequested
             // 테스트용 '딥링크로 열기'(DEBUG/BETA) → 부모가 실제 유니버설 링크와 같은 경로(.deepLink)로 보낸다.
@@ -218,7 +218,7 @@ public struct CommunityFeature: Sendable {
     public enum Path: Sendable {
         case detail(CommunityDetailFeature)
         case userProfile(UserProfileFeature)
-        /// 커뮤니티에서 내 사진·이름을 눌러 연 MY 화면(#197). 탭의 MY와 같은 화면이고 왼쪽 위에 뒤로가기가 붙는다.
+        /// 커뮤니티에서 내 이름을 눌러 연 MY 화면(#197). 탭의 MY와 같은 화면이고 왼쪽 위에 뒤로가기가 붙는다.
         case myProfile(MyProfileFeature)
         /// 홈에서 연 대회 상세의 '내 기록에 남기기'로 여는 대회 기록 추가(#304). 저장은 프로필을 아는 부모(AppTab)가 한다.
         case competitionInfo(CompetitionInfoFeature)
