@@ -11,9 +11,9 @@ import CoreKit
 import Domain
 
 /// 운영팀 문의 메일. 인증 해제·변경처럼 관리자만 할 수 있는 일을 받는다.
-/// 주소가 정해지기 전(`nil`)에는 문의 버튼을 숨겨 빈 링크가 나가지 않게 한다.
+/// 이용약관·개인정보처리방침의 운영자 메일과 같은 주소다. `nil`이면 문의 버튼을 숨긴다.
 public enum SupportContact {
-    public static let email: String? = nil
+    public static let email: String? = "jiujitsulab.team@gmail.com"
 }
 
 /// 관장 사범 인증 바텀 시트 Feature.
