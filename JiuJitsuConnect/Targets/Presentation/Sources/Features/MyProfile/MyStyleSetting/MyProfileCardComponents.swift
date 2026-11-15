@@ -29,9 +29,14 @@ public struct BeltCardView: View {
     // MARK: - Body
 
     public var body: some View {
-        VStack(spacing: 24) {
+        Group {
             if let beltRank {
-                filledContent(beltRank: beltRank)
+                // 흰 카드 왼쪽 타일에 작은 띠 그림(#320) — 띠 고르기 칩과 같은 BeltIcon.
+                BeltSection(
+                    beltRank: beltRank,
+                    beltStripe: beltStripe,
+                    onTapped: onBeltTapped
+                )
             } else {
                 emptyContent
             }
@@ -45,18 +50,6 @@ public struct BeltCardView: View {
             x: 0,
             y: 4
         )
-        .padding(.horizontal, 20)
-    }
-
-    // MARK: - Filled Content
-
-    private func filledContent(beltRank: BeltRank) -> some View {
-        BeltSection(
-            beltRank: beltRank,
-            beltStripe: beltStripe,
-            onTapped: onBeltTapped
-        )
-        .padding(.vertical, 24)
         .padding(.horizontal, 20)
     }
 
@@ -96,7 +89,7 @@ public struct BeltCardView: View {
 
 // MARK: - BeltSection
 
-/// 벨트 아이콘 + 벨트명. 남는 가로 영역까지 누르면 벨트 수정 시트가 열린다.
+/// 작은 띠 그림 + 벨트명. 남는 가로 영역까지 누르면 벨트 수정 시트가 열린다.
 private struct BeltSection: View {
     let beltRank: BeltRank
     let beltStripe: BeltStripe?
@@ -104,28 +97,35 @@ private struct BeltSection: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            beltRank.beltIcon
-                .resizable()
-                .aspectRatio(contentMode: .fit)
+            // 띠 그림은 띠 고르기 칩·휠과 같은 부품(DesignSystem BeltIcon)을 쓴다(#320).
+            BeltIcon(color: beltRank.selectButtonColor)
                 .frame(width: 40, height: 40)
+                .background(Color.semantic.surface.secondary)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("벨트")
                     .font(Font.pretendard.labelM)
                     .foregroundStyle(Color.component.beltCard.filled.labelText)
+                    .lineLimit(1)
 
                 Text([beltRank.displayName, beltStripe?.displayName].compactMap { $0 }.joined(separator: " "))
                     .font(Font.pretendard.title3)
                     .foregroundStyle(Color.component.beltCard.filled.contentText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
 
             Spacer(minLength: 0)
         }
+        .padding(.vertical, 24)
+        .padding(.horizontal, 20)
         .contentShape(Rectangle())
         .onTapGesture {
             onTapped()
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 }
 
