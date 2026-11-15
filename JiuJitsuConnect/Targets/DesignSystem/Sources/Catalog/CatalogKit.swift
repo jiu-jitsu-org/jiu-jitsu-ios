@@ -283,6 +283,8 @@ struct CatalogColorDot: View {
         Circle()
             .fill(color)
             .frame(width: size, height: size)
+            // 판과 같은 색·흰색 토큰도 보이게 옅은 그림자만 둔다(테두리는 쓰지 않는다).
+            .shadow(color: Color.primitive.opacity.black40.opacity(0.5), radius: 1.5, y: 0.5)
     }
 }
 
