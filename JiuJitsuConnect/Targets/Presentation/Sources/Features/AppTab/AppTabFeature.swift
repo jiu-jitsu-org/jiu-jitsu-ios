@@ -570,6 +570,9 @@ public struct AppTabFeature: Sendable {
                     if !cameFromWeb {
                         state.selectedTab = isSignup ? .home : .myPage
                     }
+                    // 로그인한 세션의 첫 MY에서 띠 링이 다시 돈다(#320). 바로 MY로 왔으면 띠가 오는 대로 돈다.
+                    state.myPage.hasPlayedBeltEntrance = false
+                    state.myPage.isWaitingBeltEntrance = state.selectedTab == .myPage
                     // 비로그인으로 누른 '내 기록에 남기기'(#250)를 이어서 연다. 프로필은 아래 loadProfile로 아직 받는 중이라
                     // 띠·체급 기본값 없이 열고, 저장 때 프로필이 없으면 그때 받아 온다.
                     if let pendingCompetitionRecord {
