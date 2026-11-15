@@ -19,8 +19,6 @@ public struct CommunityFeature: Sendable {
     private enum CancelID: Hashable, Sendable {
         // 새 알림 여부 조회. 진입·복귀·포그라운드가 겹쳐 들어와도 마지막 요청만 반영한다.
         case unreadNotification
-        // 헤더 내 사진 조회. 새 알림 점과 같은 시점에 다시 조회하며 마지막 요청만 반영한다.
-        case myProfileImage
     }
 
     public enum Tab: String, CaseIterable, Sendable, Equatable {
@@ -88,9 +86,6 @@ public struct CommunityFeature: Sendable {
         // GNB 종 아이콘의 새 알림 점. 안 읽은 알림이 하나라도 있으면 true.
         var hasUnreadNotification = false
 
-        // GNB 내 사진 버튼에 그릴 프로필 이미지. 없거나(기본 이미지) 아직 조회 전이면 nil → 기본 사람 아이콘.
-        var myProfileImageURL: URL?
-
         // 테스트용 웹뷰 도메인 변경 입력 다이얼로그 상태. (DEBUG/BETA 빌드에서만 노출)
         var isDebugURLAlertPresented = false
         var debugURLInput = ""
@@ -104,8 +99,6 @@ public struct CommunityFeature: Sendable {
 
         // 알림함은 로그인 사용자 전용이라 비로그인이면 종 아이콘 자체를 숨긴다(알림함 정책).
         var isNotificationButtonVisible: Bool { accessToken != nil }
-        // 내 사진 버튼은 MY(로그인 전용) 입구라 비로그인이면 숨긴다. (#43, #128)
-        var isMyProfileButtonVisible: Bool { accessToken != nil }
 
         public init(accessToken: String? = nil) {
             self.accessToken = accessToken
@@ -130,8 +123,6 @@ public struct CommunityFeature: Sendable {
         case deepLink(DeepLink)
         /// 다른 회원 프로필 열기 — 웹의 작성자 탭(`OPEN_USER_PROFILE`, isMe=false)이 보낸다(#116)
         case openUserProfile(userId: Int)
-        // 부모(AppTabFeature)가 MY에서 바뀐 내 사진(삭제 시 nil)을 주입하는 통로.
-        case myProfileImageChanged(URL?)
         // 부모가 새 알림 점을 다시 조회시킨다 — 대회 탭의 종도 이 값을 그린다(#258).
         case unreadNotificationRefreshRequested
 
@@ -152,8 +143,6 @@ public struct CommunityFeature: Sendable {
             case tabSelected(Tab)
             case notificationTapped
             case searchTapped
-            // GNB 맨 오른쪽 내 사진 버튼 → MY 화면 push. (#43, #128, #197)
-            case myProfileTapped
 
             // MARK: 브릿지 다이얼로그 결과 (AppTabView가 그린 알럿/시트 → Feature로 회신)
             // 확인 알럿의 [확인]/[취소] 버튼 탭.
@@ -185,7 +174,6 @@ public struct CommunityFeature: Sendable {
             // View가 outbox의 메시지를 evaluateJavaScript로 전달 완료했음을 통지.
             case outboundDelivered(id: UUID)
             case unreadNotificationResponse(TaskResult<Bool>)
-            case myProfileImageResponse(TaskResult<URL?>)
         }
 
         public enum DelegateAction: Sendable {
@@ -261,7 +249,6 @@ public struct CommunityFeature: Sendable {
     }
 
     @Dependency(\.noticeClient) var noticeClient
-    @Dependency(\.userClient) var userClient
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -296,13 +283,6 @@ public struct CommunityFeature: Sendable {
                 else { return .none }
                 state.path.append(.detail(Self.subview(url: url, accessToken: state.accessToken)))
                 return .none
-
-            // 앱 다른 곳에서 내 사진은 MY를 뜻하므로 커뮤니티 헤더도 MY 화면을 연다. 커뮤니티 활동은
-            // MY 화면의 '커뮤니티 활동' 줄로 계속 들어갈 수 있다. (#128)
-            // 남의 사진처럼 탭을 바꾸지 않고 이 스택에 쌓아, 뒤로가기로 돌아온다(#197).
-            case .view(.myProfileTapped):
-                guard state.isMyProfileButtonVisible else { return .none }
-                return .send(.delegate(.myProfileRequested))
 
             // FIXME: 검색 화면 진입 (커뮤니티 검색 기능 도입 시 구현)
             case .view(.searchTapped):
@@ -504,17 +484,6 @@ public struct CommunityFeature: Sendable {
                 Log.trace("새 알림 여부 조회 실패: \(error)", category: .network, level: .error)
                 return .none
 
-            case let .internal(.myProfileImageResponse(.success(url))):
-                // 응답 전에 로그아웃됐다면 이전 계정의 사진을 버린다.
-                guard state.isMyProfileButtonVisible else { return .none }
-                state.myProfileImageURL = url
-                return .none
-
-            case let .internal(.myProfileImageResponse(.failure(error))):
-                // 사진은 보조 표시라 실패를 알리지 않고 직전 값을 유지한다. 다음 진입·복귀 때 다시 조회된다.
-                Log.trace("내 프로필 사진 조회 실패: \(error)", category: .network, level: .error)
-                return .none
-
             // MARK: - Session (부모 주입 → 아웃바운드)
 
             case let .session(.loggedIn(accessToken)):
@@ -546,32 +515,21 @@ public struct CommunityFeature: Sendable {
             case .session(.loggedOut):
                 state.accessToken = nil
                 state.hasUnreadNotification = false
-                state.myProfileImageURL = nil
                 Self.enqueue(.authLogout, into: &state)
                 Self.broadcastToDetails(.loggedOut, into: &state)
-                return .merge(.cancel(id: CancelID.unreadNotification), .cancel(id: CancelID.myProfileImage))
+                return .cancel(id: CancelID.unreadNotification)
 
             case .session(.sessionExpired):
                 state.accessToken = nil
                 state.hasUnreadNotification = false
-                state.myProfileImageURL = nil
                 Self.enqueue(.authSessionExpired, into: &state)
                 Self.broadcastToDetails(.sessionExpired, into: &state)
-                return .merge(.cancel(id: CancelID.unreadNotification), .cancel(id: CancelID.myProfileImage))
+                return .cancel(id: CancelID.unreadNotification)
 
             case .session(.profileUpdated):
                 Self.enqueue(.profileUpdated, into: &state)
                 Self.broadcastToDetails(.profileUpdated, into: &state)
                 return .none
-
-            // MARK: - 내 사진 변경 (부모 주입)
-
-            case let .myProfileImageChanged(url):
-                guard state.isMyProfileButtonVisible else { return .none }
-                state.myProfileImageURL = url
-                // MY의 업로드·삭제가 끝나기 전에 홈으로 넘어오면 탭 진입 조회가 변경 전 사진을 들고 늦게 도착해
-                // 방금 반영한 값을 덮는다. 진행 중인 조회는 이미 낡은 값이므로 버린다.
-                return .cancel(id: CancelID.myProfileImage)
 
             case .unreadNotificationRefreshRequested:
                 return refreshUnreadNotification(state)
@@ -619,11 +577,6 @@ public struct CommunityFeature: Sendable {
             case .coverPath(.element(id: _, action: .myProfile(.delegate(.communityActivityRequested)))):
                 return Self.pushMyActivity(from: .modal, into: &state)
 
-            // MY에서 바꾼 사진을 헤더의 내 사진에 바로 반영한다. 탭의 MY는 탭에 들어갈 때 다시 불러온다.
-            case let .path(.element(id: _, action: .myProfile(.delegate(.profileImageChanged(url))))),
-                 let .coverPath(.element(id: _, action: .myProfile(.delegate(.profileImageChanged(url))))):
-                return .send(.myProfileImageChanged(url.flatMap(URL.init(string:))))
-
             case .path(.element(id: _, action: .myProfile(.delegate(.profileUpdated)))),
                  .coverPath(.element(id: _, action: .myProfile(.delegate(.profileUpdated)))):
                 return .send(.delegate(.profileUpdated))
@@ -651,25 +604,12 @@ public struct CommunityFeature: Sendable {
         .forEach(\.coverPath, action: \.coverPath)
     }
 
-    // MARK: - 헤더 표시(새 알림 점·내 사진)
+    // MARK: - 헤더 표시(새 알림 점)
 
-    /// 진입·탭 복귀·포그라운드·로그인 때 헤더의 새 알림 점과 내 사진을 함께 다시 조회한다.
-    /// MY에서 사진을 바꾼 뒤 커뮤니티로 돌아오면 이 시점에 반영된다.
+    /// 진입·탭 복귀·포그라운드·로그인 때 헤더의 새 알림 점을 다시 조회한다.
+    /// 헤더의 내 사진 버튼은 MY 탭과 입구가 겹쳐 뺐다 — 내 프로필은 아래 MY 탭 하나로 들어간다.
     private func refreshHeaderState(_ state: State) -> Effect<Action> {
-        .merge(refreshUnreadNotification(state), refreshMyProfileImage(state))
-    }
-
-    /// 내 프로필 사진을 다시 조회한다(GET /api/user/profile). 비로그인이면 버튼이 없으므로 조회하지 않는다.
-    private func refreshMyProfileImage(_ state: State) -> Effect<Action> {
-        guard state.isMyProfileButtonVisible else { return .none }
-        return .run { [userClient] send in
-            await send(.internal(.myProfileImageResponse(
-                await TaskResult {
-                    try await userClient.fetchUserProfile().profileImageUrl.flatMap(URL.init(string:))
-                }
-            )))
-        }
-        .cancellable(id: CancelID.myProfileImage, cancelInFlight: true)
+        refreshUnreadNotification(state)
     }
 
     /// 안 읽은 알림 여부를 다시 조회한다. 비로그인이면 알림함이 없으므로 조회하지 않는다.

@@ -303,11 +303,6 @@ public struct AppTabFeature: Sendable {
                 state.myPage.path.append(.communityDetail(.init(url: url, accessToken: state.home.accessToken)))
                 return .none
 
-            // MY에서 바꾼 사진을 커뮤니티 헤더에 바로 반영한다. 탭 진입 재조회에만 맡기면
-            // 삭제·업로드가 끝나기 전에 홈으로 넘어온 경우 변경 전 사진이 남는다.
-            case let .myPage(.delegate(.profileImageChanged(url))):
-                return .send(.home(.myProfileImageChanged(url.flatMap(URL.init(string:)))))
-
             // MY(탭이든 커뮤니티에 쌓인 것이든)에서 프로필을 저장하면 열린 웹뷰 모두가 내 프로필을 다시 불러오게 한다(jiu-jitsu-frontend#413).
             case .myPage(.delegate(.profileUpdated)), .home(.delegate(.profileUpdated)):
                 return .merge(

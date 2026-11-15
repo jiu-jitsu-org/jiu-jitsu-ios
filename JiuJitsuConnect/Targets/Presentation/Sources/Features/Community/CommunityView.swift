@@ -19,12 +19,9 @@ public struct CommunityView: View {
     }
 
     private enum Metrics {
-        // 검색·내 사진 버튼에서 공유(알림함 종은 NotificationInboxButton이 같은 값으로 그린다)
+        // 검색 버튼에서 사용(알림함 종은 NotificationInboxButton이 같은 값으로 그린다)
         static let trailingIconSize: CGFloat = 24
         static let trailingIconButtonSize: CGFloat = 40
-        // 내 사진: 28pt 원을 다른 아이콘과 같은 터치 영역 가운데에 둔다. 사진이 없으면 기본 사람 아이콘.
-        static let avatarSize: CGFloat = 28
-        static let avatarDefaultIconSize: CGFloat = 20
     }
 
     public var body: some View {
@@ -120,19 +117,6 @@ public struct CommunityView: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-
-                    if store.isMyProfileButtonVisible {
-                        Button {
-                            // 남의 사진을 누를 때처럼 MY 화면이 오른쪽에서 밀려 들어온다(#197).
-                            store.send(.view(.myProfileTapped))
-                        } label: {
-                            myAvatar
-                                .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("내 프로필")
-                    }
                 }
             }
             .padding(.leading, 16)
@@ -144,40 +128,6 @@ public struct CommunityView: View {
         .background {
             Color.component.header.background
                 .ignoresSafeArea(edges: .top)
-        }
-    }
-
-    // 사진이 없거나 불러오는 중·실패면 회색 원 위 기본 사람 아이콘을 그린다(웹 아바타와 같은 처리).
-    private var myAvatar: some View {
-        Group {
-            // URL이 nil로 바뀌어도 같은 AsyncImage는 직전에 받은 사진을 계속 그린다(사진 삭제 후 이전 사진이 남던 원인).
-            // 그래서 사진이 없으면 AsyncImage를 아예 빼고 기본 아이콘을 직접 그린다.
-            if let url = store.myProfileImageURL {
-                AsyncImage(url: url) { phase in
-                    if case let .success(image) = phase {
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    } else {
-                        myAvatarPlaceholder
-                    }
-                }
-            } else {
-                myAvatarPlaceholder
-            }
-        }
-        .frame(width: Metrics.avatarSize, height: Metrics.avatarSize)
-        .clipShape(Circle())
-    }
-
-    private var myAvatarPlaceholder: some View {
-        ZStack {
-            Color.component.header.avatarPlaceholder
-            Assets.Common.Icon.avatarDefault.swiftUIImage
-                .resizable()
-                .scaledToFit()
-                .frame(width: Metrics.avatarDefaultIconSize, height: Metrics.avatarDefaultIconSize)
-                .foregroundStyle(Color.component.header.avatarDefaultIcon)
         }
     }
 
