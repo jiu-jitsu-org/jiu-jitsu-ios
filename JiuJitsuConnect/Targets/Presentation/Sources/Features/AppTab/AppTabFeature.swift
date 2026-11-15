@@ -242,7 +242,7 @@ public struct AppTabFeature: Sendable {
                 Log.trace("커뮤니티 로그인 모달 요청: reason=\(reason ?? "-")", category: .view, level: .info)
                 return .send(.internal(.showLoginModal))
 
-            // 커뮤니티의 내 사진 버튼(#128)·피드·글 상세·댓글에서 내 이름 탭(#116).
+            // 커뮤니티 피드·글 상세·댓글에서 내 이름 탭(#116).
             // 남의 사진을 누를 때처럼 MY 화면을 커뮤니티 스택에 쌓아 뒤로가기로 돌아오게 한다(#197).
             // 탭의 MY가 불러 둔 프로필을 넘겨 바로 그린다. 게스트는 커뮤니티 행위와 같이 로그인 안내를 띄운다.
             case .home(.delegate(.myProfileRequested)):
@@ -253,7 +253,7 @@ public struct AppTabFeature: Sendable {
                 return .none
 
             // MY 탭 웹 서브뷰(커뮤니티 활동·차단한 회원)·대회 탭 웹에서 내 이름 탭. 탭바에서 MY를 누른 것과 같은 경로라 프로필 재조회도 그대로 따른다.
-            // 내 사진은 내 프로필을 뜻하므로, MY에 열어 둔 하위 화면(커뮤니티 활동 등)은 닫고 프로필 첫 화면으로 보낸다.
+            // 내 이름은 내 프로필을 뜻하므로, MY에 열어 둔 하위 화면(커뮤니티 활동 등)은 닫고 프로필 첫 화면으로 보낸다.
             case .myPage(.delegate(.webSubview(.myTabRequested))),
                  .competition(.delegate(.myTabRequested)):
                 if !state.authInfo.isGuest {
@@ -302,11 +302,6 @@ public struct AppTabFeature: Sendable {
                 else { return .none }
                 state.myPage.path.append(.communityDetail(.init(url: url, accessToken: state.home.accessToken)))
                 return .none
-
-            // MY에서 바꾼 사진을 커뮤니티 헤더에 바로 반영한다. 탭 진입 재조회에만 맡기면
-            // 삭제·업로드가 끝나기 전에 홈으로 넘어온 경우 변경 전 사진이 남는다.
-            case let .myPage(.delegate(.profileImageChanged(url))):
-                return .send(.home(.myProfileImageChanged(url.flatMap(URL.init(string:)))))
 
             // MY(탭이든 커뮤니티에 쌓인 것이든)에서 프로필을 저장하면 열린 웹뷰 모두가 내 프로필을 다시 불러오게 한다(jiu-jitsu-frontend#413).
             case .myPage(.delegate(.profileUpdated)), .home(.delegate(.profileUpdated)):
@@ -411,7 +406,7 @@ public struct AppTabFeature: Sendable {
 
             case let .deepLink(link):
                 // 대회 외의 딥링크 대상은 모두 커뮤니티 영역이라, 다른 탭에 있었다면 홈으로 되돌린 뒤 넘긴다.
-                // 탭바로 돌아올 때처럼 새 알림 점·내 사진도 다시 조회한다(탭 뷰가 유지돼 onAppear가 다시 오지 않음).
+                // 탭바로 돌아올 때처럼 새 알림 점도 다시 조회한다(탭 뷰가 유지돼 onAppear가 다시 오지 않음).
                 let isEnteringHome = state.selectedTab != .home
                 state.selectedTab = .home
                 return .merge(

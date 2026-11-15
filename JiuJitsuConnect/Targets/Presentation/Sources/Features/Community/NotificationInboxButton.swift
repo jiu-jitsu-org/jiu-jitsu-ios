@@ -13,7 +13,7 @@ struct NotificationInboxButton: View {
     let action: () -> Void
 
     private enum Metrics {
-        // 홈 머리줄의 다른 아이콘 버튼(검색·내 사진)과 같은 크기
+        // 홈 머리줄의 다른 아이콘 버튼(검색)과 같은 크기
         static let iconSize: CGFloat = 24
         static let buttonSize: CGFloat = 40
         // 새 알림 점: 6pt 원 + 바깥 1pt 테두리. 빨간 원이 종 아이콘(24pt) 상단에 딱 붙고 오른쪽에서 1pt 안쪽에 겹친다.
