@@ -90,8 +90,10 @@ struct ColorDoc: View {
     }
 
     private var arrow: some View {
-        Image(systemName: "arrow.right")
-            .font(.pretendard.labelM)
+        Assets.Common.Icon.chevronRight.swiftUIImage
+            .resizable()
+            .scaledToFit()
+            .frame(width: 12, height: 12)
             .foregroundStyle(Color.semantic.icon.tertiary)
     }
 
