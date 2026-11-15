@@ -118,6 +118,7 @@ struct ToastDoc: View {
             )
         }
         .toast(liveToast, onSwipe: { liveToast = nil }, onButtonTapped: { _ in liveToast = nil })
+        .onDisappear { dismissTask?.cancel() }
     }
 
     private func toastSample(_ state: ToastState) -> some View {
