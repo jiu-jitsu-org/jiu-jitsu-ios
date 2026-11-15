@@ -1074,6 +1074,16 @@ public struct MyProfileFeature: Sendable {
                 state.sheet = nil
                 return .none
 
+            case let .sheet(.presented(.instructorVerification(.delegate(.mailUnavailable(email))))):
+                // 메일 앱이 없으면 주소를 복사해 두고, 시트를 닫아 MY 화면 알림으로 알려 준다.
+                state.sheet = nil
+                return .run { send in
+                    await MainActor.run { UIPasteboard.general.string = email }
+                    await send(.internal(.showToast(.init(
+                        message: "메일 앱을 열 수 없어 문의 주소를 복사했어요", status: .info
+                    ))))
+                }
+
             case let .internal(.presentImageEditSheet(purpose, canDelete)):
                 state.sheet = .profileImageEdit(
                     ProfileImageEditFeature.State(purpose: purpose, canDelete: canDelete)
