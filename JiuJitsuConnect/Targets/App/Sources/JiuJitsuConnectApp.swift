@@ -109,7 +109,8 @@ struct PulseConsoleOnShakeModifier: ViewModifier {
 /// 예: `xcrun simctl launch booted <bundle id> -DesignSystemCatalog button`
 struct DesignSystemCatalogOnLaunchModifier: ViewModifier {
     #if DEBUG || BETA
-    @State private var isPresented = UserDefaults.standard.string(forKey: "DesignSystemCatalog") != nil
+    // 빈 값으로 넘어오면 열지 않는다(-DesignSystemCatalog "").
+    @State private var isPresented = !(UserDefaults.standard.string(forKey: "DesignSystemCatalog") ?? "").isEmpty
 
     func body(content: Content) -> some View {
         content
