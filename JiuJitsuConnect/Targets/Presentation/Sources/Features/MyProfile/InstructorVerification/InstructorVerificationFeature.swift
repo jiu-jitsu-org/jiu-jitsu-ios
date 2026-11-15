@@ -11,9 +11,9 @@ import CoreKit
 import Domain
 
 /// 운영팀 문의 메일. 인증 해제·변경처럼 관리자만 할 수 있는 일을 받는다.
-/// 주소가 정해지기 전(`nil`)에는 문의 버튼을 숨겨 빈 링크가 나가지 않게 한다.
+/// 이용약관·개인정보처리방침의 운영자 메일과 같은 주소다. `nil`이면 문의 버튼을 숨긴다.
 public enum SupportContact {
-    public static let email: String? = nil
+    public static let email: String? = "jiujitsulab.team@gmail.com"
 }
 
 /// 관장 사범 인증 바텀 시트 Feature.
@@ -21,6 +21,8 @@ public enum SupportContact {
 @Reducer
 public struct InstructorVerificationFeature: Sendable {
     public init() {}
+
+    private enum CancelID { case contact }
 
     @ObservableState
     public struct State: Equatable, Sendable {
@@ -68,6 +70,8 @@ public struct InstructorVerificationFeature: Sendable {
         public enum DelegateAction: Sendable {
             case didSelectUpload
             case didCancel
+            /// 메일 앱을 열지 못함(메일 앱 삭제 등). 부모가 주소를 복사하고 알려 준다.
+            case mailUnavailable(email: String)
         }
     }
 
@@ -94,11 +98,14 @@ public struct InstructorVerificationFeature: Sendable {
                     Log.trace("관장 사범 인증 문의 메일 주소를 만들지 못함: \(email)", category: .view, level: .error)
                     return .none
                 }
-                return .run { _ in
+                return .run { send in
                     if await !openURL(url) {
-                        Log.trace("관장 사범 인증 문의 메일을 열지 못함(메일 계정 없음 등)", category: .view, level: .error)
+                        Log.trace("관장 사범 인증 문의 메일을 열지 못함(메일 앱 없음 등)", category: .view, level: .error)
+                        await send(.delegate(.mailUnavailable(email: email)))
                     }
                 }
+                // 빠르게 두 번 누르면 앞 시도를 취소해, 메일 앱이 없을 때 알림이 두 번 오지 않게 한다.
+                .cancellable(id: CancelID.contact, cancelInFlight: true)
 
             case .delegate:
                 return .none
