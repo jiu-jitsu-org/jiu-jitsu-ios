@@ -39,7 +39,27 @@ extension BeltRank {
         }
     }
 
-    /// 벨트 등급에 따른 헤더 배경색
+    /// 띠 색 그대로(#320) — MY 헤더 바탕·사진 링·벨트 카드가 같은 색을 쓴다.
+    var beltColor: Color {
+        let belt = Color.component.myBelt
+        switch self {
+        case .white: return belt.white
+        case .blue: return belt.blue
+        case .purple: return belt.purple
+        case .brown: return belt.brown
+        case .black: return belt.black
+        }
+    }
+
+    /// 바탕이 밝은 띠 — 그 위 글자·아이콘·무늬를 어둡게 칠한다(키즈 노랑띠도 여기에 들어간다).
+    var isLightBelt: Bool { self == .white }
+
+    /// 링·카드에 칠하는 띠 색. 흰띠만 헤더 바탕(#F4F4F2) 위에서 뜨게 순백.
+    var beltSurfaceColor: Color {
+        self == .white ? Color.component.myBelt.whiteRing : beltColor
+    }
+
+    /// 다른 사람 프로필 헤더 배경색 (MY는 `beltColor`를 쓴다)
     /// 띠 몸 색으로 칠하되, 몸 색이 너무 밝거나(흰띠) 어두우면(검은띠) 그 띠의 바 색으로 칠한다 —
     /// 흰띠는 검은 바(먹색), 검은띠는 빨간 바.
     var headerBackgroundColor: Color {
@@ -59,6 +79,18 @@ extension BeltRank {
 }
 
 extension Optional where Wrapped == BeltRank {
+    /// MY 헤더 바탕(#320). 띠가 없으면 기본색.
+    var myHeaderColor: Color {
+        self?.beltColor ?? Color.component.myProfileHeader.bg.default
+    }
+
+    /// MY 헤더 위 글자·아이콘 색 — 밝은 띠면 어둡게, 아니면 흰색
+    var myHeaderForeground: Color {
+        self?.isLightBelt == true
+            ? Color.component.myBelt.onLight
+            : Color.component.list.setting.background
+    }
+
     /// Optional BeltRank의 헤더 배경색 (nil일 경우 기본색)
     var headerBackgroundColor: Color {
         switch self {
