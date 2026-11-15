@@ -1079,6 +1079,8 @@ public struct MyProfileFeature: Sendable {
                 state.sheet = nil
                 return .run { send in
                     await MainActor.run { UIPasteboard.general.string = email }
+                    // 시트가 내려가는 동안 알림이 시트 밑에 가려지지 않게 닫힌 뒤에 띄운다.
+                    try await clock.sleep(for: .milliseconds(300))
                     await send(.internal(.showToast(.init(
                         message: "메일 앱을 열 수 없어 문의 주소를 복사했어요", status: .info
                     ))))

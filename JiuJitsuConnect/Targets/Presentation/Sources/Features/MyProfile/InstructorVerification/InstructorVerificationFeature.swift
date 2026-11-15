@@ -22,6 +22,8 @@ public enum SupportContact {
 public struct InstructorVerificationFeature: Sendable {
     public init() {}
 
+    private enum CancelID { case contact }
+
     @ObservableState
     public struct State: Equatable, Sendable {
         public let verification: OwnerVerification
@@ -102,6 +104,8 @@ public struct InstructorVerificationFeature: Sendable {
                         await send(.delegate(.mailUnavailable(email: email)))
                     }
                 }
+                // 빠르게 두 번 누르면 앞 시도를 취소해, 메일 앱이 없을 때 알림이 두 번 오지 않게 한다.
+                .cancellable(id: CancelID.contact, cancelInFlight: true)
 
             case .delegate:
                 return .none
