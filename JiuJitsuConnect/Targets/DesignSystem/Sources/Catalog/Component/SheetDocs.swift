@@ -17,7 +17,7 @@ struct BottomSheetDoc: View {
         CatalogDoc(
             group: .component,
             title: "바텀시트",
-            summary: "아래에서 올라오는 시트 틀. 내용은 부르는 쪽이 넣는다. 시스템 sheet 대신 우리 모양(위 모서리 24·손잡이·끌어서 닫기)을 쓴다.",
+            summary: "아래에서 올라오는 시트 틀. 내용은 부르는 쪽이 넣는다. 시스템 sheet 대신 우리 모양(위 모서리 24·끌어서 닫기)을 쓴다.",
             chips: ["앱 화면 쓰는 곳 0", "2026-11-16 기준"]
         ) {
             CatalogSection(title: "개요", note: "눌러서 띄운다. 아래로 끌거나 어두운 막을 누르면 닫힌다.") {
@@ -35,8 +35,8 @@ struct BottomSheetDoc: View {
                 CatalogAnatomyList(items: [
                     "어두운 막 — component.bottomSheet.selected.container.scrim",
                     "시트 — container.background, 위 모서리 24",
-                    "손잡이 — container.handle",
-                    "내용 — customBottomSheet { } 에 넣은 View"
+                    "내용 — customBottomSheet { } 에 넣은 View. 손잡이·제목은 틀에 없어 내용 쪽에서 그린다",
+                    "아래 여백 — 안전 영역만큼 시트 색으로 채운다"
                 ])
             }
 
@@ -52,9 +52,8 @@ struct BottomSheetDoc: View {
                 CatalogSpecTable(colors: [
                     CatalogColorSpec(token: "component.bottomSheet.selected.container.scrim", role: "어두운 막", color: Color.component.bottomSheet.selected.container.scrim),
                     CatalogColorSpec(token: "component.bottomSheet.selected.container.background", role: "시트", color: Color.component.bottomSheet.selected.container.background),
-                    CatalogColorSpec(token: "component.bottomSheet.selected.container.handle", role: "손잡이", color: Color.component.bottomSheet.selected.container.handle),
-                    CatalogColorSpec(token: "component.bottomSheet.selected.container.title", role: "제목", color: Color.component.bottomSheet.selected.container.title),
-                    CatalogColorSpec(token: "component.bottomSheet.selected.container.closeIcon", role: "닫기 아이콘", color: Color.component.bottomSheet.selected.container.closeIcon)
+                    CatalogColorSpec(token: "component.bottomSheet.selected.container.handle", role: "손잡이(내용 쪽에서 그릴 때)", color: Color.component.bottomSheet.selected.container.handle),
+                    CatalogColorSpec(token: "component.bottomSheet.selected.container.title", role: "제목(내용 쪽에서 그릴 때)", color: Color.component.bottomSheet.selected.container.title)
                 ])
             }
 
@@ -115,6 +114,23 @@ struct SelectSheetDoc: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
             }
 
+            CatalogSection(title: "해부도") {
+                CatalogAnatomyList(items: [
+                    "손잡이 · 제목(title2) · 설명(labelM)",
+                    "항목 줄 — 라디오 + 글자, 고르면 라디오가 켜진다",
+                    "직접 쓰기 칸 — allowsCustomText 항목을 고르면 열린다(customTextMaxLength 까지)",
+                    "보내기 — 버튼 부품 primary·large, 고르기 전에는 비활성"
+                ])
+            }
+
+            CatalogSection(title: "비슷한 부품") {
+                CatalogCompareTable(rows: [
+                    (token: "고르기 시트", role: "순서 없는 항목 중 하나를 골라 보냄"),
+                    (token: "시트 피커", role: "차례가 있는 값을 굴려 고름"),
+                    (token: "바텀시트", role: "내용을 직접 채우는 빈 틀")
+                ])
+            }
+
             CatalogSection(title: "가이드라인") {
                 CatalogGuideline(
                     goodText: "항목 글자는 짧은 명사구로, 마지막에 '기타'를 두고 직접 쓰게 한다.",
@@ -163,6 +179,14 @@ struct TermsRowDoc: View {
                 }
             }
 
+            CatalogSection(title: "해부도") {
+                CatalogAnatomyList(items: [
+                    "체크 — 켜면 파랑, 끄면 회색",
+                    "약관 이름 + (필수)·(선택) — 종류 글자 색은 부르는 쪽이 준다",
+                    "보기 화살표 — 약관 주소가 있을 때만(showsSeeDetails)"
+                ])
+            }
+
             CatalogSection(title: "상태") {
                 CatalogPlate {
                     VStack(spacing: 4) {
@@ -179,6 +203,27 @@ struct TermsRowDoc: View {
                             followingIconColor: .clear, showsSeeDetails: false, onCheckTapped: {}, onSeeDetailsTapped: {}
                         )
                     }
+                }
+            }
+
+            CatalogSection(title: "가이드라인") {
+                CatalogGuideline(
+                    goodText: "(필수)·(선택)을 이름 바로 뒤에 붙여 한 줄에서 읽히게 한다.",
+                    badText: "필수 약관을 미리 체크해 두지 않는다. 사용자가 직접 체크한다."
+                ) {
+                    TermsAgreementRow(
+                        title: "서비스 이용약관", typeText: "(필수)", isChecked: false,
+                        leadingIconColor: .clear, labelColor: .clear,
+                        typeTextColor: Color.component.bottomSheet.selected.listItem.labelRequired,
+                        followingIconColor: .clear, onCheckTapped: {}, onSeeDetailsTapped: {}
+                    )
+                } bad: {
+                    TermsAgreementRow(
+                        title: "서비스 이용약관", typeText: "(필수)", isChecked: true,
+                        leadingIconColor: .clear, labelColor: .clear,
+                        typeTextColor: Color.component.bottomSheet.selected.listItem.labelRequired,
+                        followingIconColor: .clear, onCheckTapped: {}, onSeeDetailsTapped: {}
+                    )
                 }
             }
 

@@ -84,6 +84,29 @@ struct SheetPickerDoc: View {
                 }
             }
 
+            CatalogSection(title: "가이드라인") {
+                CatalogGuideline(
+                    goodText: "값이 차례로 이어질 때(연도·체급·띠) 쓴다. 지금 값을 가운데 두고 앞뒤를 흐리게 보여 준다.",
+                    badText: "순서가 없는 항목(신고 사유 등)을 굴려 고르게 하지 않는다. 고르기 시트를 쓴다."
+                ) {
+                    Text("2024 · 2025 · 2026")
+                        .font(.pretendard.bodyS)
+                        .foregroundStyle(Color.semantic.text.primary)
+                } bad: {
+                    Text("욕설 · 광고 · 기타")
+                        .font(.pretendard.bodyS)
+                        .foregroundStyle(Color.semantic.text.primary)
+                }
+            }
+
+            CatalogSection(title: "비슷한 부품") {
+                CatalogCompareTable(rows: [
+                    (token: "시트 피커", role: "차례가 있는 값 여럿 중 하나"),
+                    (token: "세그먼트", role: "둘 중 하나"),
+                    (token: "고르기 시트", role: "순서 없는 항목 중 하나 + 직접 쓰기")
+                ])
+            }
+
             CatalogSection(title: "스펙") {
                 CatalogSpecTable(colors: [
                     CatalogColorSpec(token: "component.picker.itemSelectedBg", role: "고른 줄 면", color: Color.component.picker.itemSelectedBg),
@@ -111,6 +134,13 @@ struct LottieDoc: View {
                     JJSLottieView("Confetti")
                         .frame(height: 240)
                 }
+            }
+
+            CatalogSection(title: "스펙") {
+                CatalogCompareTable(rows: [
+                    (token: "JJSLottieView(_ filename:, loopMode:)", role: "파일 이름은 확장자 없이. loopMode 기본 .loop"),
+                    (token: "Resources/Lottie/Confetti.lottie", role: "지금 들어 있는 유일한 파일")
+                ])
             }
 
             CatalogSection(title: "가이드라인") {
@@ -150,7 +180,7 @@ struct BeltCharacterDoc: View {
                 CatalogPlate {
                     CatalogCaptioned(caption: "\(pose.rawValue) · \(face.rawValue)") {
                         BeltCharacter(pose: pose, face: face)
-                            .frame(width: 140)
+                            .frame(width: 110)
                     }
                 }
             }

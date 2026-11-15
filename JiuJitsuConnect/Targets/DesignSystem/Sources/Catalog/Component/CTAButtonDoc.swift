@@ -24,6 +24,14 @@ struct CTAButtonDoc: View {
                 }
             }
 
+            CatalogSection(title: "해부도") {
+                CatalogAnatomyList(items: [
+                    "바탕 — component.cta.<종류>.bg, 폭을 꽉 채운다",
+                    "글자 — component.cta.<종류>.text",
+                    "왼쪽 아이콘(선택) — leftIcon"
+                ])
+            }
+
             CatalogSection(title: "변형", note: "type 을 따로 주지 않으면 blue. 앱에서 type 을 적은 곳: blue 4 · text 2 · tint 1") {
                 CatalogPlate {
                     VStack(spacing: 12) {
@@ -77,6 +85,13 @@ struct CTAButtonDoc: View {
                         CTAButton(title: "삭제", type: .dark) {}
                     }
                 }
+            }
+
+            CatalogSection(title: "비슷한 부품") {
+                CatalogCompareTable(rows: [
+                    (token: "CTA 버튼", role: "화면의 다음 단계·저장. 맨 아래 하나"),
+                    (token: "버튼 (appButtonStyle)", role: "카드·줄 안의 작은 동작. 폭은 글자만큼")
+                ])
             }
 
             CatalogSection(title: "스펙", note: "blue 기준. 다른 종류는 component.cta.<dark·tint·transparentText> 를 같은 자리에 쓴다.") {
