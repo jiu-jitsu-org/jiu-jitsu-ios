@@ -10,6 +10,7 @@ public struct SplashFeature: Sendable {
     private enum CancelID: Hashable, Sendable {
         case onAppearLaunch
         case minimumDisplay
+        case versionCheck
     }
 
     // 스플래시 최소 노출 시간
@@ -17,6 +18,8 @@ public struct SplashFeature: Sendable {
     // 자동 로그인 확인을 기다리는 최대 시간(정책 2026-10-21, #75). 모바일 API 제한 시간으로 흔한 값 —
     // 5초는 느린 망에서 정상 사용자도 실패하고, 30초(공통 timeout)는 앱이 멈춘 것처럼 보인다.
     private static let maximumWaitDuration: Duration = .seconds(10)
+    // 버전 확인 응답만 늦으면 이만큼에서 끊고 안내 없이 진행한다(#326). 자동 로그인보다 오래 붙잡지 않는다.
+    private static let versionCheckWaitDuration: Duration = .seconds(3)
 
     private enum AutoLoginOutcome: Sendable {
         case completed(TaskResult<AuthInfo?>)
@@ -26,6 +29,8 @@ public struct SplashFeature: Sendable {
     @Dependency(\.continuousClock) var clock
     @Dependency(\.authClient) var authClient
     @Dependency(\.homeFeedPreloadClient) var homeFeedPreload
+    @Dependency(\.appVersionClient) var appVersionClient
+    @Dependency(\.openURL) var openURL
 
     @ObservableState
     public struct State: Equatable {
@@ -34,8 +39,13 @@ public struct SplashFeature: Sendable {
         var isMinimumDisplaySatisfied = false
         // 자동 로그인을 다 기다림. 결과가 비로그인(nil)인 것과 아직 기다리는 중을 가르려고 감싼다.
         var autoLoginResult: AutoLoginResult?
+        // 버전 확인을 다 기다림(#326). 확인 실패 · 시간 초과는 `.upToDate`로 두어 안내 없이 진행한다.
+        var updateRequirement: AppUpdateRequirement?
+        // 공유 링크 · 푸시로 들어옴 — 권장 업데이트 안내를 건너뛰고 보려던 글로 간다(#326).
+        var hasPendingDeepLink = false
+        // 권장 업데이트 안내. 꼭 필요한 업데이트는 앱 전체를 막아야 해 AppFeature가 띄운다.
+        var recommendedUpdateVersion: String?
         var hasFinished = false
-        @Presents public var alert: AlertState<Alert>?
 
         public init() {}
     }
@@ -48,26 +58,27 @@ public struct SplashFeature: Sendable {
         case view(ViewAction)
         case `internal`(InternalAction)
         case delegate(DelegateAction)
-        case alert(PresentationAction<Alert>)
         /// 스플래시 중에 공유 링크·푸시가 보관됐다. 그 글을 빨리 보여 주려고 최소 노출 시간을 기다리지 않는다(#300).
         case deepLinkPending
 
         public enum ViewAction: Sendable {
             case onAppear
+            // 권장 업데이트 안내(#326)
+            case recommendedUpdateTapped
+            case recommendedUpdateLaterTapped
         }
 
         public enum InternalAction: Sendable {
             case minimumDisplayElapsed
             case autoLoginFinished(AuthInfo?)
+            case versionChecked(AppUpdateRequirement)
         }
 
         public enum DelegateAction: Sendable {
             case finishedLaunch(authInfo: AuthInfo?)
+            // 꼭 필요한 업데이트 — 스플래시에서 넘어가지 않고, 부모가 닫을 수 없는 안내를 띄운다(#326).
+            case updateRequired
         }
-    }
-    
-    public enum Alert: Sendable {
-        case goToUpdateTapped
     }
     
     public var body: some ReducerOf<Self> {
@@ -144,34 +155,103 @@ public struct SplashFeature: Sendable {
                     }
                 }
                 .cancellable(id: CancelID.onAppearLaunch, cancelInFlight: true)
-                return .merge(minimumDisplay, autoLogin)
+                return .merge(minimumDisplay, autoLogin, checkVersion())
 
             case .deepLinkPending:
                 state.isMinimumDisplaySatisfied = true
-                return .merge(.cancel(id: CancelID.minimumDisplay), Self.finishIfReady(&state))
+                state.hasPendingDeepLink = true
+                return .merge(.cancel(id: CancelID.minimumDisplay), finishIfReady(&state))
 
             case .internal(.minimumDisplayElapsed):
                 state.isMinimumDisplaySatisfied = true
-                return Self.finishIfReady(&state)
+                return finishIfReady(&state)
 
             case let .internal(.autoLoginFinished(authInfo)):
                 state.autoLoginResult = AutoLoginResult(authInfo: authInfo)
-                return Self.finishIfReady(&state)
+                return finishIfReady(&state)
 
-            case .alert(.presented(.goToUpdateTapped)):
-                // TODO: - 추후 업데이트 로직 구현 필요
-                return .none
-                
-            case .alert, .delegate, .view:
+            case let .internal(.versionChecked(requirement)):
+                state.updateRequirement = requirement
+                return finishIfReady(&state)
+
+            case .view(.recommendedUpdateTapped):
+                // 스토어에 다녀와도 쓰던 앱으로 돌아오게 홈으로 넘어간다. '나중에'가 아니라 다음 실행에 다시 안내한다.
+                state.recommendedUpdateVersion = nil
+                let storeURL = appVersionClient.storeURL()
+                return .merge(
+                    .run { _ in
+                        guard let storeURL else { return }
+                        await openURL(storeURL)
+                    },
+                    finish(&state)
+                )
+
+            case .view(.recommendedUpdateLaterTapped):
+                guard let version = state.recommendedUpdateVersion else { return .none }
+                state.recommendedUpdateVersion = nil
+                appVersionClient.setDismissedRecommendedVersion(version)
+                return finish(&state)
+
+            case .delegate, .view:
                 return .none
             }
         }
-        .ifLet(\.$alert, action: \.alert)
     }
 
-    /// 자동 로그인을 다 기다렸고 최소 노출 시간도 채웠으면(또는 링크로 들어와 건너뛰면) 한 번만 넘어간다.
-    private static func finishIfReady(_ state: inout State) -> Effect<Action> {
-        guard !state.hasFinished, state.isMinimumDisplaySatisfied, let result = state.autoLoginResult else { return .none }
+    /// 서버의 최소 · 최신 버전을 자동 로그인과 함께 확인한다. 실패하거나 늦으면 안내 없이 진행한다(#326).
+    private func checkVersion() -> Effect<Action> {
+        .run { send in
+            let policy = await withTaskGroup(of: AppVersionPolicy?.self) { group in
+                group.addTask {
+                    do {
+                        return try await self.appVersionClient.fetchPolicy()
+                    } catch {
+                        Log.trace("⚠️ App version check failed: \(error)", category: .network, level: .error)
+                        return nil
+                    }
+                }
+                group.addTask {
+                    try? await self.clock.sleep(for: Self.versionCheckWaitDuration)
+                    return nil
+                }
+                // 먼저 끝난 쪽(응답 또는 시간 초과)을 쓴다. 시간 초과는 nil이다
+                let first = await group.next().flatMap { $0 }
+                group.cancelAll()
+                return first
+            }
+            let requirement = policy?.requirement(for: appVersionClient.currentVersion()) ?? .upToDate
+            Log.trace("App version check: \(requirement)", category: .debug, level: .info)
+            await send(.internal(.versionChecked(requirement)))
+        }
+        .cancellable(id: CancelID.versionCheck, cancelInFlight: true)
+    }
+
+    /// 자동 로그인 · 버전 확인을 다 기다렸고 최소 노출 시간도 채웠으면(또는 링크로 들어와 건너뛰면) 한 번만 넘어간다.
+    /// 꼭 필요한 업데이트면 넘어가지 않고, 권장 업데이트면 안내를 먼저 띄운다(#326).
+    private func finishIfReady(_ state: inout State) -> Effect<Action> {
+        guard
+            !state.hasFinished,
+            state.recommendedUpdateVersion == nil,
+            state.isMinimumDisplaySatisfied,
+            state.autoLoginResult != nil,
+            let requirement = state.updateRequirement
+        else { return .none }
+
+        switch requirement {
+        case .required:
+            state.hasFinished = true
+            return .send(.delegate(.updateRequired))
+        case let .recommended(latestVersion)
+            where !state.hasPendingDeepLink && appVersionClient.dismissedRecommendedVersion() != latestVersion:
+            state.recommendedUpdateVersion = latestVersion
+            return .none
+        case .recommended, .upToDate:
+            return finish(&state)
+        }
+    }
+
+    private func finish(_ state: inout State) -> Effect<Action> {
+        guard !state.hasFinished, let result = state.autoLoginResult else { return .none }
         state.hasFinished = true
         return .send(.delegate(.finishedLaunch(authInfo: result.authInfo)))
     }

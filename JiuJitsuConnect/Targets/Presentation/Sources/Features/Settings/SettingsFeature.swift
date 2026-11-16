@@ -39,6 +39,8 @@ public struct SettingsFeature: Sendable {
     public struct State: Equatable, Sendable {
         var authInfo: AuthInfo
         var appVersion: String
+        // 서버 최신 버전과 비교한 결과(#326). 아직 확인 못 했으면 nil — 지금처럼 버전만 보인다.
+        var isLatestVersion: Bool?
 
         @Presents var destination: Destination.State?
         @Presents var termsWebCover: TermsWebViewFeature.State?
@@ -76,8 +78,11 @@ public struct SettingsFeature: Sendable {
         case termsWebCover(PresentationAction<TermsWebViewFeature.Action>)
 
         public enum ViewAction: Sendable {
+            case onAppear
             // MY에서 밀어 연 설정의 왼쪽 위 뒤로가기(#241)
             case backTapped
+            // 버전 정보의 '업데이트'(#326)
+            case updateButtonTapped
             case notificationButtonTapped
             case blockedUsersButtonTapped
             case termsButtonTapped
@@ -93,6 +98,7 @@ public struct SettingsFeature: Sendable {
         }
 
         public enum InternalAction: Sendable {
+            case versionPolicyLoaded(AppVersionPolicy)
             case withdrawalResponse(TaskResult<Bool>)
             case showToast(ToastState)
             case toastDismissed
@@ -118,12 +124,34 @@ public struct SettingsFeature: Sendable {
     @Dependency(\.authClient) var authClient
     @Dependency(\.continuousClock) var clock
     @Dependency(\.dismiss) var dismiss
+    @Dependency(\.appVersionClient) var appVersionClient
+    @Dependency(\.openURL) var openURL
+    @Dependency(\.date) var date
 
     // MARK: - Reducer Body
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
             // MARK: UI Actions
+            case .view(.onAppear):
+                // 스플래시에서 받은 결과를 쓰고, 확인이 실패했거나 오래됐으면 한 번 더 받는다(#326).
+                if let checked = appVersionClient.lastChecked() {
+                    state.isLatestVersion = Self.isLatest(state.appVersion, policy: checked.policy)
+                }
+                guard appVersionClient.needsRecheck(now: date.now) else { return .none }
+                return .run { send in
+                    guard let policy = try? await appVersionClient.fetchPolicy() else { return }
+                    await send(.internal(.versionPolicyLoaded(policy)))
+                }
+
+            case let .internal(.versionPolicyLoaded(policy)):
+                state.isLatestVersion = Self.isLatest(state.appVersion, policy: policy)
+                return .none
+
+            case .view(.updateButtonTapped):
+                guard let storeURL = appVersionClient.storeURL() else { return .none }
+                return .run { _ in await openURL(storeURL) }
+
             case .view(.backTapped):
                 guard !state.isWithdrawing else { return .none }
                 return .run { _ in await self.dismiss() }
@@ -271,3 +299,10 @@ public struct SettingsFeature: Sendable {
 
 extension SettingsFeature.Destination.State: Equatable, Sendable {}
 extension SettingsFeature.Destination.Action: Sendable {}
+
+extension SettingsFeature {
+    /// 버전 정보 줄의 표시(#326). 최소 버전보다 낮아도 '업데이트'로 같이 보인다.
+    static func isLatest(_ currentVersion: String, policy: AppVersionPolicy) -> Bool {
+        policy.requirement(for: currentVersion) == .upToDate
+    }
+}

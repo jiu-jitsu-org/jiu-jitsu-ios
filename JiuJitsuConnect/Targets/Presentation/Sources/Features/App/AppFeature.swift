@@ -9,6 +9,8 @@ public struct AppFeature: Sendable {
     private enum CancelID: Hashable, Sendable {
         // 푸시 탭 릴레이 구독. 앱 생명주기 내내 유지한다.
         case pushTapObserver
+        // 켜 둔 앱을 다시 열 때 버전 재확인(#326)
+        case versionRecheck
     }
 
     @Reducer
@@ -28,6 +30,8 @@ public struct AppFeature: Sendable {
         var greeting: Greeting?
         /// 인사 중이라 미뤄 둔 앱 진입 FCM sync. 알림 권한 창이 인사 장면을 가리지 않게 인사가 끝난 뒤 돌린다(#216).
         var isLaunchSyncDeferred = false
+        /// 꼭 필요한 업데이트(#326). 닫을 수 없는 안내로 앱 전체를 막는다 — 업데이트하면 앱이 새로 켜진다.
+        var isUpdateRequired = false
 
         public init() {}
     }
@@ -53,17 +57,24 @@ public struct AppFeature: Sendable {
             case greetingCoverStarted
             /// 홈이 화면을 다 덮었다. 인사 장면을 걷어낸다.
             case greetingFinished
+            /// 꼭 필요한 업데이트 안내의 [업데이트](#326)
+            case requiredUpdateTapped
         }
 
         public enum InternalAction: Sendable {
             /// AppDelegate가 릴레이로 넘긴 푸시 탭 payload.
             case pushNotificationTapped(PushActionPayload)
+            /// 켜 둔 앱을 다시 열 때 버전을 다시 확인했더니 꼭 필요한 업데이트(#326).
+            case updateRequiredOnResume
         }
     }
 
     @Dependency(\.firebaseClient) var firebaseClient
     @Dependency(\.userClient) var userClient
     @Dependency(\.pushNotificationClient) var pushNotificationClient
+    @Dependency(\.appVersionClient) var appVersionClient
+    @Dependency(\.openURL) var openURL
+    @Dependency(\.date) var date
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -88,7 +99,26 @@ public struct AppFeature: Sendable {
             case .view(.sceneBecameActive):
                 // 오프라인 로그아웃으로 폐기하지 못한 토큰을 네트워크가 돌아온 뒤 복귀 때 다시 폐기한다(#269).
                 // 로그인 화면에 머문 게스트도 받도록 탭 화면이 아닌 앱 루트에서 한다.
-                return .run { _ in await firebaseClient.retryPendingTokenDeletion() }
+                return .merge(
+                    .run { _ in await firebaseClient.retryPendingTokenDeletion() },
+                    recheckVersionOnResume(state)
+                )
+
+            case .internal(.updateRequiredOnResume):
+                state.isUpdateRequired = true
+                // 쓰던 화면을 닫는다. 업데이트하면 앱이 새로 켜지므로 돌아올 일이 없다.
+                state.destination = nil
+                state.greeting = nil
+                return .none
+
+            case .view(.requiredUpdateTapped):
+                // 안내는 닫지 않는다. 스토어에서 업데이트하지 않고 돌아와도 같은 안내가 남는다.
+                guard let storeURL = appVersionClient.storeURL() else { return .none }
+                return .run { _ in await openURL(storeURL) }
+
+            case .destination(.presented(.splash(.delegate(.updateRequired)))):
+                state.isUpdateRequired = true
+                return .none
 
             case let .view(.deepLinkReceived(url)):
                 return .merge(Self.route(url, into: &state), runDeferredLaunchSync(&state))
@@ -162,6 +192,21 @@ public struct AppFeature: Sendable {
         }
         // ifLet runs AFTER parent logic to handle child state
         .ifLet(\.$destination, action: \.destination)
+    }
+
+    /// 켜 둔 앱을 다시 열 때 마지막 확인 뒤 오래 지났으면 버전을 다시 확인한다(#326).
+    /// 다시 열 때는 꼭 필요한 업데이트만 안내한다. 스플래시는 직접 확인하므로 건너뛴다.
+    private func recheckVersionOnResume(_ state: State) -> Effect<Action> {
+        guard !state.isUpdateRequired, state.destination != nil else { return .none }
+        if case .splash? = state.destination { return .none }
+        guard appVersionClient.needsRecheck(now: date.now) else { return .none }
+        return .run { send in
+            guard let policy = try? await appVersionClient.fetchPolicy() else { return }
+            if policy.requirement(for: appVersionClient.currentVersion()) == .required {
+                await send(.internal(.updateRequiredOnResume))
+            }
+        }
+        .cancellable(id: CancelID.versionRecheck, cancelInFlight: true)
     }
 
     /// 앱 진입 FCM sync. 알림 권한을 아직 묻지 않았으면 여기서 권한 창이 뜬다.

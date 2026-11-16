@@ -65,12 +65,10 @@ public struct SettingsView: View {
 
                     // MARK: - 버전 정보 섹션
                     SettingsSection {
-                        HStack {
+                        HStack(spacing: 8) {
                             SettingsRowContent(asset: Assets.Common.Icon.version, text: "버전 정보")
                             Spacer()
-                            Text(store.appVersion)
-                                .font(Font.pretendard.captionM)
-                                .foregroundStyle(Color.component.list.setting.valueText)
+                            versionValue
                         }
                         .frame(minHeight: SettingsListMetrics.rowHeight)
                         .padding(.horizontal, 16)
@@ -102,6 +100,7 @@ public struct SettingsView: View {
             onSwipe: { store.send(.internal(.toastDismissed)) },
             onButtonTapped: { store.send(.view(.toastButtonTapped($0))) }
         )
+        .onAppear { store.send(.view(.onAppear)) }
         .appAlert(
             isPresented: Binding(
                 get: { store.alert != nil },
@@ -155,6 +154,34 @@ public struct SettingsView: View {
         .padding(.horizontal, Style.horizontalPadding)
         .frame(height: Style.headerHeight)
         .background(Color.component.background.default.ignoresSafeArea(edges: .top))
+    }
+
+    // MARK: - 버전 정보 (#326)
+    /// 최신이면 '버전 · 최신 버전', 새 버전이 있으면 버전과 '업데이트', 확인 못 했으면 지금처럼 버전만.
+    @ViewBuilder
+    private var versionValue: some View {
+        let versionText = Text(store.appVersion)
+            .font(Font.pretendard.captionM)
+            .foregroundStyle(Color.component.list.setting.valueText)
+        switch store.isLatestVersion {
+        case true?:
+            HStack(spacing: 0) {
+                versionText
+                Text(" · 최신 버전")
+                    .font(Font.pretendard.captionM)
+                    .foregroundStyle(Color.component.list.setting.valueText)
+            }
+        case false?:
+            versionText
+            Button {
+                store.send(.view(.updateButtonTapped))
+            } label: {
+                AppButtonConfiguration(title: "업데이트", size: .small)
+            }
+            .appButtonStyle(.primary, size: .small, height: 32)
+        case nil:
+            versionText
+        }
     }
 
     // MARK: - Alert Configuration Helper

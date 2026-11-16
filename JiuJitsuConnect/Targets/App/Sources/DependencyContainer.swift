@@ -236,6 +236,39 @@ public final class DependencyContainer {
         return sharedFirebaseClient
     }
 
+    /// 스플래시 · 앱 복귀 · 설정이 같은 버전 확인 결과를 보도록 한 벌만 둔다(#326).
+    private let appVersionPolicyCache = AppVersionPolicyCache()
+    private static let dismissedRecommendedVersionKey = "jj.appVersion.dismissed_recommended"
+
+    public func configureAppVersionClient() -> AppVersionClient {
+        let service = AppVersionService(networkService: sharedNetworkService)
+        let cache = appVersionPolicyCache
+        nonisolated(unsafe) let defaults = UserDefaults.standard
+        let dismissedKey = Self.dismissedRecommendedVersionKey
+        return AppVersionClient(
+            currentVersion: {
+                Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+            },
+            fetchPolicy: {
+                let policy = try await service.fetchPolicy()
+                cache.store(policy, at: Date())
+                return policy
+            },
+            lastChecked: {
+                cache.load()
+            },
+            dismissedRecommendedVersion: {
+                defaults.string(forKey: dismissedKey)
+            },
+            setDismissedRecommendedVersion: { version in
+                defaults.set(version, forKey: dismissedKey)
+            },
+            storeURL: {
+                AppStoreLink.url
+            }
+        )
+    }
+
     public func configureNoticeClient() -> NoticeClient {
         let noticeService = NoticeService(networkService: sharedNetworkService)
         return NoticeClient(
