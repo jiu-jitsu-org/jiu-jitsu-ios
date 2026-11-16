@@ -173,6 +173,8 @@ public struct MyProfileFeature: Sendable {
 
         public enum ViewAction: Sendable {
             case onAppear
+            /// 헤더에 서버 사진이 그려짐(#157)
+            case profileImageDisplayed(url: String)
             /// 커뮤니티에서 연 MY의 뒤로가기(#197)
             case backTapped
             // 다른 탭에서 MY로 전환 (탭 뷰가 유지돼 onAppear가 다시 오지 않으므로 AppTab이 보낸다)
@@ -274,6 +276,13 @@ public struct MyProfileFeature: Sendable {
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
+            case let .view(.profileImageDisplayed(url)):
+                // 업로드 뒤 새 사진이 실제로 보이면 겹쳐 둔 미리보기를 걷는다(#157).
+                // 업로드 중에 그려진 건 예전 사진이라 걷지 않는다.
+                guard !state.isUploadingProfileImage, url == state.userProfile?.profileImageUrl else { return .none }
+                state.pendingProfileImageData = nil
+                return .none
+
             case .view(.onAppear):
                 // 게스트 상태에서는 프로필 API를 호출하지 않는다.
                 // AppTabView가 모든 탭을 미리 마운트하므로 게스트일 때도 onAppear가 발화한다.
@@ -342,6 +351,7 @@ public struct MyProfileFeature: Sendable {
                 switch result {
                 case let .success(profile):
                     state.userProfile = profile
+                    state.pendingProfileImageData = nil
                 case let .failure(error):
                     Log.trace("Failed to refresh user profile: \(error)", category: .network, level: .error)
                 }
@@ -369,6 +379,8 @@ public struct MyProfileFeature: Sendable {
                 // 사진을 바꾸는 중이면 업로드 전 값이라 덮지 않는다 — 업로드 응답이 최신값을 넣는다.
                 guard !state.isUploadingProfileImage else { return .none }
                 state.userProfile = profile
+                // 서버 값이 기준이다. 남은 미리보기가 웹·다른 기기에서 바꾸거나 지운 사진을 가리지 않게 걷는다(#157).
+                state.pendingProfileImageData = nil
                 return .none
 
             case let .internal(.userProfileResponse(.failure(error))):
@@ -1372,10 +1384,9 @@ public struct MyProfileFeature: Sendable {
                 state.isUploadingProfileImage = false
                 state.userProfile = updatedProfile
                 state.isProfileImageDeleting = false
-                // 업로드 성공 시에는 pendingProfileImageData를 유지한다.
-                // AsyncImage가 새 URL을 가져오는 동안 `.empty` 단계에서 기본 아이콘이
-                // 잠깐 깜빡이는 걸 fallback으로 덮기 위함. 다음 업로드 때 새 값으로 덮어쓰고,
-                // 삭제 케이스에서는 명시적으로 nil로 정리한다.
+                // 업로드 성공 시에는 새 URL 사진이 그려질 때까지(profileImageDisplayed) 미리보기를 겹쳐 둔다.
+                // 그 사이 AsyncImage가 `.empty`로 시작하며 기본 아이콘이 깜빡이지 않게 하기 위함.
+                // 삭제 케이스에서는 바로 정리한다.
                 if updatedProfile.profileImageUrl == nil {
                     state.pendingProfileImageData = nil
                 }
