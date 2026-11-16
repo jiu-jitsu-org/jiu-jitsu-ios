@@ -24,6 +24,16 @@ public struct SplashView: View {
         }
         .ignoresSafeArea()
         .lightStatusBar()
+        // 권장 업데이트 안내(#326). 닫힘은 두 버튼으로만 정해지므로 바인딩의 set은 쓰지 않는다.
+        .appAlert(
+            isPresented: Binding(get: { store.recommendedUpdateVersion != nil }, set: { _ in }),
+            configuration: AppAlertConfiguration(
+                title: "새 버전이 나왔어요",
+                message: "더 편해진 OSS를 만나 보세요.",
+                primaryButton: .init(title: "업데이트", style: .primary) { store.send(.view(.recommendedUpdateTapped)) },
+                secondaryButton: .init(title: "나중에", style: .neutral) { store.send(.view(.recommendedUpdateLaterTapped)) }
+            )
+        )
         .onAppear {
             // 자동 로그인과 웹뷰 미리 만들기(#207, #270)는 SplashFeature가 정한 순서대로 시작한다
             store.send(.view(.onAppear))

@@ -1,5 +1,6 @@
 import SwiftUI
 import ComposableArchitecture
+import DesignSystem
 import Foundation
 
 @MainActor
@@ -35,6 +36,16 @@ public struct AppView: View {
         EmptyView()
       }
     }
+    // 꼭 필요한 업데이트(#326). 어느 화면 위에서도 닫을 수 없게 분기 바깥에 붙이고, 바인딩의 set은 쓰지 않는다.
+    .appAlert(
+      isPresented: Binding(get: { store.isUpdateRequired }, set: { _ in }),
+      configuration: AppAlertConfiguration(
+        title: "업데이트가 필요해요",
+        message: "더 안정적인 OSS를 위해 최신 버전으로 업데이트해 주세요.",
+        primaryButton: .init(title: "업데이트", style: .primary) { store.send(.view(.requiredUpdateTapped)) },
+        secondaryButton: nil
+      )
+    )
     // 푸시 탭 릴레이 구독 시작. 유니버설 링크 수신과 같은 이유로 분기 바깥(Group)에 붙인다.
     .onAppear { store.send(.view(.onAppear)) }
     .onChange(of: scenePhase) { _, phase in
