@@ -106,6 +106,9 @@ public struct AppFeature: Sendable {
 
             case .internal(.updateRequiredOnResume):
                 state.isUpdateRequired = true
+                // 쓰던 화면을 닫는다. 업데이트하면 앱이 새로 켜지므로 돌아올 일이 없다.
+                state.destination = nil
+                state.greeting = nil
                 return .none
 
             case .view(.requiredUpdateTapped):

@@ -14,7 +14,12 @@ public struct AppView: View {
   
   public var body: some View {
     Group {
-      if let splashStore = store.scope(state: \.destination?.splash, action: \.destination.splash) {
+      if store.isUpdateRequired {
+        // 꼭 필요한 업데이트(#326) — 쓰던 화면을 걷어 그 위에 떠 있던 시트·전체 화면 모달까지 함께 닫는다.
+        // 안내를 루트 overlay로 띄우므로, 모달이 남아 있으면 안내가 그 아래에 깔린다.
+        SplashArtwork()
+          .lightStatusBar()
+      } else if let splashStore = store.scope(state: \.destination?.splash, action: \.destination.splash) {
         SplashView(store: splashStore)
       } else if let loginStore = store.scope(state: \.destination?.login, action: \.destination.login) {
         LoginView(store: loginStore)
@@ -36,7 +41,7 @@ public struct AppView: View {
         EmptyView()
       }
     }
-    // 꼭 필요한 업데이트(#326). 어느 화면 위에서도 닫을 수 없게 분기 바깥에 붙이고, 바인딩의 set은 쓰지 않는다.
+    // 꼭 필요한 업데이트(#326). 바인딩의 set은 쓰지 않아 닫을 수 없다.
     .appAlert(
       isPresented: Binding(get: { store.isUpdateRequired }, set: { _ in }),
       configuration: AppAlertConfiguration(

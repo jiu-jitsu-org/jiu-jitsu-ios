@@ -10,19 +10,7 @@ public struct SplashView: View {
     }
 
     public var body: some View {
-        // LaunchScreen.storyboard와 같은 이미지·같은 비율로 그린다.
-        // 둘이 어긋나면 런치스크린 → 스플래시로 바뀌는 순간 그림이 움직인다.
-        GeometryReader { proxy in
-            let layout = SplashLayout(size: proxy.size)
-
-            ZStack(alignment: .top) {
-                Color.primitive.blue.b500p
-                piece(Assets.Splash.pattern, width: layout.patternWidth, top: layout.patternTop)
-                piece(Assets.Splash.tagline, width: layout.taglineWidth, top: layout.taglineTop)
-                piece(Assets.Splash.logo, width: layout.logoWidth, top: layout.logoTop)
-            }
-        }
-        .ignoresSafeArea()
+        SplashArtwork()
         .lightStatusBar()
         // 권장 업데이트 안내(#326). 닫힘은 두 버튼으로만 정해지므로 바인딩의 set은 쓰지 않는다.
         .appAlert(
@@ -38,6 +26,26 @@ public struct SplashView: View {
             // 자동 로그인과 웹뷰 미리 만들기(#207, #270)는 SplashFeature가 정한 순서대로 시작한다
             store.send(.view(.onAppear))
         }
+    }
+
+}
+
+/// 스플래시 그림. 꼭 필요한 업데이트로 앱을 막을 때도 이 위에 안내를 띄운다(#326).
+struct SplashArtwork: View {
+    var body: some View {
+        // LaunchScreen.storyboard와 같은 이미지·같은 비율로 그린다.
+        // 둘이 어긋나면 런치스크린 → 스플래시로 바뀌는 순간 그림이 움직인다.
+        GeometryReader { proxy in
+            let layout = SplashLayout(size: proxy.size)
+
+            ZStack(alignment: .top) {
+                Color.primitive.blue.b500p
+                piece(Assets.Splash.pattern, width: layout.patternWidth, top: layout.patternTop)
+                piece(Assets.Splash.tagline, width: layout.taglineWidth, top: layout.taglineTop)
+                piece(Assets.Splash.logo, width: layout.logoWidth, top: layout.logoTop)
+            }
+        }
+        .ignoresSafeArea()
     }
 
     private func piece(_ asset: ImageAsset, width: CGFloat, top: CGFloat) -> some View {
