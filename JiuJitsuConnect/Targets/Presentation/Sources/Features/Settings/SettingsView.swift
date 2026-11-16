@@ -63,6 +63,16 @@ public struct SettingsView: View {
                         }
                     }
 
+                    // MARK: - 문의하기 (#331) — 로그인 여부와 상관없이 보인다
+                    // TODO: 디자인 확정 아이콘으로 교체 (시안 확인 전, 있는 아이콘 중 inbox)
+                    if SupportContact.email != nil {
+                        SettingsSection {
+                            SettingsInteractiveRow(asset: Assets.Common.Icon.inbox, text: "문의하기") {
+                                store.send(.view(.inquiryButtonTapped))
+                            }
+                        }
+                    }
+
                     // MARK: - 버전 정보 섹션
                     SettingsSection {
                         HStack(spacing: 8) {
