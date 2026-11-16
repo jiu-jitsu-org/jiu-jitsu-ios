@@ -37,6 +37,9 @@ public struct MyProfileView: View {
     @Environment(\.tabRootScroll) private var tabRootScroll
     @State private var isUserScrolling = false
     @State private var pendingCompetitionAction: (() -> Void)?
+    // 헤더 바탕 무늬(#320) — 서버 없이 이 기기에만 저장한다.
+    @AppStorage(MyHeaderPattern.storageKey) private var headerPattern: MyHeaderPattern = .oss
+    @State private var isPatternSheetPresented = false
     // 삭제 확인 알럿에 띄울 대회(부문별 기록)
     @State private var competitionPendingDelete: [Competition]?
 
@@ -92,7 +95,7 @@ public struct MyProfileView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 24, height: 24)
-                .foregroundStyle(Color.component.list.setting.background)
+                .foregroundStyle(store.communityProfile?.beltRank.myHeaderForeground ?? Color.component.list.setting.background)
                 .frame(width: 40, height: 40)
                 .contentShape(Rectangle())
         }
@@ -213,6 +216,21 @@ public struct MyProfileView: View {
                 ])
                 .presentationBackground(Color.component.bottomSheet.selected.container.background)
             }
+            .sheet(isPresented: $isPatternSheetPresented) {
+                if let beltRank = store.communityProfile?.beltRank {
+                    MyHeaderPatternSheetView(current: headerPattern, beltRank: beltRank) { pattern in
+                        headerPattern = pattern
+                        isPatternSheetPresented = false
+                    }
+                    .presentationDragIndicator(.hidden)
+                    .presentationDetents([.height(MyHeaderPatternSheetView.contentHeight), .large])
+                    .presentationBackground(Color.component.bottomSheet.selected.container.background)
+                }
+            }
+            .onChange(of: store.communityProfile?.beltRank) { _, beltRank in
+                // 무늬는 띠 색 위에만 깔린다 — 띠가 없어지면 시트를 닫는다.
+                if beltRank == nil { isPatternSheetPresented = false }
+            }
             .appAlert(
                 isPresented: Binding(
                     get: { competitionPendingDelete != nil },
@@ -234,6 +252,9 @@ public struct MyProfileView: View {
             // 프로필 이미지는 user-level 데이터(GET /api/user/profile) — 커뮤니티 헤더 버튼과 같은 출처
             profileImageUrl: store.userProfile?.profileImageUrl,
             beltRank: store.communityProfile?.beltRank,
+            beltStripe: store.communityProfile?.beltStripe,
+            pattern: headerPattern,
+            beltEntranceTrigger: store.beltEntranceTrigger,
             safeAreaTop: safeAreaTop,
             isOwner: store.userProfile?.userRole == .owner,
             isGuest: store.authInfo.isGuest,
@@ -248,7 +269,8 @@ public struct MyProfileView: View {
             onGymInfoTapped: { store.send(.view(.gymInfoButtonTapped)) },
             onMoreButtonTapped: { store.send(.view(.moreButtonTapped)) },
             onProfileImageEditTapped: { store.send(.view(.profileImageEditButtonTapped)) },
-            onSettingsTapped: { store.send(.view(.settingsButtonTapped)) }
+            onSettingsTapped: { store.send(.view(.settingsButtonTapped)) },
+            onBackgroundTapped: { isPatternSheetPresented = true }
         )
     }
     

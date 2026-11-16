@@ -437,6 +437,34 @@ public struct ComponentColors {
         }
     }
     
+    // MARK: - My Belt (#320)
+    /// MY 헤더 바탕·사진 링·벨트 카드에 칠하는 띠 색. 그라데이션 없이 띠 색 그대로.
+    public let myBelt = MyBelt()
+
+    public struct MyBelt {
+        public let white = Color(hex: "#F4F4F2")
+        public let blue = Color(hex: "#0091FF")
+        public let purple = Color(hex: "#CD57FF")
+        public let brown = Color(hex: "#A66040")
+        public let black = Color(hex: "#2D2D2D")
+        // 키즈 띠 — 띠 모델에 생기면 이 색을 쓴다(서버가 아직 받지 않아 지금은 쓰는 곳 없음).
+        // grey #7E8189 · yellow #F2BE22 (밝은 띠) · orange #F07F22 · green #2E9E4F
+
+        /// 흰띠는 헤더 바탕(#F4F4F2) 위에서 링·카드를 순백으로 띄운다.
+        public let whiteRing = Color.primitive.bw.trueWhite
+        /// 사진 링의 띠 끝 칸 — 검은띠만 빨강
+        public let ringRankBar = Color.primitive.bw.black
+        public let blackRankBar = Color.primitive.red.r500
+        /// 그랄(띠 끝 칸에 감는 흰 줄)
+        public let stripe = Color.primitive.bw.trueWhite
+        /// 밝은 띠 위 글자·아이콘
+        public let onLight = Color.semantic.text.primary
+        /// 밝은 띠 위 무늬·링 테두리에 쓰는 먹색 — rgba(40,42,48)
+        public let lightInk = Color(hex: "#282A30")
+        /// 띠가 없을 때 사진 둘레 점선
+        public let noBeltRing = Color.primitive.coolGray.cg200
+    }
+
     // MARK: - Belt Card
     public let beltCard = BeltCard()
     

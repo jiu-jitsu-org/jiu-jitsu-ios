@@ -170,6 +170,10 @@ public struct AppTabFeature: Sendable {
                 .cancellable(id: CancelID.sessionObserver, cancelInFlight: false)
 
             case let .view(.tabSelected(tab)):
+                // MY를 떠나면 띠 링 대기를 푼다 — 안 보이는 MY에서 돌지 않고, 다음 MY 진입 때 돈다(#320).
+                if tab != .myPage {
+                    state.myPage.isWaitingBeltEntrance = false
+                }
                 // 이미 홈인데 홈 아이콘을 다시 누르면 피드를 맨 위로 올린다(#229).
                 if tab == .home, state.selectedTab == .home {
                     return .send(.home(.view(.tabReselected)))
@@ -409,6 +413,7 @@ public struct AppTabFeature: Sendable {
                 // 탭바로 돌아올 때처럼 새 알림 점도 다시 조회한다(탭 뷰가 유지돼 onAppear가 다시 오지 않음).
                 let isEnteringHome = state.selectedTab != .home
                 state.selectedTab = .home
+                state.myPage.isWaitingBeltEntrance = false
                 return .merge(
                     isEnteringHome ? .send(.home(.view(.tabEntered))) : .none,
                     .send(.home(.deepLink(link)))
@@ -570,6 +575,9 @@ public struct AppTabFeature: Sendable {
                     if !cameFromWeb {
                         state.selectedTab = isSignup ? .home : .myPage
                     }
+                    // 로그인한 세션의 첫 MY에서 띠 링이 다시 돈다(#320). 바로 MY로 왔으면 띠가 오는 대로 돈다.
+                    state.myPage.hasPlayedBeltEntrance = false
+                    state.myPage.isWaitingBeltEntrance = state.selectedTab == .myPage
                     // 비로그인으로 누른 '내 기록에 남기기'(#250)를 이어서 연다. 프로필은 아래 loadProfile로 아직 받는 중이라
                     // 띠·체급 기본값 없이 열고, 저장 때 프로필이 없으면 그때 받아 온다.
                     if let pendingCompetitionRecord {

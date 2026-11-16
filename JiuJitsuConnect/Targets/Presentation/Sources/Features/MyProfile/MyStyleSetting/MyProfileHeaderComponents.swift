@@ -21,6 +21,11 @@ public struct MyProfileHeaderView: View {
     let academyName: String?
     let profileImageUrl: String?
     let beltRank: BeltRank?
+    let beltStripe: BeltStripe?
+    /// 헤더 바탕 무늬(#320) — 띠가 있을 때만 깐다.
+    let pattern: MyHeaderPattern
+    /// 오를 때마다 사진 링이 한 번 돈다(#320) — MyProfileFeature.beltEntranceTrigger
+    let beltEntranceTrigger: Int
     let safeAreaTop: CGFloat
     /// 관장/사범 인증 완료 여부 — `true`이면 닉네임 왼쪽에 인증 뱃지 표시
     let isOwner: Bool
@@ -39,6 +44,11 @@ public struct MyProfileHeaderView: View {
     let onMoreButtonTapped: () -> Void
     let onProfileImageEditTapped: () -> Void
     let onSettingsTapped: () -> Void
+    /// 헤더 빈 바탕을 누르면 무늬 고르기 시트를 연다(#320). 띠가 없으면 무늬가 없어 열지 않는다.
+    let onBackgroundTapped: () -> Void
+
+    /// 사진(링 포함) 위 여백 — safe area 아래. 무늬가 사진 가운데를 기준으로 그려져 함께 쓴다.
+    private static let avatarTopSpacing: CGFloat = 57
 
     // 기존 호출처 호환 유지를 위한 기본값 init
     public init(
@@ -46,6 +56,9 @@ public struct MyProfileHeaderView: View {
         academyName: String?,
         profileImageUrl: String?,
         beltRank: BeltRank?,
+        beltStripe: BeltStripe? = nil,
+        pattern: MyHeaderPattern = .oss,
+        beltEntranceTrigger: Int = 0,
         safeAreaTop: CGFloat,
         isOwner: Bool = false,
         isGuest: Bool = false,
@@ -57,12 +70,16 @@ public struct MyProfileHeaderView: View {
         onGymInfoTapped: @escaping () -> Void,
         onMoreButtonTapped: @escaping () -> Void,
         onProfileImageEditTapped: @escaping () -> Void,
-        onSettingsTapped: @escaping () -> Void = {}
+        onSettingsTapped: @escaping () -> Void = {},
+        onBackgroundTapped: @escaping () -> Void = {}
     ) {
         self.nickname = nickname
         self.academyName = academyName
         self.profileImageUrl = profileImageUrl
         self.beltRank = beltRank
+        self.beltStripe = beltStripe
+        self.pattern = pattern
+        self.beltEntranceTrigger = beltEntranceTrigger
         self.safeAreaTop = safeAreaTop
         self.isOwner = isOwner
         self.isGuest = isGuest
@@ -75,28 +92,28 @@ public struct MyProfileHeaderView: View {
         self.onMoreButtonTapped = onMoreButtonTapped
         self.onProfileImageEditTapped = onProfileImageEditTapped
         self.onSettingsTapped = onSettingsTapped
+        self.onBackgroundTapped = onBackgroundTapped
     }
+
+    private var foreground: Color { beltRank.myHeaderForeground }
 
     // MARK: - Body
 
     public var body: some View {
         ZStack(alignment: .top) {
-            // 배경색 (벨트 등급에 따라 변경)
-            beltRank.headerBackgroundColor
-                .animation(.easeInOut(duration: 0.3), value: beltRank)
-
             VStack(spacing: 0) {
                 // 상단 여백
-                Spacer().frame(height: safeAreaTop + 68)
+                Spacer().frame(height: safeAreaTop + Self.avatarTopSpacing)
 
-                // 프로필 이미지
+                // 프로필 이미지 + 띠 링(#320)
                 ProfileImageView(
                     profileImageUrl: profileImageUrl,
                     pendingImageData: pendingProfileImageData,
                     isDeleting: isProfileImageDeleting,
                     isBusy: isProfileImageBusy,
-                    size: 90,
-                    cornerRadius: 24,
+                    beltRank: beltRank,
+                    beltStripe: beltStripe,
+                    entranceTrigger: beltEntranceTrigger,
                     iconSize: 64,
                     showsCameraButton: !isGuest,
                     onCameraTapped: onProfileImageEditTapped
@@ -111,7 +128,43 @@ public struct MyProfileHeaderView: View {
 
             topTrailingButtons
         }
+        .background { headerBackground }
     }
+
+    // 띠 색 바탕 + 같은 계열 색 무늬(#320). 글자·버튼이 없는 빈 곳을 누르면 무늬 고르기.
+    private var headerBackground: some View {
+        GeometryReader { proxy in
+            let avatarCenterY = safeAreaTop + Self.avatarTopSpacing + MyBeltRing.box / 2
+            ZStack {
+                beltRank.myHeaderColor
+                if let beltRank {
+                    MyHeaderPatternView(
+                        pattern: pattern,
+                        beltRank: beltRank,
+                        anchor: UnitPoint(x: 0.5, y: proxy.size.height > 0 ? avatarCenterY / proxy.size.height : 0)
+                    )
+                    .equatable()
+                    .id(pattern)
+                    .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.3), value: beltRank)
+            .animation(.easeInOut(duration: 0.3), value: pattern)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                guard canPickPattern else { return }
+                onBackgroundTapped()
+            }
+            // 빈 바탕 누르기는 VoiceOver로 찾을 수 없어 버튼으로 알린다.
+            .accessibilityElement()
+            .accessibilityLabel("배경 고르기")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { onBackgroundTapped() }
+            .accessibilityHidden(!canPickPattern)
+        }
+    }
+
+    private var canPickPattern: Bool { beltRank != nil && !isGuest }
 
     // 비로그인 MY(#242): 닉네임·도장명 자리에 인사와 로그인 안내를 같은 글자·높이로 둔다.
     // 아래 여백은 도장명이 있을 때와 같아 벨트 카드가 같은 만큼 겹친다(MyProfileView overlapWithAcademyName).
@@ -119,13 +172,13 @@ public struct MyProfileHeaderView: View {
     private var guestGreeting: some View {
         Text("반가워요")
             .font(Font.pretendard.title3)
-            .foregroundStyle(Color.component.list.setting.background)
+            .foregroundStyle(foreground)
             .frame(height: 29)
-            .padding(.top, 12)
+            .padding(.top, 10)
 
         Text("로그인하고 내 프로필을 만들어 보세요")
             .font(Font.pretendard.bodyS)
-            .foregroundStyle(Color.component.list.setting.background.opacity(0.7))
+            .foregroundStyle(foreground.opacity(0.7))
             .frame(height: 32)
 
         Spacer().frame(height: 84)
@@ -137,15 +190,17 @@ public struct MyProfileHeaderView: View {
         NicknameEditRow(
             nickname: nickname,
             isOwner: isOwner,
+            foreground: foreground,
             height: 29,
             onEditTapped: onNicknameEditTapped
         )
-        .padding(.top, 12)
+        .padding(.top, 10)
 
         // 도장명 + 수정 버튼 (있는 경우)
         if let academyName = academyName {
             AcademyNameEditRow(
                 academyName: academyName,
+                foreground: foreground,
                 height: 32,
                 onEditTapped: onGymInfoTapped
             )
@@ -176,9 +231,10 @@ public struct MyProfileHeaderView: View {
                     onMoreButtonTapped()
                 } label: {
                     Assets.MyProfile.Icon.menu.swiftUIImage
+                        .renderingMode(.template)
                         .resizable()
                         .frame(width: 16, height: 16)
-                        .foregroundStyle(Color.component.button.inverted.defaultBg)
+                        .foregroundStyle(foreground)
                         .frame(width: 32, height: 32)
                         .contentShape(Rectangle())
                 }
@@ -194,8 +250,8 @@ public struct MyProfileHeaderView: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: 22, height: 22)
-                        // 띠 색 헤더 위라 흰색 — 커뮤니티에서 연 MY의 뒤로가기와 같은 색
-                        .foregroundStyle(Color.component.list.setting.background)
+                        // 띠 색 헤더 위 — 커뮤니티에서 연 MY의 뒤로가기와 같은 색(밝은 띠면 어둡게)
+                        .foregroundStyle(foreground)
                         .frame(width: 32, height: 32)
                         .contentShape(Rectangle())
                 }
@@ -225,33 +281,33 @@ private struct ProfileImageView: View {
     let pendingImageData: Data?
     let isDeleting: Bool
     let isBusy: Bool
-    let size: CGFloat
-    let cornerRadius: CGFloat
+    let beltRank: BeltRank?
+    let beltStripe: BeltStripe?
+    let entranceTrigger: Int
     let iconSize: CGFloat
     var showsCameraButton: Bool = true
     let onCameraTapped: () -> Void
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(Color.component.list.setting.background)
-                .frame(width: size, height: size)
+        MyBeltRingView(beltRank: beltRank, beltStripe: beltStripe, entranceTrigger: entranceTrigger) {
+            ZStack {
+                Color.component.list.setting.background
 
-            imageContent
-                .frame(width: size, height: size)
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                .opacity(isBusy ? 0.6 : 1.0)
-                .animation(.easeInOut(duration: 0.2), value: isBusy)
+                imageContent
+                    .opacity(isBusy ? 0.6 : 1.0)
+                    .animation(.easeInOut(duration: 0.2), value: isBusy)
 
-            if isBusy {
-                busyOverlay
+                if isBusy {
+                    busyOverlay
+                }
             }
         }
-        .frame(width: size, height: size)
-        .overlay(alignment: .bottomTrailing) {
+        // 오른쪽 아래(135°)는 링의 띠 끝 칸·그랄 자리라, 카메라 버튼은 거울 자리인 왼쪽 아래에 둔다.
+        .overlay(alignment: .bottomLeading) {
             if showsCameraButton {
+                // 터치 영역 44 — 보이는 버튼(36)은 링 모서리 그대로 두고 바깥으로 4씩 넓힌다.
                 cameraButton
-                    .offset(x: 5, y: 4)
+                    .offset(x: -4, y: 4)
             }
         }
     }
@@ -302,9 +358,7 @@ private struct ProfileImageView: View {
 
     private var busyOverlay: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(Color.black.opacity(0.18))
-                .frame(width: size, height: size)
+            Color.black.opacity(0.18)
 
             ProgressView()
                 .progressViewStyle(.circular)
@@ -333,9 +387,11 @@ private struct ProfileImageView: View {
                     .scaledToFit()
                     .frame(width: 20, height: 20)
             }
-            .contentShape(RoundedRectangle(cornerRadius: 10))
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("프로필 사진 수정")
     }
 }
 
@@ -346,6 +402,7 @@ private struct NicknameEditRow: View {
     let nickname: String
     /// `true`이면 닉네임 왼쪽에 관장/사범 인증 뱃지를 표시한다.
     let isOwner: Bool
+    let foreground: Color
     let height: CGFloat
     let onEditTapped: () -> Void
 
@@ -363,7 +420,10 @@ private struct NicknameEditRow: View {
             Button(action: onEditTapped) {
                 Text(nickname)
                     .font(Font.pretendard.title3)
-                    .foregroundStyle(Color.component.list.setting.background)
+                    .foregroundStyle(foreground)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .minimumScaleFactor(0.8)
             }
             .buttonStyle(.plain)
 
@@ -373,13 +433,14 @@ private struct NicknameEditRow: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: 16, height: 16)
-                        .foregroundStyle(Color.white.opacity(0.5))
+                        .foregroundStyle(foreground.opacity(0.5))
                 }
                 .frame(width: 32, height: 32)
             }
             .buttonStyle(.plain)
         }
         .frame(height: height)
+        .padding(.horizontal, 20)
     }
 }
 
@@ -388,6 +449,7 @@ private struct NicknameEditRow: View {
 /// 도장명 + 수정 버튼 행
 private struct AcademyNameEditRow: View {
     let academyName: String
+    let foreground: Color
     let height: CGFloat
     let onEditTapped: () -> Void
 
@@ -395,7 +457,10 @@ private struct AcademyNameEditRow: View {
         HStack(spacing: 0) {
             Text(academyName)
                 .font(Font.pretendard.bodyS)
-                .foregroundStyle(Color.component.list.setting.background.opacity(0.7))
+                .foregroundStyle(foreground.opacity(0.7))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .minimumScaleFactor(0.8)
 
             Button(action: onEditTapped) {
                 ZStack {
@@ -403,13 +468,14 @@ private struct AcademyNameEditRow: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: 16, height: 16)
-                        .foregroundStyle(Color.white.opacity(0.5))
+                        .foregroundStyle(foreground.opacity(0.5))
                 }
                 .frame(width: 32, height: 32)
             }
             .buttonStyle(.plain)
         }
         .frame(height: height)
+        .padding(.horizontal, 20)
     }
 }
 

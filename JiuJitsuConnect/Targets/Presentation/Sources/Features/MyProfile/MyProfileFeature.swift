@@ -91,6 +91,14 @@ public struct MyProfileFeature: Sendable {
         /// 커뮤니티에서 내 사진을 눌러 스택에 쌓은 MY인지(#197). 탭 화면이 아니라 왼쪽 위에 뒤로가기가 붙고 탭바가 없다.
         var isPushed: Bool = false
 
+        // 띠 링 등장 움직임(#320) — 세션에서 MY가 처음 보일 때 한 번, 띠를 바꾼 직후 다시.
+        // 탭이 미리 마운트돼 화면의 onAppear로는 '보인 때'를 알 수 없어 탭 진입(tabEntered)·쌓은 MY의 onAppear로 정한다.
+        var hasPlayedBeltEntrance = false
+        /// 화면에 들어왔지만 띠를 아직 못 받았다 — 띠가 오면 그때 돈다.
+        var isWaitingBeltEntrance = false
+        /// 오를 때마다 링이 한 번 돈다.
+        var beltEntranceTrigger = 0
+
         public init(authInfo: AuthInfo, communityProfile: CommunityProfile? = nil) {
             self.authInfo = authInfo
             self.communityProfile = communityProfile
@@ -101,6 +109,7 @@ public struct MyProfileFeature: Sendable {
             var state = State(authInfo: tab.authInfo, communityProfile: tab.communityProfile)
             state.userProfile = tab.userProfile
             state.isPushed = true
+            state.hasPlayedBeltEntrance = tab.hasPlayedBeltEntrance
             return state
         }
     }
@@ -268,6 +277,9 @@ public struct MyProfileFeature: Sendable {
                 // 커뮤니티에 쌓은 MY는 탭의 MY가 불러 둔 값으로 바로 그린 뒤 조용히 다시 불러온다(#197).
                 // 뜰 때마다 부른다 — 이 MY 위에 쌓은 다른 MY(글 상세 → 내 댓글)에서 바꾼 값도 뒤로 돌아왔을 때 맞게 보인다.
                 // 이미 불러오는 중이면 refreshProfile이 건너뛴다.
+                if state.isPushed {
+                    Self.requestBeltEntrance(&state)
+                }
                 if state.isPushed, state.communityProfile != nil {
                     return .send(.internal(.refreshProfile))
                 }
@@ -280,6 +292,9 @@ public struct MyProfileFeature: Sendable {
                 return .run { _ in await self.dismiss() }
 
             case .view(.tabEntered), .view(.sceneBecameActive):
+                if case .view(.tabEntered) = action {
+                    Self.requestBeltEntrance(&state)
+                }
                 // 웹·다른 기기에서 바꾼 내용, 관장 사범 인증 승인 등을 반영한다(#69).
                 // 첫 조회가 아직 없으면(실패 포함) 일반 로딩으로 처리한다.
                 guard state.communityProfile != nil else {
@@ -1355,6 +1370,22 @@ public struct MyProfileFeature: Sendable {
 
             }
         }
+        .onChange(of: { $0.communityProfile?.beltRank }) { oldBelt, newBelt in
+            Reduce { state, _ in
+                guard newBelt != nil else { return .none }
+                if oldBelt != nil {
+                    // 띠를 바꾼 직후
+                    state.beltEntranceTrigger += 1
+                    state.hasPlayedBeltEntrance = true
+                } else if state.isWaitingBeltEntrance {
+                    // 화면에 들어온 뒤 띠가 처음 도착(첫 조회·첫 등록)
+                    state.isWaitingBeltEntrance = false
+                    state.beltEntranceTrigger += 1
+                    state.hasPlayedBeltEntrance = true
+                }
+                return .none
+            }
+        }
         .ifLet(\.$destination, action: \.destination) {
             Destination.body
         }
@@ -1365,6 +1396,17 @@ public struct MyProfileFeature: Sendable {
             ProfileImageCropFeature()
         }
         .forEach(\.path, action: \.path)
+    }
+
+    /// MY가 화면에 들어왔을 때 — 세션에서 아직 안 돌았으면 지금(띠가 있으면) 또는 띠가 올 때 돈다.
+    private static func requestBeltEntrance(_ state: inout State) {
+        guard !state.hasPlayedBeltEntrance else { return }
+        if state.communityProfile?.beltRank != nil {
+            state.beltEntranceTrigger += 1
+            state.hasPlayedBeltEntrance = true
+        } else {
+            state.isWaitingBeltEntrance = true
+        }
     }
 
     /// 프로필 저장을 시작한다. 진행 중이던 재조회 응답은 저장 전 값이라 버려지게 세대를 올린다(#155).
