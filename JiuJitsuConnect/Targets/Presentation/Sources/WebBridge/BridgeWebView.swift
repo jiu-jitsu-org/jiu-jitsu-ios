@@ -761,6 +761,22 @@ private final class KeyboardAvoidingWebContainer: UIView {
         ])
     }
 
+    // 키보드를 올린 채 위에 다른 화면이 쌓이면, 키보드는 이 뷰가 창에서 떨어진 뒤에 내려가 가이드가 그걸 못 받는다.
+    // 돌아왔을 때 가이드가 옛 키보드 자리에 남아 웹뷰가 줄어든 채 머무르므로, 떨어지기 전에 포커스를 풀어 둔다(#327).
+    override func willMove(toWindow newWindow: UIWindow?) {
+        super.willMove(toWindow: newWindow)
+        guard newWindow == nil else { return }
+        webView?.endEditing(true)
+    }
+
+    // 창 밖에 있던 사이 키보드가 바뀌었을 수 있으니, 다시 보일 때 바닥 고정 여부를 곧바로 다시 정한다(#327).
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        guard window != nil else { return }
+        setNeedsLayout()
+        layoutIfNeeded()
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
         // 가이드 상단이 하단 safe area보다 충분히 위에 있으면 키보드가 실제로 떠 있는 것으로 본다.
