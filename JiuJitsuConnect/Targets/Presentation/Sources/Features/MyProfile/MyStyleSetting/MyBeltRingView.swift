@@ -178,31 +178,30 @@ private enum Motion {
     static let total: Double = 1400
     static let firstPhase: Double = 1000
 
-    static func frame(at t: Double) -> (angle: Double, scale: Double) {
-        guard t < total else { return (0, 1) }
-        let p1 = firstPhase
+    static func frame(at elapsed: Double) -> (angle: Double, scale: Double) {
+        guard elapsed < total else { return (0, 1) }
         let angle: Double
         let scale: Double
-        if t < p1 {
-            angle = -720 + 726 * sine(t / p1)
+        if elapsed < firstPhase {
+            angle = -720 + 726 * sine(elapsed / firstPhase)
         } else {
-            let u = t - p1
-            angle = 6 * exp(-u / 110) * cos(2 * .pi * u / 360)
+            let settle = elapsed - firstPhase
+            angle = 6 * exp(-settle / 110) * cos(2 * .pi * settle / 360)
         }
-        if t < 140 {
-            scale = 1 - 0.06 * sin(.pi / 2 * t / 140)
-        } else if t < p1 {
-            let progress = (t - 140) / (p1 - 140)
+        if elapsed < 140 {
+            scale = 1 - 0.06 * sin(.pi / 2 * elapsed / 140)
+        } else if elapsed < firstPhase {
+            let progress = (elapsed - 140) / (firstPhase - 140)
             scale = 0.94 + 0.14 * sin(.pi * progress) + 0.06 * progress
         } else {
-            let u = t - p1
-            scale = 1 - 0.05 * exp(-u / 110) * sin(2 * .pi * u / 300)
+            let settle = elapsed - firstPhase
+            scale = 1 - 0.05 * exp(-settle / 110) * sin(2 * .pi * settle / 300)
         }
         return (angle, scale)
     }
 
-    private static func sine(_ p: Double) -> Double {
-        -(cos(.pi * p) - 1) / 2
+    private static func sine(_ fraction: Double) -> Double {
+        -(cos(.pi * fraction) - 1) / 2
     }
 }
 
