@@ -7,6 +7,7 @@
 
 import ComposableArchitecture
 import Foundation
+import UIKit
 import Domain
 import DesignSystem
 import CoreKit
@@ -54,6 +55,8 @@ public struct SettingsFeature: Sendable {
         public var toast: ToastState?
         // 탈퇴 요청이 서버에 가 있는 동안. MY 스택의 한 화면이라 닫히면 요청도 취소되므로(#241) 그동안 나가지 못하게 막는다.
         var isWithdrawing = false
+        // 문의 메일을 여는 중(#331). 빠르게 두 번 눌러도 메일 화면·토스트가 한 번만 뜨게 한다.
+        var isOpeningInquiry = false
 
         public init(authInfo: AuthInfo) {
             self.authInfo = authInfo
@@ -88,6 +91,7 @@ public struct SettingsFeature: Sendable {
             case termsButtonTapped
             case privacyPolicyButtonTapped
             case marketingConsentButtonTapped
+            case inquiryButtonTapped
             case loginButtonTapped
             case logoutButtonTapped
             case withdrawalButtonTapped
@@ -100,6 +104,7 @@ public struct SettingsFeature: Sendable {
         public enum InternalAction: Sendable {
             case versionPolicyLoaded(AppVersionPolicy)
             case withdrawalResponse(TaskResult<Bool>)
+            case inquiryOpenFinished
             case showToast(ToastState)
             case toastDismissed
         }
@@ -175,6 +180,30 @@ public struct SettingsFeature: Sendable {
                 // 가입 때 동의한 마케팅 수신 약관을 가입 후에도 다시 볼 수 있게 한다(#74).
                 guard let url = TermsURL.marketingConsent else { return .none }
                 state.termsWebCover = TermsWebViewFeature.State(url: url)
+                return .none
+
+            case .view(.inquiryButtonTapped):
+                guard !state.isOpeningInquiry, let email = SupportContact.email else { return .none }
+                let userId = state.authInfo.isGuest ? nil : state.authInfo.userInfo?.userId
+                guard let url = SupportInquiryMail.url(to: email, info: .current(userId: userId)) else {
+                    Log.trace("문의 메일 주소를 만들지 못함: \(email)", category: .view, level: .error)
+                    return .none
+                }
+                state.isOpeningInquiry = true
+                return .run { send in
+                    if await !openURL(url) {
+                        // 관장 사범 인증 문의와 같게, 메일 앱이 없으면 주소를 복사해 두고 알린다.
+                        Log.trace("문의 메일을 열지 못함(메일 앱 없음 등)", category: .view, level: .error)
+                        await MainActor.run { UIPasteboard.general.string = email }
+                        await send(.internal(.showToast(.init(
+                            message: "메일 앱을 열 수 없어 문의 주소를 복사했어요", status: .info
+                        ))))
+                    }
+                    await send(.internal(.inquiryOpenFinished))
+                }
+
+            case .internal(.inquiryOpenFinished):
+                state.isOpeningInquiry = false
                 return .none
 
             case .termsWebCover(.presented(.delegate(.didClose))):
