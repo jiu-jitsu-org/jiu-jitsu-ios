@@ -7,6 +7,7 @@ import GoogleSignIn
 import KakaoSDKAuth
 #if DEBUG || BETA
 import PulseUI
+import DesignSystem
 #endif
 
 @main
@@ -28,6 +29,7 @@ struct JiuJitsuConnectApp: App {
                     }
                 }
                 .modifier(PulseConsoleOnShakeModifier())
+                .modifier(DesignSystemCatalogOnLaunchModifier())
         }
     }
     
@@ -73,6 +75,7 @@ struct JiuJitsuConnectApp: App {
 struct PulseConsoleOnShakeModifier: ViewModifier {
     #if DEBUG || BETA
     @State private var isPresented = false
+    @State private var isCatalogPresented = false
 
     func body(content: Content) -> some View {
         content
@@ -82,7 +85,40 @@ struct PulseConsoleOnShakeModifier: ViewModifier {
             .sheet(isPresented: $isPresented) {
                 NavigationView {
                     ConsoleView()
+                        .toolbar {
+                            // 디자인 시스템 카탈로그로 가는 길. 로그 콘솔과 같은 Debug·Beta 전용 자리에 둔다.
+                            ToolbarItem(placement: .topBarLeading) {
+                                Button("디자인 시스템") { isCatalogPresented = true }
+                            }
+                        }
                 }
+                .fullScreenCover(isPresented: $isCatalogPresented) {
+                    DesignSystemCatalogView(onClose: { isCatalogPresented = false })
+                }
+            }
+    }
+    #else
+    func body(content: Content) -> some View {
+        content
+    }
+    #endif
+}
+
+/// 실행 인자 `-DesignSystemCatalog <문서>` 로 켜면 카탈로그를 바로 띄운다(시뮬레이터 캡처용). Release 에서는 아무것도 하지 않는다.
+///
+/// 예: `xcrun simctl launch booted <bundle id> -DesignSystemCatalog button`
+struct DesignSystemCatalogOnLaunchModifier: ViewModifier {
+    #if DEBUG || BETA
+    // 빈 값으로 넘어오면 열지 않는다(-DesignSystemCatalog "").
+    @State private var isPresented = !(UserDefaults.standard.string(forKey: "DesignSystemCatalog") ?? "").isEmpty
+
+    func body(content: Content) -> some View {
+        content
+            .fullScreenCover(isPresented: $isPresented) {
+                DesignSystemCatalogView(
+                    openingPage: UserDefaults.standard.string(forKey: "DesignSystemCatalog"),
+                    onClose: { isPresented = false }
+                )
             }
     }
     #else
