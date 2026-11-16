@@ -756,12 +756,7 @@ extension AppTabFeature {
     /// 앱이 켜져 있는 동안 바뀐 FCM 토큰을 서버에 등록한다(#332). 서버는 같은 기기의 옛 토큰 행을 지우고 새로 저장한다.
     private func registerRefreshedFCMToken(_ token: String) -> Effect<Action> {
         .run { _ in
-            do {
-                try await userClient.updateFCMToken(token)
-                Log.trace("✅ FCM 토큰 교체 → AppInfo 반영", category: .network, level: .info)
-            } catch {
-                Log.trace("⚠️ FCM 토큰 교체 AppInfo 실패 (\(error))", category: .network, level: .error)
-            }
+            await FCMAppInfoSync.syncRefreshedToken(token, userClient: userClient)
         }
         .cancellable(id: CancelID.deviceTokenSync, cancelInFlight: true)
     }
