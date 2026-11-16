@@ -37,6 +37,8 @@ public final class DependencyContainer {
     private let authSessionEventBroadcaster = AuthSessionEventBroadcaster()
     /// AppDelegate가 받은 푸시 탭을 Presentation(딥링크 라우팅)으로 전달하는 채널.
     private let pushNotificationTapRelay = PushNotificationTapRelay()
+    /// AppDelegate가 받은 FCM 토큰 교체를 Presentation(서버 재등록)으로 전달하는 채널(#332).
+    private let fcmTokenRefreshRelay = FCMTokenRefreshRelay()
     private let beltPromptStorage = BeltPromptStorage()
     private lazy var sharedNetworkService: NetworkService = DefaultNetworkService(
         tokenStorage: sharedTokenStorage,
@@ -66,7 +68,9 @@ public final class DependencyContainer {
     )
 
     // MARK: - Firebase Client (shared instance)
-    private lazy var sharedFirebaseClient: FirebaseClient = FirebaseClientFactory.make()
+    private lazy var sharedFirebaseClient: FirebaseClient = FirebaseClientFactory.make(
+        tokenRefreshRelay: fcmTokenRefreshRelay
+    )
 
     // MARK: - TCA Clients
 
@@ -125,6 +129,16 @@ public final class DependencyContainer {
     /// AppDelegate가 푸시 탭 payload를 흘려보내는 발신 창구.
     public func deliverPushNotificationTap(_ payload: PushActionPayload) {
         pushNotificationTapRelay.send(payload)
+    }
+
+    /// AppDelegate가 FCM 토큰을 받을 때마다 부른다. 캐시에 저장하고, 이전 토큰과 달라졌을 때만 TCA로 넘긴다.
+    /// Firebase는 앱을 켤 때마다 같은 토큰으로 콜백을 부르고, 처음 받는 토큰은 앱 진입·로그인 sync가 등록하므로
+    /// 둘 다 넘기지 않는다 — 넘기면 앱 진입 sync와 같은 등록이 겹친다(#332).
+    public func deliverFCMTokenRefresh(_ token: String) {
+        let previous = sharedFirebaseClient.loadCachedToken()
+        sharedFirebaseClient.cacheToken(token)
+        guard let previous, !previous.isEmpty, previous != token else { return }
+        fcmTokenRefreshRelay.send(token)
     }
 
     public func configureUserClient() -> UserClient {

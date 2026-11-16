@@ -24,7 +24,7 @@ enum FirebaseClientFactory {
     private static let pendingDeletionKey = "jj.fcm.pending_token_deletion"
 
     /// Live `FirebaseClient`를 생성한다. `DependencyContainer.sharedFirebaseClient`에서 한 번만 호출된다.
-    static func make() -> FirebaseClient {
+    static func make(tokenRefreshRelay: FCMTokenRefreshRelay) -> FirebaseClient {
         nonisolated(unsafe) let defaults = UserDefaults.standard
 
         return FirebaseClient(
@@ -110,6 +110,9 @@ enum FirebaseClientFactory {
             },
             clearCachedToken: {
                 defaults.removeObject(forKey: cacheKey)
+            },
+            tokenRefreshes: {
+                tokenRefreshRelay.tokens()
             }
         )
     }

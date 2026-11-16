@@ -19,6 +19,8 @@ public struct FirebaseClient {
     public var loadCachedToken: @Sendable () -> String?
     public var cacheToken: @Sendable (String) -> Void
     public var clearCachedToken: @Sendable () -> Void
+    /// 앱이 켜져 있는 동안 FCM이 토큰을 바꿔 준 것(이전에 받은 토큰이 있을 때만). 구독자별로 독립 스트림이 생성된다.
+    public var tokenRefreshes: @Sendable () -> AsyncStream<String>
 
     public init(
         configure: @Sendable @escaping () -> Void,
@@ -28,7 +30,8 @@ public struct FirebaseClient {
         deleteFCMToken: @Sendable @escaping () async throws -> Void,
         loadCachedToken: @Sendable @escaping () -> String?,
         cacheToken: @Sendable @escaping (String) -> Void,
-        clearCachedToken: @Sendable @escaping () -> Void
+        clearCachedToken: @Sendable @escaping () -> Void,
+        tokenRefreshes: @Sendable @escaping () -> AsyncStream<String>
     ) {
         self.configure = configure
         self.requestPermission = requestPermission
@@ -38,6 +41,7 @@ public struct FirebaseClient {
         self.loadCachedToken = loadCachedToken
         self.cacheToken = cacheToken
         self.clearCachedToken = clearCachedToken
+        self.tokenRefreshes = tokenRefreshes
     }
 }
 
@@ -53,7 +57,8 @@ extension FirebaseClient: DependencyKey {
         deleteFCMToken: {},
         loadCachedToken: { nil },
         cacheToken: { _ in },
-        clearCachedToken: {}
+        clearCachedToken: {},
+        tokenRefreshes: { AsyncStream { $0.finish() } }
     )
 }
 
@@ -90,6 +95,9 @@ extension FirebaseClient {
         },
         clearCachedToken: {
             fatalError("unimplemented.clearCachedToken is not implemented")
+        },
+        tokenRefreshes: {
+            fatalError("unimplemented.tokenRefreshes is not implemented")
         }
     )
 }

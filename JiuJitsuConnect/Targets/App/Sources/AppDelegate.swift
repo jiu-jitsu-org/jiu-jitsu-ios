@@ -36,14 +36,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 // MARK: - MessagingDelegate
 
 extension AppDelegate: MessagingDelegate {
-    /// FCM 토큰을 로컬에 캐싱합니다.
-    /// 서버 등록은 syncOnAppLaunch / syncAfterLoginSuccess 에서 단독으로 처리합니다.
-    /// Firebase는 delegate 설정 시 앱 매 실행마다 이 콜백을 발화하므로
-    /// 여기서 서버 호출을 하면 syncOnAppLaunch 와 중복 호출이 발생합니다.
+    /// FCM 토큰을 로컬에 캐싱하고, 앱이 켜져 있는 동안 토큰이 바뀌었으면 TCA로 넘깁니다.
+    /// 서버 등록은 로그인 여부를 아는 AppTab이 정합니다 — 여기서 바로 부르면 게스트·로그아웃 중에도 등록됩니다.
+    /// Firebase는 delegate 설정 시 앱 매 실행마다 이 콜백을 발화하므로, 같은 토큰이면 넘기지 않습니다(#332).
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         guard let fcmToken else { return }
         Log.trace("[FCM] 토큰 갱신: \(fcmToken)", category: .system, level: .info)
-        DependencyContainer.shared.configureFirebaseClient().cacheToken(fcmToken)
+        DependencyContainer.shared.deliverFCMTokenRefresh(fcmToken)
     }
 }
 
