@@ -170,6 +170,10 @@ public struct AppTabFeature: Sendable {
                 .cancellable(id: CancelID.sessionObserver, cancelInFlight: false)
 
             case let .view(.tabSelected(tab)):
+                // MY를 떠나면 띠 링 대기를 푼다 — 안 보이는 MY에서 돌지 않고, 다음 MY 진입 때 돈다(#320).
+                if tab != .myPage {
+                    state.myPage.isWaitingBeltEntrance = false
+                }
                 // 이미 홈인데 홈 아이콘을 다시 누르면 피드를 맨 위로 올린다(#229).
                 if tab == .home, state.selectedTab == .home {
                     return .send(.home(.view(.tabReselected)))
@@ -409,6 +413,7 @@ public struct AppTabFeature: Sendable {
                 // 탭바로 돌아올 때처럼 새 알림 점도 다시 조회한다(탭 뷰가 유지돼 onAppear가 다시 오지 않음).
                 let isEnteringHome = state.selectedTab != .home
                 state.selectedTab = .home
+                state.myPage.isWaitingBeltEntrance = false
                 return .merge(
                     isEnteringHome ? .send(.home(.view(.tabEntered))) : .none,
                     .send(.home(.deepLink(link)))
