@@ -20,6 +20,10 @@ public struct AppTabFeature: Sendable {
         case sessionObserver
         // 관심 대회 알림 켜기(#257) — 권한 창을 기다리는 동안 로그아웃되면 이전 계정으로 FCM을 등록하지 않게 끊는다.
         case competitionAlerts
+        // FCM 토큰 교체 구독(#332). AppTab 생명주기 동안만 유지한다.
+        case tokenRefreshObserver
+        // 앱 복귀·토큰 교체 때 기기 토큰 서버 등록(#332). 로그아웃하면 이전 계정으로 등록하지 않게 끊는다.
+        case deviceTokenSync
     }
 
     // 세 번째 탭은 설정 대신 대회(#240). 설정은 MY 오른쪽 위로 옮겼다(#241).
@@ -115,6 +119,8 @@ public struct AppTabFeature: Sendable {
             case showDeviceNotificationAlert
             // 관심 대회 알림 켜기 중 권한 창에서 허용함(#257). 그 사이 로그아웃했을 수 있어 지금 상태를 보고 FCM을 등록한다.
             case competitionAlertsPermissionGranted
+            // 앱이 켜져 있는 동안 FCM 토큰이 바뀜(#332).
+            case fcmTokenRefreshed(String)
             // 웹 주도 로그아웃 요청(AUTH_LOGOUT_REQUEST) 처리.
             case performWebLogout
             case webLogoutCompleted
@@ -159,15 +165,23 @@ public struct AppTabFeature: Sendable {
         Reduce { state, action in
             switch action {
             case .view(.onAppear):
-                // 401 인터셉터의 세션 이벤트(토큰 자동 갱신/세션 만료)를 구독한다.
+                // 401 인터셉터의 세션 이벤트(토큰 자동 갱신/세션 만료)와 FCM 토큰 교체를 구독한다.
                 guard !state.didStartSessionObserver else { return .none }
                 state.didStartSessionObserver = true
-                return .run { send in
-                    for await event in authSessionEventClient.events() {
-                        await send(.internal(.sessionEvent(event)))
+                return .merge(
+                    .run { send in
+                        for await event in authSessionEventClient.events() {
+                            await send(.internal(.sessionEvent(event)))
+                        }
                     }
-                }
-                .cancellable(id: CancelID.sessionObserver, cancelInFlight: false)
+                    .cancellable(id: CancelID.sessionObserver, cancelInFlight: false),
+                    .run { send in
+                        for await token in firebaseClient.tokenRefreshes() {
+                            await send(.internal(.fcmTokenRefreshed(token)))
+                        }
+                    }
+                    .cancellable(id: CancelID.tokenRefreshObserver, cancelInFlight: false)
+                )
 
             case let .view(.tabSelected(tab)):
                 // MY를 떠나면 띠 링 대기를 푼다 — 안 보이는 MY에서 돌지 않고, 다음 MY 진입 때 돈다(#320).
@@ -209,9 +223,13 @@ public struct AppTabFeature: Sendable {
                 return refreshUnread
 
             case .view(.sceneBecameActive):
+                guard !state.authInfo.isGuest else { return .none }
                 // MY 탭을 보고 있을 때만 포그라운드 복귀 재조회 (#69)
-                guard state.selectedTab == .myPage, !state.authInfo.isGuest else { return .none }
-                return .send(.myPage(.view(.sceneBecameActive)))
+                let refreshMyPage: Effect<Action> = state.selectedTab == .myPage
+                    ? .send(.myPage(.view(.sceneBecameActive)))
+                    : .none
+                // 로그아웃 중이면 폐기할 토큰을 다시 등록하게 된다
+                return .merge(refreshMyPage, state.isLoggingOut ? .none : resyncDeviceTokenIfPermitted())
 
             // MARK: - 설정 (MY 스택에서 연다, #241)
 
@@ -224,6 +242,7 @@ public struct AppTabFeature: Sendable {
                 return .merge(
                     Self.broadcastLoggedOut(),
                     .cancel(id: CancelID.competitionAlerts),
+                    .cancel(id: CancelID.deviceTokenSync),
                     // 로컬 세션 정리를 끝낸 뒤 로그인 모달을 띄운다. 먼저 띄우면 새로 로그인한 토큰을
                     // 뒤늦은 signOut이 지우거나, 새 로그인이 폐기 직전의 FCM 토큰을 등록할 수 있다.
                     .run { send in
@@ -451,6 +470,11 @@ public struct AppTabFeature: Sendable {
                     await FCMAppInfoSync.syncOnAppLaunch(firebaseClient: firebaseClient, userClient: userClient)
                 }
 
+            case let .internal(.fcmTokenRefreshed(token)):
+                // 서버에는 옛 토큰이 남아 다음 콜드 스타트까지 푸시가 가지 않는다. 비로그인은 등록할 계정이 없다.
+                guard !state.authInfo.isGuest, !state.isLoggingOut else { return .none }
+                return registerRefreshedFCMToken(token)
+
             case .view(.deviceNotificationAlertSettingsTapped):
                 state.isDeviceNotificationAlertPresented = false
                 return .run { _ in
@@ -469,15 +493,19 @@ public struct AppTabFeature: Sendable {
                 // 서버 세션 정리 실패는 로컬 로그아웃을 막지 않는다(토큰은 signOut으로 정리).
                 // 게스트 전환(webLogoutCompleted)은 FCM 토큰 폐기까지 끝낸 뒤에 한다. 먼저 전환하면
                 // 그 사이 새 로그인이 폐기 직전의 토큰을 새 계정에 등록할 수 있다(#269).
-                return .run { send in
-                    // 서버가 이 기기의 토큰 연결을 지우도록 함께 보낸다.
-                    let fcmToken = firebaseClient.loadCachedToken().flatMap { $0.isEmpty ? nil : $0 }
-                    _ = try? await authClient.serverLogout(fcmToken)
-                    await authClient.signOut()
-                    // 서버 요청이 실패해(오프라인 등) 연결이 남아도 이전 계정 푸시가 오지 않게 기기 토큰도 폐기한다.
-                    await Self.discardDeviceFCMToken(firebaseClient, context: "logout")
-                    await send(.internal(.webLogoutCompleted))
-                }
+                // 폐기와 겹친 기기 토큰 등록은 이전 계정에 새 토큰을 남기므로 먼저 끊는다(#332).
+                return .merge(
+                    .cancel(id: CancelID.deviceTokenSync),
+                    .run { send in
+                        // 서버가 이 기기의 토큰 연결을 지우도록 함께 보낸다.
+                        let fcmToken = firebaseClient.loadCachedToken().flatMap { $0.isEmpty ? nil : $0 }
+                        _ = try? await authClient.serverLogout(fcmToken)
+                        await authClient.signOut()
+                        // 서버 요청이 실패해(오프라인 등) 연결이 남아도 이전 계정 푸시가 오지 않게 기기 토큰도 폐기한다.
+                        await Self.discardDeviceFCMToken(firebaseClient, context: "logout")
+                        await send(.internal(.webLogoutCompleted))
+                    }
+                )
 
             case .internal(.webLogoutCompleted):
                 state.isLoggingOut = false
@@ -526,6 +554,7 @@ public struct AppTabFeature: Sendable {
                         await Self.discardDeviceFCMToken(firebaseClient, context: "session expiry")
                     },
                     .cancel(id: CancelID.competitionAlerts),
+                    .cancel(id: CancelID.deviceTokenSync),
                     .send(.home(.session(.sessionExpired))),
                     .send(.competition(.session(.sessionExpired)))
                 )
@@ -636,26 +665,6 @@ public struct AppTabFeature: Sendable {
         state.mountedTabs = allTabs
     }
 
-    /// '관심 대회 알림'을 켰을 때 기기 알림 상태를 본다(#257). 설정 값은 서버에 있어(#281) 웹·설정 화면이 저장하고, 여기서는 안내만 한다.
-    /// 이미 허용이면 할 일이 없고, 거절(또는 기기 설정에서 끔)이면 앱이 다시 물을 수 없어 설정 앱으로 안내한다.
-    /// 한 번도 묻지 않았으면 iOS 설정에 알림 줄조차 없으니 여기서 시스템 권한 창을 띄운다.
-    private func enableCompetitionAlerts(competitionId: Int?) -> Effect<Action> {
-        Log.trace("관심 대회 알림 켬: competitionId=\(competitionId.map(String.init) ?? "-")", category: .view, level: .info)
-        return .run { send in
-            switch await notificationPermissionClient.status() {
-            case .granted:
-                return
-            case .denied:
-                await send(.internal(.showDeviceNotificationAlert))
-            case .notDetermined:
-                if await firebaseClient.requestPermission() {
-                    await send(.internal(.competitionAlertsPermissionGranted))
-                }
-            }
-        }
-        .cancellable(id: CancelID.competitionAlerts, cancelInFlight: true)
-    }
-
     /// 로그아웃·탈퇴·세션 만료 — 게스트로 바꾸고 이전 계정의 화면을 정리한 뒤 홈으로 보낸다.
     private static func resetToGuest(_ state: inout State) {
         state.authInfo = .guest
@@ -686,20 +695,6 @@ public struct AppTabFeature: Sendable {
         return .none
     }
 
-    /// 로그아웃·탈퇴 — 이 기기로 이전 계정 푸시가 가지 않게 FCM 토큰을 폐기한다.
-    /// 캐시를 남기면 다음 로그인(syncAfterLoginSuccess)이 폐기된 토큰을 서버에 다시 등록하므로 함께 지운다.
-    /// 캐시는 폐기보다 먼저 지운다 — 세션 만료는 게스트 전환이 먼저라, 폐기 중 시작된 새 로그인이
-    /// 캐시의 옛 토큰을 등록하면 안 된다(폐기 때 SDK는 토큰 콜백에 nil을 넘겨 캐시가 다시 채워지지 않는다).
-    /// 폐기가 실패하면 앱 진입·복귀와 다음 토큰 발급 때 다시 시도한다(`FirebaseClientFactory`).
-    private static func discardDeviceFCMToken(_ firebaseClient: FirebaseClient, context: String) async {
-        firebaseClient.clearCachedToken()
-        do {
-            try await firebaseClient.deleteFCMToken()
-        } catch {
-            Log.trace("FCM token deletion after \(context) failed: \(error)", category: .system, level: .error)
-        }
-    }
-
     /// 네이티브 로그아웃을 홈·대회 웹 세션에도 알린다.
     private static func broadcastLoggedOut() -> Effect<Action> {
         .merge(
@@ -720,6 +715,68 @@ public struct AppTabFeature: Sendable {
             return .send(.competition(.session(.loginCancelled)))
         case .myPage, nil:
             return .none
+        }
+    }
+}
+
+// MARK: - 기기 알림 권한 · FCM 토큰
+
+extension AppTabFeature {
+    /// '관심 대회 알림'을 켰을 때 기기 알림 상태를 본다(#257). 설정 값은 서버에 있어(#281) 웹·설정 화면이 저장하고, 여기서는 안내만 한다.
+    /// 이미 허용이면 할 일이 없고, 거절(또는 기기 설정에서 끔)이면 앱이 다시 물을 수 없어 설정 앱으로 안내한다.
+    /// 한 번도 묻지 않았으면 iOS 설정에 알림 줄조차 없으니 여기서 시스템 권한 창을 띄운다.
+    private func enableCompetitionAlerts(competitionId: Int?) -> Effect<Action> {
+        Log.trace("관심 대회 알림 켬: competitionId=\(competitionId.map(String.init) ?? "-")", category: .view, level: .info)
+        return .run { send in
+            switch await notificationPermissionClient.status() {
+            case .granted:
+                return
+            case .denied:
+                await send(.internal(.showDeviceNotificationAlert))
+            case .notDetermined:
+                if await firebaseClient.requestPermission() {
+                    await send(.internal(.competitionAlertsPermissionGranted))
+                }
+            }
+        }
+        .cancellable(id: CancelID.competitionAlerts, cancelInFlight: true)
+    }
+
+    /// 앱 복귀 때 기기 토큰을 서버에 다시 등록한다(#332). 첫 권한 창에서 거절한 뒤 iOS 설정에서 켜고 돌아오면
+    /// 서버에 이 기기 토큰이 없고, 앱 진입 등록이 오프라인으로 실패했어도 마찬가지다. 서버는 같은 토큰이면 OS 버전만 고친다.
+    /// 아직 묻지 않았으면 등록 과정이 권한 창을 띄우므로 허용일 때만 한다 — 권한은 알림이 필요한 때에 묻는다.
+    private func resyncDeviceTokenIfPermitted() -> Effect<Action> {
+        .run { _ in
+            guard await notificationPermissionClient.status() == .granted else { return }
+            await FCMAppInfoSync.syncOnAppLaunch(firebaseClient: firebaseClient, userClient: userClient)
+        }
+        .cancellable(id: CancelID.deviceTokenSync, cancelInFlight: true)
+    }
+
+    /// 앱이 켜져 있는 동안 바뀐 FCM 토큰을 서버에 등록한다(#332). 서버는 같은 기기의 옛 토큰 행을 지우고 새로 저장한다.
+    private func registerRefreshedFCMToken(_ token: String) -> Effect<Action> {
+        .run { _ in
+            do {
+                try await userClient.updateFCMToken(token)
+                Log.trace("✅ FCM 토큰 교체 → AppInfo 반영", category: .network, level: .info)
+            } catch {
+                Log.trace("⚠️ FCM 토큰 교체 AppInfo 실패 (\(error))", category: .network, level: .error)
+            }
+        }
+        .cancellable(id: CancelID.deviceTokenSync, cancelInFlight: true)
+    }
+
+    /// 로그아웃·탈퇴 — 이 기기로 이전 계정 푸시가 가지 않게 FCM 토큰을 폐기한다.
+    /// 캐시를 남기면 다음 로그인(syncAfterLoginSuccess)이 폐기된 토큰을 서버에 다시 등록하므로 함께 지운다.
+    /// 캐시는 폐기보다 먼저 지운다 — 세션 만료는 게스트 전환이 먼저라, 폐기 중 시작된 새 로그인이
+    /// 캐시의 옛 토큰을 등록하면 안 된다(폐기 때 SDK는 토큰 콜백에 nil을 넘겨 캐시가 다시 채워지지 않는다).
+    /// 폐기가 실패하면 앱 진입·복귀와 다음 토큰 발급 때 다시 시도한다(`FirebaseClientFactory`).
+    private static func discardDeviceFCMToken(_ firebaseClient: FirebaseClient, context: String) async {
+        firebaseClient.clearCachedToken()
+        do {
+            try await firebaseClient.deleteFCMToken()
+        } catch {
+            Log.trace("FCM token deletion after \(context) failed: \(error)", category: .system, level: .error)
         }
     }
 }
