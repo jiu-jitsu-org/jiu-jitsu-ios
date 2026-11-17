@@ -101,6 +101,7 @@ public struct CommunityDetailView: View {
                 onLoadingFinished: { store.send(.internal(.loadingFinished)) },
                 onLoadingFailed: { store.send(.internal(.loadingFailed)) },
                 onLoadingCommitted: { store.send(.internal(.loadingCommitted)) },
+                onWebProcessTerminated: { store.send(.internal(.webProcessTerminated)) },
                 onBridgeMessage: { store.send(.internal(.bridgeMessageReceived($0))) },
                 onOutboundDelivered: { store.send(.internal(.outboundDelivered(id: $0))) }
             )
@@ -149,16 +150,25 @@ public struct CommunityDetailView: View {
 
     private var errorOverlay: some View {
         VStack(spacing: 13) {
-            Text("잠시 문제가 생겼어요")
-                .font(.pretendard.bodyM)
-                .foregroundStyle(Color.component.errorState.default.titleText)
-            Button {
-                store.send(.view(.retryTapped))
-            } label: {
-                AppButtonConfiguration(title: "재시도", size: .medium)
+            VStack(spacing: 4) {
+                Text("잠시 문제가 생겼어요")
+                    .font(.pretendard.bodyM)
+                    .foregroundStyle(Color.component.errorState.default.titleText)
+                if store.hasLostDraft {
+                    Text("쓰던 글은 사라졌어요")
+                        .font(.pretendard.bodyS)
+                        .foregroundStyle(Color.component.errorState.default.descriptionText)
+                }
             }
-            .appButtonStyle(.neutral, size: .medium)
-            .frame(height: 38)
+            if !store.hidesRetry {
+                Button {
+                    store.send(.view(.retryTapped))
+                } label: {
+                    AppButtonConfiguration(title: "재시도", size: .medium)
+                }
+                .appButtonStyle(.neutral, size: .medium)
+                .frame(height: 38)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.component.background.default)

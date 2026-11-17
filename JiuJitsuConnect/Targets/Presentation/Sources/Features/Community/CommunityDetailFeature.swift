@@ -33,6 +33,14 @@ public struct CommunityDetailFeature: Sendable {
         // 네이티브가 스피너를 띄운다. 첫 응답부터는 웹 스켈레톤이 로딩 모습을 맡는다(#299 이후).
         var isAwaitingFirstResponse: Bool = true
         var hasError: Bool = false
+        // 웹 프로세스가 죽어 글쓰기 · 수정 화면의 작성 내용이 사라짐(#352). 오류 화면에 함께 알린다.
+        var hasLostDraft = false
+        // 글쓰기 · 수정으로 연 웹뷰의 프로세스가 죽음(#352). 등록 뒤엔 같은 웹뷰가 상세로 바뀌어(router.replace)
+        // 다시 불러오면 처음 연 글쓰기 주소가 빈 화면으로 열려 같은 글을 또 올리게 될 수 있어, 재시도 없이 뒤로가기만 둔다.
+        var hidesRetry = false
+        // 웹이 PAGE_READY를 보내 웹 헤더의 뒤로가기와 BACK_PRESSED 응답이 살아 있음(#352).
+        // 404 · 오류 화면은 보내지 않는다 — 그런 화면에서 스와이프를 웹에 넘기면 아무도 답하지 않아 갇힌다.
+        var isPageReady = false
         // 스스로 닫기 시작함(뒤로가기·CLOSE_SUBVIEW). 닫힘 애니메이션 동안 살아 있는 웹뷰가
         // 늦은 로딩 완료를 보내지 않도록 dismiss 전에 웹뷰를 먼저 멈춘다(#152).
         var isClosing = false
@@ -98,8 +106,9 @@ public struct CommunityDetailFeature: Sendable {
         /// 스와이프 백을 막고 BACK_PRESSED로 넘길지.
         /// 로딩/에러 중엔 오버레이가 웹을 덮어 작성 내용이 있을 수 없고 웹이 BACK_PRESSED에 응답하지도
         /// 못하므로, 가드와 무관하게 스와이프로 닫히게 둔다(오버레이 뒤로가기 `backTapped`와 같은 기준).
+        /// 페이지가 PAGE_READY를 보내기 전(404 · 오류 화면 포함)도 응답할 웹이 없어 막지 않는다(#352).
         var blocksSwipeBack: Bool {
-            leaveGuardEnabled && !isLoading && !hasError
+            leaveGuardEnabled && isPageReady && !isLoading && !hasError
         }
     }
 
@@ -133,6 +142,7 @@ public struct CommunityDetailFeature: Sendable {
             case loadingCommitted
             case loadingFinished
             case loadingFailed
+            case webProcessTerminated
             // 웹뷰가 AppBridge로 보내온 인바운드 메시지(WKScriptMessageHandler 경유).
             case bridgeMessageReceived(WebBridgeInboundMessage)
             // View가 outbox의 메시지를 evaluateJavaScript로 전달 완료했음을 통지.
@@ -185,7 +195,9 @@ public struct CommunityDetailFeature: Sendable {
         Reduce { state, action in
             switch action {
             case .view(.retryTapped):
+                guard !state.hidesRetry else { return .none }
                 state.hasError = false
+                state.hasLostDraft = false
                 state.isLoading = true
                 state.isAwaitingFirstResponse = true
                 state.loadToken = UUID()
@@ -259,6 +271,8 @@ public struct CommunityDetailFeature: Sendable {
                 state.isLoading = true
                 state.isAwaitingFirstResponse = true
                 state.hasError = false
+                state.hasLostDraft = false
+                state.isPageReady = false
                 // 문서를 새로 불러오면 직전 페이지의 가드는 의미가 없다. 웹은 언마운트 때 false를 보내지만
                 // 페이지 자체가 교체될 땐 그 정리가 돌지 않아, 남은 true가 BACK_PRESSED에 답하지 않는 페이지의
                 // 스와이프를 계속 막을 수 있다. 새 페이지가 다시 알려 줄 때까지 처음 열 때의 기본값으로 되돌린다.
@@ -281,6 +295,22 @@ public struct CommunityDetailFeature: Sendable {
                 state.hasError = true
                 return .none
 
+            case .internal(.webProcessTerminated):
+                // 죽은 웹은 BACK_PRESSED에도, 떠 있는 알럿 · 시트 결과에도 답하지 않는다 — 가드를 풀고 오류 화면(뒤로가기 · 재시도)으로 돌린다.
+                // 쓰던 내용이 있었는지는 처음 연 주소가 아니라 가드로 본다 — 등록 뒤 상세로 바뀌었거나 빈 글쓰기면 웹이 가드를 껐다.
+                state.hasLostDraft = state.leaveGuardEnabled && state.isPageReady
+                state.hidesRetry = State.isWriteOrEditScreen(state.url)
+                state.leaveGuardEnabled = false
+                state.isPageReady = false
+                state.isLoading = false
+                state.isAwaitingFirstResponse = false
+                state.hasError = true
+                state.pendingConfirmDialog = nil
+                state.pendingSelectSheet = nil
+                state.pendingPhotoPick = nil
+                state.isPhotoPickerPresented = false
+                return .none
+
             // MARK: - Web Bridge (인바운드)
 
             case let .internal(.bridgeMessageReceived(message)):
@@ -294,6 +324,7 @@ public struct CommunityDetailFeature: Sendable {
                     // 오류 화면 중엔 늦게 온 신호로 탈출용 뒤로가기를 거두지 않는다.
                     guard !state.hasError else { return .none }
                     state.isLoading = false
+                    state.isPageReady = true
                     return .none
 
                 case let .openSubview(payload):
