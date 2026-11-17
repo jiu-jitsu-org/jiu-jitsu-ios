@@ -155,6 +155,8 @@ private extension WebBridgeInboundMessage {
             return "COMPETITION_HEADER_TINT  color=\(hex ?? "null")"
         case let .setSheetOpen(open):
             return "SET_SHEET_OPEN  open=\(open)"
+        case let .contentCreated(kind):
+            return "CONTENT_CREATED  kind=\(kind.rawValue)"
         case let .unknown(type):
             return "\(type)  (unsupported)"
         }
@@ -255,6 +257,9 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 가린 높이를 0으로 돌려, 시트가 탭 바 자리까지 내려오게 한다(안 그러면 그 자리를 WebKit이 시트 가장자리 색으로 채운다).
     /// 화면 표시만 바꾸는 신호라 BridgeWebView가 받아 처리하고 Feature로는 넘기지 않는다.
     case setSheetOpen(Bool)
+    /// 글 · 댓글(답글 · 밸런스 게임 댓글 포함) 등록 성공(#333 · jiu-jitsu-frontend#495). 웹은 매번 보내고(capability 확인 없음),
+    /// 알림 권한 안내를 띄울지는 앱(AppTab)이 정한다.
+    case contentCreated(ContentCreatedKind)
     /// 계약에 없는 타입(상위 버전/오타 등) — 무시 대상.
     case unknown(type: String)
 
@@ -277,6 +282,7 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case competitionAlertsEnabled = "COMPETITION_ALERTS_ENABLED"
         case competitionHeaderTint = "COMPETITION_HEADER_TINT"
         case setSheetOpen = "SET_SHEET_OPEN"
+        case contentCreated = "CONTENT_CREATED"
     }
 
     /// `WKScriptMessage.body`를 파싱한다.
@@ -308,20 +314,7 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case .authTokenRefresh:
             return .authTokenRefresh
         case .openSubview:
-            // url은 필수. 빈 값/누락이면 띄울 대상이 없으므로 무시한다(동일 origin 검사는 Feature가 수행).
-            guard let urlString = payload?["url"] as? String, !urlString.isEmpty else {
-                Log.trace("OPEN_SUBVIEW payload url 누락/빈값", category: .network, level: .error)
-                return nil
-            }
-            let presentation = (payload?["presentation"] as? String)
-                .flatMap(OpenSubviewPayload.Presentation.init(rawValue:)) ?? .push
-            return .openSubview(
-                OpenSubviewPayload(
-                    url: urlString,
-                    title: payload?["title"] as? String,
-                    presentation: presentation
-                )
-            )
+            return decodeOpenSubview(payload)
         case .closeSubview:
             return .closeSubview
         case .setLeaveGuard:
@@ -441,9 +434,36 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case .setSheetOpen:
             // 값이 어긋나면 닫힘으로 본다 — 탭 바가 숨은 채 갇히지 않게.
             return .setSheetOpen((payload?["open"] as? Bool) ?? false)
+        case .contentCreated:
+            return decodeContentCreated(payload)
         case .none:
             return .unknown(type: rawType)
         }
+    }
+
+    private static func decodeOpenSubview(_ payload: [String: Any]?) -> WebBridgeInboundMessage? {
+        // url은 필수. 빈 값/누락이면 띄울 대상이 없으므로 무시한다(동일 origin 검사는 Feature가 수행).
+        guard let urlString = payload?["url"] as? String, !urlString.isEmpty else {
+            Log.trace("OPEN_SUBVIEW payload url 누락/빈값", category: .network, level: .error)
+            return nil
+        }
+        let presentation = (payload?["presentation"] as? String)
+            .flatMap(OpenSubviewPayload.Presentation.init(rawValue:)) ?? .push
+        return .openSubview(
+            OpenSubviewPayload(
+                url: urlString,
+                title: payload?["title"] as? String,
+                presentation: presentation
+            )
+        )
+    }
+
+    private static func decodeContentCreated(_ payload: [String: Any]?) -> WebBridgeInboundMessage? {
+        guard let kind = (payload?["kind"] as? String).flatMap(ContentCreatedKind.init(rawValue:)) else {
+            Log.trace("CONTENT_CREATED payload 필수 필드 누락", category: .network, level: .error)
+            return nil
+        }
+        return .contentCreated(kind)
     }
 
     private static func normalizedObject(from body: Any) -> [String: Any]? {
@@ -463,6 +483,12 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
 // MARK: - OPEN_USER_PROFILE Payload
 
 /// `OPEN_USER_PROFILE` 페이로드. `userId`는 글·댓글 응답의 `author.id`다.
+/// `CONTENT_CREATED`로 알린 것 — 답글 · 밸런스 게임 댓글도 COMMENT다.
+public enum ContentCreatedKind: String, Equatable, Sendable {
+    case post = "POST"
+    case comment = "COMMENT"
+}
+
 public struct OpenUserProfilePayload: Equatable, Sendable {
     public let userId: Int
     /// 웹이 판단한 "내 글·댓글" 여부. 남에게 보이는 모습이 아니라 내가 고칠 수 있는 MY로 보낼지 가른다.

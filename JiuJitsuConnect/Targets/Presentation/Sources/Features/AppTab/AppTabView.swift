@@ -181,6 +181,21 @@ public struct AppTabView: View {
             isPresented: deviceNotificationAlertBinding(isInCover: false),
             configuration: deviceNotificationAlertConfiguration
         )
+        // 첫 글 · 댓글을 올린 뒤 알림 권한을 묻기 전 한 줄 안내(#333). 상세 모달이 떠 있으면 Feature가 띄우지 않는다.
+        .sheet(
+            isPresented: Binding(
+                get: { store.isNotificationPromptPresented },
+                set: { if !$0 { store.send(.view(.notificationPrompt(.dismissed))) } }
+            )
+        ) {
+            NotificationPromptView(
+                onAllow: { store.send(.view(.notificationPrompt(.allowTapped))) },
+                onLater: { store.send(.view(.notificationPrompt(.laterTapped))) }
+            )
+            .presentationDragIndicator(.hidden)
+            .presentationDetents([.height(NotificationPromptView.contentHeight)])
+            .presentationBackground(Color.component.bottomSheet.selected.container.background)
+        }
         // 리스트 웹뷰가 요청한 확인 알럿·선택 시트를 최상위에서 그려 GNB·하단 탭바까지 덮는다.
         // (웹뷰는 자기 프레임 밖을 딤 처리할 수 없어 이 표면은 네이티브가 소유한다.)
         .webBridgeDialogs(

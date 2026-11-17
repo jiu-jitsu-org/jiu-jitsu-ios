@@ -198,6 +198,8 @@ public struct CommunityFeature: Sendable {
             case homeFeedRequested
             // 홈에 쌓인 끝난 대회 상세의 '내 기록에 남기기'(#304) → 부모가 프로필을 보고 기록 추가를 그 상세 위에 쌓는다.
             case competitionRecordRequested(OpenCompetitionRecordPayload)
+            // 홈 웹에서 글 · 댓글을 올림(#333) → 부모(AppTab)가 알림 권한 안내를 띄울지 정한다.
+            case contentCreated
         }
 
         /// 부모가 세션 상태 변화를 알려주면 그에 맞는 아웃바운드 메시지를 웹에 주입한다.
@@ -458,6 +460,9 @@ public struct CommunityFeature: Sendable {
                     // 홈 피드 글 속 대회 카드에서도 관심 첫 등록 시트가 뜬다(#257) → 부모(AppTab)가 대회 탭과 같이 처리한다.
                     return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
 
+                case .contentCreated:
+                    return .send(.delegate(.contentCreated))
+
                 case .openHomeFeed, .openCompetitionRecord, .competitionHeaderTint, .setSheetOpen:
                     // 대회 화면만 알리는 신호(#250)라 홈 피드 웹에서는 오지 않아야 한다. 받을 곳이 없어 무시한다.
                     Log.trace("리스트 웹뷰 \(message) 수신 — 무시", category: .network, level: .info)
@@ -678,6 +683,8 @@ public struct CommunityFeature: Sendable {
         case .competitionHeaderTintChanged:
             // 대회 탭 목록만 알리는 신호라 쌓인 상세는 이미 무시했다.
             return .none
+        case .contentCreated:
+            return .send(.delegate(.contentCreated))
         }
     }
 
