@@ -22,6 +22,17 @@ public struct SplashView: View {
                 secondaryButton: .init(title: "나중에", style: .neutral) { store.send(.view(.recommendedUpdateLaterTapped)) }
             )
         )
+        // 저장된 로그인은 있는데 서버에 닿지 못함(#367). 로그인 화면으로 보내면 로그아웃된 줄 알고
+        // 다른 소셜로 새 계정을 만들 수 있어, 로그인을 지킨 채 다시 시도하게 한다.
+        .appAlert(
+            isPresented: Binding(get: { store.isConnectionFailurePresented }, set: { _ in }),
+            configuration: AppAlertConfiguration(
+                title: "서버에 연결하지 못했어요",
+                message: "인터넷 연결을 확인하고 다시 시도해 주세요.",
+                primaryButton: .init(title: "다시 시도", style: .primary) { store.send(.view(.connectionRetryTapped)) },
+                secondaryButton: nil
+            )
+        )
         .onAppear {
             // 자동 로그인과 웹뷰 미리 만들기(#207, #270)는 SplashFeature가 정한 순서대로 시작한다
             store.send(.view(.onAppear))

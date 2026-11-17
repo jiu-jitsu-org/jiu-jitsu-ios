@@ -134,7 +134,7 @@ public final class DefaultNetworkService: NetworkService {
                 throw NetworkError.unknown(error)
             }
             switch urlError.code {
-            case .notConnectedToInternet:
+            case _ where Self.connectionFailureCodes.contains(urlError.code):
                 throw NetworkError.noConnection
             case .timedOut:
                 throw NetworkError.timeout
@@ -206,6 +206,19 @@ public final class DefaultNetworkService: NetworkService {
         return try await requestData(endpoint: endpoint, allowAuthRetry: false)
     }
 
+    /// 서버에 닿지 못한 연결 오류(#367). 지하철 · 비행기 모드 · 서버 재시작 중에 나는 코드들로,
+    /// '알 수 없는 오류'가 아니라 연결 실패로 알려야 다시 시도를 안내할 수 있다.
+    private static let connectionFailureCodes: Set<URLError.Code> = [
+        .notConnectedToInternet,
+        .networkConnectionLost,
+        .cannotConnectToHost,
+        .cannotFindHost,
+        .dnsLookupFailed,
+        .dataNotAllowed,
+        .internationalRoamingOff,
+        .callIsActive
+    ]
+
     /// 인터셉터 재귀 없이 refresh 엔드포인트를 직접 호출해 토큰을 갱신·저장하고 새 accessToken을 반환한다.
     /// self를 참조하지 않도록 static으로 두어 코디네이터 주입 시 순환을 피한다.
     private static func executeRefresh(
@@ -232,7 +245,7 @@ public final class DefaultNetworkService: NetworkService {
             #endif
             // 갱신 요청이 서버에 닿지 못한 것이라 refresh 토큰은 아직 유효하다 → 세션 만료가 아님.
             switch (error as? URLError)?.code {
-            case .notConnectedToInternet?:
+            case let code? where connectionFailureCodes.contains(code):
                 throw NetworkError.noConnection
             case .timedOut?:
                 throw NetworkError.timeout

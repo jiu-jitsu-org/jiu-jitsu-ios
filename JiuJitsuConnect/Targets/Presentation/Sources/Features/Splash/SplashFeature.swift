@@ -46,6 +46,8 @@ public struct SplashFeature: Sendable {
         // 권장 업데이트 안내. 꼭 필요한 업데이트는 앱 전체를 막아야 해 AppFeature가 띄운다.
         var recommendedUpdateVersion: String?
         var hasFinished = false
+        // 서버 연결 실패 안내 + [다시 시도](#367)
+        var isConnectionFailurePresented = false
 
         public init() {}
     }
@@ -54,6 +56,8 @@ public struct SplashFeature: Sendable {
         let authInfo: AuthInfo?
         // 저장된 로그인이 만료로 끝남 — 로그인 화면에서 이유를 알린다(#373).
         var isSessionExpired = false
+        // 저장된 로그인은 있는데 서버에 닿지 못함(망 없음 · 5xx · 시간 초과) — 로그인 화면 대신 다시 시도를 묻는다(#367).
+        var isConnectionFailed = false
     }
 
     public enum Action: Sendable {
@@ -68,11 +72,13 @@ public struct SplashFeature: Sendable {
             // 권장 업데이트 안내(#326)
             case recommendedUpdateTapped
             case recommendedUpdateLaterTapped
+            case connectionRetryTapped
         }
 
         public enum InternalAction: Sendable {
             case minimumDisplayElapsed
             case autoLoginFinished(AuthInfo?, isSessionExpired: Bool = false)
+            case autoLoginConnectionFailed
             case versionChecked(AppUpdateRequirement)
         }
 
@@ -97,68 +103,7 @@ public struct SplashFeature: Sendable {
                         await send(.internal(.minimumDisplayElapsed))
                     }
                     .cancellable(id: CancelID.minimumDisplay, cancelInFlight: true)
-                let autoLogin: Effect<Action> = .run { send in
-                    // 자동 로그인은 비구조적 Task로 돌려, 10초에 기다림을 끊어도 요청은 취소되지 않게 한다.
-                    // refresh 토큰은 서버에서 1회용으로 회전되므로, 늦게 도착한 재발급 응답의 새 토큰도
-                    // autoLogin(AuthRepositoryImpl)이 저장해야 다음 실행의 자동 로그인이 깨지지 않는다.
-                    let autoLoginTask = Task { try await self.authClient.autoLogin() }
-
-                    // 저장된 access token이 아직 유효하면 자동 로그인을 기다리지 않고 홈 피드를 미리 불러 둔다(#270).
-                    // 서버는 토큰을 갱신해도 이전 access token을 막지 않아 그대로 써도 된다.
-                    // 미리 불러 둘 수 없으면(로그인 전·토큰 만료) 웹킷만 데워 둔다(#207).
-                    // 자동 로그인을 먼저 시작해, 웹뷰를 만드는 동안 밀리지 않게 한다.
-                    let homeURL = CommunityFeature.makeCommunityURL()
-                    var isPreloading = false
-                    if let homeURL, let token = self.authClient.storedAccessToken(), !JWTDecoder.isExpired(token) {
-                        await self.homeFeedPreload.preload(homeURL, token)
-                        isPreloading = true
-                    } else {
-                        await self.homeFeedPreload.prewarm()
-                    }
-
-                    let outcome = await withTaskGroup(of: AutoLoginOutcome.self) { group in
-                        group.addTask {
-                            // 비구조적 Task의 value를 기다리는 쪽이 취소돼도 Task 자체는 취소되지 않는다.
-                            .completed(await TaskResult { try await autoLoginTask.value })
-                        }
-                        group.addTask {
-                            try? await self.clock.sleep(for: Self.maximumWaitDuration)
-                            return .timedOut
-                        }
-                        let first = await group.next() ?? .timedOut
-                        group.cancelAll()
-                        return first
-                    }
-
-                    // 홈으로 가면, 미리 불러 두지 못했어도 새 토큰으로 지금 시작한다 — 스플래시 남은 시간만큼 겹친다.
-                    // 링크로 들어오면 남은 시간이 없어 이 대기만큼 늦게 넘어간다(순서 조정은 #301).
-                    // 로그인 화면으로 가면 미리 불러 둔 화면을 버린다.
-                    let authInfo: AuthInfo? = if case let .completed(.success(info)) = outcome { info } else { nil }
-                    if let accessToken = authInfo?.accessToken {
-                        if !isPreloading, let homeURL {
-                            await self.homeFeedPreload.preload(homeURL, accessToken)
-                        }
-                    } else {
-                        await self.homeFeedPreload.discard()
-                    }
-
-                    switch outcome {
-                    case let .completed(.success(authInfo)):
-                        Log.trace("✅ Auto login check completed. AuthInfo: \(authInfo != nil)", category: .debug, level: .info)
-                        await send(.internal(.autoLoginFinished(authInfo)))
-                    case let .completed(.failure(error)):
-                        Log.trace("⚠️ Auto login failed: \(error)", category: .debug, level: .error)
-                        let isSessionExpired = if case let .apiError(code, _)? = error as? DomainError { code.endsSession } else { false }
-                        await send(.internal(.autoLoginFinished(nil, isSessionExpired: isSessionExpired)))
-                    case .timedOut:
-                        // 정책 문의 '자동 로그인 네트워크 실패 시 처리'(#21) 결정 전까지 네트워크 실패와 같게 처리한다.
-                        // 저장된 토큰은 지우지 않는다(진행 중인 재발급이 끝나면 갱신됨).
-                        Log.trace("⚠️ Auto login timed out after \(Self.maximumWaitDuration)", category: .debug, level: .error)
-                        await send(.internal(.autoLoginFinished(nil)))
-                    }
-                }
-                .cancellable(id: CancelID.onAppearLaunch, cancelInFlight: true)
-                return .merge(minimumDisplay, autoLogin, checkVersion())
+                return .merge(minimumDisplay, autoLoginEffect(), checkVersion())
 
             case .deepLinkPending:
                 state.isMinimumDisplaySatisfied = true
@@ -172,6 +117,17 @@ public struct SplashFeature: Sendable {
             case let .internal(.autoLoginFinished(authInfo, isSessionExpired)):
                 state.autoLoginResult = AutoLoginResult(authInfo: authInfo, isSessionExpired: isSessionExpired)
                 return finishIfReady(&state)
+
+            case .internal(.autoLoginConnectionFailed):
+                state.autoLoginResult = AutoLoginResult(authInfo: nil, isConnectionFailed: true)
+                return finishIfReady(&state)
+
+            case .view(.connectionRetryTapped):
+                state.isConnectionFailurePresented = false
+                state.autoLoginResult = nil
+                // 같은 연결 실패로 버전 확인도 '최신'으로 넘겼을 수 있어 다시 확인한다 — 꼭 필요한 업데이트를 건너뛰지 않게.
+                state.updateRequirement = nil
+                return .merge(autoLoginEffect(), checkVersion())
 
             case let .internal(.versionChecked(requirement)):
                 state.updateRequirement = requirement
@@ -236,20 +192,111 @@ public struct SplashFeature: Sendable {
             !state.hasFinished,
             state.recommendedUpdateVersion == nil,
             state.isMinimumDisplaySatisfied,
-            state.autoLoginResult != nil,
+            let result = state.autoLoginResult,
             let requirement = state.updateRequirement
         else { return .none }
 
-        switch requirement {
-        case .required:
+        if case .required = requirement {
             state.hasFinished = true
             return .send(.delegate(.updateRequired))
+        }
+        // 꼭 필요한 업데이트 다음, 권장 업데이트 안내보다 먼저 묻는다 — 연결이 안 되면 업데이트 확인도 믿을 수 없다.
+        if result.isConnectionFailed {
+            state.isConnectionFailurePresented = true
+            return .none
+        }
+
+        switch requirement {
+        case .required:
+            return .none
         case let .recommended(latestVersion)
             where !state.hasPendingDeepLink && appVersionClient.dismissedRecommendedVersion() != latestVersion:
             state.recommendedUpdateVersion = latestVersion
             return .none
         case .recommended, .upToDate:
             return finish(&state)
+        }
+    }
+
+    /// 자동 로그인을 최대 10초 기다린다. 앱을 열 때와 연결 실패 뒤 [다시 시도](#367)가 같이 쓴다.
+    private func autoLoginEffect() -> Effect<Action> {
+        .run { send in
+            // 자동 로그인은 비구조적 Task로 돌려, 10초에 기다림을 끊어도 요청은 취소되지 않게 한다.
+            // refresh 토큰은 서버에서 1회용으로 회전되므로, 늦게 도착한 재발급 응답의 새 토큰도
+            // autoLogin(AuthRepositoryImpl)이 저장해야 다음 실행의 자동 로그인이 깨지지 않는다.
+            let autoLoginTask = Task { try await self.authClient.autoLogin() }
+
+            // 저장된 access token이 아직 유효하면 자동 로그인을 기다리지 않고 홈 피드를 미리 불러 둔다(#270).
+            // 서버는 토큰을 갱신해도 이전 access token을 막지 않아 그대로 써도 된다.
+            // 미리 불러 둘 수 없으면(로그인 전·토큰 만료) 웹킷만 데워 둔다(#207).
+            // 자동 로그인을 먼저 시작해, 웹뷰를 만드는 동안 밀리지 않게 한다.
+            let homeURL = CommunityFeature.makeCommunityURL()
+            var isPreloading = false
+            if let homeURL, let token = self.authClient.storedAccessToken(), !JWTDecoder.isExpired(token) {
+                await self.homeFeedPreload.preload(homeURL, token)
+                isPreloading = true
+            } else {
+                await self.homeFeedPreload.prewarm()
+            }
+
+            let outcome = await Self.waitAtMost(Self.maximumWaitDuration, for: autoLoginTask, clock: self.clock)
+
+            // 홈으로 가면, 미리 불러 두지 못했어도 새 토큰으로 지금 시작한다 — 스플래시 남은 시간만큼 겹친다.
+            // 링크로 들어오면 남은 시간이 없어 이 대기만큼 늦게 넘어간다(순서 조정은 #301).
+            // 로그인 화면으로 가면 미리 불러 둔 화면을 버린다.
+            let authInfo: AuthInfo? = if case let .completed(.success(info)) = outcome { info } else { nil }
+            if let accessToken = authInfo?.accessToken {
+                if !isPreloading, let homeURL {
+                    await self.homeFeedPreload.preload(homeURL, accessToken)
+                }
+            } else {
+                await self.homeFeedPreload.discard()
+            }
+
+            switch outcome {
+            case let .completed(.success(authInfo)):
+                Log.trace("✅ Auto login check completed. AuthInfo: \(authInfo != nil)", category: .debug, level: .info)
+                await send(.internal(.autoLoginFinished(authInfo)))
+            case let .completed(.failure(error)):
+                Log.trace("⚠️ Auto login failed: \(error)", category: .debug, level: .error)
+                // autoLogin은 저장된 로그인이 없으면 nil을 돌려주므로, 실패는 저장된 로그인이 있다는 뜻이다.
+                // 서버가 세션 종료를 알렸을 때만 로그인 화면으로 가고, 그 밖엔 토큰을 지키고 다시 시도를 묻는다(#367).
+                if case let .apiError(code, _)? = error as? DomainError, code.endsSession {
+                    await send(.internal(.autoLoginFinished(nil, isSessionExpired: true)))
+                } else {
+                    await send(.internal(.autoLoginConnectionFailed))
+                }
+            case .timedOut:
+                // 저장된 토큰은 지우지 않는다. 요청은 계속 돌고, [다시 시도]가 그 결과에 합류한다.
+                Log.trace("⚠️ Auto login timed out after \(Self.maximumWaitDuration)", category: .debug, level: .error)
+                await send(.internal(.autoLoginConnectionFailed))
+            }
+        }
+        .cancellable(id: CancelID.onAppearLaunch, cancelInFlight: true)
+    }
+
+    /// 자동 로그인을 `duration`까지만 기다린다. 먼저 끝난 쪽 하나만 결과로 쓴다.
+    /// TaskGroup으로 두 자식을 경쟁시키면 그룹이 남은 자식까지 기다리고, `Task.value`는 기다리는 쪽이
+    /// 취소돼도 돌아오지 않아 시간 초과가 걸리지 않는다(#367). 그래서 두 비구조적 Task가 한 번만 넘긴다.
+    private static func waitAtMost(
+        _ duration: Duration,
+        for task: Task<AuthInfo?, Error>,
+        clock: any Clock<Duration>
+    ) async -> AutoLoginOutcome {
+        await withCheckedContinuation { continuation in
+            let isResumed = LockIsolated(false)
+            let resumeOnce: @Sendable (AutoLoginOutcome) -> Void = { outcome in
+                let shouldResume = isResumed.withValue { resumed in
+                    defer { resumed = true }
+                    return !resumed
+                }
+                if shouldResume { continuation.resume(returning: outcome) }
+            }
+            Task { resumeOnce(.completed(await TaskResult { try await task.value })) }
+            Task {
+                try? await clock.sleep(for: duration)
+                resumeOnce(.timedOut)
+            }
         }
     }
 
