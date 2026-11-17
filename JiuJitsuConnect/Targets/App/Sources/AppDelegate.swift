@@ -72,6 +72,9 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        // 배너만으로는 앱 안 종의 새 알림 점이 켜지지 않아, 앱 안으로도 알린다(#394).
+        Log.trace("[Push] 앱 사용 중 알림 수신", category: .system, level: .info)
+        DependencyContainer.shared.deliverForegroundNotification()
         completionHandler([.banner, .sound, .badge])
     }
 

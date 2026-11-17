@@ -3,6 +3,7 @@
 //  Presentation
 //
 //  첫 글 · 댓글을 올린 뒤 알림 권한을 묻기 전 한 줄 안내(#333). 어느 탭의 웹에서 올렸든 AppTab이 한곳에서 정한다.
+//  열린 설정 › 알림 다시 읽기(#281), 앱을 쓰는 중 도착한 알림으로 새 알림 점 다시 조회(#394)도 여기 둔다.
 //
 
 import ComposableArchitecture
@@ -72,5 +73,41 @@ extension AppTabFeature {
             @Dependency(\.date.now) var now
             return .run { [now] _ in notificationPromptClient.snooze(now) }
         }
+    }
+}
+
+// MARK: - 알림 설정 · 앱 사용 중 알림
+
+extension AppTabFeature {
+    /// 웹이 관심 대회 알림을 서버에 저장함(#281) → MY 스택에 설정 › 알림이 열려 있으면 서버 값을 다시 읽힌다.
+    static func refreshOpenNotificationSetting(_ state: State) -> Effect<Action> {
+        for id in state.myPage.path.ids {
+            guard
+                case let .settings(settings)? = state.myPage.path[id: id],
+                case .notificationSetting? = settings.destination
+            else { continue }
+            return .send(.myPage(.path(.element(
+                id: id,
+                action: .settings(.destination(.presented(.notificationSetting(.settingRefreshRequested))))
+            ))))
+        }
+        return .none
+    }
+
+    /// 앱을 쓰는 중 도착한 알림을 구독한다(#394). 배너만 뜨고 종의 새 알림 점은 그대로라 받을 때마다 다시 조회한다.
+    func observeNotificationArrivals() -> Effect<Action> {
+        .run { send in
+            for await _ in pushNotificationClient.arrivals() {
+                await send(.internal(.notificationArrived))
+            }
+        }
+        .cancellable(id: CancelID.notificationArrivalObserver, cancelInFlight: false)
+    }
+
+    /// 홈에 새 알림 점을 다시 조회시킨다. 대회 탭 종도 같은 값을 그려 함께 켜진다(#258).
+    /// 게스트는 홈이 조회하지 않고, 로그아웃 중엔 이전 계정의 알림이라 조회하지 않는다.
+    static func refreshUnreadOnArrival(_ state: State) -> Effect<Action> {
+        guard !state.authInfo.isGuest, !state.isLoggingOut else { return .none }
+        return .send(.home(.unreadNotificationRefreshRequested))
     }
 }
