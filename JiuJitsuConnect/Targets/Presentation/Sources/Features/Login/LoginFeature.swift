@@ -20,6 +20,12 @@ public struct LoginFeature: Sendable {
         
         @Presents var sheet: Sheet.State?
         var path = StackState<Path.State>()
+
+        /// 서버 로그인 중이거나 가입을 진행 중인지(약관 시트 · 닉네임 단계 · 가입 완료). 이 동안 들어온 공유 링크 · 푸시는
+        /// 흐름을 끊지 않고 보관한다(#375). SNS 앱으로 넘어간 단계는 알 수 없어 포함하지 않는다.
+        var isSigningUp: Bool {
+            isLoading || tempToken != nil || sheet != nil || !path.isEmpty
+        }
         
         public init() {}
     }
