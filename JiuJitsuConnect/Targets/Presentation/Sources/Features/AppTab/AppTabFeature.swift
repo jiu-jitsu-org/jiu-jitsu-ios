@@ -8,6 +8,7 @@
 import Foundation
 import UIKit
 import ComposableArchitecture
+import DesignSystem
 import Domain
 import CoreKit
 
@@ -26,6 +27,8 @@ public struct AppTabFeature: Sendable {
         case deviceTokenSync
         // 웹뷰 위임 토큰 갱신. 로그아웃 · 세션 만료 · 탈퇴 때 끊어 이전 계정 토큰이 웹으로 가지 않게 한다(#372).
         case webTokenRefresh
+        // 탭 화면 토스트(로그아웃 · 계정 복구 안내, #385)가 떠 있는 시간
+        case toast
     }
 
     // 세 번째 탭은 설정 대신 대회(#240). 설정은 MY 오른쪽 위로 옮겼다(#241).
@@ -56,6 +59,10 @@ public struct AppTabFeature: Sendable {
         var isLoginPromptPresented: Bool = false
         // 갱신 토큰 만료로 게스트가 됐음을 알림(#373). 로그아웃 · 탈퇴에는 띄우지 않는다.
         var isSessionExpiredAlertPresented = false
+        // 탈퇴를 마쳤다는 안내(#385). 30일 유예와 다시 로그인하면 취소된다는 걸 알려, 무심코 로그인해 되살리지 않게 한다.
+        var isWithdrawalNoticePresented = false
+        // 탭 화면 아래 토스트(로그아웃 · 계정 복구 안내, #385)
+        var toast: ToastState?
         // 관심 대회 알림을 켰는데 기기 알림이 꺼져 있을 때 설정 앱으로 안내하는 AppAlert 표시 여부(#257)
         var isDeviceNotificationAlertPresented: Bool = false
         // 첫 글 · 댓글을 올린 뒤 알림 권한을 묻기 전 한 줄 안내(#333) 표시 여부
@@ -103,6 +110,8 @@ public struct AppTabFeature: Sendable {
         case deepLink(DeepLink)
         // 부모(AppFeature)가 홈을 덮던 인사 장면을 걷었다(끝남·건너뜀·딥링크로 접힘).
         case greetingFinished
+        // 부모(AppFeature)의 첫 화면 로그인이 탈퇴 유예 중인 계정을 되살렸다(#385).
+        case accountRestored
 
         @CasePathable
         public enum ViewAction: Sendable {
@@ -120,6 +129,9 @@ public struct AppTabFeature: Sendable {
             // 알림 권한 안내(#333)의 [알림 받기] · [나중에] · 내려 닫기
             case notificationPrompt(NotificationPromptAction)
             case sessionExpiredAlert(SessionExpiredAlertAction)
+            // 탈퇴 안내(#385)의 [확인] · 닫힘
+            case withdrawalNoticeDismissed
+            case toastSwiped
         }
 
         public enum InternalAction: Sendable {
@@ -135,6 +147,10 @@ public struct AppTabFeature: Sendable {
             // 웹 주도 로그아웃 요청(AUTH_LOGOUT_REQUEST) 처리.
             case performWebLogout
             case webLogoutCompleted
+            // 탈퇴 뒤 로컬 세션 정리(signOut · 쿠키 · FCM 폐기)가 끝남(#385).
+            case withdrawalCleanupFinished
+            case showToast(ToastState)
+            case toastDismissed
             // 401 인터셉터가 방송한 세션 이벤트 수신.
             case sessionEvent(AuthSessionEvent)
             // 웹뷰 위임 토큰 갱신 성공 → 새 토큰을 웹에 주입.
@@ -161,6 +177,7 @@ public struct AppTabFeature: Sendable {
     @Dependency(\.notificationPermissionClient) var notificationPermissionClient
     @Dependency(\.communityClient) var communityClient
     @Dependency(\.openURL) var openURL
+    @Dependency(\.continuousClock) var clock
 
     public var body: some ReducerOf<Self> {
         Scope(state: \.home, action: \.home) {
@@ -249,21 +266,11 @@ public struct AppTabFeature: Sendable {
                 return .send(.internal(.showLoginModal))
 
             case .myPage(.delegate(.settings(.didWithdrawSuccessfully))):
-                Self.resetToGuest(&state)
-                return .merge(
-                    Self.broadcastLoggedOut(),
-                    .cancel(id: CancelID.notificationPermission),
-                    .cancel(id: CancelID.deviceTokenSync),
-                    .cancel(id: CancelID.webTokenRefresh),
-                    // 로컬 세션 정리를 끝낸 뒤 로그인 모달을 띄운다. 먼저 띄우면 새로 로그인한 토큰을
-                    // 뒤늦은 signOut이 지우거나, 새 로그인이 폐기 직전의 FCM 토큰을 등록할 수 있다.
-                    .run { send in
-                        await authClient.signOut()
-                        await WebSessionCookie.clear()
-                        await Self.discardDeviceFCMToken(firebaseClient, context: "withdrawal")
-                        await send(.internal(.showLoginModal))
-                    }
-                )
+                return finishWithdrawal(&state)
+
+            case .internal(.withdrawalCleanupFinished), .view(.withdrawalNoticeDismissed), .accountRestored,
+                 .internal(.showToast), .internal(.toastDismissed), .view(.toastSwiped):
+                return reduceAccountNotice(action, into: &state)
 
             // MARK: - Community Web Bridge Delegate
             case let .home(.delegate(.loginPromptRequested(reason))):
@@ -553,7 +560,9 @@ public struct AppTabFeature: Sendable {
                         .run { _ in await WebSessionCookie.clear() }
                     ),
                     .cancel(id: CancelID.notificationPermission),
-                    .cancel(id: CancelID.webTokenRefresh)
+                    .cancel(id: CancelID.webTokenRefresh),
+                    // 정리를 모두 마친 뒤 알린다 — 홈으로 돌아온 것만으로는 로그아웃이 됐는지 알 수 없다(#385).
+                    .send(.internal(.showToast(AccountNotice.loggedOutToast)))
                 )
 
             case let .internal(.sessionEvent(event)):
@@ -673,6 +682,7 @@ public struct AppTabFeature: Sendable {
                     return .merge(
                         .send(.myPage(.internal(.loadProfile))),
                         syncWeb,
+                        Self.noticeIfRestored(newAuthInfo),
                         .run { _ in
                             await FCMAppInfoSync.syncAfterLoginSuccess(
                                 firebaseClient: self.firebaseClient,
@@ -779,7 +789,7 @@ extension AppTabFeature {
     /// 캐시는 폐기보다 먼저 지운다 — 세션 만료는 게스트 전환이 먼저라, 폐기 중 시작된 새 로그인이
     /// 캐시의 옛 토큰을 등록하면 안 된다(폐기 때 SDK는 토큰 콜백에 nil을 넘겨 캐시가 다시 채워지지 않는다).
     /// 폐기가 실패하면 앱 진입·복귀와 다음 토큰 발급 때 다시 시도한다(`FirebaseClientFactory`).
-    private static func discardDeviceFCMToken(_ firebaseClient: FirebaseClient, context: String) async {
+    static func discardDeviceFCMToken(_ firebaseClient: FirebaseClient, context: String) async {
         firebaseClient.clearCachedToken()
         do {
             try await firebaseClient.deleteFCMToken()
