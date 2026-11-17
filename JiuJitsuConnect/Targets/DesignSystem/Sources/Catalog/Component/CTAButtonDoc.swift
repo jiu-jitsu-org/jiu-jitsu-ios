@@ -9,14 +9,14 @@
 import SwiftUI
 
 struct CTAButtonDoc: View {
-    private let types: [(CTAButton.ButtonType, String)] = [(.blue, "blue"), (.dark, "dark"), (.tint, "tint"), (.text, "text")]
+    private let types: [(CTAButton.ButtonType, String)] = [(.blue, "blue"), (.dark, "dark"), (.tint, "tint"), (.neutral, "neutral"), (.text, "text")]
 
     var body: some View {
         CatalogDoc(
             group: .component,
             title: "CTA 버튼",
             summary: "화면 맨 아래에 폭을 꽉 채우는 다음 단계·저장 버튼. 기본 높이 51.",
-            chips: ["쓰는 곳 22(15화면)", "종류 4", "모양 2", "2026-11-16 기준"]
+            chips: ["쓰는 곳 22(15화면)", "종류 5", "모양 2", "2026-11-16 기준"]
         ) {
             CatalogSection(title: "개요") {
                 CatalogPlate {
