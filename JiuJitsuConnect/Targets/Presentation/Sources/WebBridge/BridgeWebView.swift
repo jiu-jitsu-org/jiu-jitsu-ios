@@ -72,6 +72,8 @@ struct BridgeWebView: UIViewRepresentable {
     // 첫 응답이 와서 문서를 그리기 시작함(didCommit). 그 전까지는 웹이 아무것도 그릴 수 없어, 그 사이만 네이티브가
     // 로딩을 알리는 화면(상세)이 받는다. 당겨서 새로고침 중엔 띠가 로딩을 알리므로 보내지 않는다.
     var onLoadingCommitted: (() -> Void)?
+    // 웹 프로세스가 죽음(#352). 화면은 흰 채로 남고 웹 헤더 · BACK_PRESSED 응답도 없어, 받는 화면(상세)이 오류로 돌린다.
+    var onWebProcessTerminated: (() -> Void)?
     // 웹 → 네이티브 인바운드 메시지(AppBridge) 수신 콜백.
     let onBridgeMessage: (WebBridgeInboundMessage) -> Void
     // 아웃바운드 메시지를 evaluateJavaScript로 실제 전달한 뒤 호출.
@@ -87,6 +89,7 @@ struct BridgeWebView: UIViewRepresentable {
             onOutboundDelivered: onOutboundDelivered
         )
         coordinator.onLoadingCommitted = onLoadingCommitted
+        coordinator.onWebProcessTerminated = onWebProcessTerminated
         return coordinator
     }
 
@@ -228,6 +231,7 @@ struct BridgeWebView: UIViewRepresentable {
             onOutboundDelivered: onOutboundDelivered
         )
         context.coordinator.onLoadingCommitted = onLoadingCommitted
+        context.coordinator.onWebProcessTerminated = onWebProcessTerminated
         context.coordinator.scrollToTop(token: scrollToTopToken)
         context.coordinator.setPullToRefreshBackground(pullToRefreshBackground.map { UIColor($0) })
         // 탭 첫 화면 웹만 스크롤을 AppTabView에 알린다 — 탭 바 숨김·맨 위로 버튼(#267).
@@ -269,6 +273,7 @@ struct BridgeWebView: UIViewRepresentable {
         private var onBridgeMessage: (WebBridgeInboundMessage) -> Void
         private var onOutboundDelivered: (UUID) -> Void
         var onLoadingCommitted: (() -> Void)?
+        var onWebProcessTerminated: (() -> Void)?
 
         private var lastLoadedURL: URL?
         private var lastLoadToken: UUID?
@@ -538,6 +543,7 @@ struct BridgeWebView: UIViewRepresentable {
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
             // 웹 프로세스가 죽으면 닫힘 신호도 새 문서(didCommit)도 오지 않을 수 있다 — 시트가 열린 채였으면 탭 바를 돌려놓는다.
             setWebSheetOpen(false)
+            onWebProcessTerminated?()
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
