@@ -106,6 +106,8 @@ struct BridgeWebView: UIViewRepresentable {
         config.allowsInlineMediaPlayback = true
         // 리스트·상세 웹뷰가 로그인 세션 쿠키(httpOnly 포함)를 공유하도록 영구 default 데이터스토어를 강제한다.
         config.websiteDataStore = .default()
+        // 웹 서버가 앱 안 요청인지 · 앱 버전을 알게 한다(#370). 홈 피드 미리 불러오기도 이 설정을 쓴다.
+        WebEnvironment.appendAppName(to: config)
 
         // 웹 → 네이티브 단일 라우터(AppBridge) 등록.
         // WKUserContentController가 핸들러를 strong 참조하므로 약한 프록시를 끼워 누수를 막는다.
