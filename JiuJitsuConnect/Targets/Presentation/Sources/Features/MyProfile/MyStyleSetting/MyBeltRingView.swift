@@ -27,6 +27,8 @@ struct MyBeltRingView<Content: View>: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var spinToken = 0
+    /// 마지막으로 시작한 움직임. 다른 화면에서 돌아와 뷰가 다시 나타나면 task가 같은 토큰으로 다시 도는데, 이미 한 움직임은 다시 하지 않는다.
+    @State private var playedSpinToken = 0
     @State private var spinKind = SpinKind.entrance
     /// 움직임을 시작한 때. 끝나기 전 다시 누르면 무시하는 데 쓴다.
     @State private var spinStartedAt: Date?
@@ -57,7 +59,8 @@ struct MyBeltRingView<Content: View>: View {
             spinToken += 1
         }
         .task(id: spinToken) {
-            guard spinToken > 0 else { return }
+            guard spinToken > playedSpinToken else { return }
+            playedSpinToken = spinToken
             spinStartedAt = .now
             var reset = Transaction()
             reset.disablesAnimations = true
@@ -65,7 +68,9 @@ struct MyBeltRingView<Content: View>: View {
             // 0으로 돌린 프레임이 한 번 그려진 뒤에 출발해야 처음부터 돈다.
             try? await Task.sleep(for: .milliseconds(16))
             guard !Task.isCancelled else { return }
-            withAnimation(.linear(duration: Motion.total / 1000)) { spinTime = Motion.total }
+            withAnimation(.linear(duration: Motion.total / 1000)) { spinTime = Motion.total } completion: {
+                spinKind = .entrance
+            }
         }
     }
 
