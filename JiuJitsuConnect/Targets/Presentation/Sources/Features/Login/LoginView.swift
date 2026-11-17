@@ -13,6 +13,7 @@ public struct LoginView: View {
         NavigationStack(path: $store.scope(state: \.path, action: \.path)) {
             LoginSceneView {
                 loginButtons
+                    .serverLoginProgress(isLoading: store.isLoading)
             }
             // 빈 내비게이션 바가 안전 영역을 차지하지 않도록 첫 화면에서만 숨긴다
             .toolbar(.hidden, for: .navigationBar)
@@ -67,6 +68,7 @@ public struct LoginView: View {
         }
         .padding(.top, 8)
         .padding(.trailing, 16)
+        .disabled(store.isLoading)
     }
     #endif
 
@@ -126,6 +128,38 @@ public struct LoginView: View {
         // 최종 높이 계산
         let totalHeight = baseHeight + (CGFloat(itemCount) * rowHeight) + (CGFloat(max(0, itemCount - 1)) * spacing)
         return totalHeight
+    }
+}
+
+// MARK: - 서버 로그인 진행 표시 (#384)
+
+private extension View {
+    /// SNS 창에서 돌아와 서버 확인을 기다리는 동안 버튼을 흐리게 막고 그 위에 진행 중임을 알린다.
+    /// 표시가 없으면 사람들은 멈춘 줄 알고 버튼을 다시 누르는데, 진행 중엔 리듀서가 그 탭을 버려 아무 반응이 없다.
+    /// SNS 창이 떠 있는 단계는 넣지 않는다 — `isLoading`이 서버 확인 때만 켜진다(카카오톡에서 그냥 돌아오면 SDK가 응답하지 않음).
+    func serverLoginProgress(isLoading: Bool) -> some View {
+        self
+            // 버튼은 자리만 남기고 감춘다. 흐리게만 두면 검은 Apple 버튼이 회색 띠로 남아 가운데 문구와 겹친다.
+            // 자리를 남겨 덮개가 걷힐 때 시트 높이가 들썩이지 않는다.
+            .opacity(isLoading ? 0 : 1)
+            .disabled(isLoading)
+            .accessibilityHidden(isLoading)
+            .overlay {
+                if isLoading {
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .controlSize(.large)
+                            .tint(Color.semantic.text.secondary)
+                        Text("로그인하는 중이에요")
+                            .font(Font.pretendard.custom(weight: .medium, size: 16))
+                            .foregroundStyle(Color.semantic.text.primary)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.15), value: isLoading)
     }
 }
 
