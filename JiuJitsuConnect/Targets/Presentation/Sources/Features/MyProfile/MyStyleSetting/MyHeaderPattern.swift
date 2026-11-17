@@ -90,7 +90,7 @@ struct MyHeaderPatternView: View, Equatable {
                     var tip = context
                     tip.translateBy(x: point.x, y: point.y)
                     tip.rotate(by: .degrees(-24))
-                    tip.fill(Path(roundedRect: CGRect(x: 0, y: 0, width: 34, height: 12), cornerRadius: 2), with: .color(ink(0.12)))
+                    tip.fill(Path(roundedRect: CGRect(x: 0, y: 0, width: 34, height: 12), cornerRadius: 2), with: .color(ink(0.16)))
                     for gapX: CGFloat in [12, 19] {
                         tip.fill(Path(CGRect(x: gapX, y: 0, width: 3, height: 12)), with: .color(beltRank.beltColor))
                     }
@@ -116,12 +116,12 @@ struct MyHeaderPatternView: View, Equatable {
     }
 
     /// 밝은 띠는 먹색을 조금 더 옅게(×0.55), 나머지는 흰색.
-    /// 시안 값(alpha)보다 절반으로 옅게 깐다 — 시안대로는 무늬가 시끄러웠다.
+    /// 시안 값(alpha)의 1.1배로 깐다 — 절반(×0.5)으로는 폰에서 무늬가 거의 안 보였다(#341).
     private func ink(_ alpha: Double) -> Color {
-        let calmAlpha = alpha * 0.5
+        let patternAlpha = alpha * 1.1
         return beltRank.isLightBelt
-            ? Color.component.myBelt.lightInk.opacity(calmAlpha * 0.55)
-            : Color.primitive.bw.trueWhite.opacity(calmAlpha)
+            ? Color.component.myBelt.lightInk.opacity(patternAlpha * 0.55)
+            : Color.primitive.bw.trueWhite.opacity(patternAlpha)
     }
 
     /// 엇갈린 격자 — 홀수 줄은 반 칸 민다. index는 그린 순서(회전을 돌려 쓰는 데 쓴다).
