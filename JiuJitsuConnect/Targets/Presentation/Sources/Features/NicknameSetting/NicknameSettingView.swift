@@ -17,10 +17,8 @@ public struct NicknameSettingView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // 수정 모드에서만 헤더(뒤로가기)를 노출한다. 최초 닉네임 설정에는 미노출.
-            if store.mode == .edit {
-                headerView
-            }
+            // 가입 중에도 뒤로가기를 둔다 — 없으면 닉네임을 정하거나 앱을 꺼야만 나갈 수 있다(#368).
+            headerView
             titleSection
             textFieldSection
             Spacer()
@@ -33,8 +31,28 @@ public struct NicknameSettingView: View {
             store.send(.view(.viewTapped))
         }
         .alert($store.scope(state: \.alert, action: \.alert))
+        .appAlert(
+            isPresented: Binding(
+                get: { store.isQuitSignupAlertPresented },
+                set: { if !$0 { store.send(.view(.quitSignupAlertDismissed)) } }
+            ),
+            configuration: AppAlertConfiguration(
+                title: "가입을 그만둘까요?",
+                message: "지금 그만두면 처음부터 다시 가입해야 해요.",
+                // 계속하기를 강조한다 — 그만두면 약관부터 다시 해야 한다.
+                primaryButton: .init(title: "계속하기", style: .primary, action: { store.send(.view(.quitSignupAlertDismissed)) }),
+                secondaryButton: .init(title: "그만두기", style: .neutral, action: { store.send(.view(.quitSignupConfirmed)) })
+            )
+        )
         .navigationBarBackButtonHidden(true)
         .navigationBarHidden(true)
+        // 가입 중엔 스와이프로 바로 나가지 않게 막고 뒤로가기와 같이 '그만둘까요?'를 묻는다(#368).
+        // 바를 숨겨도 앱 전역 확장이 스와이프를 다시 켜 둔다(UINavigationController+SwipeBack). 수정 모드는 지금처럼 스와이프로 나간다.
+        .background {
+            if store.mode == .initial {
+                InteractivePopBlocker(onBlocked: { store.send(.view(.backButtonTapped)) })
+            }
+        }
     }
 }
 
@@ -60,6 +78,7 @@ private extension NicknameSettingView {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("뒤로 가기")
 
             Spacer()
 

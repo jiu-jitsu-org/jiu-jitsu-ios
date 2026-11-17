@@ -42,7 +42,11 @@ public struct NicknameSettingFeature: Sendable {
         var isKeyboardVisible: Bool = false
         var isCtaButtonEnabled: Bool = true
         var isTextFieldActive: Bool = false
-        
+        // 가입 중 닫기를 눌러 '가입을 그만둘까요?'를 묻는 중(#368)
+        var isQuitSignupAlertPresented = false
+        // 가입 요청을 보내 결과를 기다리는 중. 이때 그만두면 계정은 만들어지는데 화면만 나가므로 닫기를 막는다.
+        var isSigningUp = false
+
         // MARK: - Passed Data (초기 설정 모드에만 사용)
         let tempToken: String?
         let isMarketingAgreed: Bool?
@@ -86,6 +90,9 @@ public struct NicknameSettingFeature: Sendable {
             case viewTapped
             case doneButtonTapped
             case backButtonTapped
+            // '가입을 그만둘까요?'의 [그만두기] · [계속하기] · 닫힘(#368)
+            case quitSignupConfirmed
+            case quitSignupAlertDismissed
         }
         
         public enum InternalAction: Sendable {
@@ -100,6 +107,8 @@ public struct NicknameSettingFeature: Sendable {
             case signupFailed(message: String)
             /// 약관·닉네임에 시간이 걸려 임시 토큰이 만료됨 — 가입을 이어갈 수 없어 로그인부터 다시 해야 한다.
             case signupSessionExpired
+            /// 가입 중 닫기 → 그만두기(#368). 받은 쪽이 가입 단계를 비우고 로그인 전 화면으로 돌린다.
+            case signupAbandoned
             case didUpdateNickname(String)  // 닉네임 수정 저장 완료 — 부모가 화면을 닫고 프로필 반영
             case cancel
         }
@@ -195,6 +204,7 @@ public struct NicknameSettingFeature: Sendable {
                         )
                         // 결과가 올 때까지 CTA를 막아 연타로 가입이 두 번 나가지 않게 한다.
                         state.isCtaButtonEnabled = false
+                        state.isSigningUp = true
                         return .run { send in
                             await send(.internal(.signupResponse(
                                 await TaskResult { try await userClient.signup(info) }
@@ -209,11 +219,35 @@ public struct NicknameSettingFeature: Sendable {
                 }
                 
             case .view(.backButtonTapped):
-                // 수정 모드에서만 노출되는 뒤로가기 — 부모에 cancel 위임 후 화면 dismiss
-                return .concatenate(
-                    .send(.delegate(.cancel)),
-                    .run { _ in await self.dismiss() }
+                switch state.mode {
+                case .edit:
+                    // 부모에 cancel 위임 후 화면 dismiss
+                    return .concatenate(
+                        .send(.delegate(.cancel)),
+                        .run { _ in await self.dismiss() }
+                    )
+                case .initial:
+                    // 잘못 누른 소셜 · 둘러보기만 하려던 사람이 앱을 끄지 않고 나가게 한다(#368).
+                    // 나가면 처음부터 다시 가입해야 하니 한 번 묻는다. 가입 요청 중엔 계정이 만들어지는 중이라 막는다.
+                    guard !state.isSigningUp else { return .none }
+                    state.isKeyboardVisible = false
+                    state.isQuitSignupAlertPresented = true
+                    return .none
+                }
+
+            case .view(.quitSignupConfirmed):
+                state.isQuitSignupAlertPresented = false
+                return .merge(
+                    .cancel(id: CancelID.checkNickname),
+                    .send(.delegate(.signupAbandoned))
                 )
+
+            case .view(.quitSignupAlertDismissed):
+                guard state.isQuitSignupAlertPresented else { return .none }
+                state.isQuitSignupAlertPresented = false
+                // 계속하면 쓰던 닉네임 그대로 입력을 이어 간다.
+                state.isKeyboardVisible = true
+                return .none
                 
             case let .internal(.checkNicknameResponse(nickname, .success(isAvailable))):
                 // 취소가 닿기 전에 도착한 이전 입력값의 응답은 버린다.
@@ -232,9 +266,11 @@ public struct NicknameSettingFeature: Sendable {
                 return handleError(state: &state, error: error)
                 
             case let .internal(.signupResponse(.success(info))):
+                state.isSigningUp = false
                 return .send(.delegate(.signupSuccessful(info: info)))
-                
+
             case let .internal(.signupResponse(.failure(error))):
+                state.isSigningUp = false
                 // 임시 토큰 만료(403 A0003)는 다시 눌러도 계속 실패하므로 재시도 대신 로그인부터 다시 안내한다.
                 if case .apiError(code: .expiredToken, message: _) = error as? DomainError {
                     return .send(.delegate(.signupSessionExpired))
@@ -350,7 +386,7 @@ public extension NicknameSettingFeature {
         var headerTitle: String {
             switch self {
             case .initial:
-                return ""  // 최초 설정에는 헤더 없음
+                return ""  // 최초 설정은 닫기(뒤로가기)만 둔다(#368)
             case .edit:
                 return "닉네임 수정"
             }
