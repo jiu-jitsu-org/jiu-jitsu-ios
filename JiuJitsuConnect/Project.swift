@@ -8,6 +8,20 @@ public let appDestinations: Destinations = [.iPhone]
 let isAppStore = Environment.isAppStore.getBoolean(default: false)
 let additionalCondition = isAppStore ? "APPSTORE" : ""
 
+// MARK: - Release Info.plist (#353)
+// 테스트용 ATS 예외(NSAppTransportSecurity)는 Debug·Beta 서버 전환에만 쓰므로 Release 빌드 결과에서 지운다.
+// Info.plist 값을 빌드 변수로 바꾸면 불리언이 문자열로 들어가 ATS가 읽지 못할 수 있어 빌드 뒤 PlistBuddy로 지운다.
+let releaseInfoPlistScript: TargetScript = .post(
+    script: """
+    if [ "${CONFIGURATION}" = "Release" ]; then
+        /usr/libexec/PlistBuddy -c "Delete :NSAppTransportSecurity" "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}" || true
+    fi
+    """,
+    name: "Remove Test ATS Exceptions (Release)",
+    inputPaths: ["$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)"],
+    basedOnDependencyAnalysis: false
+)
+
 // MARK: - SwiftLint (스킴 `SwiftLint`로만 실행 — 일반 앱 빌드에서는 스크립트 미실행)
 let swiftlintScript: TargetScript = .pre(
     script: """
@@ -88,7 +102,7 @@ let appInfoPlist: [String: Plist.Value] = {
         // - NSAllowsArbitraryLoadsInWebContent: WKWebView가 임의 http(IP 포함)를 로드 가능.
         // - NSAllowsLocalNetworking: LAN/사설망(192.168.x, 172.16~31.x 등) 및 .local 접근 허용.
         // 네이티브 API 통신은 이 키들의 영향을 받지 않고 여전히 ATS(https)로 보호된다.
-        // 도메인 변경 진입 버튼은 DEBUG/BETA 빌드에서만 노출되므로 릴리즈 실사용 노출은 없다.
+        // 도메인 변경 진입 버튼은 DEBUG/BETA 빌드에서만 노출되므로 Release에서는 `releaseInfoPlistScript`가 지운다(#353).
         "NSAppTransportSecurity": [
             "NSAllowsArbitraryLoadsInWebContent": true,
             "NSAllowsLocalNetworking": true,
@@ -97,15 +111,12 @@ let appInfoPlist: [String: Plist.Value] = {
             "kakaokompassauth",
             "kakaolink"
         ],
-        "UIBackgroundModes": [
-            "remote-notification"
-        ],
         "FirebaseAppDelegateProxyEnabled": false,
         // 프로필 이미지 수정 + 커뮤니티 글 작성 웹뷰(<input type=file>) — 카메라 촬영
-        "NSCameraUsageDescription": "사진을 촬영하기 위해 카메라를 사용합니다.",
+        "NSCameraUsageDescription": "프로필 사진과 글에 올릴 사진을 찍을 때 카메라를 사용해요.",
         // 기능상 필수는 아님(PHPicker/웹뷰 파일 입력은 권한 프롬프트 없이 동작)이나
         // 보관함 접근 안내 일관성을 위해 명시.
-        "NSPhotoLibraryUsageDescription": "사진을 첨부하기 위해 사진 보관함에 접근합니다.",
+        "NSPhotoLibraryUsageDescription": "프로필 사진과 글에 올릴 사진을 고를 때 사진 보관함에 접근해요.",
     ]
     return base
 }()
@@ -167,6 +178,7 @@ let project = Project(
                 // UIAppFonts는 앱 본체에서 찾으므로 폰트 파일은 앱 타깃에만 넣는다(#224).
                 .glob(pattern: .relativeToRoot("Targets/DesignSystem/Resources/Fonts/**"))
             ],
+            scripts: [releaseInfoPlistScript],
             dependencies: [
                 .target(name: "Presentation"),
                 .target(name: "Data"),
