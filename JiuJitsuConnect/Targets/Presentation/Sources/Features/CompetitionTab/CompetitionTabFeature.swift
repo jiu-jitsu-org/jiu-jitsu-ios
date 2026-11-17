@@ -180,12 +180,12 @@ public struct CompetitionTabFeature: Sendable {
             case let .path(.element(id: _, action: .communityDetail(.delegate(delegate)))):
                 return .send(.delegate(.webSubview(delegate)))
 
-            // 알림함에서 읽은 알림을 점에 반영한다(홈과 같은 처리). forEach보다 먼저 실행돼 pop 대상이 아직 스택에 남아 있고,
-            // 알림함 위에 쌓인 상세까지 한 번에 닫히는 경우도 있어 pop 범위 전체를 본다.
+            // 알림함에서 읽은 알림 · 글 상세를 열어 읽음 처리된 그 글의 알림(#401)을 점에 반영한다(홈과 같은 처리).
+            // forEach보다 먼저 실행돼 pop 대상이 아직 스택에 남아 있고, 여러 화면이 한 번에 닫히기도 해 pop 범위 전체를 본다.
             case let .path(.popFrom(id)):
                 guard
                     let index = state.path.ids.firstIndex(of: id),
-                    state.path.ids[index...].contains(where: { Self.isNotificationsDetail(state.path[id: $0]) })
+                    state.path.ids[index...].contains(where: { Self.refreshesUnreadOnClose(state.path[id: $0]) })
                 else { return .none }
                 return .send(.delegate(.unreadNotificationRefreshRequested))
 
@@ -242,6 +242,12 @@ public struct CompetitionTabFeature: Sendable {
     private static func isNotificationsDetail(_ element: Path.State?) -> Bool {
         guard case let .communityDetail(detail)? = element else { return false }
         return NotificationInbox.isInbox(detail.url)
+    }
+
+    /// 닫힐 때 새 알림 점을 다시 읽을 화면 — 알림함과 글 · 밸런스 게임 상세(열면 그 글 알림이 읽음 처리된다, #401).
+    private static func refreshesUnreadOnClose(_ element: Path.State?) -> Bool {
+        guard case let .communityDetail(detail)? = element else { return false }
+        return isNotificationsDetail(element) || DeepLinkParser.isContentDetail(detail.url)
     }
 
     private static func subview(url: URL, title: String?, accessToken: String?) -> CommunityDetailFeature.State {

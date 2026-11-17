@@ -586,14 +586,28 @@ public struct CommunityFeature: Sendable {
                  .coverPath(.element(id: _, action: .myProfile(.delegate(.profileUpdated)))):
                 return .send(.delegate(.profileUpdated))
 
-            // 알림함에서 읽은 알림을 점에 반영한다. forEach보다 먼저 실행돼 pop 대상이 아직 스택에 남아 있다.
-            // 알림함 위에 쌓인 상세까지 한 번에 닫히는 경우도 있어 pop 범위 전체를 본다.
+            // 알림함에서 읽은 알림 · 글 상세를 열어 서버가 읽음 처리한 그 글의 알림(#401, backend#246)을 점에 반영한다.
+            // forEach · ifLet보다 먼저 실행돼 닫히는 화면이 아직 스택에 남아 있다. 여러 화면이 한 번에 닫히기도 해 닫히는 범위 전체를 본다.
             case let .path(.popFrom(id)):
                 guard
                     let index = state.path.ids.firstIndex(of: id),
-                    state.path.ids[index...].contains(where: { Self.isNotificationsDetail(state.path[id: $0]) })
+                    state.path.ids[index...].contains(where: { Self.refreshesUnreadOnClose(state.path[id: $0]) })
                 else { return .none }
                 return refreshUnreadNotification(state)
+
+            case let .coverPath(.popFrom(id)):
+                guard
+                    let index = state.coverPath.ids.firstIndex(of: id),
+                    state.coverPath.ids[index...].contains(where: { Self.refreshesUnreadOnClose(state.coverPath[id: $0]) })
+                else { return .none }
+                return refreshUnreadNotification(state)
+
+            // 푸시 · 링크로 연 상세 모달이 닫힘 — 모달 안 스택도 함께 닫힌다.
+            case .detailCover(.dismiss):
+                guard let cover = state.detailCover else { return .none }
+                let closesContent = Self.refreshesUnreadOnClose(.detail(cover))
+                    || state.coverPath.contains(where: { Self.refreshesUnreadOnClose($0) })
+                return closesContent ? refreshUnreadNotification(state) : .none
 
             case .path, .coverPath, .detailCover:
                 return .none
@@ -644,9 +658,10 @@ public struct CommunityFeature: Sendable {
         URL(string: blockedUsersPath, relativeTo: base)?.absoluteURL
     }
 
-    private static func isNotificationsDetail(_ element: Path.State?) -> Bool {
+    /// 닫힐 때 새 알림 점을 다시 읽을 화면 — 알림함과 글 · 밸런스 게임 상세(열면 그 글 알림이 읽음 처리된다, #401).
+    private static func refreshesUnreadOnClose(_ element: Path.State?) -> Bool {
         guard case let .detail(detail)? = element else { return false }
-        return NotificationInbox.isInbox(detail.url)
+        return NotificationInbox.isInbox(detail.url) || DeepLinkParser.isContentDetail(detail.url)
     }
 
     // MARK: - Subview 라우팅 헬퍼

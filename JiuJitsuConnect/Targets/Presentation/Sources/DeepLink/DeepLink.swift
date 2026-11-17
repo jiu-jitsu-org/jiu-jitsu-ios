@@ -50,6 +50,20 @@ enum DeepLinkParser {
         !value.isEmpty && value.allSatisfy { $0.isASCII && $0.isNumber }
     }
 
+    /// 글 · 밸런스 게임 상세 주소인지(`/community/{숫자}` · `/community/balance/{숫자}`) — 열린 화면이 무엇인지 가릴 때 쓴다.
+    /// 들어온 링크를 거르는 `parse`와 같은 경로 규칙이지만 호스트는 보지 않고, 상세가 아니어도 로그를 남기지 않는다.
+    static func isContentDetail(_ url: URL) -> Bool {
+        let segments = url.pathComponents.filter { $0 != "/" }
+        guard segments.first == communitySegment else { return false }
+        let id: String
+        switch segments.count {
+        case 2: id = segments[1]
+        case 3 where segments[1] == balanceSegment: id = segments[2]
+        default: return false
+        }
+        return !id.isEmpty && id.allSatisfy(\.isNumber)
+    }
+
     /// 웹 페이지 안의 '앱 열기' 버튼용 커스텀 스킴.
     /// Info.plist `CFBundleURLTypes`(Project.swift)·웹(FE#72)에 등록된 값과 반드시 같아야 한다.
     private static let customScheme = "bjjossapp"
