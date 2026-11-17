@@ -120,6 +120,8 @@ public struct NicknameSettingFeature: Sendable {
 
     @Dependency(\.userClient) var userClient
     @Dependency(\.dismiss) var dismiss
+    @Dependency(\.recentErrorClient) var recentErrorClient
+    @Dependency(\.date) var date
     
     public var body: some ReducerOf<Self> {
         BindingReducer()
@@ -341,16 +343,24 @@ public struct NicknameSettingFeature: Sendable {
                 return .none
             }
             
-            // Other API errors fall through to default handling
             state.validationState = .networkError
             state.isKeyboardVisible = false
-            return .send(.delegate(.signupFailed(message: "오류가 발생했습니다. 다시 시도해주세요.")))
-            
+            return signupFailed(domainError)
+
         default:
             state.validationState = .networkError
             state.isKeyboardVisible = false
-            return .send(.delegate(.signupFailed(message: "오류가 발생했습니다. 다시 시도해주세요.")))
+            return signupFailed(domainError)
         }
+    }
+
+    /// 가입 실패를 이유 또는 오류 코드와 함께 알린다(#379).
+    private func signupFailed(_ error: DomainError) -> Effect<Action> {
+        guard let notice = DomainErrorMapper.authFailure(from: error) else { return .none }
+        if let code = notice.code {
+            recentErrorClient.record(RecentError(code: code, occurredAt: date.now))
+        }
+        return .send(.delegate(.signupFailed(message: notice.message)))
     }
 
     /// 수정 모드는 화면을 닫지 않고 그 자리에서 원인을 안내한다(정책 2.3).

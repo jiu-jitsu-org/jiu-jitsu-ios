@@ -82,6 +82,8 @@ public struct LoginFeature: Sendable {
     // MARK: - Dependencies
     @Dependency(\.authClient) var authClient
     @Dependency(\.continuousClock) var clock
+    @Dependency(\.recentErrorClient) var recentErrorClient
+    @Dependency(\.date) var date
     
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -243,22 +245,12 @@ public struct LoginFeature: Sendable {
             return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, status: .error))))
         }
 
-        switch domainError {
-        case .signInCancelled:
-            return .none
-
-        case .apiError(let code, _):
-            return .send(.internal(.showToast(.init(message: code.displayMessage, status: .error))))
-
-        default:
-            let displayError = DomainErrorMapper.toDisplayError(from: domainError)
-            switch displayError {
-            case .toast(let message), .info(let message), .alert(let message):
-                return .send(.internal(.showToast(.init(message: message, status: .error))))
-            case .none:
-                return .none
-            }
+        // 실패 이유(탈퇴 처리 · 영구 삭제)나 오류 코드를 알린다(#379). 취소는 안내하지 않는다.
+        guard let notice = DomainErrorMapper.authFailure(from: domainError) else { return .none }
+        if let code = notice.code {
+            recentErrorClient.record(RecentError(code: code, occurredAt: date.now))
         }
+        return .send(.internal(.showToast(.init(message: notice.message, status: .error))))
     }
 }
 

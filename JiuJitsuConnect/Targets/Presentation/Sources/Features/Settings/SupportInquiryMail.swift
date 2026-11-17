@@ -18,8 +18,10 @@ enum SupportInquiryMail {
         let osVersion: String
         let modelIdentifier: String
         let userId: Int?
+        /// 앱을 켜 둔 동안 마지막으로 보인 오류(#379). 없으면 줄을 뺀다.
+        var recentError: RecentError?
 
-        static func current(userId: Int?) -> DeviceInfo {
+        static func current(userId: Int?, recentError: RecentError? = nil) -> DeviceInfo {
             let bundle = Bundle.main
             let osVersion = ProcessInfo.processInfo.operatingSystemVersion
             return DeviceInfo(
@@ -27,7 +29,8 @@ enum SupportInquiryMail {
                 buildNumber: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "N/A",
                 osVersion: "\(osVersion.majorVersion).\(osVersion.minorVersion).\(osVersion.patchVersion)",
                 modelIdentifier: Self.currentModelIdentifier(),
-                userId: userId
+                userId: userId,
+                recentError: recentError
             )
         }
 
@@ -60,8 +63,19 @@ enum SupportInquiryMail {
         if let userId = info.userId {
             lines.append("회원 번호: \(userId)")
         }
+        if let recentError = info.recentError {
+            lines.append("최근 오류: \(recentError.code) (\(Self.errorTimeFormatter.string(from: recentError.occurredAt)))")
+        }
         return lines.joined(separator: "\n")
     }
+
+    /// 서버 기록과 맞춰 보기 쉬운 '2026.11.17 14:03' 꼴. 기기 시간대 그대로.
+    private static let errorTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy.MM.dd HH:mm"
+        return formatter
+    }()
 
     static func url(to email: String, info: DeviceInfo) -> URL? {
         var components = URLComponents()

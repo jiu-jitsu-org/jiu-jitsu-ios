@@ -23,8 +23,9 @@ public enum DomainError: Error, Equatable {
     case apiError(code: APIErrorCode, message: String?)
     /// 인터넷 연결 문제 (네트워크 끊김, 타임아웃 등)
     case networkUnavailable
-    /// 서버 비즈니스 에러 또는 5xx 에러
-    case serverError(message: String?)
+    /// 앱이 모르는 서버 코드 또는 코드 없는 4xx · 5xx.
+    /// 사용자 안내 · 문의에 쓰도록 원래 코드 문자열과 HTTP 상태를 남긴다(#379).
+    case serverError(code: String?, statusCode: Int?, message: String?)
     
     // MARK: - 개발/환경(Development) 관련 에러
     /// 최상위 ViewController를 찾을 수 없음
