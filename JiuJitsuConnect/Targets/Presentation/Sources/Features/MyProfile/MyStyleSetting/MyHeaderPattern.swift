@@ -14,7 +14,6 @@ import Domain
 
 public enum MyHeaderPattern: String, CaseIterable, Identifiable, Sendable {
     case oss
-    case bigBelt
     case beltTip
     case wrap
 
@@ -26,7 +25,6 @@ public enum MyHeaderPattern: String, CaseIterable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .oss: return "OSS 손"
-        case .bigBelt: return "큰 띠"
         case .beltTip: return "띠 끝"
         case .wrap: return "감긴 띠"
         }
@@ -35,17 +33,15 @@ public enum MyHeaderPattern: String, CaseIterable, Identifiable, Sendable {
 
 // MARK: - MyHeaderPatternView
 
-/// 무늬 그림. 모양 수치는 시안(belt-kids5·6)의 SVG를 pt 그대로 옮겼고, 격자(OSS 손·띠 끝)는 1.5배로 성기게 했다.
-/// `anchor`는 사진 가운데 — 띠 한 줄 무늬(큰 띠·감긴 띠)를 사진 아래에 걸치게 하는 기준이다.
+/// 무늬 그림. OSS 손·띠 끝은 시안(belt-kids5·6)의 SVG를 pt 그대로 옮겨 1.5배로 성기게 깔았고,
+/// 감긴 띠는 억지로 띠 모양을 붙이지 않게 둥근 두 줄로 다시 그렸다(#341).
+/// `anchor`는 사진 가운데 — 시트 미리보기에서 무늬를 줄일 때 이 점을 기준으로 줄인다.
 struct MyHeaderPatternView: View, Equatable {
     let pattern: MyHeaderPattern
     let beltRank: BeltRank
     let anchor: UnitPoint
     /// 시트 미리보기처럼 작은 자리에서 무늬를 줄여 그린다.
     var scale: CGFloat = 1
-
-    /// 사진이 시안(72)보다 큰 만큼(90) 사진 기준 거리만 늘린다.
-    private let avatarScale: CGFloat = 90 / 72
 
     var body: some View {
         let shaka = Assets.Common.Shaka.icon.swiftUIImage.renderingMode(.template)
@@ -73,18 +69,6 @@ struct MyHeaderPatternView: View, Equatable {
                     tileContext.draw(symbol, in: CGRect(x: -17, y: -16, width: 34, height: 32))
                 }
 
-            case .bigBelt:
-                var band = context
-                band.translateBy(x: center.x, y: center.y + 63 * avatarScale)
-                band.rotate(by: .degrees(-16))
-                let bandRect = CGRect(x: -area.width * 1.5, y: -18, width: area.width * 3, height: 34)
-                band.fill(Path(roundedRect: bandRect, cornerRadius: 4), with: .color(ink(0.14)))
-                let barX = 13 * avatarScale
-                band.fill(Path(CGRect(x: barX, y: -18, width: 34, height: 34)), with: .color(ink(0.26)))
-                for gapX in [barX + 10, barX + 18] {
-                    band.fill(Path(CGRect(x: gapX, y: -18, width: 3, height: 34)), with: .color(beltRank.beltColor))
-                }
-
             case .beltTip:
                 tile(in: area, dx: 96, dy: 69) { point, _ in
                     var tip = context
@@ -97,18 +81,15 @@ struct MyHeaderPatternView: View, Equatable {
                 }
 
             case .wrap:
-                var wrap = context
-                wrap.translateBy(x: center.x, y: center.y + 43 * avatarScale)
-                wrap.rotate(by: .degrees(-8))
-                let width = area.width * 3
-                wrap.fill(
-                    Path(roundedRect: CGRect(x: -width / 2, y: -20 * avatarScale, width: width, height: 28), cornerRadius: 5),
-                    with: .color(ink(0.13))
-                )
-                wrap.fill(
-                    Path(roundedRect: CGRect(x: -width / 2, y: 14 * avatarScale, width: width, height: 28), cornerRadius: 5),
-                    with: .color(ink(0.08))
-                )
+                // 두 번 감은 띠 — 둥근 캡슐 두 줄을 띠 끝과 같은 기울기로 엇갈려 깐다.
+                tile(in: area, dx: 92, dy: 72) { point, _ in
+                    var band = context
+                    band.translateBy(x: point.x, y: point.y)
+                    band.rotate(by: .degrees(-24))
+                    for y: CGFloat in [0, 11] {
+                        band.fill(Path(roundedRect: CGRect(x: 0, y: y, width: 32, height: 7), cornerRadius: 3.5), with: .color(ink(0.14)))
+                    }
+                }
             }
         }
         .allowsHitTesting(false)
