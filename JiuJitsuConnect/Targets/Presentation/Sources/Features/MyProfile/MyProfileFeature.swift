@@ -1369,8 +1369,9 @@ public struct MyProfileFeature: Sendable {
                 state.userProfile = state.userProfile?.updatingOwnerVerification(
                     OwnerVerification(status: .pending, documentImageUrl: uploadedImageUrl)
                 )
+                // 승인 · 반려 알림이 없어 결과를 알려 준다고 약속하지 않고, 어디서 보는지 안내한다(#389).
                 return .send(.internal(.showToast(.init(
-                    message: "업로드 완료! 관리자 검토 후 결과를 알려드릴게요.", status: .success
+                    message: "신청했어요. 결과는 관장 사범 인증 화면에서 확인할 수 있어요.", status: .success
                 ))))
 
             case let .internal(.instructorVerificationRequestResponse(.failure(error))):

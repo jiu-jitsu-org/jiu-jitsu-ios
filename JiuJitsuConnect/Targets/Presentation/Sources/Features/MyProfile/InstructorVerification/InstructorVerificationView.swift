@@ -195,9 +195,11 @@ public struct InstructorVerificationView: View {
             }
             .frame(minHeight: 21)
 
+            // 승인 · 반려 알림은 보내지 않아 '알려드립니다'라고 약속하지 않는다(#389). 결과는 이 시트에서 본다.
+            // 입구 위치(MY ⋯)는 바뀔 수 있어 경로 대신 '이 화면'이라고 쓴다.
             Text(
                 """
-                사진을 업로드하면 2-3일 내 관리자가 확인 후 인증 여부를 알려드립니다.
+                사진을 올리면 2~3일 안에 관리자가 확인합니다. 결과는 이 화면에서 확인할 수 있습니다.
                 해당 사진은 인증용으로, 외부에 노출되지 않습니다.
                 """
             )
@@ -215,14 +217,21 @@ public struct InstructorVerificationView: View {
         .padding(.horizontal, Metrics.horizontalPadding)
     }
 
-    /// 거절됐으면 왜 다시 올려야 하는지를, 아니면 올릴 사진의 조건을 알린다.
+    /// 거절됐으면 왜 다시 올려야 하는지를, 검토 중이면 기다리면 된다는 것을, 아니면 올릴 사진의 조건을 알린다.
+    /// 검토 중에도 '업로드해주세요'만 보이면 제출이 안 된 줄 알고 다시 올린다 — 결과를 이 화면에서 보라고 안내하므로(#389) 상태를 밝힌다.
     private var warningText: String {
         let verification = store.verification
-        guard verification.status == .rejected else { return "인증 가능한 사진을 업로드해주세요." }
-        if let reason = verification.rejectReason {
-            return "반려 사유: \(reason)"
+        switch verification.status {
+        case .rejected:
+            if let reason = verification.rejectReason {
+                return "반려 사유: \(reason)"
+            }
+            return "인증이 반려됐어요. 사진을 다시 올려주세요."
+        case .pending:
+            return "관리자가 확인하고 있어요. 다른 사진으로 바꾸려면 다시 올려주세요."
+        case .notRequested, .approved:
+            return "인증 가능한 사진을 업로드해주세요."
         }
-        return "인증이 반려됐어요. 사진을 다시 올려주세요."
     }
 
     private var ctaSection: some View {
