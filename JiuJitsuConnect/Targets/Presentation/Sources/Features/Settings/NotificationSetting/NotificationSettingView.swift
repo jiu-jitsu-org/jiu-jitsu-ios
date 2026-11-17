@@ -18,6 +18,7 @@ private enum Style {
 
 public struct NotificationSettingView: View {
     @Bindable var store: StoreOf<NotificationSettingFeature>
+    @Environment(\.scenePhase) private var scenePhase
 
     public init(store: StoreOf<NotificationSettingFeature>) {
         self.store = store
@@ -30,6 +31,10 @@ public struct NotificationSettingView: View {
 
                 ScrollView {
                     VStack(spacing: Style.sectionSpacing) {
+                        if store.showsDeviceNotificationBanner {
+                            deviceNotificationBanner
+                        }
+
                         // 카테고리별 토글 (우선순위: 보안 > 공지 > 커뮤니티 > 관심 대회 > 마케팅)
                         // 마케팅은 정통망법상 옵트인 → 기본 false.
                         SettingsSection {
@@ -99,6 +104,34 @@ public struct NotificationSettingView: View {
         .navigationBarHidden(true)
         .ignoresSafeArea(edges: .bottom)
         .onAppear { store.send(.view(.onAppear)) }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { store.send(.view(.sceneBecameActive)) }
+        }
+    }
+
+    // 기기 알림을 아직 묻지 않았거나 거절했을 때(#333). 서버 설정이 켜져 있어도 알림이 오지 않는다는 걸 알린다.
+    private var deviceNotificationBanner: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("기기 알림이 꺼져 있어요")
+                    .font(Font.pretendard.bodyM)
+                    .foregroundStyle(Color.semantic.text.primary)
+                Text("지금은 알림이 오지 않아요")
+                    .font(Font.pretendard.bodyS)
+                    .foregroundStyle(Color.semantic.text.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button {
+                store.send(.view(.deviceNotificationTurnOnTapped))
+            } label: {
+                AppButtonConfiguration(title: "켜기", size: .small)
+            }
+            .appButtonStyle(.primary, size: .small, height: 32)
+        }
+        .padding(16)
+        .background(Color.semantic.surface.primarySubtle)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     private var headerView: some View {

@@ -44,14 +44,10 @@ enum FirebaseClientFactory {
             getFCMToken: {
                 let center = UNUserNotificationCenter.current()
                 let settings = await center.notificationSettings()
+                // 아직 묻지 않았으면 여기서 묻지 않는다(#333) — 앱 진입 · 로그인에서 설명 없이 권한 창이 뜨지 않게.
+                // 권한은 알림이 쓸모 있어지는 때(첫 글 · 댓글 뒤 안내, 관심 대회 알림, 설정 › 알림)에 requestPermission으로 묻는다.
                 let granted: Bool
                 switch settings.authorizationStatus {
-                case .notDetermined:
-                    do {
-                        granted = try await center.requestAuthorization(options: [.alert, .badge, .sound])
-                    } catch {
-                        granted = false
-                    }
                 case .authorized, .provisional, .ephemeral:
                     granted = true
                 default:

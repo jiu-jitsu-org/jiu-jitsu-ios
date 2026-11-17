@@ -40,6 +40,7 @@ public final class DependencyContainer {
     /// AppDelegate가 받은 FCM 토큰 교체를 Presentation(서버 재등록)으로 전달하는 채널(#332).
     private let fcmTokenRefreshRelay = FCMTokenRefreshRelay()
     private let beltPromptStorage = BeltPromptStorage()
+    private let notificationPromptStorage = NotificationPromptStorage()
     private lazy var sharedNetworkService: NetworkService = DefaultNetworkService(
         tokenStorage: sharedTokenStorage,
         sessionEventBroadcaster: authSessionEventBroadcaster
@@ -196,6 +197,13 @@ public final class DependencyContainer {
             canCheck: { self.beltPromptStorage.canCheck(now: $0) },
             markChecked: { self.beltPromptStorage.markChecked(now: $0) },
             snooze: { self.beltPromptStorage.snooze(now: $0) }
+        )
+    }
+
+    public func configureNotificationPromptClient() -> NotificationPromptClient {
+        NotificationPromptClient(
+            canPrompt: { self.notificationPromptStorage.canPrompt(now: $0) },
+            snooze: { self.notificationPromptStorage.snooze(now: $0) }
         )
     }
 

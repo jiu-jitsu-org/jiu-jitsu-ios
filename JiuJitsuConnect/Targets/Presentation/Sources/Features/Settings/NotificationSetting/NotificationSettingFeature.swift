@@ -9,13 +9,14 @@ import ComposableArchitecture
 import Domain
 import DesignSystem
 import CoreKit
+import UIKit
 
 @Reducer
 public struct NotificationSettingFeature: Sendable {
     public init() {}
 
     // 연속 토글 시 마지막 상태만 서버에 반영하기 위한 debounce
-    private enum CancelID { case fetchSetting, updateSetting, toast }
+    private enum CancelID { case fetchSetting, updateSetting, toast, deviceNotification }
 
     @ObservableState
     public struct State: Equatable, Sendable {
@@ -41,7 +42,15 @@ public struct NotificationSettingFeature: Sendable {
 
         var toast: ToastState?
 
+        // 기기 알림 권한(#333). 서버 알림 설정은 기본으로 켜져 있어, 기기 알림이 꺼진 사람은 켜져 있는데도 알림을 못 받는다.
+        // 읽기 전(nil)과 허용이면 배너를 숨긴다.
+        var deviceNotificationStatus: NotificationPermissionClient.Status?
+
         public init() {}
+
+        var showsDeviceNotificationBanner: Bool {
+            deviceNotificationStatus == .notDetermined || deviceNotificationStatus == .denied
+        }
 
         /// 화면에는 바뀌었지만 아직 서버 반영이 확인되지 않은 값(디바운스 대기·응답 대기 중).
         /// 화면이 닫히면 이 화면의 저장 요청도 취소되므로, 부모가 닫힐 때 이 값을 대신 저장한다.
@@ -78,6 +87,9 @@ public struct NotificationSettingFeature: Sendable {
 
         public enum ViewAction: Sendable {
             case onAppear
+            // 아이폰 설정에서 알림을 바꾸고 돌아옴 — 화면은 그대로라 onAppear가 오지 않는다(#333)
+            case sceneBecameActive
+            case deviceNotificationTurnOnTapped
             case backButtonTapped
             case accountSecurityNotificationToggled(Bool)
             case serviceNoticeNotificationToggled(Bool)
@@ -95,6 +107,7 @@ public struct NotificationSettingFeature: Sendable {
             case triggerUpdateSetting
             case showToast(ToastState)
             case toastDismissed
+            case deviceNotificationStatusLoaded(NotificationPermissionClient.Status)
         }
 
         public enum DelegateAction: Sendable {
@@ -106,6 +119,10 @@ public struct NotificationSettingFeature: Sendable {
     @Dependency(\.noticeClient) var noticeClient
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.continuousClock) var clock
+    @Dependency(\.notificationPermissionClient) var notificationPermissionClient
+    @Dependency(\.firebaseClient) var firebaseClient
+    @Dependency(\.userClient) var userClient
+    @Dependency(\.openURL) var openURL
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -116,7 +133,35 @@ public struct NotificationSettingFeature: Sendable {
             case .view(.onAppear):
                 // 서버에서 카테고리별 수신 여부를 읽는다. 처음 열 때와, 위에 쌓인 화면을 닫고 돌아와 다시 나타날 때 불린다.
                 // 이 화면이 열린 채 다른 탭(웹의 '알림 받기')에서 켠 값은 부모가 브리지를 받아 settingRefreshRequested로 다시 읽힌다(#281).
-                return fetchSetting(generation: state.saveGeneration)
+                return .merge(fetchSetting(generation: state.saveGeneration), loadDeviceNotificationStatus())
+
+            case .view(.sceneBecameActive):
+                return loadDeviceNotificationStatus()
+
+            case let .internal(.deviceNotificationStatusLoaded(status)):
+                state.deviceNotificationStatus = status
+                return .none
+
+            case .view(.deviceNotificationTurnOnTapped):
+                switch state.deviceNotificationStatus {
+                case .notDetermined:
+                    // 허용하면 앱 진입과 같은 흐름으로 푸시 등록 · FCM 토큰 발급 · 서버 등록을 잇는다. 이 화면은 로그인해야 열린다.
+                    return .run { send in
+                        if await firebaseClient.requestPermission() {
+                            await FCMAppInfoSync.syncOnAppLaunch(firebaseClient: firebaseClient, userClient: userClient)
+                        }
+                        await send(.internal(.deviceNotificationStatusLoaded(notificationPermissionClient.status())))
+                    }
+                    .cancellable(id: CancelID.deviceNotification, cancelInFlight: true)
+                case .denied:
+                    // 앱이 다시 물을 수 없어 이 앱의 알림 설정으로 보낸다. 돌아오면 sceneBecameActive가 다시 읽는다.
+                    return .run { _ in
+                        guard let url = URL(string: UIApplication.openNotificationSettingsURLString) else { return }
+                        await openURL(url)
+                    }
+                case .granted, nil:
+                    return .none
+                }
 
             case .settingRefreshRequested:
                 // 웹이 관심 대회 알림을 서버에 저장했다는 브리지(#281) → 부모가 열려 있는 이 화면에 알린다.
@@ -252,6 +297,12 @@ public struct NotificationSettingFeature: Sendable {
                 guard !state.isLoaded else { return .send(.internal(.toastDismissed)) }
                 return .merge(.send(.internal(.toastDismissed)), fetchSetting(generation: state.saveGeneration))
             }
+        }
+    }
+
+    private func loadDeviceNotificationStatus() -> Effect<Action> {
+        .run { send in
+            await send(.internal(.deviceNotificationStatusLoaded(notificationPermissionClient.status())))
         }
     }
 

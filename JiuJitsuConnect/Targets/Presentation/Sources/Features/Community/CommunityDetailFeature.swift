@@ -171,6 +171,8 @@ public struct CommunityDetailFeature: Sendable {
             case competitionAlertsEnabled(competitionId: Int?)
             // 대회 목록 맨 위 색(COMPETITION_HEADER_TINT) → 대회 탭이 머리줄을 그 색으로 칠한다. nil이면 기본색.
             case competitionHeaderTintChanged(hex: String?)
+            // 글 · 댓글 등록 성공(CONTENT_CREATED) → 어느 탭이든 부모가 AppTab까지 올려 알림 권한 안내를 정한다. (#333)
+            case contentCreated
         }
     }
 
@@ -404,6 +406,9 @@ public struct CommunityDetailFeature: Sendable {
                 case let .competitionAlertsEnabled(competitionId):
                     // 웹은 capability 없이 늘 보낸다(홈 피드의 대회 카드·글 상세·알림함·대회 화면). 어느 탭이든 부모가 AppTab까지 올린다.
                     return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
+
+                case .contentCreated:
+                    return .send(.delegate(.contentCreated))
 
                 case let .competitionHeaderTint(hex):
                     // 대회 탭 목록 웹만 알린다. 다른 웹뷰에서 오면 칠할 머리줄이 없어 무시한다.
