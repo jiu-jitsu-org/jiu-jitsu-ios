@@ -308,7 +308,8 @@ public struct AppTabFeature: Sendable {
                  .competition(.delegate(.webSubview(.tokenRefreshRequested))):
                 // 하이브리드 토큰 소유권은 네이티브 — 웹뷰 만료 시 네이티브 refresh로 갱신해 웹에 돌려준다.
                 // 갱신 결과는 열려 있는 모든 웹뷰에 전파되므로, 진행 중이면 그 응답을 함께 기다리면 된다.
-                guard !state.isRefreshingWebToken else { return .none }
+                // 로그아웃 중엔 이전 계정 토큰을 새로 받지 않는다 — 웹은 곧 AUTH_LOGOUT을 받는다(#372).
+                guard !state.isRefreshingWebToken, !state.isLoggingOut else { return .none }
                 state.isRefreshingWebToken = true
                 return .run { send in
                     do {
@@ -537,8 +538,14 @@ public struct AppTabFeature: Sendable {
                 state.isLoggingOut = false
                 Self.resetToGuest(&state)
                 return .merge(
-                    Self.broadcastLoggedOut(),
-                    .cancel(id: CancelID.notificationPermission)
+                    // 로그아웃을 기다리는 동안 웹 상태는 이전 토큰을 들고 있어 다시 그려질 때 쿠키를 되살릴 수 있다.
+                    // 웹 상태를 게스트로 바꾼 뒤 한 번 더 지운다(#372).
+                    .concatenate(
+                        Self.broadcastLoggedOut(),
+                        .run { _ in await WebSessionCookie.clear() }
+                    ),
+                    .cancel(id: CancelID.notificationPermission),
+                    .cancel(id: CancelID.webTokenRefresh)
                 )
 
             case let .internal(.sessionEvent(event)):
