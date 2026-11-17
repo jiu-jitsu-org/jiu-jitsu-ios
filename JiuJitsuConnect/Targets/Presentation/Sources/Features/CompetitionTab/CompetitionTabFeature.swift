@@ -208,7 +208,7 @@ public struct CompetitionTabFeature: Sendable {
                 return .none
 
             case let .openDetail(url, accessToken):
-                // 같은 대회가 이미 맨 위면 다시 쌓지 않는다(링크 재탭·중복 전달, 홈 딥링크의 isTopDetail과 같은 이유).
+                // 같은 대회가 이미 맨 위면 다시 쌓지 않는다(링크 재탭·중복 전달, 홈 딥링크의 updateTopDetail과 같은 이유).
                 // 공유 링크엔 꼬리(?utm=…, 끝 '/')가 붙을 수 있어 주소 전체가 아니라 호스트·경로로 같은 대회인지 본다.
                 if case let .communityDetail(top)? = state.path.last, Self.isSameDetail(top.url, url) {
                     Log.trace("대회 딥링크 무시(이미 최상단): \(url.absoluteString)", category: .view, level: .info)

@@ -197,12 +197,7 @@ public struct CommunityDetailFeature: Sendable {
         Reduce { state, action in
             switch action {
             case .view(.retryTapped):
-                guard !state.hidesRetry else { return .none }
-                state.hasError = false
-                state.hasLostDraft = false
-                state.isLoading = true
-                state.isAwaitingFirstResponse = true
-                state.loadToken = UUID()
+                Self.reload(&state)
                 return .none
 
             case .view(.backTapped):
@@ -432,6 +427,18 @@ public struct CommunityDetailFeature: Sendable {
                 return .none
             }
         }
+    }
+
+    /// 같은 주소를 처음부터 다시 불러온다 — 다시 시도 버튼, 보고 있는 글의 푸시 · 링크(#383).
+    /// 쓰던 댓글은 웹이 이 웹뷰의 sessionStorage에 들고 있다가 되살린다.
+    /// 재시도 없이 뒤로가기만 두는 화면(#352)은 다시 불러오면 글쓰기 주소가 빈 화면으로 열려 건드리지 않는다.
+    static func reload(_ state: inout State) {
+        guard !state.hidesRetry else { return }
+        state.hasError = false
+        state.hasLostDraft = false
+        state.isLoading = true
+        state.isAwaitingFirstResponse = true
+        state.loadToken = UUID()
     }
 
     /// 부모가 전파한 세션 변화를 상세 웹뷰 상태에 반영한다.

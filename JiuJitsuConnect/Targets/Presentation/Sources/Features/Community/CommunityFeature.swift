@@ -547,7 +547,7 @@ public struct CommunityFeature: Sendable {
             case let .openUserProfile(userId):
                 // 상세 모달이 떠 있으면 모달 안 스택에 쌓는다(모달을 닫으며 push하면 전환이 튄다)
                 // 게스트에게는 띠를 묻지 않는다(#130)
-                // 연타·중복 전달로 같은 프로필이 겹쳐 쌓이지 않게 한다(딥링크의 isTopDetail과 같은 이유)
+                // 연타·중복 전달로 같은 프로필이 겹쳐 쌓이지 않게 한다(딥링크의 updateTopDetail과 같은 이유)
                 let top = state.detailCover != nil ? state.coverPath.last : state.path.last
                 if case let .userProfile(current)? = top, current.userId == userId { return .none }
                 let profile = UserProfileFeature.State(userId: userId, canPromptBelt: state.accessToken != nil)
@@ -820,9 +820,14 @@ public struct CommunityFeature: Sendable {
     /// 겹치면 전환이 튀기 때문으로, 중첩 OPEN_SUBVIEW를 push로 강등하는 것과 같은 이유다.
     private static func openDeepLink(_ link: DeepLink, into state: inout State) -> Effect<Action> {
         let container: SubviewContainer = state.detailCover != nil ? .modal : .push
-        // 같은 글이 이미 최상단이면 무시한다. 링크 재탭이나 중복 전달로 상세가 겹쳐 쌓이는 것을 막는다.
-        guard !isTopDetail(url: link.url, in: state, container: container) else {
-            Log.trace("딥링크 무시(이미 최상단): \(link.url.absoluteString)", category: .view, level: .info)
+        // 같은 글이 이미 최상단이면 새로 쌓지 않는다. 링크 재탭이나 중복 전달로 상세가 겹쳐 쌓이는 것을 막는다.
+        // 대신 보고 있는 글의 푸시(새 댓글 등)면 다시 불러와 새 내용을 보인다(#383).
+        // 아직 첫 로딩 중이면 같은 링크가 두 경로로 잇달아 들어온 중복 전달이라 그대로 둔다.
+        if updateTopDetail(url: link.url, in: &state, container: container, { top in
+            guard !top.isLoading else { return }
+            CommunityDetailFeature.reload(&top)
+        }) {
+            Log.trace("딥링크: 이미 최상단인 글 — 로딩 중이 아니면 다시 불러옴: \(link.url.absoluteString)", category: .view, level: .info)
             return .none
         }
 
@@ -837,17 +842,30 @@ public struct CommunityFeature: Sendable {
         return .none
     }
 
-    /// 해당 컨테이너의 최상단에 같은 URL의 상세가 이미 떠 있는지 검사한다.
-    private static func isTopDetail(url: URL, in state: State, container: SubviewContainer) -> Bool {
+    /// 해당 컨테이너의 최상단에 같은 URL의 상세가 떠 있으면 그 상태를 고치고 true를 돌려준다.
+    private static func updateTopDetail(
+        url: URL,
+        in state: inout State,
+        container: SubviewContainer,
+        _ update: (inout CommunityDetailFeature.State) -> Void
+    ) -> Bool {
         switch container {
         case .push:
-            guard case let .detail(top)? = state.path.last else { return false }
-            return top.url == url
+            guard let id = state.path.ids.last, case var .detail(top)? = state.path[id: id], top.url == url else { return false }
+            update(&top)
+            state.path[id: id] = .detail(top)
+            return true
         case .modal:
-            if case let .detail(top)? = state.coverPath.last {
-                return top.url == url
+            if let id = state.coverPath.ids.last {
+                guard case var .detail(top)? = state.coverPath[id: id], top.url == url else { return false }
+                update(&top)
+                state.coverPath[id: id] = .detail(top)
+                return true
             }
-            return state.detailCover?.url == url
+            guard var top = state.detailCover, top.url == url else { return false }
+            update(&top)
+            state.detailCover = top
+            return true
         }
     }
 
