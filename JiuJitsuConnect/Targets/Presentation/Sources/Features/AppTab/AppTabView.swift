@@ -173,6 +173,16 @@ public struct AppTabView: View {
                 isPresented: sessionExpiredAlertBinding(isInCover: true),
                 configuration: sessionExpiredAlertConfiguration
             )
+            .appAlert(
+                isPresented: withdrawalNoticeBinding(isInCover: true),
+                configuration: withdrawalNoticeConfiguration
+            )
+            // 모달 안 웹에서 로그아웃하면 모달이 남아 아래 탭 화면의 토스트가 가려진다.
+            .toast(
+                store.home.detailCover != nil ? store.toast : nil,
+                onSwipe: { store.send(.view(.toastSwiped)) },
+                onButtonTapped: { _ in store.send(.view(.toastSwiped)) }
+            )
         }
         .appAlert(
             isPresented: Binding(
@@ -188,6 +198,17 @@ public struct AppTabView: View {
         .appAlert(
             isPresented: sessionExpiredAlertBinding(isInCover: false),
             configuration: sessionExpiredAlertConfiguration
+        )
+        .appAlert(
+            isPresented: withdrawalNoticeBinding(isInCover: false),
+            configuration: withdrawalNoticeConfiguration
+        )
+        // 탭 바가 떠 있으면 그 위로 띄운다.
+        .toast(
+            store.home.detailCover == nil ? store.toast : nil,
+            bottomPadding: isBarShown ? max(dockReservedHeight - deviceBottomInset, 0) + 12 : nil,
+            onSwipe: { store.send(.view(.toastSwiped)) },
+            onButtonTapped: { _ in store.send(.view(.toastSwiped)) }
         )
         // 첫 글 · 댓글을 올린 뒤 알림 권한을 묻기 전 한 줄 안내(#333). 상세 모달이 떠 있으면 Feature가 띄우지 않는다.
         .sheet(
@@ -565,6 +586,31 @@ public struct AppTabView: View {
         case .competition: store.send(.competition(.view(.tabReselected)))
         case .myPage: break
         }
+    }
+}
+
+// MARK: - 탈퇴 · 로그아웃 · 계정 복구 안내 (#385)
+
+extension AppTabView {
+    // 탈퇴 안내도 상세 모달 위 · 탭 화면 위 중 맨 위 한 곳에만 그린다.
+    fileprivate func withdrawalNoticeBinding(isInCover: Bool) -> Binding<Bool> {
+        Binding(
+            get: { store.isWithdrawalNoticePresented && (store.home.detailCover != nil) == isInCover },
+            set: { if !$0 { store.send(.view(.withdrawalNoticeDismissed)) } }
+        )
+    }
+
+    fileprivate var withdrawalNoticeConfiguration: AppAlertConfiguration {
+        AppAlertConfiguration(
+            title: AccountNotice.withdrawalTitle,
+            message: AccountNotice.withdrawalBody,
+            primaryButton: .init(
+                title: "확인",
+                style: .primary,
+                action: { store.send(.view(.withdrawalNoticeDismissed)) }
+            ),
+            secondaryButton: nil
+        )
     }
 }
 

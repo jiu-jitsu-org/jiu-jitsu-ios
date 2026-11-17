@@ -176,9 +176,14 @@ public struct AppFeature: Sendable {
             case let .destination(.presented(.login(.delegate(.didLogin(authInfo))))),
                  let .destination(.presented(.login(.delegate(.didSignup(authInfo))))):
                 state.destination = .appTab(.init(authInfo: authInfo))
+                // 탈퇴 유예 중인 계정을 되살렸으면 새 탭 화면에서 알린다(#385). 탭 안 로그인 창은 AppTab이 직접 알린다.
+                let restoredNotice: Effect<Action> = authInfo.userInfo?.deactivatedWithinGrace == true
+                    ? .send(.destination(.presented(.appTab(.accountRestored))))
+                    : .none
                 // 로그인 성공 FCM sync
                 return .merge(
                     Self.consumePendingDeepLink(&state),
+                    restoredNotice,
                     .run { _ in
                         await FCMAppInfoSync.syncAfterLoginSuccess(
                             firebaseClient: self.firebaseClient,

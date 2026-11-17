@@ -6,12 +6,23 @@
 //
 
 import ComposableArchitecture
+import DesignSystem
+import Domain
 
 /// 세션 만료 안내 문구(#373). 앱 사용 중 알럿과 앱을 열 때 로그인 화면 토스트가 같은 말을 쓴다.
 enum SessionExpiryNotice {
     static let title = "로그인이 만료됐어요"
     static let body = "다시 로그인해 주세요."
     static let message = "\(title). \(body)"
+}
+
+/// 탈퇴 · 로그아웃 · 계정 복구가 끝났다는 안내(#385). 설정의 탈퇴 확인 알럿과 같은 사실(30일 · 다시 로그인하면 취소)을 말한다.
+enum AccountNotice {
+    static let withdrawalTitle = "탈퇴 신청이 끝났어요"
+    static let withdrawalBody = "30일 뒤 계정이 삭제돼요. 그 전에 같은 계정으로 로그인하면 탈퇴가 취소돼요."
+    // 토스트마다 새 id가 필요해 매번 만든다.
+    static var loggedOutToast: ToastState { ToastState(message: "로그아웃했어요", status: .success) }
+    static var restoredToast: ToastState { ToastState(message: "탈퇴를 취소하고 계정을 되살렸어요", status: .success) }
 }
 
 extension AppTabFeature {
@@ -30,6 +41,59 @@ extension AppTabFeature {
         case .closeTapped, .dismissed:
             // 그사이 웹이 로그인을 요청했으면(만료 직후 관심 등록 등) 그 행위를 버리게 한다.
             return cancelPendingWebLogin(&state)
+        }
+    }
+
+    /// 탈퇴 성공 — 게스트로 바꾸고 로컬 세션을 정리한 뒤 탈퇴 안내를 띄운다(#385).
+    func finishWithdrawal(_ state: inout State) -> Effect<Action> {
+        Self.resetToGuest(&state)
+        return .merge(
+            Self.broadcastLoggedOut(),
+            .cancel(id: CancelID.notificationPermission),
+            .cancel(id: CancelID.deviceTokenSync),
+            .cancel(id: CancelID.webTokenRefresh),
+            // 로컬 세션 정리를 끝낸 뒤 안내한다. 먼저 안내하면 [확인] 뒤 바로 로그인한 토큰을
+            // 뒤늦은 signOut이 지우거나, 새 로그인이 폐기 직전의 FCM 토큰을 등록할 수 있다.
+            // 로그인 창은 띄우지 않는다 — 유예 중 같은 계정으로 로그인하면 탈퇴가 취소되기 때문이다.
+            .run { send in
+                await authClient.signOut()
+                await WebSessionCookie.clear()
+                await Self.discardDeviceFCMToken(firebaseClient, context: "withdrawal")
+                await send(.internal(.withdrawalCleanupFinished))
+            }
+        )
+    }
+
+    /// 탭 안 로그인 창으로 들어온 계정이 탈퇴 유예 중이었으면 서버가 되살렸다고 알린다(#385).
+    /// 모르는 사이 탈퇴가 취소되지 않게 한다.
+    static func noticeIfRestored(_ authInfo: AuthInfo) -> Effect<Action> {
+        guard authInfo.userInfo?.deactivatedWithinGrace == true else { return .none }
+        return .send(.internal(.showToast(AccountNotice.restoredToast)))
+    }
+
+    /// 탈퇴 안내 알럿과 탭 화면 토스트(로그아웃 · 계정 복구, #385).
+    func reduceAccountNotice(_ action: Action, into state: inout State) -> Effect<Action> {
+        switch action {
+        case .internal(.withdrawalCleanupFinished):
+            state.isWithdrawalNoticePresented = true
+            return .none
+        case .view(.withdrawalNoticeDismissed):
+            state.isWithdrawalNoticePresented = false
+            return .none
+        case .accountRestored:
+            return .send(.internal(.showToast(AccountNotice.restoredToast)))
+        case let .internal(.showToast(toast)):
+            state.toast = toast
+            return .run { [clock] send in
+                try await clock.sleep(for: toast.duration)
+                await send(.internal(.toastDismissed))
+            }
+            .cancellable(id: CancelID.toast, cancelInFlight: true)
+        case .internal(.toastDismissed), .view(.toastSwiped):
+            state.toast = nil
+            return .cancel(id: CancelID.toast)
+        default:
+            return .none
         }
     }
 
