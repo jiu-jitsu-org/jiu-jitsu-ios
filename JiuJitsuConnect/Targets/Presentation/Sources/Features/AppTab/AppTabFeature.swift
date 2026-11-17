@@ -24,6 +24,8 @@ public struct AppTabFeature: Sendable {
         case tokenRefreshObserver
         // 앱 복귀·토큰 교체 때 기기 토큰 서버 등록(#332). 로그아웃하면 이전 계정으로 등록하지 않게 끊는다.
         case deviceTokenSync
+        // 웹뷰 위임 토큰 갱신. 로그아웃 · 세션 만료 · 탈퇴 때 끊어 이전 계정 토큰이 웹으로 가지 않게 한다(#372).
+        case webTokenRefresh
     }
 
     // 세 번째 탭은 설정 대신 대회(#240). 설정은 MY 오른쪽 위로 옮겼다(#241).
@@ -249,10 +251,12 @@ public struct AppTabFeature: Sendable {
                     Self.broadcastLoggedOut(),
                     .cancel(id: CancelID.notificationPermission),
                     .cancel(id: CancelID.deviceTokenSync),
+                    .cancel(id: CancelID.webTokenRefresh),
                     // 로컬 세션 정리를 끝낸 뒤 로그인 모달을 띄운다. 먼저 띄우면 새로 로그인한 토큰을
                     // 뒤늦은 signOut이 지우거나, 새 로그인이 폐기 직전의 FCM 토큰을 등록할 수 있다.
                     .run { send in
                         await authClient.signOut()
+                        await WebSessionCookie.clear()
                         await Self.discardDeviceFCMToken(firebaseClient, context: "withdrawal")
                         await send(.internal(.showLoginModal))
                     }
@@ -319,6 +323,7 @@ public struct AppTabFeature: Sendable {
                         await send(.internal(.tokenRefreshFailed))
                     }
                 }
+                .cancellable(id: CancelID.webTokenRefresh, cancelInFlight: true)
 
             // MARK: - MY 탭 웹 서브뷰 (#44)
 
@@ -511,13 +516,17 @@ public struct AppTabFeature: Sendable {
                 // 게스트 전환(webLogoutCompleted)은 FCM 토큰 폐기까지 끝낸 뒤에 한다. 먼저 전환하면
                 // 그 사이 새 로그인이 폐기 직전의 토큰을 새 계정에 등록할 수 있다(#269).
                 // 폐기와 겹친 기기 토큰 등록은 이전 계정에 새 토큰을 남기므로 먼저 끊는다(#332).
+                // 끊긴 갱신은 응답이 오지 않으므로 진행 표시도 여기서 푼다.
+                state.isRefreshingWebToken = false
                 return .merge(
                     .cancel(id: CancelID.deviceTokenSync),
+                    .cancel(id: CancelID.webTokenRefresh),
                     .run { send in
                         // 서버가 이 기기의 토큰 연결을 지우도록 함께 보낸다.
                         let fcmToken = firebaseClient.loadCachedToken().flatMap { $0.isEmpty ? nil : $0 }
                         _ = try? await authClient.serverLogout(fcmToken)
                         await authClient.signOut()
+                        await WebSessionCookie.clear()
                         // 서버 요청이 실패해(오프라인 등) 연결이 남아도 이전 계정 푸시가 오지 않게 기기 토큰도 폐기한다.
                         await Self.discardDeviceFCMToken(firebaseClient, context: "logout")
                         await send(.internal(.webLogoutCompleted))
@@ -549,6 +558,8 @@ public struct AppTabFeature: Sendable {
 
             case let .internal(.tokenRefreshSucceeded(accessToken)):
                 state.isRefreshingWebToken = false
+                // 취소와 엇갈려 로그아웃 뒤에 도착한 응답은 이전 계정 토큰이라 웹에 넘기지 않는다.
+                guard !state.authInfo.isGuest else { return .none }
                 // 갱신 "응답"이므로 `.loggedIn`(중복 제거되는 수동 동기화)이 아니라 `.tokenRefreshed`로 내린다.
                 // 다른 요청이 이미 갱신을 마쳐 토큰 값이 그대로여도, 요청한 웹뷰는 응답을 받아야 한다.
                 return .merge(
@@ -571,10 +582,12 @@ public struct AppTabFeature: Sendable {
                 return .merge(
                     .run { _ in
                         await authClient.signOut()
+                        await WebSessionCookie.clear()
                         await Self.discardDeviceFCMToken(firebaseClient, context: "session expiry")
                     },
                     .cancel(id: CancelID.notificationPermission),
                     .cancel(id: CancelID.deviceTokenSync),
+                    .cancel(id: CancelID.webTokenRefresh),
                     .send(.home(.session(.sessionExpired))),
                     .send(.competition(.session(.sessionExpired)))
                 )
@@ -685,22 +698,6 @@ public struct AppTabFeature: Sendable {
         state.mountedTabs = allTabs
     }
 
-    /// 로그아웃·탈퇴·세션 만료 — 게스트로 바꾸고 이전 계정의 화면을 정리한 뒤 홈으로 보낸다.
-    private static func resetToGuest(_ state: inout State) {
-        state.authInfo = .guest
-        state.isDeviceNotificationAlertPresented = false
-        state.isNotificationPromptPresented = false
-        state.pendingWebLoginTab = nil
-        state.pendingCompetitionRecord = nil
-        // 이전 계정으로 대회 탭에 쌓아 둔 상세·프로필도 닫는다.
-        state.competition.path.removeAll()
-        // MY 스택에 열어 둔 설정·웹 화면도 함께 닫힌다.
-        state.myPage = MyProfileFeature.State(authInfo: .guest)
-        // 이전 계정으로 커뮤니티에 쌓아 둔 MY 화면(#197)·대회 기록 추가(#304)도 닫는다.
-        CommunityFeature.closeAccountScreens(into: &state.home)
-        state.selectedTab = .home
-    }
-
     /// 웹이 관심 대회 알림을 서버에 저장함(#281) → MY 스택에 설정 › 알림이 열려 있으면 서버 값을 다시 읽힌다.
     private static func refreshOpenNotificationSetting(_ state: State) -> Effect<Action> {
         for id in state.myPage.path.ids {
@@ -714,29 +711,6 @@ public struct AppTabFeature: Sendable {
             ))))
         }
         return .none
-    }
-
-    /// 네이티브 로그아웃을 홈·대회 웹 세션에도 알린다.
-    private static func broadcastLoggedOut() -> Effect<Action> {
-        .merge(
-            .send(.home(.session(.loggedOut))),
-            .send(.competition(.session(.loggedOut)))
-        )
-    }
-
-    /// 웹발 로그인을 취소 — 그 웹이 보관한 행위(글쓰기·관심 등록 등)를 버리게 한다.
-    private static func cancelPendingWebLogin(_ state: inout State) -> Effect<Action> {
-        let tab = state.pendingWebLoginTab
-        state.pendingWebLoginTab = nil
-        state.pendingCompetitionRecord = nil
-        switch tab {
-        case .home:
-            return .send(.home(.session(.loginCancelled)))
-        case .competition:
-            return .send(.competition(.session(.loginCancelled)))
-        case .myPage, nil:
-            return .none
-        }
     }
 }
 

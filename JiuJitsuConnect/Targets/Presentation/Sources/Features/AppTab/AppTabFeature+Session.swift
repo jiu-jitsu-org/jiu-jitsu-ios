@@ -1,0 +1,49 @@
+//
+//  AppTabFeature+Session.swift
+//  Presentation
+//
+//  게스트 전환(로그아웃 · 탈퇴 · 세션 만료)과 웹 세션 알림 도우미.
+//
+
+import ComposableArchitecture
+
+extension AppTabFeature {
+    /// 로그아웃·탈퇴·세션 만료 — 게스트로 바꾸고 이전 계정의 화면을 정리한 뒤 홈으로 보낸다.
+    static func resetToGuest(_ state: inout State) {
+        state.authInfo = .guest
+        state.isDeviceNotificationAlertPresented = false
+        state.isNotificationPromptPresented = false
+        state.pendingWebLoginTab = nil
+        state.pendingCompetitionRecord = nil
+        // 이전 계정으로 대회 탭에 쌓아 둔 상세·프로필도 닫는다.
+        state.competition.path.removeAll()
+        // MY 스택에 열어 둔 설정·웹 화면도 함께 닫힌다.
+        state.myPage = MyProfileFeature.State(authInfo: .guest)
+        // 이전 계정으로 커뮤니티에 쌓아 둔 MY 화면(#197)·대회 기록 추가(#304)도 닫는다.
+        CommunityFeature.closeAccountScreens(into: &state.home)
+        state.selectedTab = .home
+    }
+
+    /// 네이티브 로그아웃을 홈·대회 웹 세션에도 알린다.
+    static func broadcastLoggedOut() -> Effect<Action> {
+        .merge(
+            .send(.home(.session(.loggedOut))),
+            .send(.competition(.session(.loggedOut)))
+        )
+    }
+
+    /// 웹발 로그인을 취소 — 그 웹이 보관한 행위(글쓰기·관심 등록 등)를 버리게 한다.
+    static func cancelPendingWebLogin(_ state: inout State) -> Effect<Action> {
+        let tab = state.pendingWebLoginTab
+        state.pendingWebLoginTab = nil
+        state.pendingCompetitionRecord = nil
+        switch tab {
+        case .home:
+            return .send(.home(.session(.loginCancelled)))
+        case .competition:
+            return .send(.competition(.session(.loginCancelled)))
+        case .myPage, nil:
+            return .none
+        }
+    }
+}

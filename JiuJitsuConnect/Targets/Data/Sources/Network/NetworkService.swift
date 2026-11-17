@@ -279,6 +279,13 @@ public final class DefaultNetworkService: NetworkService {
             throw NetworkError.sessionExpired
         }
 
+        // 응답을 기다리는 사이 로그아웃(토큰 삭제)이나 다른 계정 로그인이 있었으면 이전 세션의 토큰이라 버린다(#372).
+        // 저장하면 다음 실행에 이전 계정으로 자동 로그인된다. 세션 만료로 던지면 새 세션을 끝내므로 취소로 끝낸다.
+        guard tokenStorage.getRefreshToken() == refreshToken else {
+            Log.trace("토큰 갱신 응답이 바뀐 세션에 도착 → 저장하지 않음", category: .network, level: .info)
+            throw CancellationError()
+        }
+
         // provider는 refresh로 바뀌지 않으므로 기존 값을 유지한다.
         let provider = tokenStorage.getProvider() ?? ""
         tokenStorage.save(

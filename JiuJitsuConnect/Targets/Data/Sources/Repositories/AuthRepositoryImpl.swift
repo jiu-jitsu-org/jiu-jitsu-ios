@@ -225,7 +225,14 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             let endpoint = AuthEndpoint.refresh(requestDTO)
             let responseDTO: RefreshResponseDTO = try await networkService.request(endpoint: endpoint)
             
-            // 4. 새 토큰 저장
+            // 4. 기다리는 사이(스플래시 대기 초과 뒤 로그인 · 로그아웃) 세션이 바뀌었으면 결과를 버린다(#372).
+            //    저장하면 새 계정 토큰을 이전 계정 토큰으로 덮는다.
+            guard tokenStorage.getRefreshToken() == refreshToken else {
+                Log.trace("자동 로그인 응답이 바뀐 세션에 도착 → 저장하지 않음", category: .network, level: .info)
+                return nil
+            }
+
+            // 5. 새 토큰 저장
             if let accessToken = responseDTO.accessToken,
                let refreshToken = responseDTO.refreshToken,
                let provider = tokenStorage.getProvider() {
@@ -240,8 +247,10 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
         } catch let error as NetworkError {
             let domainError = error.toDomainError()
             // refresh 토큰 만료 = 세션 완전 종료, 재시도 불가이므로 저장된 토큰을 즉시 정리한다.
+            // 그사이 다른 계정으로 로그인했으면 그 토큰까지 지우지 않는다(#372).
             if case .apiError(let code, _) = domainError,
-               code == .expiredToken || code == .invalidRefreshToken {
+               code == .expiredToken || code == .invalidRefreshToken,
+               tokenStorage.getRefreshToken() == refreshToken {
                 tokenStorage.clear()
             }
             throw domainError

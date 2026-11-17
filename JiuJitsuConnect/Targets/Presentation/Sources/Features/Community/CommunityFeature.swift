@@ -888,9 +888,15 @@ public struct CommunityFeature: Sendable {
     /// 같은 메시지(AUTH_LOGIN_SUCCESS)로 받아 구분할 수 없어, 만료 토큰을 주입하면 "갱신됐다"고
     /// 판단하고 같은 토큰으로 재조회하다 403(A0003)으로 복구에 실패한다. (#26)
     /// 만료 상태면 주입 대신 네이티브 갱신을 먼저 태우고, 그 결과를 AUTH_LOGIN_SUCCESS(새 토큰)
-    /// 또는 AUTH_SESSION_EXPIRED로 회신한다. 게스트면 아무것도 보내지 않는다(웹은 비로그인으로 시작).
+    /// 또는 AUTH_SESSION_EXPIRED로 회신한다. 게스트면 AUTH_LOGOUT을 보낸다.
     private static func syncSessionOnReady(into state: inout State) -> Effect<Action> {
-        guard let accessToken = state.accessToken else { return .none }
+        guard let accessToken = state.accessToken else {
+            // 게스트로 바뀔 때 보낸 AUTH_LOGOUT을 놓친 웹(로딩 중 · 오류 · 다시 뜬 웹)도 비로그인으로 맞춘다(#372).
+            // 웹은 이미 비로그인이던 화면에 온 로그아웃은 다시 읽지 않는다.
+            WebBridge.logEvent("WEBVIEW_READY: 게스트 → AUTH_LOGOUT으로 남은 세션 정리", source: .list)
+            enqueue(.authLogout, into: &state)
+            return .none
+        }
         guard !JWTDecoder.isExpired(accessToken) else {
             WebBridge.logEvent("WEBVIEW_READY: accessToken 만료 → 재주입 보류, 네이티브 갱신 요청", source: .list)
             return .send(.delegate(.tokenRefreshRequested))
