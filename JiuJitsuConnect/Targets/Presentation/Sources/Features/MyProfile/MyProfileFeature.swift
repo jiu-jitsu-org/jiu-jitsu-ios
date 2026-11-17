@@ -1193,6 +1193,8 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case let .internal(.presentImageCaptureSource(source)):
+                // 카메라 확인 사이에 시트를 닫았으면 띄우지 않는다 — 남은 값이 다음 시트에서 picker를 저절로 띄우지 않게
+                guard state.sheet != nil else { return .none }
                 state.imageCaptureSource = source
                 return .none
 
