@@ -125,7 +125,9 @@ public struct SplashFeature: Sendable {
             case .view(.connectionRetryTapped):
                 state.isConnectionFailurePresented = false
                 state.autoLoginResult = nil
-                return autoLoginEffect()
+                // 같은 연결 실패로 버전 확인도 '최신'으로 넘겼을 수 있어 다시 확인한다 — 꼭 필요한 업데이트를 건너뛰지 않게.
+                state.updateRequirement = nil
+                return .merge(autoLoginEffect(), checkVersion())
 
             case let .internal(.versionChecked(requirement)):
                 state.updateRequirement = requirement
@@ -237,19 +239,7 @@ public struct SplashFeature: Sendable {
                 await self.homeFeedPreload.prewarm()
             }
 
-            let outcome = await withTaskGroup(of: AutoLoginOutcome.self) { group in
-                group.addTask {
-                    // 비구조적 Task의 value를 기다리는 쪽이 취소돼도 Task 자체는 취소되지 않는다.
-                    .completed(await TaskResult { try await autoLoginTask.value })
-                }
-                group.addTask {
-                    try? await self.clock.sleep(for: Self.maximumWaitDuration)
-                    return .timedOut
-                }
-                let first = await group.next() ?? .timedOut
-                group.cancelAll()
-                return first
-            }
+            let outcome = await Self.waitAtMost(Self.maximumWaitDuration, for: autoLoginTask, clock: self.clock)
 
             // 홈으로 가면, 미리 불러 두지 못했어도 새 토큰으로 지금 시작한다 — 스플래시 남은 시간만큼 겹친다.
             // 링크로 들어오면 남은 시간이 없어 이 대기만큼 늦게 넘어간다(순서 조정은 #301).
@@ -283,6 +273,31 @@ public struct SplashFeature: Sendable {
             }
         }
         .cancellable(id: CancelID.onAppearLaunch, cancelInFlight: true)
+    }
+
+    /// 자동 로그인을 `duration`까지만 기다린다. 먼저 끝난 쪽 하나만 결과로 쓴다.
+    /// TaskGroup으로 두 자식을 경쟁시키면 그룹이 남은 자식까지 기다리고, `Task.value`는 기다리는 쪽이
+    /// 취소돼도 돌아오지 않아 시간 초과가 걸리지 않는다(#367). 그래서 두 비구조적 Task가 한 번만 넘긴다.
+    private static func waitAtMost(
+        _ duration: Duration,
+        for task: Task<AuthInfo?, Error>,
+        clock: any Clock<Duration>
+    ) async -> AutoLoginOutcome {
+        await withCheckedContinuation { continuation in
+            let isResumed = LockIsolated(false)
+            let resumeOnce: @Sendable (AutoLoginOutcome) -> Void = { outcome in
+                let shouldResume = isResumed.withValue { resumed in
+                    defer { resumed = true }
+                    return !resumed
+                }
+                if shouldResume { continuation.resume(returning: outcome) }
+            }
+            Task { resumeOnce(.completed(await TaskResult { try await task.value })) }
+            Task {
+                try? await clock.sleep(for: duration)
+                resumeOnce(.timedOut)
+            }
+        }
     }
 
     private func finish(_ state: inout State) -> Effect<Action> {
