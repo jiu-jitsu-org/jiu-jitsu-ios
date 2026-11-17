@@ -13,6 +13,8 @@ import Domain
 // MARK: - MyHeaderPattern
 
 public enum MyHeaderPattern: String, CaseIterable, Identifiable, Sendable {
+    // 무늬 없이 띠 색만 — 무늬가 생기기 전 모습. 고르기 시트 맨 앞에 둔다.
+    case plain
     case oss
     case beltTip
     case wrap
@@ -24,6 +26,7 @@ public enum MyHeaderPattern: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
+        case .plain: return "단색"
         case .oss: return "OSS 손"
         case .beltTip: return "띠 끝"
         case .wrap: return "감긴 띠"
@@ -58,6 +61,9 @@ struct MyHeaderPatternView: View, Equatable {
             )
 
             switch pattern {
+            case .plain:
+                break
+
             case .oss:
                 var symbol = context.resolve(shaka)
                 symbol.shading = .color(ink(0.16))
