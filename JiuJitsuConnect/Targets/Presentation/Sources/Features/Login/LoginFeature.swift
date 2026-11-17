@@ -56,6 +56,8 @@ public struct LoginFeature: Sendable {
             /// 신규 가입 완료 후 '홈으로'. 진입 경로와 상관없이 홈 탭으로 보내기 위해 로그인과 구분한다(#72).
             case didSignup(AuthInfo)
             case skipLogin
+            /// 닉네임 단계에서 가입을 그만둠(#368). 로그인 화면은 이미 첫 화면으로 돌아와 있다.
+            case signupAbandoned
         }
     }
     
@@ -183,7 +185,14 @@ public struct LoginFeature: Sendable {
                     state.tempToken = nil
                     state.path.removeAll()
                     return .send(.internal(.showToast(.init(message: "시간이 지나 가입이 중단됐어요. 다시 로그인해주세요.", status: .info))))
-                    
+
+                    // 가입을 그만둠(#368) — 임시 토큰을 버리고 로그인 첫 화면으로. 그다음은 부모가 정한다
+                    // (앱 첫 화면은 로그인 화면에 머물고, 앱 안 로그인 창은 둘러보기처럼 닫힌다).
+                case .element(id: _, action: .nicknameSetting(.delegate(.signupAbandoned))):
+                    state.tempToken = nil
+                    state.path.removeAll()
+                    return .send(.delegate(.signupAbandoned))
+
                 default: return .none
                 }
                 

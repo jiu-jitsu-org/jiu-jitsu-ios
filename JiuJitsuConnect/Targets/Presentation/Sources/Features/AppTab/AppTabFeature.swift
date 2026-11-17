@@ -691,8 +691,8 @@ public struct AppTabFeature: Sendable {
                         }
                     )
 
-                case .skipLogin:
-                    // 웹발 로그인을 취소하면 그 웹의 대기 중 행위(pendingAction)를 폐기시킨다.
+                case .skipLogin, .signupAbandoned:
+                    // 웹발 로그인을 취소하면(가입을 그만둔 것 포함, #368) 그 웹의 대기 중 행위(pendingAction)를 폐기시킨다.
                     state.loginCover = nil
                     return Self.cancelPendingWebLogin(&state)
                 }
