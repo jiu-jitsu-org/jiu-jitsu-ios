@@ -22,6 +22,28 @@ let releaseInfoPlistScript: TargetScript = .post(
     basedOnDependencyAnalysis: false
 )
 
+// MARK: - Crashlytics dSYM 업로드 (#374)
+// 아카이브(로컬 · Xcode Cloud)에서만 올린다. 일반 빌드마다 올리면 확인용 Release 빌드도 콘솔에 섞인다.
+// Firebase 기본 `run`은 앱 dSYM만 올리는데, 앱 코드 대부분이 동적 framework(Presentation 등)에 있어
+// 같은 폴더의 dSYM을 모두 올린다. 망이 없어도 아카이브는 막지 않는다.
+let crashlyticsDSYMUploadScript: TargetScript = .post(
+    script: """
+    if [ "${ACTION}" != "install" ] || [ "${CONFIGURATION}" = "Debug" ]; then
+        exit 0
+    fi
+    "${SRCROOT}/Tuist/.build/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols" \\
+        -gsp "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleService-Info.plist" \\
+        -p ios "${DWARF_DSYM_FOLDER_PATH}" \\
+        || echo "warning: Crashlytics dSYM 업로드 실패 — Firebase 콘솔에서 수동 업로드 필요"
+    """,
+    name: "Upload dSYMs to Crashlytics",
+    inputPaths: [
+        "${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${PRODUCT_NAME}",
+        "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist",
+    ],
+    basedOnDependencyAnalysis: false
+)
+
 // MARK: - SwiftLint (스킴 `SwiftLint`로만 실행 — 일반 앱 빌드에서는 스크립트 미실행)
 let swiftlintScript: TargetScript = .pre(
     script: """
@@ -112,6 +134,9 @@ let appInfoPlist: [String: Plist.Value] = {
             "kakaolink"
         ],
         "FirebaseAppDelegateProxyEnabled": false,
+        // 구성별 값은 앱 타깃 configurations. Crashlytics는 문자열 "YES"/"NO"도 읽는다.
+        // setCrashlyticsCollectionEnabled는 쓰지 않는다 — UserDefaults에 남아 같은 번들 id로 깐 다른 구성에도 따라간다.
+        "FirebaseCrashlyticsCollectionEnabled": "$(CRASHLYTICS_COLLECTION_ENABLED)",
         // 프로필 이미지 수정 + 커뮤니티 글 작성 웹뷰(<input type=file>) — 카메라 촬영
         "NSCameraUsageDescription": "프로필 사진과 글에 올릴 사진을 찍을 때 카메라를 사용해요.",
         // 기능상 필수는 아님(PHPicker/웹뷰 파일 입력은 권한 프롬프트 없이 동작)이나
@@ -178,7 +203,7 @@ let project = Project(
                 // UIAppFonts는 앱 본체에서 찾으므로 폰트 파일은 앱 타깃에만 넣는다(#224).
                 .glob(pattern: .relativeToRoot("Targets/DesignSystem/Resources/Fonts/**"))
             ],
-            scripts: [releaseInfoPlistScript],
+            scripts: [releaseInfoPlistScript, crashlyticsDSYMUploadScript],
             dependencies: [
                 .target(name: "Presentation"),
                 .target(name: "Data"),
@@ -187,6 +212,7 @@ let project = Project(
                 .external(name: "PulseUI"),
                 .external(name: "FirebaseCore"),
                 .external(name: "FirebaseMessaging"),
+                .external(name: "FirebaseCrashlytics"),
                 .external(name: "GoogleSignIn")
             ],
             settings: .settings(
@@ -205,6 +231,8 @@ let project = Project(
                         "OTHER_LDFLAGS": "$(inherited)",
                         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "\(additionalCondition) DEBUG",
                         "CODE_SIGN_ENTITLEMENTS": "JiuJitsuConnect.entitlements",
+                        // 개발 중 크래시는 콘솔에 올리지 않는다
+                        "CRASHLYTICS_COLLECTION_ENABLED": "NO",
                     ]),
                     .release(name: "Beta", settings: [
                         "OTHER_LDFLAGS": "$(inherited)",
@@ -212,11 +240,13 @@ let project = Project(
                         // Release와 별도 파일 — APNs는 production이지만 유니버설 링크는
                         // 이 구성이 로드하는 WEB_URL_DEV(dev 도메인)를 등록해야 한다.
                         "CODE_SIGN_ENTITLEMENTS": "JiuJitsuConnect.Beta.entitlements",
+                        "CRASHLYTICS_COLLECTION_ENABLED": "YES",
                     ]),
                     .release(name: "Release", settings: [
                         "OTHER_LDFLAGS": "$(inherited)",
                         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "\(additionalCondition)",
                         "CODE_SIGN_ENTITLEMENTS": "JiuJitsuConnect.Release.entitlements",
+                        "CRASHLYTICS_COLLECTION_ENABLED": "YES",
                     ]),
                 ]
             )

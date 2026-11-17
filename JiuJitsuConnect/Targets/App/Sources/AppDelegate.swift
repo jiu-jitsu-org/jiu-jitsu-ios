@@ -6,6 +6,7 @@
 import UIKit
 import UserNotifications
 import FirebaseCore
+import FirebaseCrashlytics
 import FirebaseMessaging
 import CoreKit
 import Presentation
@@ -16,9 +17,25 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         FirebaseApp.configure()
+        // Beta · Release가 같은 Firebase 앱 · 같은 버전 번호라 콘솔에서 구분하려고 넣는다. 회원 정보는 넣지 않는다(#374)
+        Crashlytics.crashlytics().setCustomValue(Self.buildConfiguration, forKey: "build_config")
+        #if DEBUG
+        // 수집을 꺼도 크래시 보고서는 기기에 남아, 같은 기기에 Beta · Release를 깔면 그때 올라간다
+        Crashlytics.crashlytics().deleteUnsentReports()
+        #endif
         Messaging.messaging().delegate = self
         UNUserNotificationCenter.current().delegate = self
         return true
+    }
+
+    private static var buildConfiguration: String {
+        #if DEBUG
+        return "debug"
+        #elseif BETA
+        return "beta"
+        #else
+        return "release"
+        #endif
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
