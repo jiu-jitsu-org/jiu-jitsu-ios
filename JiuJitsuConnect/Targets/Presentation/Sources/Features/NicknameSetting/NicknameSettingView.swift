@@ -18,7 +18,6 @@ public struct NicknameSettingView: View {
     public var body: some View {
         VStack(spacing: 0) {
             // 가입 중에도 뒤로가기를 둔다 — 없으면 닉네임을 정하거나 앱을 꺼야만 나갈 수 있다(#368).
-            // 스와이프는 내비게이션 바를 숨겨 막아 둔다(실수로 나가지 않게).
             headerView
             titleSection
             textFieldSection
@@ -47,6 +46,13 @@ public struct NicknameSettingView: View {
         )
         .navigationBarBackButtonHidden(true)
         .navigationBarHidden(true)
+        // 가입 중엔 스와이프로 바로 나가지 않게 막고 뒤로가기와 같이 '그만둘까요?'를 묻는다(#368).
+        // 바를 숨겨도 앱 전역 확장이 스와이프를 다시 켜 둔다(UINavigationController+SwipeBack). 수정 모드는 지금처럼 스와이프로 나간다.
+        .background {
+            if store.mode == .initial {
+                InteractivePopBlocker(onBlocked: { store.send(.view(.backButtonTapped)) })
+            }
+        }
     }
 }
 
