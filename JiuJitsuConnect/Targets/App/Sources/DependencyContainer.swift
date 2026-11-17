@@ -37,6 +37,7 @@ public final class DependencyContainer {
     private let authSessionEventBroadcaster = AuthSessionEventBroadcaster()
     /// AppDelegate가 받은 푸시 탭을 Presentation(딥링크 라우팅)으로 전달하는 채널.
     private let pushNotificationTapRelay = PushNotificationTapRelay()
+    private let pushNotificationArrivalRelay = PushNotificationArrivalRelay()
     /// AppDelegate가 받은 FCM 토큰 교체를 Presentation(서버 재등록)으로 전달하는 채널(#332).
     private let fcmTokenRefreshRelay = FCMTokenRefreshRelay()
     private let beltPromptStorage = BeltPromptStorage()
@@ -125,14 +126,24 @@ public final class DependencyContainer {
 
     /// 푸시 탭 payload를 TCA가 구독하기 위한 클라이언트.
     public func configurePushNotificationClient() -> PushNotificationClient {
-        PushNotificationClient(taps: { [pushNotificationTapRelay] in
-            pushNotificationTapRelay.taps()
-        })
+        PushNotificationClient(
+            taps: { [pushNotificationTapRelay] in
+                pushNotificationTapRelay.taps()
+            },
+            arrivals: { [pushNotificationArrivalRelay] in
+                pushNotificationArrivalRelay.arrivals()
+            }
+        )
     }
 
     /// AppDelegate가 푸시 탭 payload를 흘려보내는 발신 창구.
     public func deliverPushNotificationTap(_ payload: PushActionPayload) {
         pushNotificationTapRelay.send(payload)
+    }
+
+    /// AppDelegate가 앱을 쓰는 중 알림을 받을 때 부른다(#394).
+    public func deliverForegroundNotification() {
+        pushNotificationArrivalRelay.send()
     }
 
     /// AppDelegate가 FCM 토큰을 받을 때마다 부른다. 캐시에 저장하고, 이전 토큰과 달라졌을 때만 TCA로 넘긴다.

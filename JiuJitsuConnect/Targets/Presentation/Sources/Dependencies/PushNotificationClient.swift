@@ -13,17 +13,23 @@ import Foundation
 public struct PushNotificationClient: Sendable {
     /// 사용자가 탭한 푸시의 payload 스트림. 구독자별로 독립 스트림이 생성된다.
     public var taps: @Sendable () -> AsyncStream<PushActionPayload>
+    /// 앱을 쓰는 중에 알림이 도착함(#394). 배너만 뜨고 앱 안 새 알림 점은 그대로라, 받는 쪽이 다시 조회한다.
+    public var arrivals: @Sendable () -> AsyncStream<Void>
 
-    public init(taps: @Sendable @escaping () -> AsyncStream<PushActionPayload>) {
+    public init(
+        taps: @Sendable @escaping () -> AsyncStream<PushActionPayload>,
+        arrivals: @Sendable @escaping () -> AsyncStream<Void>
+    ) {
         self.taps = taps
+        self.arrivals = arrivals
     }
 }
 
 extension PushNotificationClient: DependencyKey {
     // 실제 릴레이는 App Composition Root에서 주입한다. 기본값은 즉시 종료되는 빈 스트림.
-    public static let liveValue: Self = Self(taps: { AsyncStream { $0.finish() } })
-    public static let testValue: Self = Self(taps: { AsyncStream { $0.finish() } })
-    public static let previewValue: Self = Self(taps: { AsyncStream { $0.finish() } })
+    public static let liveValue: Self = Self(taps: { AsyncStream { $0.finish() } }, arrivals: { AsyncStream { $0.finish() } })
+    public static let testValue: Self = Self(taps: { AsyncStream { $0.finish() } }, arrivals: { AsyncStream { $0.finish() } })
+    public static let previewValue: Self = Self(taps: { AsyncStream { $0.finish() } }, arrivals: { AsyncStream { $0.finish() } })
 }
 
 public extension DependencyValues {
@@ -90,6 +96,53 @@ public final class PushNotificationTapRelay: Sendable {
             }
             lock.unlock()
             snapshot.forEach { $0.yield(payload) }
+        }
+    }
+}
+
+/// 앱을 쓰는 중 도착한 알림을 구독자에게 알린다(#394).
+///
+/// 푸시 탭 릴레이와 달리 구독자가 없을 때 온 알림은 보관하지 않는다. 그때는 아직 탭 화면이 없어,
+/// 홈에 들어가며 새 알림 점을 처음 조회할 때 반영된다.
+public final class PushNotificationArrivalRelay: Sendable {
+    private let storage = Storage()
+
+    public init() {}
+
+    public func arrivals() -> AsyncStream<Void> {
+        AsyncStream { continuation in
+            let id = storage.add(continuation)
+            continuation.onTermination = { [storage] _ in
+                storage.remove(id)
+            }
+        }
+    }
+
+    public func send() {
+        storage.broadcast()
+    }
+
+    private final class Storage: @unchecked Sendable {
+        private let lock = NSLock()
+        private var continuations: [UUID: AsyncStream<Void>.Continuation] = [:]
+
+        func add(_ continuation: AsyncStream<Void>.Continuation) -> UUID {
+            let id = UUID()
+            lock.lock(); defer { lock.unlock() }
+            continuations[id] = continuation
+            return id
+        }
+
+        func remove(_ id: UUID) {
+            lock.lock(); defer { lock.unlock() }
+            continuations[id] = nil
+        }
+
+        func broadcast() {
+            lock.lock()
+            let snapshot = Array(continuations.values)
+            lock.unlock()
+            snapshot.forEach { $0.yield() }
         }
     }
 }

@@ -29,6 +29,8 @@ public struct AppTabFeature: Sendable {
         case webTokenRefresh
         // 탭 화면 토스트(로그아웃 · 계정 복구 안내, #385)가 떠 있는 시간
         case toast
+        // 앱을 쓰는 중 도착한 알림 구독(#394). AppTab 생명주기 동안만 유지한다.
+        case notificationArrivalObserver
     }
 
     // 세 번째 탭은 설정 대신 대회(#240). 설정은 MY 오른쪽 위로 옮겼다(#241).
@@ -144,6 +146,8 @@ public struct AppTabFeature: Sendable {
             case presentNotificationPrompt
             // 앱이 켜져 있는 동안 FCM 토큰이 바뀜(#332).
             case fcmTokenRefreshed(String)
+            // 앱을 쓰는 중 알림이 도착함(#394).
+            case notificationArrived
             // 웹 주도 로그아웃 요청(AUTH_LOGOUT_REQUEST) 처리.
             case performWebLogout
             case webLogoutCompleted
@@ -177,6 +181,7 @@ public struct AppTabFeature: Sendable {
     @Dependency(\.notificationPermissionClient) var notificationPermissionClient
     @Dependency(\.communityClient) var communityClient
     @Dependency(\.openURL) var openURL
+    @Dependency(\.pushNotificationClient) var pushNotificationClient
     @Dependency(\.continuousClock) var clock
 
     public var body: some ReducerOf<Self> {
@@ -208,8 +213,12 @@ public struct AppTabFeature: Sendable {
                             await send(.internal(.fcmTokenRefreshed(token)))
                         }
                     }
-                    .cancellable(id: CancelID.tokenRefreshObserver, cancelInFlight: false)
+                    .cancellable(id: CancelID.tokenRefreshObserver, cancelInFlight: false),
+                    observeNotificationArrivals()
                 )
+
+            case .internal(.notificationArrived):
+                return Self.refreshUnreadOnArrival(state)
 
             case let .view(.tabSelected(tab)):
                 // MY를 떠나면 띠 링 대기를 푼다 — 안 보이는 MY에서 돌지 않고, 다음 MY 진입 때 돈다(#320).
@@ -726,20 +735,6 @@ public struct AppTabFeature: Sendable {
         state.mountedTabs = allTabs
     }
 
-    /// 웹이 관심 대회 알림을 서버에 저장함(#281) → MY 스택에 설정 › 알림이 열려 있으면 서버 값을 다시 읽힌다.
-    private static func refreshOpenNotificationSetting(_ state: State) -> Effect<Action> {
-        for id in state.myPage.path.ids {
-            guard
-                case let .settings(settings)? = state.myPage.path[id: id],
-                case .notificationSetting? = settings.destination
-            else { continue }
-            return .send(.myPage(.path(.element(
-                id: id,
-                action: .settings(.destination(.presented(.notificationSetting(.settingRefreshRequested))))
-            ))))
-        }
-        return .none
-    }
 }
 
 // MARK: - 기기 알림 권한 · FCM 토큰
