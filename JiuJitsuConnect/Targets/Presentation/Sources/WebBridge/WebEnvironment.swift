@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import WebKit
 
 enum WebEnvironment {
     /// 이 빌드 구성이 바라보는 웹 도메인. 오버라이드가 없을 때 커뮤니티 웹뷰가 로드한다.
@@ -26,6 +27,22 @@ enum WebEnvironment {
         candidates.append(contentsOf: [string(forKey: "DEBUG_WEB_URL_DEV"), string(forKey: "DEBUG_WEB_URL_PROD")])
 #endif
         return Set(candidates.compactMap { URL(string: $0)?.host?.lowercased() })
+    }
+
+    /// 웹뷰 User-Agent 끝에 붙이는 앱 표시(#370). 웹 서버가 앱 안인지 · 앱 버전을 첫 요청부터 안다
+    /// (jiu-jitsu-frontend#510). 웹은 `OSSApp/`으로 찾으므로 형식을 바꾸면 웹과 같이 바꾼다.
+    static var appUserAgentToken: String {
+        let version = string(forKey: "CFBundleShortVersionString")
+        return "OSSApp/\(version.isEmpty ? "0" : version) (iOS)"
+    }
+
+    /// 웹뷰 설정의 User-Agent 끝에 앱 표시를 덧붙인다.
+    /// `applicationNameForUserAgent`의 기본값은 `Mobile/…` 토큰이라 덮어쓰면 웹이 모바일로 보지 못한다 — 뒤에 이어 붙인다.
+    /// `customUserAgent`로 통째로 바꾸지 않는 것도 같은 이유(Safari와 같은 기본값을 지킴).
+    @MainActor
+    static func appendAppName(to configuration: WKWebViewConfiguration) {
+        let base = configuration.applicationNameForUserAgent ?? ""
+        configuration.applicationNameForUserAgent = base.isEmpty ? appUserAgentToken : "\(base) \(appUserAgentToken)"
     }
 
     static func string(forKey key: String) -> String {

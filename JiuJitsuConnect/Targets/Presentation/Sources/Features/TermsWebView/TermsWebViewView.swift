@@ -215,6 +215,8 @@ private struct TermsWKWebView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
+        // 약관도 같은 웹 서버라 앱 안 요청임을 알린다(#370).
+        WebEnvironment.appendAppName(to: configuration)
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         // 시스템 자동 인셋을 끄고, SwiftUI에서 계산한 값을 직접 주입한다.
