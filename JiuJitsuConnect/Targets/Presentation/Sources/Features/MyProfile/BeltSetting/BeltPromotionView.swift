@@ -40,7 +40,7 @@ public enum BeltPromotion: Equatable, Identifiable, Sendable {
 /// 띠·그랄을 올려 저장했을 때 잠깐 덮는 축하 장면(#278, #286).
 ///
 /// 띠 승급은 새 띠 캐릭터가 화면 아래에서 올라오고, 그랄은 띠를 크게 그려 새로 감은 그랄이 채워진다.
-/// 둘 다 대회 완료 화면과 같은 종이 꽃가루가 퍼진다. 아무 데나 누르거나 2초가 지나면 옅어지며 사라진다.
+/// 둘 다 대회 완료 화면과 같은 종이 꽃가루가 퍼진다. 오른쪽 위 닫기(X)를 눌러야만 옅어지며 사라진다(#339).
 struct BeltPromotionView: View {
     let promotion: BeltPromotion
     let onDismiss: () -> Void
@@ -59,6 +59,12 @@ struct BeltPromotionView: View {
         static let beltSideInset: CGFloat = 40
         static let maxBeltWidth: CGFloat = 300
         static let beltTitleGap: CGFloat = 40
+        // 닫기는 다른 화면 머리줄(높이 60·양옆 16)의 오른쪽 아이콘 자리 — 아이콘 24 오른쪽 끝이 화면에서 16, 누르는 칸은 44.
+        static let headerHeight: CGFloat = 60
+        static let headerSideInset: CGFloat = 16
+        static let closeIcon: CGFloat = 24
+        static let closeGlyph: CGFloat = 18
+        static let closeTapSize: CGFloat = 44
     }
 
     private enum Motion {
@@ -67,31 +73,33 @@ struct BeltPromotionView: View {
         static let disappear = Animation.easeOut(duration: 0.25)
         // 장면이 다 보인 뒤 그랄이 위에서 아래로 감긴다.
         static let stripe = Animation.easeInOut(duration: 0.5).delay(0.35)
-        static let stay: Duration = .seconds(2)
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .bottom) {
-                Color.primitive.coolGray.cg25
+        ZStack(alignment: .topTrailing) {
+            GeometryReader { proxy in
+                ZStack(alignment: .bottom) {
+                    Color.primitive.coolGray.cg25
 
-                switch promotion {
-                case let .belt(belt):
-                    PaperConfettiView(startDelay: 0.2)
-                    beltScene(belt: belt, size: proxy.size)
-                case let .stripe(belt, from, to):
-                    // 그랄이 다 감길 즈음 퍼진다.
-                    PaperConfettiView(startDelay: 0.7)
-                    stripeScene(belt: belt, from: from, to: to, width: proxy.size.width)
+                    switch promotion {
+                    case let .belt(belt):
+                        PaperConfettiView(startDelay: 0.2)
+                        beltScene(belt: belt, size: proxy.size)
+                    case let .stripe(belt, from, to):
+                        // 그랄이 다 감길 즈음 퍼진다.
+                        PaperConfettiView(startDelay: 0.7)
+                        stripeScene(belt: belt, from: from, to: to, width: proxy.size.width)
+                    }
                 }
             }
-            .opacity(isShown ? 1 : 0)
+            .ignoresSafeArea()
+
+            // 장면은 화면 끝까지 덮고, 닫기만 안전 영역 아래 머리줄 자리에 둔다.
+            closeButton
+                .padding(.top, (Metrics.headerHeight - Metrics.closeTapSize) / 2)
+                .padding(.trailing, Metrics.headerSideInset - (Metrics.closeTapSize - Metrics.closeIcon) / 2)
         }
-        .ignoresSafeArea()
-        .contentShape(Rectangle())
-        .onTapGesture { Task { await close() } }
-        .accessibilityAddTraits(.isButton)
-        .accessibilityHint("누르면 닫혀요")
+        .opacity(isShown ? 1 : 0)
         .sensoryFeedback(.success, trigger: isShown) { _, isNowShown in isNowShown }
         .presentationBackground(.clear)
         .task {
@@ -102,12 +110,26 @@ struct BeltPromotionView: View {
                 withAnimation(Motion.appear) { isShown = true }
                 withAnimation(Motion.stripe) { isStripeAdded = true }
             }
-            guard (try? await Task.sleep(for: Motion.stay)) != nil else { return }
-            await close()
         }
     }
 
     // MARK: - View Components
+
+    /// 면 없이 아이콘만 — 약관 화면 닫기와 같은 xmark(18 semibold, 24 칸).
+    private var closeButton: some View {
+        Button {
+            Task { await close() }
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: Metrics.closeGlyph, weight: .semibold))
+                .foregroundStyle(Color.component.header.iconButton)
+                .frame(width: Metrics.closeIcon, height: Metrics.closeIcon)
+                .frame(width: Metrics.closeTapSize, height: Metrics.closeTapSize)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("닫기")
+    }
 
     private func title(_ text: String) -> some View {
         Text(text)
@@ -149,7 +171,7 @@ struct BeltPromotionView: View {
         .frame(maxHeight: .infinity)
     }
 
-    /// 눌렀거나 시간이 다 되었을 때 부른다. 어느 쪽이 먼저든 한 번만 닫는다.
+    /// 닫기를 눌렀을 때 부른다. 연달아 눌러도 한 번만 닫는다.
     private func close() async {
         guard !isClosing else { return }
         isClosing = true
