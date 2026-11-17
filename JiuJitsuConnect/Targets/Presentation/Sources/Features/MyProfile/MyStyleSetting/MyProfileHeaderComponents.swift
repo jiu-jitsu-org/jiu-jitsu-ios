@@ -291,6 +291,9 @@ private struct ProfileImageView: View {
     /// 사진·링을 누를 때마다 링이 커지며 다시 두 바퀴 돈다(#338). 사진 아래 수정 띠는 따로 된 버튼이라 누르면 링을 올리지 않는다.
     @State private var replayTrigger = 0
 
+    /// 서버 사진이 실제로 그려진 주소. 불러오는 중·실패면 이 주소와 달라 수정 띠를 옅은 회색으로 둔다.
+    @State private var loadedPhotoURL: URL?
+
     var body: some View {
         MyBeltRingView(
             beltRank: beltRank,
@@ -345,6 +348,7 @@ private struct ProfileImageView: View {
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
+                        .onAppear { loadedPhotoURL = url }
                 case .empty, .failure:
                     pendingPreviewOrDefault
                 @unknown default:
@@ -391,14 +395,13 @@ private struct ProfileImageView: View {
             .frame(width: iconSize, height: iconSize)
     }
 
-    /// 사진이 있는지 — 없으면(기본 아이콘) 띠를 반투명 검정 대신 옅은 회색 면으로 깔아, 흰 바탕 위에서 탁해 보이지 않게 한다.
+    /// 사진이 실제로 그려졌는지(서버 사진을 다 불러왔거나 방금 고른 사진이 있음).
+    /// 아니면(불러오는 중·실패·기본 아이콘) 띠를 반투명 검정 대신 옅은 회색 면으로 깔아, 흰 바탕 위에서 탁해 보이지 않게 한다.
     private var hasPhoto: Bool {
         if isDeleting { return false }
-        if let profileImageUrl, let url = URL(string: profileImageUrl),
-           url.scheme == "https" || url.scheme == "http" {
-            return true
-        }
-        return pendingImageData != nil
+        if pendingImageData != nil { return true }
+        guard let profileImageUrl, let url = URL(string: profileImageUrl) else { return false }
+        return loadedPhotoURL == url
     }
 
     // 사진 아래 26 높이를 띠로 덮고 카메라를 얹는다(사진 원 밖으로 나가지 않아 떠 보이지 않는다, #340).
