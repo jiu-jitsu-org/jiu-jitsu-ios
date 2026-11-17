@@ -288,8 +288,16 @@ private struct ProfileImageView: View {
     var showsCameraButton: Bool = true
     let onCameraTapped: () -> Void
 
+    /// 사진·링을 누를 때마다 링이 커지며 다시 두 바퀴 돈다(#338). 카메라 버튼은 위에 겹친 따로 된 버튼이라 올리지 않는다.
+    @State private var replayTrigger = 0
+
     var body: some View {
-        MyBeltRingView(beltRank: beltRank, beltStripe: beltStripe, entranceTrigger: entranceTrigger) {
+        MyBeltRingView(
+            beltRank: beltRank,
+            beltStripe: beltStripe,
+            entranceTrigger: entranceTrigger,
+            replayTrigger: replayTrigger
+        ) {
             ZStack {
                 Color.component.list.setting.background
 
@@ -302,6 +310,8 @@ private struct ProfileImageView: View {
                 }
             }
         }
+        .contentShape(Circle())
+        .onTapGesture { replayTrigger += 1 }
         // 오른쪽 아래(135°)는 링의 띠 끝 칸·그랄 자리라, 카메라 버튼은 거울 자리인 왼쪽 아래에 둔다.
         .overlay(alignment: .bottomLeading) {
             if showsCameraButton {
