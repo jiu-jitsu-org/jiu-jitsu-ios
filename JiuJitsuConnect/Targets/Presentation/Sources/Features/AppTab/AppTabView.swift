@@ -27,9 +27,6 @@ public struct AppTabView: View {
     @State private var scrollTracker = TabScrollTracker()
     // 화면 맨 아래 안전 영역(홈 막대 자리)
     @State private var deviceBottomInset: CGFloat = 0
-    // 맨 위로 동그라미가 어디로 들어가는지 — 탭 바가 올라오면 그 맨 위로 칸으로, 아니면 제자리에서 사라진다.
-    // 나타날 땐 늘 화면 아래에서 올라온다.
-    @State private var circleExit: CircleMotion = .inPlace
     // 웹 바텀 시트가 떠 있는 탭(#314). 그 탭을 보는 동안 탭 바·맨 위로 버튼을 숨겨 시트가 화면 맨 아래까지 오게 한다.
     @State private var webSheetOpenTab: AppTabFeature.Tab?
 
@@ -139,7 +136,6 @@ public struct AppTabView: View {
         }
         .onChange(of: isTabRootInFront) { _, isInFront in
             guard isInFront, isTabBarHidden else { return }
-            circleExit = .inPlace
             withAnimation(Self.tabBarAnimation) { isTabBarHidden = false }
         }
         .fullScreenCover(
@@ -300,8 +296,6 @@ public struct AppTabView: View {
         // 맨 위에서 먼지는 안 보이는 탭도 늘 맞춘다 — 다른 탭에 있는 동안 웹이 다시 불려 맨 위로 가도 돌아왔을 때 맞게.
         let isAwayFromTop = offsetY > ScrollMetrics.topButtonOffset
         if tabsAwayFromTop.contains(tab) != isAwayFromTop {
-            // 탭 바가 숨은 채 맨 위로 문턱을 넘나들면 동그라미는 제자리에서 사라진다.
-            circleExit = .inPlace
             withAnimation(Self.tabBarAnimation) {
                 if isAwayFromTop { tabsAwayFromTop.insert(tab) } else { tabsAwayFromTop.remove(tab) }
             }
@@ -321,8 +315,6 @@ public struct AppTabView: View {
             shouldHide = offsetY > lastOffsetY
         }
         guard shouldHide != isTabBarHidden else { return }
-        // 맨 위에서 먼 채 탭 바가 올라오면, 동그라미는 탭 바의 맨 위로 칸으로 들어간다.
-        circleExit = shouldHide ? .inPlace : .slot
         withAnimation(Self.tabBarAnimation) { isTabBarHidden = shouldHide }
     }
 
@@ -331,7 +323,6 @@ public struct AppTabView: View {
     private func handleWebSheet(tab: AppTabFeature.Tab, isOpen: Bool) {
         let next: AppTabFeature.Tab? = isOpen ? tab : (webSheetOpenTab == tab ? nil : webSheetOpenTab)
         guard next != webSheetOpenTab else { return }
-        circleExit = .inPlace
         withAnimation(Self.tabBarAnimation) { webSheetOpenTab = next }
     }
 
@@ -358,11 +349,6 @@ public struct AppTabView: View {
     /// 탭 바와 맨 위로 동그라미는 따로 움직이는 유리 두 개다(#267).
     /// - 탭 바: 홈·대회·MY (맨 위에서 멀면 맨 위로 칸이 붙어 4칸). 숨길 땐 그대로 아래로 내려간다.
     /// - 동그라미: 탭 바가 숨고 맨 위에서 멀 때의 맨 위로 버튼
-    private enum CircleMotion {
-        case inPlace
-        case slot
-    }
-
     private var isBarShown: Bool {
         isTabRootInFront && !isTabBarHidden && !isWebSheetOpen
     }
@@ -402,13 +388,6 @@ public struct AppTabView: View {
             width: DockMetrics.circleSize,
             height: DockMetrics.circleSize
         )
-    }
-
-    /// 탭 바의 맨 위로 칸 아이콘 자리(4칸일 때 맨 오른쪽 칸, 글자 위)
-    private func topItemIconCenter(in size: CGSize) -> CGPoint {
-        let bar = barFrame(showsTopItem: true, in: size)
-        let itemTop = bar.midY - DockMetrics.itemHeight / 2
-        return CGPoint(x: bar.maxX - DockMetrics.barPadding - DockMetrics.itemWidth / 2, y: itemTop + 7 + 12)
     }
 
     private func tabDock(in size: CGSize) -> some View {
@@ -451,8 +430,8 @@ public struct AppTabView: View {
     private func dockCircle(in size: CGSize) -> some View {
         if isCircleShown {
             let frame = circleFrame(in: size)
-            let slot = topItemIconCenter(in: size)
-            let toSlot = CGSize(width: slot.x - frame.midX, height: slot.y - frame.midY)
+            // 탭 바와 같이 화면 아래 가장자리 밖에서 올라오고, 사라질 땐 그 자리로 내려간다.
+            let belowEdge = CircleSlotModifier(offset: CGSize(width: 0, height: size.height - frame.minY + 24), scale: 1, opacity: 1)
             Button {
                 scrollCurrentTabToTop()
             } label: {
@@ -464,27 +443,10 @@ public struct AppTabView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("맨 위로")
             .position(x: frame.midX, y: frame.midY)
-            .transition(.asymmetric(
-                // 화면 아래 가장자리 밖에서 제자리로 올라온다.
-                insertion: .modifier(
-                    active: CircleSlotModifier(offset: CGSize(width: 0, height: size.height - frame.minY + 24), scale: 1, opacity: 1),
-                    identity: CircleSlotModifier(offset: .zero, scale: 1, opacity: 1)
-                ),
-                removal: circleTransition(circleExit, toSlot: toSlot)
-            ))
-        }
-    }
-
-    /// 사라지는 움직임 — 제자리: 살짝 작아지며 흐려진다. 칸: 탭 바의 맨 위로 칸 아이콘 자리로 작아지며 들어간다.
-    private func circleTransition(_ motion: CircleMotion, toSlot: CGSize) -> AnyTransition {
-        switch motion {
-        case .inPlace:
-            return .scale(scale: 0.85).combined(with: .opacity)
-        case .slot:
-            return .modifier(
-                active: CircleSlotModifier(offset: toSlot, scale: 0.5, opacity: 0),
+            .transition(.modifier(
+                active: belowEdge,
                 identity: CircleSlotModifier(offset: .zero, scale: 1, opacity: 1)
-            )
+            ))
         }
     }
 
@@ -555,7 +517,7 @@ public struct AppTabView: View {
     }
 }
 
-/// 맨 위로 동그라미가 탭 바 칸으로 들어가고 나오는 움직임(#267)
+/// 맨 위로 동그라미가 화면 아래에서 올라오고 내려가는 움직임(#267)
 private struct CircleSlotModifier: ViewModifier {
     let offset: CGSize
     let scale: CGFloat
