@@ -35,6 +35,9 @@ public struct CommunityDetailFeature: Sendable {
         var hasError: Bool = false
         // 웹 프로세스가 죽어 글쓰기 · 수정 화면의 작성 내용이 사라짐(#352). 오류 화면에 함께 알린다.
         var hasLostDraft = false
+        // 글쓰기 · 수정으로 연 웹뷰의 프로세스가 죽음(#352). 등록 뒤엔 같은 웹뷰가 상세로 바뀌어(router.replace)
+        // 다시 불러오면 처음 연 글쓰기 주소가 빈 화면으로 열려 같은 글을 또 올리게 될 수 있어, 재시도 없이 뒤로가기만 둔다.
+        var hidesRetry = false
         // 웹이 PAGE_READY를 보내 웹 헤더의 뒤로가기와 BACK_PRESSED 응답이 살아 있음(#352).
         // 404 · 오류 화면은 보내지 않는다 — 그런 화면에서 스와이프를 웹에 넘기면 아무도 답하지 않아 갇힌다.
         var isPageReady = false
@@ -192,6 +195,7 @@ public struct CommunityDetailFeature: Sendable {
         Reduce { state, action in
             switch action {
             case .view(.retryTapped):
+                guard !state.hidesRetry else { return .none }
                 state.hasError = false
                 state.hasLostDraft = false
                 state.isLoading = true
@@ -293,7 +297,9 @@ public struct CommunityDetailFeature: Sendable {
 
             case .internal(.webProcessTerminated):
                 // 죽은 웹은 BACK_PRESSED에도, 떠 있는 알럿 · 시트 결과에도 답하지 않는다 — 가드를 풀고 오류 화면(뒤로가기 · 재시도)으로 돌린다.
-                state.hasLostDraft = State.isWriteOrEditScreen(state.url)
+                // 쓰던 내용이 있었는지는 처음 연 주소가 아니라 가드로 본다 — 등록 뒤 상세로 바뀌었거나 빈 글쓰기면 웹이 가드를 껐다.
+                state.hasLostDraft = state.leaveGuardEnabled && state.isPageReady
+                state.hidesRetry = State.isWriteOrEditScreen(state.url)
                 state.leaveGuardEnabled = false
                 state.isPageReady = false
                 state.isLoading = false

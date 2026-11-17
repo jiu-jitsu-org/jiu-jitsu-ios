@@ -160,13 +160,15 @@ public struct CommunityDetailView: View {
                         .foregroundStyle(Color.component.errorState.default.descriptionText)
                 }
             }
-            Button {
-                store.send(.view(.retryTapped))
-            } label: {
-                AppButtonConfiguration(title: "재시도", size: .medium)
+            if !store.hidesRetry {
+                Button {
+                    store.send(.view(.retryTapped))
+                } label: {
+                    AppButtonConfiguration(title: "재시도", size: .medium)
+                }
+                .appButtonStyle(.neutral, size: .medium)
+                .frame(height: 38)
             }
-            .appButtonStyle(.neutral, size: .medium)
-            .frame(height: 38)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.component.background.default)
