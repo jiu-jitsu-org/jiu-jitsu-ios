@@ -49,6 +49,8 @@ struct BeltPromotionView: View {
     @State private var isShown = false
     @State private var isStripeAdded = false
     @State private var isClosing = false
+    /// 등장 페이드가 끝나 장면이 다 보인 뒤에만 닫기가 눌리고 VoiceOver에 잡힌다.
+    @State private var isCloseEnabled = false
 
     private enum Metrics {
         // 캐릭터는 화면 높이의 절반, 최대 400pt. 참가 그림을 세로 1200px(=400pt@3x)로 다시 뽑아 늘리지 않고 그린다(#285).
@@ -106,8 +108,9 @@ struct BeltPromotionView: View {
             if reduceMotion {
                 isShown = true
                 isStripeAdded = true
+                isCloseEnabled = true
             } else {
-                withAnimation(Motion.appear) { isShown = true }
+                withAnimation(Motion.appear) { isShown = true } completion: { isCloseEnabled = true }
                 withAnimation(Motion.stripe) { isStripeAdded = true }
             }
         }
@@ -128,7 +131,9 @@ struct BeltPromotionView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .allowsHitTesting(isCloseEnabled)
         .accessibilityLabel("닫기")
+        .accessibilityHidden(!isCloseEnabled)
     }
 
     private func title(_ text: String) -> some View {
