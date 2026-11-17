@@ -441,17 +441,16 @@ private struct NicknameEditRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
-            if isOwner {
-                Assets.MyProfile.Icon.badgeCheckLight.swiftUIImage
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 24, height: 24)
-                    .padding(.trailing, 5)
-            }
-
-            // 닉네임 텍스트도 수정 진입 영역(정책 2.1, #66). 글자·연필 사이 빈틈을 누르면 바탕(배경 고르기)이 받지 않게 한 버튼으로 묶는다.
+            // 닉네임 텍스트도 수정 진입 영역(정책 2.1, #66). 뱃지·글자·연필 사이 빈틈을 누르면 바탕(배경 고르기)이 받지 않게 한 버튼으로 묶는다.
             Button(action: onEditTapped) {
                 HStack(spacing: 0) {
+                    if isOwner {
+                        Assets.MyProfile.Icon.badgeCheckLight.swiftUIImage
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 24, height: 24)
+                            .padding(.trailing, 5)
+                    }
                     Text(nickname)
                         .font(Font.pretendard.title3)
                         .foregroundStyle(foreground)
@@ -517,12 +516,11 @@ private struct EditPencil: View {
 }
 
 private extension View {
-    /// 보이는 줄 높이는 그대로 두고 누르는 자리만 위아래로 넓힌다(44pt 남짓) — 줄 사이를 눌러도 배경 고르기가 열리지 않게.
+    /// 보이는 자리는 그대로 두고 누르는 자리를 왼쪽으로 8pt 넓힌다. 높이는 연필 칸(32pt)이 이미 채운다 —
+    /// 위아래로 넓히면 닉네임·도장 두 줄의 누르는 자리가 겹쳐 아래 줄이 위 줄 글자 아래쪽을 가로챈다.
     func editRowHitArea() -> some View {
-        padding(.vertical, 8)
-            .padding(.leading, 8)
+        padding(.leading, 8)
             .contentShape(Rectangle())
-            .padding(.vertical, -8)
             .padding(.leading, -8)
     }
 }
