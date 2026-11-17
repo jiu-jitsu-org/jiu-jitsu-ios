@@ -288,8 +288,11 @@ private struct ProfileImageView: View {
     var showsCameraButton: Bool = true
     let onCameraTapped: () -> Void
 
-    /// 사진·링을 누를 때마다 링이 커지며 다시 두 바퀴 돈다(#338). 카메라 버튼은 위에 겹친 따로 된 버튼이라 올리지 않는다.
+    /// 사진·링을 누를 때마다 링이 커지며 다시 두 바퀴 돈다(#338). 사진 아래 수정 띠는 따로 된 버튼이라 누르면 링을 올리지 않는다.
     @State private var replayTrigger = 0
+
+    /// 서버 사진이 실제로 그려진 주소. 불러오는 중·실패면 이 주소와 달라 수정 띠를 옅은 회색으로 둔다.
+    @State private var loadedPhotoURL: URL?
 
     var body: some View {
         MyBeltRingView(
@@ -309,22 +312,23 @@ private struct ProfileImageView: View {
                     busyOverlay
                 }
             }
-        }
-        .contentShape(Circle())
-        .onTapGesture { replayTrigger += 1 }
-        // VoiceOver에서도 같은 다시 보기를 실행한다. 동작 줄이기에선 MyBeltRingView가 움직이지 않는다.
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("띠 링 다시 보기")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { replayTrigger += 1 }
-        // 오른쪽 아래(135°)는 링의 띠 끝 칸·그랄 자리라, 카메라 버튼은 거울 자리인 왼쪽 아래에 둔다.
-        .overlay(alignment: .bottomLeading) {
-            if showsCameraButton {
-                // 터치 영역 44 — 보이는 버튼(36)은 링 모서리 그대로 두고 바깥으로 4씩 넓힌다.
-                cameraButton
-                    .offset(x: -4, y: 4)
+            // VoiceOver에선 사진만 '다시 보기' 버튼으로 읽는다. 수정 띠는 아래 overlay라 따로 읽힌다.
+            // 동작 줄이기에선 MyBeltRingView가 움직이지 않는다.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("띠 링 다시 보기")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { replayTrigger += 1 }
+            // 사진 원 안쪽 아래를 띠로 덮는다 — MyBeltRingView가 사진을 원으로 잘라 링·틈은 덮지 않고,
+            // 다시 보기로 커질 때도 사진과 함께 커진다(#340).
+            .overlay(alignment: .bottom) {
+                if showsCameraButton {
+                    cameraButton
+                }
             }
         }
+        // 띠 위를 누르면 띠 버튼만 반응하고, 그 밖의 사진·링을 누르면 링이 다시 돈다.
+        .contentShape(Circle())
+        .onTapGesture { replayTrigger += 1 }
     }
 
     @ViewBuilder
@@ -344,6 +348,7 @@ private struct ProfileImageView: View {
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
+                        .onAppear { loadedPhotoURL = url }
                 case .empty, .failure:
                     pendingPreviewOrDefault
                 @unknown default:
@@ -390,22 +395,35 @@ private struct ProfileImageView: View {
             .frame(width: iconSize, height: iconSize)
     }
 
+    /// 사진이 실제로 그려졌는지(서버 사진을 다 불러왔거나 방금 고른 사진이 있음).
+    /// 아니면(불러오는 중·실패·기본 아이콘) 띠를 반투명 검정 대신 옅은 회색 면으로 깔아, 흰 바탕 위에서 탁해 보이지 않게 한다.
+    private var hasPhoto: Bool {
+        if isDeleting { return false }
+        if pendingImageData != nil { return true }
+        guard let profileImageUrl, let url = URL(string: profileImageUrl) else { return false }
+        return loadedPhotoURL == url
+    }
+
+    // 사진 아래 26 높이를 띠로 덮고 카메라를 얹는다(사진 원 밖으로 나가지 않아 떠 보이지 않는다, #340).
+    // 누르는 칸은 띠를 포함한 아래 44 전체. 사진을 올리거나 지우는 중엔 사진과 같이 흐리게 두고 누를 수 없다.
     private var cameraButton: some View {
         Button(action: onCameraTapped) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.component.button.neutral.defaultBg)
-                    .frame(width: 36, height: 36)
-
-                Assets.MyProfile.Icon.camera.swiftUIImage
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 20, height: 20)
-            }
-            .frame(width: 44, height: 44)
-            .contentShape(Rectangle())
+            Assets.MyProfile.Icon.camera.swiftUIImage
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 16, height: 16)
+                .foregroundStyle(hasPhoto ? Color.semantic.icon.onOverlay : Color.semantic.icon.secondary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 26)
+                .background(hasPhoto ? Color.semantic.overlay.scrim : Color.semantic.surface.tertiary)
+                .frame(height: 44, alignment: .bottom)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(isBusy)
+        .opacity(isBusy ? 0.6 : 1.0)
+        .animation(.easeInOut(duration: 0.2), value: isBusy)
         .accessibilityLabel("프로필 사진 수정")
     }
 }
