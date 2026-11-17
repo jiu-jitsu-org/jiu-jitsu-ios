@@ -312,6 +312,11 @@ private struct ProfileImageView: View {
         }
         .contentShape(Circle())
         .onTapGesture { replayTrigger += 1 }
+        // VoiceOver에서도 같은 다시 보기를 실행한다. 동작 줄이기에선 MyBeltRingView가 움직이지 않는다.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("띠 링 다시 보기")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { replayTrigger += 1 }
         // 오른쪽 아래(135°)는 링의 띠 끝 칸·그랄 자리라, 카메라 버튼은 거울 자리인 왼쪽 아래에 둔다.
         .overlay(alignment: .bottomLeading) {
             if showsCameraButton {
