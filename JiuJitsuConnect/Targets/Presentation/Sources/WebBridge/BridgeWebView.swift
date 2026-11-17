@@ -536,6 +536,9 @@ struct BridgeWebView: UIViewRepresentable {
                 default: break
                 }
             }
+            // 이 웹뷰 위에 화면을 쌓는 요청이면 쌓기 전에 키보드를 내린다(#329). 그대로 두면 push가 시작된 뒤
+            // 웹뷰가 창에서 떨어질 때(#327) 키보드가 내려가, 그 애니메이션에 들어오는 화면이 섞여 비스듬히 들어온다.
+            if inbound.stacksScreenOverWebView { webView?.endEditing(true) }
             onBridgeMessage(inbound)
         }
 
@@ -720,6 +723,16 @@ struct BridgeWebView: UIViewRepresentable {
                 return
             }
             presenter.present(viewController, animated: true)
+        }
+    }
+}
+
+private extension WebBridgeInboundMessage {
+    /// 이 웹뷰 위에 네이티브 화면(회원 프로필 · 서브뷰)을 쌓는 요청인지.
+    var stacksScreenOverWebView: Bool {
+        switch self {
+        case .openUserProfile, .openSubview: true
+        default: false
         }
     }
 }
