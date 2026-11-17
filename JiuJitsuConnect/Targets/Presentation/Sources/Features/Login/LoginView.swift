@@ -87,7 +87,7 @@ public struct LoginView: View {
             Button(action: { store.send(.view(.googleButtonTapped)) }) {
                 SocialLoginButton(
                     asset: Assets.Login.Logo.google,
-                    text: "구글로 계속하기",
+                    text: "Google로 계속하기",
                     backgroundColor: Color.primitive.google.bg,
                     foregroundColor: Color.primitive.google.text,
                     borderColor: Color.primitive.coolGray.cg75
@@ -97,7 +97,7 @@ public struct LoginView: View {
             Button(action: { store.send(.view(.appleButtonTapped)) }) {
                 SocialLoginButton(
                     asset: Assets.Login.Logo.apple,
-                    text: "애플로 계속하기",
+                    text: "Apple로 계속하기",
                     backgroundColor: Color.primitive.apple.bg,
                     foregroundColor: Color.primitive.apple.text
                 )
