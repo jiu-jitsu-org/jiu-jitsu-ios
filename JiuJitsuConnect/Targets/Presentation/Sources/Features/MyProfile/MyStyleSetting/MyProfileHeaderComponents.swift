@@ -41,7 +41,8 @@ public struct MyProfileHeaderView: View {
 
     let onNicknameEditTapped: () -> Void
     let onGymInfoTapped: () -> Void
-    let onMoreButtonTapped: () -> Void
+    /// "..." 메뉴의 '관장 사범 인증'을 고름.
+    let onInstructorVerificationTapped: () -> Void
     let onProfileImageEditTapped: () -> Void
     let onSettingsTapped: () -> Void
     /// 헤더 빈 바탕을 누르면 무늬 고르기 시트를 연다(#320). 띠가 없으면 무늬가 없어 열지 않는다.
@@ -70,7 +71,7 @@ public struct MyProfileHeaderView: View {
         isProfileImageBusy: Bool = false,
         onNicknameEditTapped: @escaping () -> Void,
         onGymInfoTapped: @escaping () -> Void,
-        onMoreButtonTapped: @escaping () -> Void,
+        onInstructorVerificationTapped: @escaping () -> Void,
         onProfileImageEditTapped: @escaping () -> Void,
         onSettingsTapped: @escaping () -> Void = {},
         onBackgroundTapped: @escaping () -> Void = {},
@@ -92,7 +93,7 @@ public struct MyProfileHeaderView: View {
         self.isProfileImageBusy = isProfileImageBusy
         self.onNicknameEditTapped = onNicknameEditTapped
         self.onGymInfoTapped = onGymInfoTapped
-        self.onMoreButtonTapped = onMoreButtonTapped
+        self.onInstructorVerificationTapped = onInstructorVerificationTapped
         self.onProfileImageEditTapped = onProfileImageEditTapped
         self.onSettingsTapped = onSettingsTapped
         self.onBackgroundTapped = onBackgroundTapped
@@ -232,8 +233,10 @@ public struct MyProfileHeaderView: View {
     private var topTrailingButtons: some View {
         HStack(spacing: 4) {
             if !isGuest {
-                Button {
-                    onMoreButtonTapped()
+                // 시스템 메뉴라 바깥을 누르거나 스크롤 · 탭을 옮기면 닫히고 VoiceOver도 메뉴로 읽는다(#399).
+                // 직접 그린 오버레이는 "..."를 다시 눌러야만 닫혔다.
+                Menu {
+                    Button("관장 사범 인증") { onInstructorVerificationTapped() }
                 } label: {
                     Assets.MyProfile.Icon.menu.swiftUIImage
                         .renderingMode(.template)
@@ -244,6 +247,7 @@ public struct MyProfileHeaderView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("더 보기")
             }
 
             if showsSettingsButton {
@@ -543,7 +547,7 @@ private extension View {
         safeAreaTop: 47,
         onNicknameEditTapped: { },
         onGymInfoTapped: { },
-        onMoreButtonTapped: { },
+        onInstructorVerificationTapped: { },
         onProfileImageEditTapped: { }
     )
     .background(Color.component.background.default)
@@ -559,7 +563,7 @@ private extension View {
         isOwner: true,
         onNicknameEditTapped: { },
         onGymInfoTapped: { },
-        onMoreButtonTapped: { },
+        onInstructorVerificationTapped: { },
         onProfileImageEditTapped: { }
     )
     .background(Color.component.background.default)
@@ -574,7 +578,7 @@ private extension View {
         safeAreaTop: 47,
         onNicknameEditTapped: { },
         onGymInfoTapped: { },
-        onMoreButtonTapped: { },
+        onInstructorVerificationTapped: { },
         onProfileImageEditTapped: { }
     )
     .background(Color.component.background.default)
@@ -594,7 +598,7 @@ private extension View {
                     safeAreaTop: 47,
                     onNicknameEditTapped: { },
                     onGymInfoTapped: { },
-                    onMoreButtonTapped: { },
+                    onInstructorVerificationTapped: { },
                     onProfileImageEditTapped: { }
                 )
                 

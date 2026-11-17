@@ -57,9 +57,6 @@ public struct MyProfileFeature: Sendable {
         /// 축하 장면이 실제로 떠서 링이 가려진 동안 돌지 않고, 장면을 닫아 MY가 다시 보이면 그때 한 번 돈다(#339).
         var isBeltEntranceAfterPromotion = false
         
-        // 우측 상단 "..." 메뉴 노출 여부 (관장 사범 인증 메뉴)
-        var isMoreMenuPresented: Bool = false
-
         // 관장 사범 인증 업로드(토큰 발급 → ImageKit 업로드 → PUT /api/user/owner) 진행 중.
         // 동안 로딩 오버레이로 화면 터치를 막아 중복 제출을 차단한다(#62).
         var isUploadingInstructorVerification: Bool = false
@@ -196,8 +193,7 @@ public struct MyProfileFeature: Sendable {
             case deleteCompetitionConfirmed([Competition])  // 대회 시트에서 삭제 확인 (그 대회의 부문 전부)
             case competitionPinToggled([Competition])  // 대회 줄 시트 '맨 위에 고정'/'고정 해제' — 묶인 부문 전부 (#124)
             case competitionsReordered([[Competition]])  // 대회 줄을 끌어 옮기고 '완료' — 순서가 바뀐 묶음(고정/고정 안 함)의 줄별 부문들, 위에서부터 (#204)
-            case moreButtonTapped                   // 우측 상단 "..." 버튼 탭 (토글)
-            case instructorVerificationMenuTapped   // "관장 사범 인증" 메뉴 항목 탭
+            case instructorVerificationMenuTapped   // "..." 메뉴의 "관장 사범 인증" 탭
             case imagePicked(Data)                  // 카메라/앨범 픽커에서 이미지 선택됨
             case imagePickerCancelled               // 픽커 취소 (시스템 dismiss 포함)
             case profileImageEditButtonTapped       // 프로필 이미지 우측 하단 카메라 버튼 탭
@@ -826,7 +822,6 @@ public struct MyProfileFeature: Sendable {
             case .view(.settingsButtonTapped):
                 // 연타로 설정이 두 번 쌓이지 않게 한다.
                 if case .settings? = state.path.last { return .none }
-                state.isMoreMenuPresented = false
                 state.path.append(.settings(SettingsFeature.State(authInfo: state.authInfo)))
                 return .none
 
@@ -1078,12 +1073,7 @@ public struct MyProfileFeature: Sendable {
                 )
                 return .none
 
-            case .view(.moreButtonTapped):
-                state.isMoreMenuPresented.toggle()
-                return .none
-
             case .view(.instructorVerificationMenuTapped):
-                state.isMoreMenuPresented = false
                 guard !state.isUploadingInstructorVerification else { return .none }
                 // 역할이 OWNER인데 신청 기록이 없는 회원(승인 API 이전에 권한을 받은 경우)도 완료로 본다.
                 // 기록이 있으면 서버 상태를 그대로 따른다.

@@ -18,11 +18,6 @@ private enum Metrics {
         static let overlapWithButton: CGFloat = 46.49
         static let overlapWithAcademyName: CGFloat = 71
     }
-    // "..." 메뉴 오른쪽 끝을 "..." 버튼에 맞춘다. 옆에 톱니바퀴(32 + 간격 4)가 있으면 그만큼 안쪽으로(#241).
-    enum MoreMenu {
-        static let trailing: CGFloat = 16
-        static let trailingWithSettings: CGFloat = 16 + 32 + 4
-    }
 }
 
 // MARK: - MyProfileView
@@ -111,28 +106,12 @@ public struct MyProfileView: View {
                 ? Metrics.Card.overlapWithAcademyName
                 : Metrics.Card.overlapWithButton
 
-            // 메뉴는 헤더 위 overlay로 부착해 스크롤에 따라 함께 이동한다.
-            // ("..." 버튼 탭으로만 토글되며 외부 탭 dismiss는 없음)
             ScrollView(showsIndicators: false) {
                 ZStack(alignment: .bottom) {
                     // 메인 콘텐츠
                     VStack(spacing: 0) {
-                        // 1. 헤더 영역 — "..." 메뉴는 헤더 우상단에 오버레이
+                        // 1. 헤더 영역 — "..." 메뉴는 헤더의 시스템 메뉴(#399)
                         headerView(safeAreaTop: safeAreaTop)
-                            .overlay(alignment: .topTrailing) {
-                                if store.isMoreMenuPresented {
-                                    MyProfileMoreMenuView(
-                                        onInstructorVerificationTapped: {
-                                            store.send(.view(.instructorVerificationMenuTapped))
-                                        }
-                                    )
-                                    // "..." 버튼(safeAreaTop + 12 ~ safeAreaTop + 44) 하단에 간격 없이 붙임
-                                    // 우측은 버튼 trailing(16)과 동일하게 정렬
-                                    .padding(.top, safeAreaTop + 44)
-                                    .padding(.trailing, store.isPushed ? Metrics.MoreMenu.trailing : Metrics.MoreMenu.trailingWithSettings)
-                                    .transition(.opacity)
-                                }
-                            }
                             .zIndex(0)
 
                         // 2. 벨트 카드
@@ -183,7 +162,6 @@ public struct MyProfileView: View {
                 store.send(.view(.onAppear))
             }
             .background(Color.component.background.default)
-            .animation(.easeInOut(duration: 0.15), value: store.isMoreMenuPresented)
             .ignoresSafeArea(edges: .top)
             .navigationDestinations(store: $store)
             .uploadingOverlay(isPresented: store.isUploadingInstructorVerification)
@@ -267,7 +245,7 @@ public struct MyProfileView: View {
                 && (store.pendingProfileImageData != nil || store.isProfileImageDeleting),
             onNicknameEditTapped: { store.send(.view(.nicknameEditButtonTapped)) },
             onGymInfoTapped: { store.send(.view(.gymInfoButtonTapped)) },
-            onMoreButtonTapped: { store.send(.view(.moreButtonTapped)) },
+            onInstructorVerificationTapped: { store.send(.view(.instructorVerificationMenuTapped)) },
             onProfileImageEditTapped: { store.send(.view(.profileImageEditButtonTapped)) },
             onSettingsTapped: { store.send(.view(.settingsButtonTapped)) },
             onBackgroundTapped: { isPatternSheetPresented = true },

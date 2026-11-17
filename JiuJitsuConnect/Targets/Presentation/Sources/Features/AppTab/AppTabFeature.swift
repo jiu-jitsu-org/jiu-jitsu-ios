@@ -666,7 +666,6 @@ public struct AppTabFeature: Sendable {
                     // 비로그인 MY에서 열어 둔 설정 등은 닫고, 같은 MY를 로그인 상태로 보인다(#242).
                     // 웹발 로그인이어도 닫는다 — 비로그인으로 연 설정이 남으면 로그인했는데도 '로그인' 줄만 보인다.
                     state.myPage.path.removeAll()
-                    state.myPage.isMoreMenuPresented = false
                     if !cameFromWeb {
                         state.selectedTab = isSignup ? .home : .myPage
                     }
