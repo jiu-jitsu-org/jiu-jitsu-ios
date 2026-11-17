@@ -21,10 +21,17 @@ struct MyBeltRingView<Content: View>: View {
     let beltStripe: BeltStripe?
     /// 오를 때마다 등장 움직임을 한 번 한다. 언제 올릴지는 MyProfileFeature가 정한다(세션 첫 MY · 띠 바꾼 직후).
     var entranceTrigger: Int = 0
+    /// 오를 때마다 다시 보기 움직임을 한 번 한다(#338) — 사진을 눌렀을 때. 움직이는 중이면 처음부터 다시 하지 않고 무시한다.
+    var replayTrigger: Int = 0
     @ViewBuilder let content: Content
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var spinToken = 0
+    /// 마지막으로 시작한 움직임. 다른 화면에서 돌아와 뷰가 다시 나타나면 task가 같은 토큰으로 다시 도는데, 이미 한 움직임은 다시 하지 않는다.
+    @State private var playedSpinToken = 0
+    @State private var spinKind = SpinKind.entrance
+    /// 움직임을 시작한 때. 끝나기 전 다시 누르면 무시하는 데 쓴다.
+    @State private var spinStartedAt: Date?
     /// 움직임 경과 시간(ms). 0 → total로 선형 애니메이션하고, 곡선은 매 프레임 Motion.frame이 계산한다.
     @State private var spinTime = Motion.total
 
@@ -35,24 +42,35 @@ struct MyBeltRingView<Content: View>: View {
                 .clipShape(Circle())
 
             ring
-                .modifier(SpinRotation(time: spinTime))
+                .modifier(SpinRotation(time: spinTime, kind: spinKind))
                 .allowsHitTesting(false)
         }
         .frame(width: Ring.box, height: Ring.box)
-        .modifier(SpinScale(time: spinTime))
+        .modifier(SpinScale(time: spinTime, kind: spinKind))
         .onChange(of: entranceTrigger) { _, _ in
             guard !reduceMotion else { return }
+            spinKind = .entrance
+            spinToken += 1
+        }
+        .onChange(of: replayTrigger) { _, _ in
+            guard !reduceMotion else { return }
+            if let spinStartedAt, Date.now.timeIntervalSince(spinStartedAt) < Motion.total / 1000 { return }
+            spinKind = .replay
             spinToken += 1
         }
         .task(id: spinToken) {
-            guard spinToken > 0 else { return }
+            guard spinToken > playedSpinToken else { return }
+            playedSpinToken = spinToken
+            spinStartedAt = .now
             var reset = Transaction()
             reset.disablesAnimations = true
             withTransaction(reset) { spinTime = 0 }
             // 0으로 돌린 프레임이 한 번 그려진 뒤에 출발해야 처음부터 돈다.
             try? await Task.sleep(for: .milliseconds(16))
             guard !Task.isCancelled else { return }
-            withAnimation(.linear(duration: Motion.total / 1000)) { spinTime = Motion.total }
+            withAnimation(.linear(duration: Motion.total / 1000)) { spinTime = Motion.total } completion: {
+                spinKind = .entrance
+            }
         }
     }
 
@@ -146,39 +164,49 @@ private struct RingArc: Shape {
 
 // MARK: - Motion
 
+/// 세션 첫 MY·띠 바꾼 직후의 등장(웅크렸다 도는) 움직임과, 사진을 눌렀을 때의 다시 보기 움직임(#338).
+private enum SpinKind {
+    case entrance
+    case replay
+}
+
 /// 링만 돌린다. time을 선형으로 움직이고 각도는 곡선으로 매 프레임 계산한다.
 private struct SpinRotation: ViewModifier, Animatable {
     var time: Double
+    let kind: SpinKind
     var animatableData: Double {
         get { time }
         set { time = newValue }
     }
 
     func body(content: Content) -> some View {
-        content.rotationEffect(.degrees(Motion.frame(at: time).angle))
+        content.rotationEffect(.degrees(Motion.frame(at: time, kind: kind).angle))
     }
 }
 
 /// 사진과 링을 함께 키우고 줄인다.
 private struct SpinScale: ViewModifier, Animatable {
     var time: Double
+    let kind: SpinKind
     var animatableData: Double {
         get { time }
         set { time = newValue }
     }
 
     func body(content: Content) -> some View {
-        content.scaleEffect(Motion.frame(at: time).scale)
+        content.scaleEffect(Motion.frame(at: time, kind: kind).scale)
     }
 }
 
 /// 등장 움직임 — 시안(belt-kids6) `spinCore`를 그대로 옮겼다. 시간 단위는 ms.
 /// 0~0.14초 웅크림 → 1초까지 링이 천천히 출발해 빨라졌다 천천히 두 바퀴 → 제자리를 6° 지나쳤다 통통 멈춤.
+/// 다시 보기(#338)는 도는 곡선·시간이 같고, 웅크림 없이 가장 빨리 돌 때 1.12배까지 커졌다 돌아온다.
 private enum Motion {
     static let total: Double = 1400
     static let firstPhase: Double = 1000
+    static let replayPeakScale: Double = 0.12
 
-    static func frame(at elapsed: Double) -> (angle: Double, scale: Double) {
+    static func frame(at elapsed: Double, kind: SpinKind) -> (angle: Double, scale: Double) {
         guard elapsed < total else { return (0, 1) }
         let angle: Double
         let scale: Double
@@ -188,7 +216,9 @@ private enum Motion {
             let settle = elapsed - firstPhase
             angle = 6 * exp(-settle / 110) * cos(2 * .pi * settle / 360)
         }
-        if elapsed < 140 {
+        if kind == .replay, elapsed < firstPhase {
+            scale = 1 + replayPeakScale * sin(.pi * elapsed / firstPhase)
+        } else if elapsed < 140 {
             scale = 1 - 0.06 * sin(.pi / 2 * elapsed / 140)
         } else if elapsed < firstPhase {
             let progress = (elapsed - 140) / (firstPhase - 140)
