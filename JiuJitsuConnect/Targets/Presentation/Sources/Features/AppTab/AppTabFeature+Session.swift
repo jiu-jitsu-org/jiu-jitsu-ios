@@ -28,7 +28,8 @@ extension AppTabFeature {
         case .loginTapped:
             return .send(.internal(.showLoginModal))
         case .closeTapped, .dismissed:
-            return .none
+            // 그사이 웹이 로그인을 요청했으면(만료 직후 관심 등록 등) 그 행위를 버리게 한다.
+            return cancelPendingWebLogin(&state)
         }
     }
 

@@ -471,6 +471,8 @@ public struct AppTabFeature: Sendable {
                 
             // MARK: - Login Logic
             case .internal(.showLoginPromptAlert):
+                // 만료 안내가 이미 [로그인]을 묻고 있으면 겹쳐 띄우지 않는다. 웹의 대기 행위는 그 알럿의 결과를 따른다(#373).
+                guard !state.isSessionExpiredAlertPresented else { return .none }
                 state.isLoginPromptPresented = true
                 return .none
 
@@ -591,8 +593,10 @@ public struct AppTabFeature: Sendable {
                 state.isRefreshingWebToken = false
                 // refresh 토큰까지 만료 — 로컬 토큰만 정리하고 게스트로 전환한다(서버 세션은 이미 죽음).
                 // 서버에 토큰 연결을 지워 달라고 할 수 없으니, 이전 계정 푸시가 오지 않게 기기 토큰을 폐기한다(#269).
+                // 이미 게스트면(로그아웃 직후 웹이 늦게 갱신을 요청한 경우 등) 만료 안내를 띄우지 않는다 — 직접 로그아웃한 사람에게 '만료'는 거짓 안내다.
+                let wasLoggedIn = !state.authInfo.isGuest
                 Self.resetToGuest(&state)
-                state.isSessionExpiredAlertPresented = true
+                state.isSessionExpiredAlertPresented = wasLoggedIn
                 return .merge(
                     .run { _ in
                         await authClient.signOut()
