@@ -109,6 +109,9 @@ public final class DependencyContainer {
             },
             appleAuthorizationCodeForWithdrawal: {
                 try await self.authRepository.appleAuthorizationCodeForWithdrawal()
+            },
+            storedProvider: {
+                self.authRepository.storedProvider()
             }
         )
     }

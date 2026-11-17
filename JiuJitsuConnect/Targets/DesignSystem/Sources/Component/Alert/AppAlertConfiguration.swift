@@ -13,6 +13,8 @@ public struct AppAlertConfiguration {
     let message: String
     let primaryButton: Button
     let secondaryButton: Button?
+    /// 본문 최대 줄 수. 기본 3줄이고, 꼭 다 읽어야 하는 안내(탈퇴 등)는 nil로 줄 수 제한을 푼다(#398).
+    let messageLineLimit: Int?
 
     public struct Button {
         let title: String
@@ -34,14 +36,21 @@ public struct AppAlertConfiguration {
         case truncatable(String, suffix: String)
     }
 
-    public init(title: Title, message: String, primaryButton: Button, secondaryButton: Button?) {
+    public init(title: Title, message: String, primaryButton: Button, secondaryButton: Button?, messageLineLimit: Int? = 3) {
         self.title = title
         self.message = message
         self.primaryButton = primaryButton
         self.secondaryButton = secondaryButton
+        self.messageLineLimit = messageLineLimit
     }
 
-    public init(title: String, message: String, primaryButton: Button, secondaryButton: Button?) {
-        self.init(title: .plain(title), message: message, primaryButton: primaryButton, secondaryButton: secondaryButton)
+    public init(title: String, message: String, primaryButton: Button, secondaryButton: Button?, messageLineLimit: Int? = 3) {
+        self.init(
+            title: .plain(title),
+            message: message,
+            primaryButton: primaryButton,
+            secondaryButton: secondaryButton,
+            messageLineLimit: messageLineLimit
+        )
     }
 }

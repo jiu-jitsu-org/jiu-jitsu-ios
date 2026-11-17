@@ -55,6 +55,8 @@ public struct SettingsFeature: Sendable {
         public var toast: ToastState?
         // 탈퇴 요청이 서버에 가 있는 동안. MY 스택의 한 화면이라 닫히면 요청도 취소되므로(#241) 그동안 나가지 못하게 막는다.
         var isWithdrawing = false
+        // 탈퇴 알럿을 연 계정이 Apple 회원인지(#398). Apple은 탈퇴 직전 확인 창이 한 번 더 떠서 알럿에서 미리 알린다.
+        var isAppleWithdrawal = false
         // 문의 메일을 여는 중(#331). 빠르게 두 번 눌러도 메일 화면·토스트가 한 번만 뜨게 한다.
         var isOpeningInquiry = false
 
@@ -227,6 +229,7 @@ public struct SettingsFeature: Sendable {
                 return .none
 
             case .view(.withdrawalButtonTapped):
+                state.isAppleWithdrawal = authClient.storedProvider() == .apple
                 state.alert = .withdrawal
                 return .none
 
@@ -263,6 +266,10 @@ public struct SettingsFeature: Sendable {
             case let .internal(.withdrawalResponse(.failure(error))):
                 Log.trace("\(error)")
                 state.isWithdrawing = false
+                // Apple 확인 창을 닫으면 탈퇴가 멈춘다. 로그인 취소처럼 말없이 넘기면 탈퇴됐는지 알 수 없다(#398).
+                if case .signInCancelled? = error as? DomainError {
+                    return .send(.internal(.showToast(.init(message: "Apple 확인을 취소해 탈퇴하지 않았어요.", status: .info))))
+                }
                 return handleError(error)
 
             case .view(.alertDismissed):
