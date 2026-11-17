@@ -261,18 +261,17 @@ public final class DefaultNetworkService: NetworkService {
             throw CancellationError()
         }
 
-        // refresh 토큰 만료(403 A0003)·무효(401 A0009)·유형 불일치(400 A0002) 등 4xx만 세션 만료다.
-        // 5xx는 서버 쪽 일시 장애라 refresh 토큰을 버리지 않는다.
-        if (400...499).contains(httpResponse.statusCode) {
-            throw NetworkError.sessionExpired
-        }
-
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         decoder.dateDecodingStrategy = .iso8601
 
         guard (200...299).contains(httpResponse.statusCode) else {
+            // 서버가 세션 종료 코드(A0002 · A0003 · A0009 · U0002)를 보냈을 때만 세션 만료다(#373).
+            // 본문 없는 403 · 429처럼 서버 앞단(Cloudflare 등)이 막은 응답은 5xx처럼 일시 실패로 두어 토큰을 지킨다.
             let apiError = try? decoder.decode(APIErrorResponseDTO.self, from: data)
+            if let code = apiError.flatMap({ APIErrorCode(rawValue: $0.code) }), code.endsSession {
+                throw NetworkError.sessionExpired
+            }
             throw NetworkError.statusCodeError(statusCode: httpResponse.statusCode, response: apiError)
         }
 

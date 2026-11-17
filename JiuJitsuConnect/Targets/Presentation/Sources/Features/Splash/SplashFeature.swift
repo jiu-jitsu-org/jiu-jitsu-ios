@@ -52,6 +52,8 @@ public struct SplashFeature: Sendable {
     
     struct AutoLoginResult: Equatable {
         let authInfo: AuthInfo?
+        // 저장된 로그인이 만료로 끝남 — 로그인 화면에서 이유를 알린다(#373).
+        var isSessionExpired = false
     }
 
     public enum Action: Sendable {
@@ -70,12 +72,12 @@ public struct SplashFeature: Sendable {
 
         public enum InternalAction: Sendable {
             case minimumDisplayElapsed
-            case autoLoginFinished(AuthInfo?)
+            case autoLoginFinished(AuthInfo?, isSessionExpired: Bool = false)
             case versionChecked(AppUpdateRequirement)
         }
 
         public enum DelegateAction: Sendable {
-            case finishedLaunch(authInfo: AuthInfo?)
+            case finishedLaunch(authInfo: AuthInfo?, isSessionExpired: Bool)
             // 꼭 필요한 업데이트 — 스플래시에서 넘어가지 않고, 부모가 닫을 수 없는 안내를 띄운다(#326).
             case updateRequired
         }
@@ -146,7 +148,8 @@ public struct SplashFeature: Sendable {
                         await send(.internal(.autoLoginFinished(authInfo)))
                     case let .completed(.failure(error)):
                         Log.trace("⚠️ Auto login failed: \(error)", category: .debug, level: .error)
-                        await send(.internal(.autoLoginFinished(nil)))
+                        let isSessionExpired = if case let .apiError(code, _)? = error as? DomainError { code.endsSession } else { false }
+                        await send(.internal(.autoLoginFinished(nil, isSessionExpired: isSessionExpired)))
                     case .timedOut:
                         // 정책 문의 '자동 로그인 네트워크 실패 시 처리'(#21) 결정 전까지 네트워크 실패와 같게 처리한다.
                         // 저장된 토큰은 지우지 않는다(진행 중인 재발급이 끝나면 갱신됨).
@@ -166,8 +169,8 @@ public struct SplashFeature: Sendable {
                 state.isMinimumDisplaySatisfied = true
                 return finishIfReady(&state)
 
-            case let .internal(.autoLoginFinished(authInfo)):
-                state.autoLoginResult = AutoLoginResult(authInfo: authInfo)
+            case let .internal(.autoLoginFinished(authInfo, isSessionExpired)):
+                state.autoLoginResult = AutoLoginResult(authInfo: authInfo, isSessionExpired: isSessionExpired)
                 return finishIfReady(&state)
 
             case let .internal(.versionChecked(requirement)):
@@ -253,6 +256,6 @@ public struct SplashFeature: Sendable {
     private func finish(_ state: inout State) -> Effect<Action> {
         guard !state.hasFinished, let result = state.autoLoginResult else { return .none }
         state.hasFinished = true
-        return .send(.delegate(.finishedLaunch(authInfo: result.authInfo)))
+        return .send(.delegate(.finishedLaunch(authInfo: result.authInfo, isSessionExpired: result.isSessionExpired)))
     }
 }

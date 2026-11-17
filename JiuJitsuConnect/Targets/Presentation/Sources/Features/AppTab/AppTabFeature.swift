@@ -54,6 +54,8 @@ public struct AppTabFeature: Sendable {
         @Presents var loginCover: LoginFeature.State?
         // 게스트가 로그인이 필요한 행위(커뮤니티 글쓰기·대회 관심 등)를 할 때 노출되는 공통 AppAlert 표시 여부
         var isLoginPromptPresented: Bool = false
+        // 갱신 토큰 만료로 게스트가 됐음을 알림(#373). 로그아웃 · 탈퇴에는 띄우지 않는다.
+        var isSessionExpiredAlertPresented = false
         // 관심 대회 알림을 켰는데 기기 알림이 꺼져 있을 때 설정 앱으로 안내하는 AppAlert 표시 여부(#257)
         var isDeviceNotificationAlertPresented: Bool = false
         // 첫 글 · 댓글을 올린 뒤 알림 권한을 묻기 전 한 줄 안내(#333) 표시 여부
@@ -117,6 +119,7 @@ public struct AppTabFeature: Sendable {
             case deviceNotificationAlertDismissed
             // 알림 권한 안내(#333)의 [알림 받기] · [나중에] · 내려 닫기
             case notificationPrompt(NotificationPromptAction)
+            case sessionExpiredAlert(SessionExpiredAlertAction)
         }
 
         public enum InternalAction: Sendable {
@@ -468,6 +471,8 @@ public struct AppTabFeature: Sendable {
                 
             // MARK: - Login Logic
             case .internal(.showLoginPromptAlert):
+                // 만료 안내가 이미 [로그인]을 묻고 있으면 겹쳐 띄우지 않는다. 웹의 대기 행위는 그 알럿의 결과를 따른다(#373).
+                guard !state.isSessionExpiredAlertPresented else { return .none }
                 state.isLoginPromptPresented = true
                 return .none
 
@@ -509,6 +514,9 @@ public struct AppTabFeature: Sendable {
 
             case let .view(.notificationPrompt(action)):
                 return reduceNotificationPrompt(action, into: &state)
+
+            case let .view(.sessionExpiredAlert(action)):
+                return Self.reduceSessionExpiredAlert(action, into: &state)
 
             case .internal(.performWebLogout):
                 guard !state.isLoggingOut else { return .none }
@@ -585,7 +593,10 @@ public struct AppTabFeature: Sendable {
                 state.isRefreshingWebToken = false
                 // refresh 토큰까지 만료 — 로컬 토큰만 정리하고 게스트로 전환한다(서버 세션은 이미 죽음).
                 // 서버에 토큰 연결을 지워 달라고 할 수 없으니, 이전 계정 푸시가 오지 않게 기기 토큰을 폐기한다(#269).
+                // 이미 게스트면(로그아웃 직후 웹이 늦게 갱신을 요청한 경우 등) 만료 안내를 띄우지 않는다 — 직접 로그아웃한 사람에게 '만료'는 거짓 안내다.
+                let wasLoggedIn = !state.authInfo.isGuest
                 Self.resetToGuest(&state)
+                state.isSessionExpiredAlertPresented = wasLoggedIn
                 return .merge(
                     .run { _ in
                         await authClient.signOut()

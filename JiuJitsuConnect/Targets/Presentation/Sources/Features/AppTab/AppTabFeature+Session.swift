@@ -2,12 +2,37 @@
 //  AppTabFeature+Session.swift
 //  Presentation
 //
-//  게스트 전환(로그아웃 · 탈퇴 · 세션 만료)과 웹 세션 알림 도우미.
+//  게스트 전환(로그아웃 · 탈퇴 · 세션 만료)과 웹 세션 알림 도우미, 세션 만료 안내(#373).
 //
 
 import ComposableArchitecture
 
+/// 세션 만료 안내 문구(#373). 앱 사용 중 알럿과 앱을 열 때 로그인 화면 토스트가 같은 말을 쓴다.
+enum SessionExpiryNotice {
+    static let title = "로그인이 만료됐어요"
+    static let body = "다시 로그인해 주세요."
+    static let message = "\(title). \(body)"
+}
+
 extension AppTabFeature {
+    public enum SessionExpiredAlertAction: Sendable {
+        case loginTapped
+        case closeTapped
+        case dismissed
+    }
+
+    /// 어떤 소셜로 가입했는지 떠올리다 다른 버튼으로 새 계정을 만들지 않게, 만료됐다고 알리고 바로 로그인 창을 연다.
+    static func reduceSessionExpiredAlert(_ action: SessionExpiredAlertAction, into state: inout State) -> Effect<Action> {
+        state.isSessionExpiredAlertPresented = false
+        switch action {
+        case .loginTapped:
+            return .send(.internal(.showLoginModal))
+        case .closeTapped, .dismissed:
+            // 그사이 웹이 로그인을 요청했으면(만료 직후 관심 등록 등) 그 행위를 버리게 한다.
+            return cancelPendingWebLogin(&state)
+        }
+    }
+
     /// 로그아웃·탈퇴·세션 만료 — 게스트로 바꾸고 이전 계정의 화면을 정리한 뒤 홈으로 보낸다.
     static func resetToGuest(_ state: inout State) {
         state.authInfo = .guest
