@@ -223,6 +223,8 @@ struct BridgeWebView: UIViewRepresentable {
         (container as? KeyboardAvoidingWebContainer)?.tabBarObscuredBottom = context.environment.tabBarReservedHeight
         guard isActive else {
             context.coordinator.deactivate()
+            // 닫히는 동안 키보드가 내려가며 알리면 이미 스택에서 빠진 화면으로 간다.
+            (container as? KeyboardAvoidingWebContainer)?.onKeyboardVisibilityChanged = nil
             return
         }
         context.coordinator.update(
