@@ -140,8 +140,10 @@ public struct ProfileImageEditView: View {
     }
 
     private var cancelButton: some View {
+        // 긍정 행동이 아니라 닫기라 파란 면 대신 회색 면(대회 기록 시트와 같음)
         CTAButton(
             title: "취소",
+            type: .neutral,
             action: {
                 store.send(.view(.cancelTapped))
             }
