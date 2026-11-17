@@ -38,6 +38,9 @@ public struct CommunityDetailFeature: Sendable {
         // 글쓰기 · 수정으로 연 웹뷰의 프로세스가 죽음(#352). 등록 뒤엔 같은 웹뷰가 상세로 바뀌어(router.replace)
         // 다시 불러오면 처음 연 글쓰기 주소가 빈 화면으로 열려 같은 글을 또 올리게 될 수 있어, 재시도 없이 뒤로가기만 둔다.
         var hidesRetry = false
+        // 키보드가 떠 있음(댓글 · 답글을 쓰는 중). 보고 있는 글의 푸시로 다시 불러오지 않는다 —
+        // 웹은 쓰던 글자만 되살리고 답글 대상은 잊어 일반 댓글로 올라간다(#383). 당겨서 새로고침과 같은 기준(#432).
+        var isKeyboardVisible = false
         // 웹이 PAGE_READY를 보내 웹 헤더의 뒤로가기와 BACK_PRESSED 응답이 살아 있음(#352).
         // 404 · 오류 화면은 보내지 않는다 — 그런 화면에서 스와이프를 웹에 넘기면 아무도 답하지 않아 갇힌다.
         var isPageReady = false
@@ -143,6 +146,7 @@ public struct CommunityDetailFeature: Sendable {
             case loadingFinished
             case loadingFailed
             case webProcessTerminated
+            case keyboardVisibilityChanged(Bool)
             // 웹뷰가 AppBridge로 보내온 인바운드 메시지(WKScriptMessageHandler 경유).
             case bridgeMessageReceived(WebBridgeInboundMessage)
             // View가 outbox의 메시지를 evaluateJavaScript로 전달 완료했음을 통지.
@@ -197,12 +201,7 @@ public struct CommunityDetailFeature: Sendable {
         Reduce { state, action in
             switch action {
             case .view(.retryTapped):
-                guard !state.hidesRetry else { return .none }
-                state.hasError = false
-                state.hasLostDraft = false
-                state.isLoading = true
-                state.isAwaitingFirstResponse = true
-                state.loadToken = UUID()
+                Self.reload(&state)
                 return .none
 
             case .view(.backTapped):
@@ -295,6 +294,10 @@ public struct CommunityDetailFeature: Sendable {
                 state.isLoading = false
                 state.isAwaitingFirstResponse = false
                 state.hasError = true
+                return .none
+
+            case let .internal(.keyboardVisibilityChanged(isVisible)):
+                state.isKeyboardVisible = isVisible
                 return .none
 
             case .internal(.webProcessTerminated):
@@ -432,6 +435,18 @@ public struct CommunityDetailFeature: Sendable {
                 return .none
             }
         }
+    }
+
+    /// 같은 주소를 처음부터 다시 불러온다 — 다시 시도 버튼, 보고 있는 글의 푸시 · 링크(#383).
+    /// 쓰던 댓글은 웹이 이 웹뷰의 sessionStorage에 들고 있다가 되살린다.
+    /// 재시도 없이 뒤로가기만 두는 화면(#352)은 다시 불러오면 글쓰기 주소가 빈 화면으로 열려 건드리지 않는다.
+    static func reload(_ state: inout State) {
+        guard !state.hidesRetry else { return }
+        state.hasError = false
+        state.hasLostDraft = false
+        state.isLoading = true
+        state.isAwaitingFirstResponse = true
+        state.loadToken = UUID()
     }
 
     /// 부모가 전파한 세션 변화를 상세 웹뷰 상태에 반영한다.

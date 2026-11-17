@@ -35,6 +35,9 @@ final class KeyboardAvoidingWebContainer: UIView {
     var onScroll: (@MainActor (CGFloat, CGFloat, Bool) -> Void)?
     // 키보드가 떠 있는지. 고정 셸(상세)이 댓글을 쓰는 중에 당겨서 새로고침되지 않게 본다(#432).
     private(set) var isKeyboardVisible = false
+    // 키보드가 뜨고 내릴 때 알린다. 상세는 이 동안 보고 있는 글의 푸시로 다시 불러오지 않는다 —
+    // 다시 불러오면 답글 대상이 사라져 쓰던 답글이 일반 댓글로 올라간다(#383).
+    var onKeyboardVisibilityChanged: ((Bool) -> Void)?
 
     func pinWebView(_ webView: WKWebView) {
         self.webView = webView
@@ -83,6 +86,10 @@ final class KeyboardAvoidingWebContainer: UIView {
         // 탭 첫 화면은 떠 있는 탭 바 자리만큼 아래 안전 영역이 커져 있어(#267), 기기 자체의 아래 안전 영역과 견준다.
         let deviceBottomInset = window?.safeAreaInsets.bottom ?? safeAreaInsets.bottom
         let keyboardVisible = distanceFromBottom > deviceBottomInset + 8
+        if isKeyboardVisible != keyboardVisible, onKeyboardVisibilityChanged != nil {
+            // 레이아웃 도중에 상태를 바꾸면 SwiftUI 갱신과 겹치므로 다음 차례로 미룬다.
+            DispatchQueue.main.async { [weak self] in self?.onKeyboardVisibilityChanged?(keyboardVisible) }
+        }
         isKeyboardVisible = keyboardVisible
         if reportsTabBarAsObscured, let webView {
             let obscuredBottom = keyboardVisible || isSheetOpen ? 0 : tabBarObscuredBottom
