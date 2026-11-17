@@ -240,6 +240,7 @@ public struct MyProfileFeature: Sendable {
 
             // 프로필 이미지 수정 흐름 — 시트/풀스크린 전환 사이에 짧은 딜레이를 두고 발화
             case presentImageCaptureSource(State.ImageCaptureSource)
+            case cameraUnavailable
             case presentImageCrop(Data)
             // 관장 사범 인증 → 사진 첨부 시트로의 시트-시트 전환을 위한 딜레이 발화
             case presentImageEditSheet(ProfileImageEditFeature.Purpose, canDelete: Bool)
@@ -264,6 +265,7 @@ public struct MyProfileFeature: Sendable {
     @Dependency(\.communityClient) var communityClient
     @Dependency(\.imageUploadClient) var imageUploadClient
     @Dependency(\.imageClient) var imageClient
+    @Dependency(\.cameraAvailabilityClient) var cameraAvailabilityClient
     @Dependency(\.userClient) var userClient
     @Dependency(\.noticeClient) var noticeClient
     @Dependency(\.dismiss) var dismiss
@@ -1138,8 +1140,14 @@ public struct MyProfileFeature: Sendable {
                 // purpose는 picker→crop→업로드 파이프라인 분기에 필요하므로 시트가 살아있는
                 // 동안 별도 상태에 보관해둔다.
                 state.pendingImagePurpose = state.sheet?.profileImageEdit?.purpose ?? .profileImage
-                state.imageCaptureSource = .camera
-                return .none
+                // 카메라가 없는 기기에서 `.camera` picker를 띄우면 앱이 죽을 수 있다(#353)
+                return .run { send in
+                    if await cameraAvailabilityClient.isAvailable() {
+                        await send(.internal(.presentImageCaptureSource(.camera)))
+                    } else {
+                        await send(.internal(.cameraUnavailable))
+                    }
+                }
 
             case .sheet(.presented(.profileImageEdit(.delegate(.didSelectAlbum)))):
                 state.pendingImagePurpose = state.sheet?.profileImageEdit?.purpose ?? .profileImage
@@ -1187,6 +1195,12 @@ public struct MyProfileFeature: Sendable {
             case let .internal(.presentImageCaptureSource(source)):
                 state.imageCaptureSource = source
                 return .none
+
+            case .internal(.cameraUnavailable):
+                // 토스트가 시트에 가려지지 않게 시트를 닫고 알린다
+                state.sheet = nil
+                state.pendingImagePurpose = nil
+                return .send(.internal(.showToast(.init(message: "이 기기에서는 카메라를 쓸 수 없어요", status: .info))))
 
             case let .view(.imagePicked(data)):
                 // 사진 선택 완료 — picker dismiss + 액션 시트 정리.
