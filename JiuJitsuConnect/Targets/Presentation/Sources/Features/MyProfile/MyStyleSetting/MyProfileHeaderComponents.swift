@@ -405,7 +405,7 @@ private struct ProfileImageView: View {
     }
 
     // 사진 아래 26 높이를 띠로 덮고 카메라를 얹는다(사진 원 밖으로 나가지 않아 떠 보이지 않는다, #340).
-    // 누르는 칸은 띠를 포함한 아래 44 전체.
+    // 누르는 칸은 띠를 포함한 아래 44 전체. 사진을 올리거나 지우는 중엔 사진과 같이 흐리게 두고 누를 수 없다.
     private var cameraButton: some View {
         Button(action: onCameraTapped) {
             Assets.MyProfile.Icon.camera.swiftUIImage
@@ -421,6 +421,9 @@ private struct ProfileImageView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(isBusy)
+        .opacity(isBusy ? 0.6 : 1.0)
+        .animation(.easeInOut(duration: 0.2), value: isBusy)
         .accessibilityLabel("프로필 사진 수정")
     }
 }
