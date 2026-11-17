@@ -46,6 +46,8 @@ public struct MyProfileHeaderView: View {
     let onSettingsTapped: () -> Void
     /// 헤더 빈 바탕을 누르면 무늬 고르기 시트를 연다(#320). 띠가 없으면 무늬가 없어 열지 않는다.
     let onBackgroundTapped: () -> Void
+    /// 서버 사진이 실제로 그려짐(#157). 업로드 뒤 새 사진이 보이면 겹쳐 둔 로컬 미리보기를 걷는다.
+    let onProfileImageDisplayed: (String) -> Void
 
     /// 사진(링 포함) 위 여백 — safe area 아래. 무늬가 사진 가운데를 기준으로 그려져 함께 쓴다.
     private static let avatarTopSpacing: CGFloat = 57
@@ -71,7 +73,8 @@ public struct MyProfileHeaderView: View {
         onMoreButtonTapped: @escaping () -> Void,
         onProfileImageEditTapped: @escaping () -> Void,
         onSettingsTapped: @escaping () -> Void = {},
-        onBackgroundTapped: @escaping () -> Void = {}
+        onBackgroundTapped: @escaping () -> Void = {},
+        onProfileImageDisplayed: @escaping (String) -> Void = { _ in }
     ) {
         self.nickname = nickname
         self.academyName = academyName
@@ -93,6 +96,7 @@ public struct MyProfileHeaderView: View {
         self.onProfileImageEditTapped = onProfileImageEditTapped
         self.onSettingsTapped = onSettingsTapped
         self.onBackgroundTapped = onBackgroundTapped
+        self.onProfileImageDisplayed = onProfileImageDisplayed
     }
 
     private var foreground: Color { beltRank.myHeaderForeground }
@@ -116,7 +120,8 @@ public struct MyProfileHeaderView: View {
                     entranceTrigger: beltEntranceTrigger,
                     iconSize: 64,
                     showsCameraButton: !isGuest,
-                    onCameraTapped: onProfileImageEditTapped
+                    onCameraTapped: onProfileImageEditTapped,
+                    onRemoteImageDisplayed: onProfileImageDisplayed
                 )
 
                 if isGuest {
@@ -271,7 +276,8 @@ public struct MyProfileHeaderView: View {
 ///
 /// 표시 우선순위:
 /// 1. `isDeleting`이면 기본 아이콘 (삭제 진행 중 즉시 반영)
-/// 2. `pendingImageData`가 있으면 로컬 미리보기 (Optimistic Update)
+/// 2. `pendingImageData`가 있으면 로컬 미리보기 (Optimistic Update). 서버 사진 위에 겹쳐,
+///    업로드 중에는 예전 사진 대신 새 사진이 보이고 새 URL을 받아 오는 동안에도 깜빡이지 않는다(#157)
 /// 3. `profileImageUrl`이 유효한 http/https면 AsyncImage
 /// 4. 그 외 기본 아이콘
 ///
@@ -287,6 +293,7 @@ private struct ProfileImageView: View {
     let iconSize: CGFloat
     var showsCameraButton: Bool = true
     let onCameraTapped: () -> Void
+    let onRemoteImageDisplayed: (String) -> Void
 
     /// 사진·링을 누를 때마다 링이 커지며 다시 두 바퀴 돈다(#338). 사진 아래 수정 띠는 따로 된 버튼이라 누르면 링을 올리지 않는다.
     @State private var replayTrigger = 0
@@ -336,41 +343,41 @@ private struct ProfileImageView: View {
         if isDeleting {
             // 삭제 진행 중 — 헤더를 즉시 기본 상태로 전환
             defaultProfileIcon
-        } else if let profileImageUrl = profileImageUrl,
-                  let url = URL(string: profileImageUrl),
-                  url.scheme == "https" || url.scheme == "http" {
-            // 서버 URL이 있는 경로. 업로드 성공 직후엔 새 URL의 AsyncImage가 `.empty`로
-            // 시작하면서 잠깐 기본 아이콘이 깜빡일 수 있는데, 그 사이를 로컬 미리보기로 덮어
-            // 사용자에게는 무중단 전환처럼 보이도록 한다.
+        } else {
+            ZStack {
+                remoteImageOrDefault
+                if let data = pendingImageData, let uiImage = UIImage(data: data) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFill()
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var remoteImageOrDefault: some View {
+        if let profileImageUrl = profileImageUrl,
+           let url = URL(string: profileImageUrl),
+           url.scheme == "https" || url.scheme == "http" {
             AsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
                     image
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .onAppear { loadedPhotoURL = url }
+                        .scaledToFill()
+                        .onAppear {
+                            loadedPhotoURL = url
+                            onRemoteImageDisplayed(profileImageUrl)
+                        }
                 case .empty, .failure:
-                    pendingPreviewOrDefault
+                    defaultProfileIcon
                 @unknown default:
-                    pendingPreviewOrDefault
+                    defaultProfileIcon
                 }
             }
-        } else if let data = pendingImageData, let uiImage = UIImage(data: data) {
-            // URL이 아직 없거나(예: 최초 등록 진행 중) 비http인 경우 — 로컬 미리보기
-            Image(uiImage: uiImage)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-        } else {
-            defaultProfileIcon
-        }
-    }
-
-    @ViewBuilder
-    private var pendingPreviewOrDefault: some View {
-        if let data = pendingImageData, let uiImage = UIImage(data: data) {
-            Image(uiImage: uiImage)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
+            // URL이 바뀌면 새로 그려 새 사진이 보일 때 다시 알린다
+            .id(url)
         } else {
             defaultProfileIcon
         }

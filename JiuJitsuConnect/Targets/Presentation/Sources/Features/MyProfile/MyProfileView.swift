@@ -270,7 +270,8 @@ public struct MyProfileView: View {
             onMoreButtonTapped: { store.send(.view(.moreButtonTapped)) },
             onProfileImageEditTapped: { store.send(.view(.profileImageEditButtonTapped)) },
             onSettingsTapped: { store.send(.view(.settingsButtonTapped)) },
-            onBackgroundTapped: { isPatternSheetPresented = true }
+            onBackgroundTapped: { isPatternSheetPresented = true },
+            onProfileImageDisplayed: { store.send(.view(.profileImageDisplayed(url: $0))) }
         )
     }
     
