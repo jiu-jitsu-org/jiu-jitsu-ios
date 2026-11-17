@@ -53,6 +53,8 @@ public struct MyProfileFeature: Sendable {
         /// 띠 고르기 시트가 내려가는 중인지. 내려가는 중엔 덮개를 띄울 수 없어, 저장이 먼저 끝나면 pendingPromotion에 두었다가 다 내려간 뒤 띄운다.
         var isBeltSheetClosing = false
         var pendingPromotion: BeltPromotion?
+        /// 축하 장면에 가려 링이 안 보이는 동안 돌지 않고, 장면을 닫아 MY가 다시 보이면 그때 한 번 돈다(#339).
+        var isBeltEntranceAfterPromotion = false
         
         // 우측 상단 "..." 메뉴 노출 여부 (관장 사범 인증 메뉴)
         var isMoreMenuPresented: Bool = false
@@ -183,7 +185,7 @@ public struct MyProfileFeature: Sendable {
             case registerStyleButtonTapped
             case styleCardEditTapped(MyStyleSettingType)  // 프로필 스타일 카드 탭 → 해당 타입 수정 모드 진입
             case toastButtonTapped(ToastState.Action)
-            case beltPromotionDismissed     // 띠·그랄 축하 장면을 눌렀거나 시간이 다 됨 (#278, #286)
+            case beltPromotionDismissed     // 띠·그랄 축하 장면의 닫기(X)를 누름 (#278, #286, #339)
             case beltSheetDidDismiss        // 띠 고르기 시트가 다 내려감 (#278)
             case addCompetitionButtonTapped  // 대회 정보 추가 버튼 탭
             case competitionDetailTapped(Competition)  // 대회 정보 행 탭
@@ -518,6 +520,7 @@ public struct MyProfileFeature: Sendable {
                 state.isBeltSheetClosing = true
                 // 지난 저장에서 시트 닫힘을 기다리던 축하가 남아 있으면 이번 저장 뒤에 엉뚱하게 뜨지 않게 비운다.
                 state.pendingPromotion = nil
+                state.isBeltEntranceAfterPromotion = false
                 return .send(.internal(.saveBeltInfoOnly(rank: rank, stripe: stripe)))
                 
             case let .internal(.saveBeltInfoOnly(rank, stripe)):
@@ -709,6 +712,7 @@ public struct MyProfileFeature: Sendable {
                 // 더 높은 띠로 바꿨거나 같은 띠에서 그랄을 올렸으면 토스트 대신 축하 장면을 띄운다(#278, #286).
                 // 낮은 띠, 그랄을 내리거나 그대로 둔 경우는 그대로 토스트.
                 if let promotion = BeltPromotion(from: previousProfile, to: updatedProfile) {
+                    state.isBeltEntranceAfterPromotion = true
                     // 띠 시트가 아직 내려가는 중이면 새 화면을 띄울 수 없다 → 다 내려간 뒤(beltSheetDidDismiss) 띄운다
                     if state.isBeltSheetClosing {
                         state.pendingPromotion = promotion
@@ -782,6 +786,12 @@ public struct MyProfileFeature: Sendable {
 
             case .view(.beltPromotionDismissed):
                 state.promotion = nil
+                // 장면에 가려 미뤄 둔 링 움직임을 MY가 다시 보이는 지금 새 띠·그랄로 한 번 한다.
+                if state.isBeltEntranceAfterPromotion {
+                    state.isBeltEntranceAfterPromotion = false
+                    state.beltEntranceTrigger += 1
+                    state.hasPlayedBeltEntrance = true
+                }
                 return .none
 
             case .view(.beltSheetDidDismiss):
@@ -1374,8 +1384,10 @@ public struct MyProfileFeature: Sendable {
             Reduce { state, _ in
                 guard newBelt != nil else { return .none }
                 if oldBelt != nil {
-                    // 띠를 바꾼 직후
-                    state.beltEntranceTrigger += 1
+                    // 띠를 바꾼 직후 — 축하 장면이 덮으면 닫힌 뒤(beltPromotionDismissed)로 미룬다
+                    if !state.isBeltEntranceAfterPromotion {
+                        state.beltEntranceTrigger += 1
+                    }
                     state.hasPlayedBeltEntrance = true
                 } else if state.isWaitingBeltEntrance {
                     // 화면에 들어온 뒤 띠가 처음 도착(첫 조회·첫 등록)
