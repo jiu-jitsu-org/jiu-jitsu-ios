@@ -171,7 +171,8 @@ struct CompetitionActionSheetView: View {
     }
 
     private var cancelButton: some View {
-        CTAButton(title: "취소", action: onCancelTapped)
+        // 긍정 행동이 아니라 닫기라 파란 면 대신 회색 면
+        CTAButton(title: "취소", type: .neutral, action: onCancelTapped)
             .padding(.horizontal, Metrics.horizontalPadding)
             .padding(.top, 8)
             .padding(.bottom, 24)

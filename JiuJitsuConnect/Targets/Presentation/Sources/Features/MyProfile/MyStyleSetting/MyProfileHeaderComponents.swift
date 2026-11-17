@@ -448,36 +448,28 @@ private struct NicknameEditRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
-            if isOwner {
-                Assets.MyProfile.Icon.badgeCheckLight.swiftUIImage
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 24, height: 24)
-                    .padding(.trailing, 5)
-            }
-
-            // 닉네임 텍스트도 수정 진입 영역(정책 2.1, #66)
+            // 닉네임 텍스트도 수정 진입 영역(정책 2.1, #66). 뱃지·글자·연필 사이 빈틈을 누르면 바탕(배경 고르기)이 받지 않게 한 버튼으로 묶는다.
             Button(action: onEditTapped) {
-                Text(nickname)
-                    .font(Font.pretendard.title3)
-                    .foregroundStyle(foreground)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .minimumScaleFactor(0.8)
-            }
-            .buttonStyle(.plain)
-
-            Button(action: onEditTapped) {
-                ZStack {
-                    Assets.Common.Icon.pencil.swiftUIImage
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 16, height: 16)
-                        .foregroundStyle(foreground.opacity(0.35)) // 이름 글자보다 눈에 덜 띄게 — 연필은 보조 표시
+                HStack(spacing: 0) {
+                    if isOwner {
+                        Assets.MyProfile.Icon.badgeCheckLight.swiftUIImage
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 24, height: 24)
+                            .padding(.trailing, 5)
+                    }
+                    Text(nickname)
+                        .font(Font.pretendard.title3)
+                        .foregroundStyle(foreground)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .minimumScaleFactor(0.8)
+                    EditPencil(foreground: foreground)
                 }
-                .frame(width: 32, height: 32)
+                .editRowHitArea()
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("\(nickname), 닉네임 수정")
         }
         .frame(height: height)
         .padding(.horizontal, 20)
@@ -494,28 +486,49 @@ private struct AcademyNameEditRow: View {
     let onEditTapped: () -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
-            Text(academyName)
-                .font(Font.pretendard.bodyS)
-                .foregroundStyle(foreground.opacity(0.7))
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .minimumScaleFactor(0.8)
-
-            Button(action: onEditTapped) {
-                ZStack {
-                    Assets.Common.Icon.pencil.swiftUIImage
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 16, height: 16)
-                        .foregroundStyle(foreground.opacity(0.35)) // 이름 글자보다 눈에 덜 띄게 — 연필은 보조 표시
-                }
-                .frame(width: 32, height: 32)
+        // 도장 이름 글자도 수정 진입 영역 — 연필만 버튼이면 글자를 누를 때 바탕(배경 고르기)이 열렸다.
+        Button(action: onEditTapped) {
+            HStack(spacing: 0) {
+                Text(academyName)
+                    .font(Font.pretendard.bodyS)
+                    .foregroundStyle(foreground.opacity(0.7))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .minimumScaleFactor(0.8)
+                EditPencil(foreground: foreground)
             }
-            .buttonStyle(.plain)
+            .editRowHitArea()
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(academyName), 도장 정보 수정")
         .frame(height: height)
         .padding(.horizontal, 20)
+    }
+}
+
+// MARK: - 수정 행 공통
+
+/// 닉네임·도장 이름 옆 연필 — 이름 글자보다 눈에 덜 띄게 둔 보조 표시
+private struct EditPencil: View {
+    let foreground: Color
+
+    var body: some View {
+        Assets.Common.Icon.pencil.swiftUIImage
+            .resizable()
+            .scaledToFit()
+            .frame(width: 16, height: 16)
+            .foregroundStyle(foreground.opacity(0.35))
+            .frame(width: 32, height: 32)
+    }
+}
+
+private extension View {
+    /// 보이는 자리는 그대로 두고 누르는 자리를 왼쪽으로 8pt 넓힌다. 높이는 연필 칸(32pt)이 이미 채운다 —
+    /// 위아래로 넓히면 닉네임·도장 두 줄의 누르는 자리가 겹쳐 아래 줄이 위 줄 글자 아래쪽을 가로챈다.
+    func editRowHitArea() -> some View {
+        padding(.leading, 8)
+            .contentShape(Rectangle())
+            .padding(.leading, -8)
     }
 }
 

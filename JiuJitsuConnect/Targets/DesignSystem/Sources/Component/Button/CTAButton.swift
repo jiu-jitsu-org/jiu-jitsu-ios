@@ -10,7 +10,7 @@ import SwiftUI
 /// 앱 전반에서 사용될 공통 CTA 버튼입니다.
 /// - Parameters:
 ///   - title: 버튼에 표시될 텍스트
-///   - type: 버튼의 색상 타입 (.dark, .blue, .tint, .text). 기본값은 .blue.
+///   - type: 버튼의 색상 타입 (.dark, .blue, .tint, .neutral, .text). 기본값은 .blue.
 ///   - leftIcon: 제목 왼쪽에 둘 아이콘(24pt, 글자색). 기본값은 없음.
 ///   - style: 버튼의 모서리 스타일 (.rounded, .keypad). 기본값은 .rounded.
 ///   - height: 버튼의 높이. 기본값은 52.
@@ -27,6 +27,7 @@ public struct CTAButton: View {
         case dark
         case blue
         case tint   // 주 CTA와 함께 두는 보조 CTA (연한 파랑 면)
+        case neutral // 시트의 '취소'처럼 긍정이 아닌 닫기 (회색 면, 버튼 neutral 색)
         case text
     }
     
@@ -137,6 +138,15 @@ private struct CTAButtonStyle: ButtonStyle {
             } else {
                 return (Color.component.cta.tint.bg, Color.component.cta.tint.text)
             }
+        case .neutral:
+            let neutral = Color.component.button.neutral
+            if isPressed {
+                return (neutral.pressedBg, neutral.pressedText)
+            } else if !isEnabled {
+                return (neutral.disabledBg, neutral.disabledText)
+            } else {
+                return (neutral.defaultBg, neutral.defaultText)
+            }
         case .text:
             if isPressed {
                 return (Color.component.cta.transparentText.pressedBg, Color.component.cta.transparentText.text)
@@ -156,6 +166,7 @@ private struct CTAButtonStyle: ButtonStyle {
         CTAButton(title: "라운드 버튼 (기본 높이)", type: .blue, action: {})
         CTAButton(title: "라운드 버튼 (높이 56)", type: .dark, height: 56, action: {})
         CTAButton(title: "보조 버튼 (tint)", type: .tint, leftIcon: Image(systemName: "plus"), action: {})
+        CTAButton(title: "취소 (neutral)", type: .neutral, action: {})
         
         // --- Keypad (새로운 스타일) ---
         CTAButton(title: "키패드 버튼 (기본 높이)", type: .blue, style: .keypad, action: {})
