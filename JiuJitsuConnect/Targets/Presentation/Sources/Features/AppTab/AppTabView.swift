@@ -348,7 +348,7 @@ public struct AppTabView: View {
 
     /// 탭 바와 맨 위로 동그라미는 따로 움직이는 유리 두 개다(#267).
     /// - 탭 바: 홈·대회·MY (맨 위에서 멀면 맨 위로 칸이 붙어 4칸). 숨길 땐 그대로 아래로 내려간다.
-    /// - 동그라미: 탭 바가 숨고 맨 위에서 멀 때의 맨 위로 버튼
+    /// - 동그라미: 탭 바가 숨고 맨 위에서 멀 때의 맨 위로 버튼. 탭 바처럼 화면 아래에서 올라오고 아래로 내려간다.
     private var isBarShown: Bool {
         isTabRootInFront && !isTabBarHidden && !isWebSheetOpen
     }
@@ -431,7 +431,9 @@ public struct AppTabView: View {
         if isCircleShown {
             let frame = circleFrame(in: size)
             // 탭 바와 같이 화면 아래 가장자리 밖에서 올라오고, 사라질 땐 그 자리로 내려간다.
-            let belowEdge = CircleSlotModifier(offset: CGSize(width: 0, height: size.height - frame.minY + 24), scale: 1, opacity: 1)
+            // 내려갈 땐 흐려지며 간다 — 탭 바가 같은 0.5초에 올라와 맨 위로 칸과 엇갈릴 때 동그라미가 그 칸 위에 겹쳐 보이지 않게.
+            let drop = CGSize(width: 0, height: size.height - frame.minY + 24)
+            let identity = CircleSlotModifier(offset: .zero, opacity: 1)
             Button {
                 scrollCurrentTabToTop()
             } label: {
@@ -443,9 +445,9 @@ public struct AppTabView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("맨 위로")
             .position(x: frame.midX, y: frame.midY)
-            .transition(.modifier(
-                active: belowEdge,
-                identity: CircleSlotModifier(offset: .zero, scale: 1, opacity: 1)
+            .transition(.asymmetric(
+                insertion: .modifier(active: CircleSlotModifier(offset: drop, opacity: 1), identity: identity),
+                removal: .modifier(active: CircleSlotModifier(offset: drop, opacity: 0), identity: identity)
             ))
         }
     }
@@ -520,12 +522,10 @@ public struct AppTabView: View {
 /// 맨 위로 동그라미가 화면 아래에서 올라오고 내려가는 움직임(#267)
 private struct CircleSlotModifier: ViewModifier {
     let offset: CGSize
-    let scale: CGFloat
     let opacity: Double
 
     func body(content: Content) -> some View {
         content
-            .scaleEffect(scale)
             .offset(offset)
             .opacity(opacity)
     }
