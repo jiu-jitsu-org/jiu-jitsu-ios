@@ -28,7 +28,7 @@ public struct AppFeature: Sendable {
         var pendingDeepLink: DeepLink?
         /// 자동 로그인으로 들어온 사람에게 홈 위에 덮어 보여주는 인사 장면. nil이면 장면 없이 홈만 보인다.
         var greeting: Greeting?
-        /// 인사 중이라 미뤄 둔 앱 진입 FCM sync. 알림 권한 창이 인사 장면을 가리지 않게 인사가 끝난 뒤 돌린다(#216).
+        /// 인사 중이라 미뤄 둔 앱 진입 FCM sync. 인사가 끝난 뒤 돌린다(#216). 권한 창은 #333부터 여기서 뜨지 않는다.
         var isLaunchSyncDeferred = false
         /// 꼭 필요한 업데이트(#326). 닫을 수 없는 안내로 앱 전체를 막는다 — 업데이트하면 앱이 새로 켜진다.
         var isUpdateRequired = false
@@ -152,7 +152,7 @@ public struct AppFeature: Sendable {
                     // 인사 중에는 홈이 안 보이는 탭을 띄우지 않게 알려 둔다(#271)
                     state.destination = .appTab(.init(authInfo: authInfo, isGreetingShowing: state.greeting != nil))
                     // 앱 진입 FCM sync: 로그인 상태일 때만 실행 (취소되지 않음).
-                    // 처음 받는 사람에게는 알림 권한 창이 뜨므로, 인사 중이면 인사가 끝날 때까지 미룬다(#216)
+                    // 인사 중이면 인사가 끝날 때까지 미룬다(#216). 권한 창은 #333부터 여기서 뜨지 않는다
                     if state.greeting != nil {
                         state.isLaunchSyncDeferred = true
                         return Self.consumePendingDeepLink(&state)
@@ -209,7 +209,7 @@ public struct AppFeature: Sendable {
         .cancellable(id: CancelID.versionRecheck, cancelInFlight: true)
     }
 
-    /// 앱 진입 FCM sync. 알림 권한을 아직 묻지 않았으면 여기서 권한 창이 뜬다.
+    /// 앱 진입 FCM sync. 이미 허용했을 때만 토큰을 등록한다 — 아직 묻지 않았으면 여기서 묻지 않는다(#333).
     private func launchSync() -> Effect<Action> {
         .run { _ in
             await FCMAppInfoSync.syncOnAppLaunch(
