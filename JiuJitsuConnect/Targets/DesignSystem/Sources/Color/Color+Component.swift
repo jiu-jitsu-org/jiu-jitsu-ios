@@ -442,7 +442,9 @@ public struct ComponentColors {
     public let myBelt = MyBelt()
 
     public struct MyBelt {
-        public let white = Color(hex: "#F4F4F2")
+        // 아래 회색 바탕(Gray-25 #EDEFEF)보다 조금 밝은 무채색 — #F4F4F2는 노란 기가 돌아 바탕과 섞여 경계가 흐렸다.
+        // 노란 기가 도는 회색은 아이보리처럼 보여 쓰지 않는다.
+        public let white = Color(hex: "#F7F8F8")
         public let blue = Color(hex: "#0091FF")
         public let purple = Color(hex: "#CD57FF")
         public let brown = Color(hex: "#A66040")
@@ -450,7 +452,7 @@ public struct ComponentColors {
         // 키즈 띠 — 띠 모델에 생기면 이 색을 쓴다(서버가 아직 받지 않아 지금은 쓰는 곳 없음).
         // grey #7E8189 · yellow #F2BE22 (밝은 띠) · orange #F07F22 · green #2E9E4F
 
-        /// 흰띠는 헤더 바탕(#F4F4F2) 위에서 링·카드를 순백으로 띄운다.
+        /// 흰띠는 헤더 바탕(#F7F8F8) 위에서 링·카드를 순백으로 띄운다.
         public let whiteRing = Color.primitive.bw.trueWhite
         /// 사진 링의 띠 끝 칸 — 검은띠만 빨강
         public let ringRankBar = Color.primitive.bw.black

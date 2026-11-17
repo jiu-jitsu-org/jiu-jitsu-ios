@@ -35,7 +35,8 @@ public struct CompetitionTabFeature: Sendable {
                     isTabRoot: true,
                     // 사진 고르기는 쌓인 상세 화면만 띄울 수 있어 목록에서는 알리지 않는다.
                     // 머리줄 색은 이 탭 머리줄 아래 붙은 목록만 알린다.
-                    capabilities: [.competitionHeaderTint]
+                    // 끝난 관심 대회 배너의 '남기기'(#403)도 목록에서 누르므로 기록 추가를 받는다.
+                    capabilities: [.competitionHeaderTint, .openCompetitionRecord]
                 )
             }
         }
@@ -130,6 +131,9 @@ public struct CompetitionTabFeature: Sendable {
 
             case let .web(.delegate(.competitionAlertsEnabled(competitionId))):
                 return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
+
+            case let .web(.delegate(.competitionRecordRequested(payload))):
+                return .send(.delegate(.competitionRecordRequested(payload)))
 
             case let .web(.delegate(.competitionHeaderTintChanged(hex))):
                 state.headerTint = hex

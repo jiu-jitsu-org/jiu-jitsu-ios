@@ -466,7 +466,7 @@ private struct NicknameEditRow: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: 16, height: 16)
-                        .foregroundStyle(foreground.opacity(0.5))
+                        .foregroundStyle(foreground.opacity(0.35)) // 이름 글자보다 눈에 덜 띄게 — 연필은 보조 표시
                 }
                 .frame(width: 32, height: 32)
             }
@@ -501,7 +501,7 @@ private struct AcademyNameEditRow: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: 16, height: 16)
-                        .foregroundStyle(foreground.opacity(0.5))
+                        .foregroundStyle(foreground.opacity(0.35)) // 이름 글자보다 눈에 덜 띄게 — 연필은 보조 표시
                 }
                 .frame(width: 32, height: 32)
             }
