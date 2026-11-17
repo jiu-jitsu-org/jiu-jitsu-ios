@@ -196,19 +196,25 @@ public struct AppFeature: Sendable {
                 state.destination = .appTab(.init(authInfo: .guest))
                 return Self.consumePendingDeepLink(&state)
 
-            // 가입하다 그만두면 로그인 화면으로 돌아온다. 가입 중에 받아 둔 링크가 있으면 로그인 화면에 머물지 않고
-            // 둘러보기와 같이 게스트로 그 화면을 연다(#375).
-            case .destination(.presented(.login(.delegate(.signupAbandoned)))):
-                guard state.pendingDeepLink != nil else { return .none }
-                state.destination = .appTab(.init(authInfo: .guest))
-                return Self.consumePendingDeepLink(&state)
-
             default:
                 return .none
             }
         }
         // ifLet runs AFTER parent logic to handle child state
         .ifLet(\.$destination, action: \.destination)
+        // 로그인 화면이 동작을 처리한 뒤에 본다(#375). 가입 중에 받아 둔 링크가 있는데 가입 흐름이 끝나 첫 로그인 화면으로
+        // 돌아왔으면(그만두기 · 약관 시트 닫기 · 서버 로그인 실패 · 가입 시간 만료) 둘러보기와 같이 게스트로 그 화면을 연다.
+        // 로그인 · 가입을 마친 경우는 위에서 이미 탭 화면으로 바뀌어 여기 걸리지 않는다.
+        Reduce { state, action in
+            guard
+                case .destination(.presented(.login)) = action,
+                case let .login(login)? = state.destination,
+                !login.isSigningUp,
+                state.pendingDeepLink != nil
+            else { return .none }
+            state.destination = .appTab(.init(authInfo: .guest))
+            return Self.consumePendingDeepLink(&state)
+        }
     }
 
     /// 켜 둔 앱을 다시 열 때 마지막 확인 뒤 오래 지났으면 버전을 다시 확인한다(#326).
