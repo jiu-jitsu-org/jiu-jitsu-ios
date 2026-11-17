@@ -725,11 +725,14 @@ public struct CommunityFeature: Sendable {
         }
     }
 
-    /// 홈에 쌓인 화면(푸시 스택·상세 모달·모달 안 스택)을 모두 닫아 피드 첫 화면이 바로 보이게 한다(#250, #304).
+    /// 홈에 쌓인 화면(푸시 스택·상세 모달·모달 안 스택)을 모두 닫고 피드를 맨 위로 올려, 피드 첫 화면이 바로 보이게 한다(#250, #304).
+    /// 맨 위까지 올리는 이유(#386): 부르는 곳(대회 '커뮤니티에서 더 보기', 웹의 '오늘의 게임 하러 가기')은 피드 맨 위의
+    /// 오늘의 밸런스 게임·새 글을 보러 가는 것인데, 피드를 내려 둔 채였으면 닫기만 해서는 그 자리가 보이지 않는다.
     public static func closeToFeed(into state: inout State) {
         state.path.removeAll()
         state.detailCover = nil
         state.coverPath.removeAll()
+        state.scrollToTopToken = UUID()
     }
 
     /// 로그아웃·탈퇴 때 이전 계정으로 연 MY 화면(#197)과 대회 기록 추가(#304)를 닫는다. 그 위에 쌓인 화면도 함께 닫는다.

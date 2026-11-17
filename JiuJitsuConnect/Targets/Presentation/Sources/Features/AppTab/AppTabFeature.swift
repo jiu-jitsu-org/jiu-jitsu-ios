@@ -354,7 +354,7 @@ public struct AppTabFeature: Sendable {
                     let base = state.home.url,
                     let url = CommunityFeature.myActivityURL(base: base)
                 else { return .none }
-                state.myPage.path.append(.communityDetail(.init(url: url, accessToken: state.home.accessToken)))
+                state.myPage.path.append(.communityDetail(Self.myTabActivity(url: url, accessToken: state.home.accessToken)))
                 return .none
 
             // MY(탭이든 커뮤니티에 쌓인 것이든)에서 프로필을 저장하면 열린 웹뷰 모두가 내 프로필을 다시 불러오게 한다(jiu-jitsu-frontend#413).
@@ -417,18 +417,15 @@ public struct AppTabFeature: Sendable {
             case .competition(.delegate(.unreadNotificationRefreshRequested)):
                 return .send(.home(.unreadNotificationRefreshRequested))
 
-            // 대회 상세의 '커뮤니티에서 더 보기'(#250). 대회 스택과 홈에 쌓인 화면을 닫아 피드가 바로 보이게 한 뒤 홈으로 간다.
+            // 웹의 '피드로 가기'(OPEN_HOME_FEED) — 연 탭마다 무엇을 닫는지는 AppTabFeature+HomeFeed.
             case .competition(.delegate(.homeFeedRequested)):
-                state.competition.path.removeAll()
-                CommunityFeature.closeToFeed(into: &state.home)
-                return .send(.view(.tabSelected(.home)))
+                return Self.showHomeFeed(from: .competition, into: &state)
 
-            // 홈(피드·글 상세·알림함)에서 연 대회 상세의 '커뮤니티에서 더 보기'(#304). 이미 홈 탭이라 홈에 쌓인 화면만 닫는다.
-            // 대회 탭 스택은 그 탭에서 보던 화면이라 건드리지 않는다.
-            // 알림함을 거쳐 왔으면 뒤로가기(popFrom)를 거치지 않고 닫히므로, 새 알림 점을 여기서 다시 조회한다.
             case .home(.delegate(.homeFeedRequested)):
-                CommunityFeature.closeToFeed(into: &state.home)
-                return .send(.home(.unreadNotificationRefreshRequested))
+                return Self.showHomeFeed(from: .home, into: &state)
+
+            case .myPage(.delegate(.webSubview(.homeFeedRequested))):
+                return Self.showHomeFeed(from: .myPage, into: &state)
 
             // 끝난 대회의 '내 기록에 남기기'(#250). 웹은 비로그인이면 로그인 안내를 대신 보내지만, 웹과 앱의 로그인 상태가
             // 어긋났을 때를 대비해 앱도 막는다 — 로그인 모달을 띄우고, 로그인하면 이 대회로 이어서 연다.
