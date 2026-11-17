@@ -30,6 +30,9 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     /// 탈퇴 재인증(`appleAuthorizationCodeForWithdrawal`) 전용 continuation.
     /// 로그인용(`appleSignInContinuation`)과 같은 delegate를 공유하므로, 둘 중 하나만 동시에 살아 있다.
     private var appleAuthCodeContinuation: CheckedContinuation<String, Error>?
+    /// 스플래시가 10초에 끊어 둔 자동 로그인이 도는 중에 [다시 시도]가 새로 시작하면, 늦게 끝난 쪽이
+    /// 회전된 refresh 토큰을 덮어 다음 자동 로그인이 깨진다. 진행 중이면 그 요청에 합류한다(#367).
+    private let autoLoginInFlight = AutoLoginInFlight()
     /// `presentationContextProvider`는 weak라 요청이 끝날 때까지 여기서 붙잡아 둔다.
     private var applePresentationContext: ApplePresentationContext?
     
@@ -205,6 +208,10 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     // MARK: - Auto Login
 
     public func autoLogin() async throws -> AuthInfo? {
+        try await autoLoginInFlight.run { [self] in try await performAutoLogin() }
+    }
+
+    private func performAutoLogin() async throws -> AuthInfo? {
         // 자동 로그인 불가 경로에서는 남은 토큰을 모두 지운다. accessToken만 남으면
         // 게스트 상태의 이후 요청(로그인 포함)에 만료 토큰이 실려 A0003으로 계속 거부된다.
         // 1. 자동 로그인 설정 확인
@@ -420,5 +427,22 @@ private final class ApplePresentationContext: NSObject, ASAuthorizationControlle
 
     func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
         anchor
+    }
+}
+
+// MARK: - AutoLoginInFlight
+
+/// 진행 중인 자동 로그인 하나를 들고 있다가, 겹쳐 온 호출을 그 결과에 합류시킨다.
+private actor AutoLoginInFlight {
+    private var task: Task<AuthInfo?, Error>?
+
+    func run(_ operation: @Sendable @escaping () async throws -> AuthInfo?) async throws -> AuthInfo? {
+        if let task {
+            return try await task.value
+        }
+        let task = Task { try await operation() }
+        self.task = task
+        defer { self.task = nil }
+        return try await task.value
     }
 }
