@@ -217,14 +217,21 @@ public struct InstructorVerificationView: View {
         .padding(.horizontal, Metrics.horizontalPadding)
     }
 
-    /// 거절됐으면 왜 다시 올려야 하는지를, 아니면 올릴 사진의 조건을 알린다.
+    /// 거절됐으면 왜 다시 올려야 하는지를, 검토 중이면 기다리면 된다는 것을, 아니면 올릴 사진의 조건을 알린다.
+    /// 검토 중에도 '업로드해주세요'만 보이면 제출이 안 된 줄 알고 다시 올린다 — 결과를 이 화면에서 보라고 안내하므로(#389) 상태를 밝힌다.
     private var warningText: String {
         let verification = store.verification
-        guard verification.status == .rejected else { return "인증 가능한 사진을 업로드해주세요." }
-        if let reason = verification.rejectReason {
-            return "반려 사유: \(reason)"
+        switch verification.status {
+        case .rejected:
+            if let reason = verification.rejectReason {
+                return "반려 사유: \(reason)"
+            }
+            return "인증이 반려됐어요. 사진을 다시 올려주세요."
+        case .pending:
+            return "관리자가 확인하고 있어요. 다른 사진으로 바꾸려면 다시 올려주세요."
+        case .notRequested, .approved:
+            return "인증 가능한 사진을 업로드해주세요."
         }
-        return "인증이 반려됐어요. 사진을 다시 올려주세요."
     }
 
     private var ctaSection: some View {
