@@ -134,6 +134,7 @@ public struct SettingsFeature: Sendable {
     @Dependency(\.appVersionClient) var appVersionClient
     @Dependency(\.openURL) var openURL
     @Dependency(\.date) var date
+    @Dependency(\.recentErrorClient) var recentErrorClient
 
     // MARK: - Reducer Body
     public var body: some ReducerOf<Self> {
@@ -187,7 +188,8 @@ public struct SettingsFeature: Sendable {
             case .view(.inquiryButtonTapped):
                 guard !state.isOpeningInquiry, let email = SupportContact.email else { return .none }
                 let userId = state.authInfo.isGuest ? nil : state.authInfo.userInfo?.userId
-                guard let url = SupportInquiryMail.url(to: email, info: .current(userId: userId)) else {
+                let info = SupportInquiryMail.DeviceInfo.current(userId: userId, recentError: recentErrorClient.latest())
+                guard let url = SupportInquiryMail.url(to: email, info: info) else {
                     Log.trace("문의 메일 주소를 만들지 못함: \(email)", category: .view, level: .error)
                     return .none
                 }
@@ -270,7 +272,14 @@ public struct SettingsFeature: Sendable {
                 if case .signInCancelled? = error as? DomainError {
                     return .send(.internal(.showToast(.init(message: "Apple 확인을 취소해 탈퇴하지 않았어요.", status: .info))))
                 }
-                return handleError(error)
+                // 실패 이유나 오류 코드를 알리고, 문의 메일에 남긴다(#379).
+                guard let domainError = error as? DomainError,
+                      let notice = DomainErrorMapper.authFailure(from: domainError)
+                else { return handleError(error) }
+                if let code = notice.code {
+                    recentErrorClient.record(RecentError(code: code, occurredAt: date.now))
+                }
+                return .send(.internal(.showToast(.init(message: notice.message, status: .error))))
 
             case .view(.alertDismissed):
                 state.alert = nil

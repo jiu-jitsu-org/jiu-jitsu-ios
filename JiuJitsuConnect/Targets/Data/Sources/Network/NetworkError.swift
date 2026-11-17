@@ -66,15 +66,16 @@ public enum NetworkError: Error, LocalizedError, Sendable {
             // 호출부 에러 매핑에서는 refresh 토큰 무효와 동일하게 취급한다.
             return .apiError(code: .invalidRefreshToken, message: nil)
 
-        case .statusCodeError(_, let response):
-            // 기존 AuthRepositoryImpl에 있던 로직을 그대로 가져옵니다.
+        case let .statusCodeError(statusCode, response):
             if let response, !response.code.isEmpty {
-                // 서버에서 받은 code(String)를 APIErrorCode(enum)으로 변환
-                let errorCode = APIErrorCode(rawValue: response.code) ?? .unknown
-                return .apiError(code: errorCode, message: response.message)
+                if let errorCode = APIErrorCode(rawValue: response.code) {
+                    return .apiError(code: errorCode, message: response.message)
+                }
+                // 앱이 모르는 코드는 원래 문자열을 그대로 남긴다 — 사용자 안내 · 문의에서 어떤 오류인지 알 수 있게(#379).
+                return .serverError(code: response.code, statusCode: statusCode, message: response.message)
             }
             // APIErrorResponseDTO가 없거나 코드가 비어있는 5xx, 4xx 에러
-            return .serverError(message: response?.message)
+            return .serverError(code: nil, statusCode: statusCode, message: response?.message)
             
         case .invalidURL, .invalidResponse, .unknown:
             // 개발자가 확인해야 하는 시스템 레벨 오류
