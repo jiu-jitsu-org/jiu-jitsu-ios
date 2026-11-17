@@ -54,7 +54,7 @@ extension BeltRank {
     /// 바탕이 밝은 띠 — 그 위 글자·아이콘·무늬를 어둡게 칠한다(키즈 노랑띠도 여기에 들어간다).
     var isLightBelt: Bool { self == .white }
 
-    /// 링·카드에 칠하는 띠 색. 흰띠만 헤더 바탕(#F4F4F2) 위에서 뜨게 순백.
+    /// 링·카드에 칠하는 띠 색. 흰띠만 헤더 바탕(#F7F8F8) 위에서 뜨게 순백.
     var beltSurfaceColor: Color {
         self == .white ? Color.component.myBelt.whiteRing : beltColor
     }
