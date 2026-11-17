@@ -202,6 +202,19 @@ public struct AppFeature: Sendable {
         }
         // ifLet runs AFTER parent logic to handle child state
         .ifLet(\.$destination, action: \.destination)
+        // 로그인 화면이 동작을 처리한 뒤에 본다(#375). 가입 중에 받아 둔 링크가 있는데 가입 흐름이 끝나 첫 로그인 화면으로
+        // 돌아왔으면(그만두기 · 약관 시트 닫기 · 서버 로그인 실패 · 가입 시간 만료) 둘러보기와 같이 게스트로 그 화면을 연다.
+        // 로그인 · 가입을 마친 경우는 위에서 이미 탭 화면으로 바뀌어 여기 걸리지 않는다.
+        Reduce { state, action in
+            guard
+                case .destination(.presented(.login)) = action,
+                case let .login(login)? = state.destination,
+                !login.isSigningUp,
+                state.pendingDeepLink != nil
+            else { return .none }
+            state.destination = .appTab(.init(authInfo: .guest))
+            return Self.consumePendingDeepLink(&state)
+        }
     }
 
     /// 켜 둔 앱을 다시 열 때 마지막 확인 뒤 오래 지났으면 버전을 다시 확인한다(#326).
@@ -242,9 +255,18 @@ public struct AppFeature: Sendable {
         // AppTab이 이미 살아 있으면 바로 흘려보내고, 스플래시·로그인 중이면 진입 직후 소비한다.
         guard case .appTab? = state.destination else {
             state.pendingDeepLink = link
-            // 스플래시 중이면 최소 노출 시간을 채우지 않고 자동 로그인만 기다려 바로 넘어가게 알린다(#300).
-            guard case .splash? = state.destination else { return .none }
-            return .send(.destination(.presented(.splash(.deepLinkPending))))
+            switch state.destination {
+            case .splash?:
+                // 스플래시 중이면 최소 노출 시간을 채우지 않고 자동 로그인만 기다려 바로 넘어가게 알린다(#300).
+                return .send(.destination(.presented(.splash(.deepLinkPending))))
+            case let .login(login)? where !login.isSigningUp:
+                // 로그인 화면에 머문 채 링크 · 푸시가 오면 둘러보기와 같이 게스트로 바로 연다(#375) — 꺼진 앱을
+                // 비로그인으로 링크로 열 때와 같다. 가입 진행 중이면 흐름을 끊지 않고 보관했다가 가입 · 그만두기 뒤에 연다.
+                state.destination = .appTab(.init(authInfo: .guest))
+                return Self.consumePendingDeepLink(&state)
+            default:
+                return .none
+            }
         }
         // 인사 중에 링크가 들어오면 인사를 접고 바로 그 화면을 보여준다
         let wasGreeting = state.greeting != nil
