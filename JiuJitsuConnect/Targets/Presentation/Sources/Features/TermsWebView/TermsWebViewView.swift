@@ -69,10 +69,10 @@ public struct TermsWebViewView: View {
                     .scaleEffect(1.2)
             }
         }
+        // 닫기는 불러오는 동안에도 늘 보이고 눌린다(#376) — 전체 화면 덮개라 쓸어 닫기가 없어, 웹이 느리면 나갈 길이 이것뿐이다.
         .overlay(alignment: .bottom) {
             closeButton
                 .padding(.bottom, Style.bottomPadding)
-                .opacity(isWebViewReady || isLoadFailed ? 1 : 0)
         }
         .background(
             Color.primitive.bw.trueWhite
@@ -238,7 +238,7 @@ private struct TermsWKWebView: UIViewRepresentable {
         // 최초 1회만 로드. 이후 updateUIView가 호출되어도 같은 url이면 재로드하지 않는다.
         context.coordinator.loadedURL = url
         context.coordinator.loadedReloadToken = reloadToken
-        webView.load(URLRequest(url: url))
+        webView.load(URLRequest(url: url, timeoutInterval: BridgeWebView.documentRequestTimeout))
         return webView
     }
 
@@ -261,7 +261,7 @@ private struct TermsWKWebView: UIViewRepresentable {
                 || context.coordinator.loadedReloadToken != reloadToken else { return }
         context.coordinator.loadedURL = url
         context.coordinator.loadedReloadToken = reloadToken
-        uiView.load(URLRequest(url: url))
+        uiView.load(URLRequest(url: url, timeoutInterval: BridgeWebView.documentRequestTimeout))
     }
 
     private func applyInsets(to webView: WKWebView) {
