@@ -335,7 +335,8 @@ public struct AppTabView: View {
         switch store.selectedTab {
         case .home: store.home.path.isEmpty && store.home.detailCover == nil
         case .competition: store.competition.path.isEmpty
-        case .myPage: store.myPage.path.isEmpty
+        // MY의 닉네임·도장·스타일·대회 기록 수정은 path가 아니라 destination으로 쌓인다 — 그때도 탭 바를 내린다.
+        case .myPage: store.myPage.path.isEmpty && store.myPage.destination == nil
         }
     }
 
