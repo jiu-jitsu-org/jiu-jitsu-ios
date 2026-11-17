@@ -203,10 +203,9 @@ public struct AppTabView: View {
             isPresented: withdrawalNoticeBinding(isInCover: false),
             configuration: withdrawalNoticeConfiguration
         )
-        // 탭 바가 떠 있으면 그 위로 띄운다.
         .toast(
             store.home.detailCover == nil ? store.toast : nil,
-            bottomPadding: isBarShown ? max(dockReservedHeight - deviceBottomInset, 0) + 12 : nil,
+            bottomPadding: tabToastBottomPadding,
             onSwipe: { store.send(.view(.toastSwiped)) },
             onButtonTapped: { _ in store.send(.view(.toastSwiped)) }
         )
@@ -592,6 +591,14 @@ public struct AppTabView: View {
 // MARK: - 탈퇴 · 로그아웃 · 계정 복구 안내 (#385)
 
 extension AppTabView {
+    /// 탭 바가 떠 있으면 탭 바와 웹 글쓰기 버튼(탭 바 위 12 · 48) 위로 띄운다 — 2초 동안 글쓰기 버튼을 가리지 않게.
+    /// 쌓인 화면 위에선 탭 바가 내려가 있으니 토스트 기본 여백을 쓴다.
+    fileprivate var tabToastBottomPadding: CGFloat? {
+        guard isBarShown else { return nil }
+        let aboveWriteButton = dockReservedHeight + DockMetrics.edgeInset + DockMetrics.circleSize + 8
+        return max(aboveWriteButton - deviceBottomInset, 0)
+    }
+
     // 탈퇴 안내도 상세 모달 위 · 탭 화면 위 중 맨 위 한 곳에만 그린다.
     fileprivate func withdrawalNoticeBinding(isInCover: Bool) -> Binding<Bool> {
         Binding(
