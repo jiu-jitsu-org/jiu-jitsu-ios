@@ -21,7 +21,7 @@ import CoreKit
 /// (`signInWithApple` / `appleAuthorizationCodeForWithdrawal`)에서 설정되고
 /// 동일 메인 스레드에서 발화하는 delegate 콜백(`authorizationController(...)`)에서만 접근하므로
 /// 외부 동시성 경계에서 안전하다.
-public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding, @unchecked Sendable {
+public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorizationControllerDelegate, @unchecked Sendable {
 
     private let networkService: NetworkService
     private let tokenStorage: TokenStorage
@@ -30,6 +30,8 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     /// 탈퇴 재인증(`appleAuthorizationCodeForWithdrawal`) 전용 continuation.
     /// 로그인용(`appleSignInContinuation`)과 같은 delegate를 공유하므로, 둘 중 하나만 동시에 살아 있다.
     private var appleAuthCodeContinuation: CheckedContinuation<String, Error>?
+    /// `presentationContextProvider`는 weak라 요청이 끝날 때까지 여기서 붙잡아 둔다.
+    private var applePresentationContext: ApplePresentationContext?
     
     public init(networkService: NetworkService = DefaultNetworkService(),
                 tokenStorage: TokenStorage = DefaultTokenStorage(),
@@ -60,8 +62,10 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             Log.trace("Apple sign-in already in progress — ignoring duplicate request", category: .debug, level: .info)
             throw DomainError.signInCancelled
         }
+        let presentationContext = try makeApplePresentationContext()
         return try await withCheckedThrowingContinuation { continuation in
             self.appleSignInContinuation = continuation
+            self.applePresentationContext = presentationContext
             
             let appleIDProvider = ASAuthorizationAppleIDProvider()
             let request = appleIDProvider.createRequest()
@@ -69,7 +73,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             
             let authorizationController = ASAuthorizationController(authorizationRequests: [request])
             authorizationController.delegate = self
-            authorizationController.presentationContextProvider = self
+            authorizationController.presentationContextProvider = presentationContext
             authorizationController.performRequests()
         }
     }
@@ -87,8 +91,10 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             Log.trace("Apple auth already in progress — ignoring withdrawal re-auth", category: .debug, level: .info)
             throw DomainError.signInCancelled
         }
+        let presentationContext = try makeApplePresentationContext()
         return try await withCheckedThrowingContinuation { continuation in
             self.appleAuthCodeContinuation = continuation
+            self.applePresentationContext = presentationContext
 
             let appleIDProvider = ASAuthorizationAppleIDProvider()
             let request = appleIDProvider.createRequest()
@@ -96,7 +102,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
 
             let authorizationController = ASAuthorizationController(authorizationRequests: [request])
             authorizationController.delegate = self
-            authorizationController.presentationContextProvider = self
+            authorizationController.presentationContextProvider = presentationContext
             authorizationController.performRequests()
         }
     }
@@ -320,6 +326,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     private func resumeAppleSignIn(with result: Result<SNSUser, Error>) {
         guard let continuation = appleSignInContinuation else { return }
         appleSignInContinuation = nil
+        applePresentationContext = nil
         continuation.resume(with: result)
     }
 
@@ -327,18 +334,28 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
     private func resumeAppleAuthCode(with result: Result<String, Error>) {
         guard let continuation = appleAuthCodeContinuation else { return }
         appleAuthCodeContinuation = nil
+        applePresentationContext = nil
         continuation.resume(with: result)
     }
     
-    // MARK: - ASAuthorizationControllerPresentationContextProviding
-    
-    public func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        guard let windowScene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
-              let window = windowScene.windows.first(where: { $0.isKeyWindow }) else {
-            // 절대 도달하지 않는 경로
-            fatalError("No active window found for Apple Sign In")
+    // MARK: - Apple 창 기준 window
+
+    /// `presentationAnchor`는 옵셔널을 돌려줄 수 없어, 요청 전에 window를 정하고 못 정하면 요청하지 않는다(#378).
+    /// 제어 센터 · 시스템 알럿이 떠 있으면 key window가 없을 수 있어 순서대로 물러선다:
+    /// 활성 장면의 key window → 아무 장면의 window → 장면으로 새 window.
+    @MainActor
+    private func makeApplePresentationContext() throws -> ApplePresentationContext {
+        let windowScenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let activeScene = windowScenes.first { $0.activationState == .foregroundActive }
+        if let keyWindow = activeScene?.windows.first(where: { $0.isKeyWindow })
+            ?? windowScenes.lazy.flatMap(\.windows).first {
+            return ApplePresentationContext(anchor: keyWindow)
         }
-        return window
+        guard let scene = activeScene ?? windowScenes.first else {
+            Log.trace("Apple sign-in: no window scene to present from", category: .system, level: .error)
+            throw DomainError.cannotFindRootViewController
+        }
+        return ApplePresentationContext(anchor: UIWindow(windowScene: scene))
     }
     
     public func signOut() async {
@@ -380,4 +397,19 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
         )
     }
     
+}
+
+// MARK: - ApplePresentationContext
+
+/// 요청을 시작할 때 정한 window를 그대로 돌려준다.
+private final class ApplePresentationContext: NSObject, ASAuthorizationControllerPresentationContextProviding {
+    private let anchor: ASPresentationAnchor
+
+    init(anchor: ASPresentationAnchor) {
+        self.anchor = anchor
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        anchor
+    }
 }
