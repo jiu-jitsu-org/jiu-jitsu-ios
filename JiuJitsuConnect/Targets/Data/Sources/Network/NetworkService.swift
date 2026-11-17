@@ -253,6 +253,14 @@ public final class DefaultNetworkService: NetworkService {
         NetworkLogger.log(response: httpResponse, data: data)
         #endif
 
+        // 응답을 기다리는 사이 로그아웃(토큰 삭제)이나 다른 계정 로그인이 있었으면 이전 세션의 응답이라 버린다(#372).
+        // 2xx를 저장하면 다음 실행에 이전 계정으로 자동 로그인되고, 4xx(로그아웃이 서버 토큰을 먼저 지운 경우)를
+        // 세션 만료로 던지면 새 세션을 끝낸다. 그래서 상태 코드를 보기 전에 취소로 끝낸다.
+        guard tokenStorage.getRefreshToken() == refreshToken else {
+            Log.trace("토큰 갱신 응답이 바뀐 세션에 도착 → 반영하지 않음", category: .network, level: .info)
+            throw CancellationError()
+        }
+
         // refresh 토큰 만료(403 A0003)·무효(401 A0009)·유형 불일치(400 A0002) 등 4xx만 세션 만료다.
         // 5xx는 서버 쪽 일시 장애라 refresh 토큰을 버리지 않는다.
         if (400...499).contains(httpResponse.statusCode) {

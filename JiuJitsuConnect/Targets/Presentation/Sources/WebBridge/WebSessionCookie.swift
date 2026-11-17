@@ -24,7 +24,7 @@ enum WebSessionCookie {
 
     /// accessToken을 세션 쿠키로 만들어 공유 쿠키 저장소에 주입한다.
     /// SSR이 첫 요청부터 인증되도록 웹뷰 `load` 직전에 await한다. accessToken이 없으면(게스트)
-    /// 아무것도 심지 않는다. (로그아웃 시 쿠키 제거는 FE가 DELETE /api/auth/session으로 처리)
+    /// 아무것도 심지 않는다. 게스트 전환 때 지우는 건 `clear`가 한다.
     @MainActor
     static func sync(accessToken: String?, for url: URL, into store: WKHTTPCookieStore) async {
         guard
@@ -32,6 +32,19 @@ enum WebSessionCookie {
             let cookie = make(accessToken: accessToken, url: url)
         else { return }
         await store.setCookie(cookie)
+    }
+
+    /// 게스트로 바뀔 때(로그아웃 · 세션 만료 · 탈퇴) 앱이 세션 쿠키를 직접 지운다(#372).
+    /// 웹의 AUTH_LOGOUT에만 맡기면 웹이 로딩 중 · 오류 · 종료 상태라 메시지를 놓쳤을 때 쿠키가 남아
+    /// 다시 뜬 웹이 이전 계정으로 그려진다. 테스트용 도메인 전환으로 host가 여럿일 수 있어 이름으로 모두 지운다.
+    /// `sync(nil)`에서 지우지 않는 이유: updateUIView마다 도는 Task라 늦게 끝난 게스트 동기화가 새 로그인 쿠키를 지울 수 있다.
+    @MainActor
+    static func clear() async {
+        // 웹뷰는 모두 기본 저장소를 쓴다(BridgeWebView · HomeFeedPreloader).
+        let store = WKWebsiteDataStore.default().httpCookieStore
+        for cookie in await store.allCookies() where cookie.name == name {
+            await store.deleteCookie(cookie)
+        }
     }
 
     private static func make(accessToken: String, url: URL) -> HTTPCookie? {
