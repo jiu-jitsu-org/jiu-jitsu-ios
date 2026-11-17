@@ -249,7 +249,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
             // refresh 토큰 만료 = 세션 완전 종료, 재시도 불가이므로 저장된 토큰을 즉시 정리한다.
             // 그사이 다른 계정으로 로그인했으면 그 토큰까지 지우지 않는다(#372).
             if case .apiError(let code, _) = domainError,
-               code == .expiredToken || code == .invalidRefreshToken,
+               code.endsSession,
                tokenStorage.getRefreshToken() == refreshToken {
                 tokenStorage.clear()
             }

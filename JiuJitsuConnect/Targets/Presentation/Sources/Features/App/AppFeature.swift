@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import DesignSystem
 import Foundation
 import Domain
 
@@ -144,7 +145,7 @@ public struct AppFeature: Sendable {
 
                 // MARK: - Navigation Logic
 
-            case let .destination(.presented(.splash(.delegate(.finishedLaunch(authInfo))))):
+            case let .destination(.presented(.splash(.delegate(.finishedLaunch(authInfo, isSessionExpired))))):
                 if let authInfo = authInfo {
                     // 공유 링크·푸시로 들어왔으면 그 글을 바로 보여줘야 해 인사를 건너뛴다.
                     // 그 밖에는 앱을 열 때마다 튼다(#277)
@@ -165,7 +166,11 @@ public struct AppFeature: Sendable {
                     return Self.consumePendingDeepLink(&state)
                 } else {
                     state.destination = .login(.init())
-                    return .none
+                    guard isSessionExpired else { return .none }
+                    // 어떤 소셜로 가입했는지 떠올리다 다른 버튼으로 새 계정을 만들지 않게 이유를 알린다(#373).
+                    // 로그인 화면의 토스트 타이머를 타도록 상태에 직접 넣지 않고 보낸다.
+                    let notice = ToastState(message: SessionExpiryNotice.message, status: .info)
+                    return .send(.destination(.presented(.login(.internal(.showToast(notice))))))
                 }
 
             case let .destination(.presented(.login(.delegate(.didLogin(authInfo))))),

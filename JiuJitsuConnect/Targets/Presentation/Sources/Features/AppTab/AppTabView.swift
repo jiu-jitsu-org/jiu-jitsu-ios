@@ -169,6 +169,10 @@ public struct AppTabView: View {
                 isPresented: deviceNotificationAlertBinding(isInCover: true),
                 configuration: deviceNotificationAlertConfiguration
             )
+            .appAlert(
+                isPresented: sessionExpiredAlertBinding(isInCover: true),
+                configuration: sessionExpiredAlertConfiguration
+            )
         }
         .appAlert(
             isPresented: Binding(
@@ -180,6 +184,10 @@ public struct AppTabView: View {
         .appAlert(
             isPresented: deviceNotificationAlertBinding(isInCover: false),
             configuration: deviceNotificationAlertConfiguration
+        )
+        .appAlert(
+            isPresented: sessionExpiredAlertBinding(isInCover: false),
+            configuration: sessionExpiredAlertConfiguration
         )
         // 첫 글 · 댓글을 올린 뒤 알림 권한을 묻기 전 한 줄 안내(#333). 상세 모달이 떠 있으면 Feature가 띄우지 않는다.
         .sheet(
@@ -245,6 +253,31 @@ public struct AppTabView: View {
         Binding(
             get: { store.isDeviceNotificationAlertPresented && (store.home.detailCover != nil) == isInCover },
             set: { if !$0 { store.send(.view(.deviceNotificationAlertDismissed)) } }
+        )
+    }
+
+    // 세션 만료 안내(#373)도 상세 모달 위 · 탭 화면 위 중 맨 위 한 곳에만 그린다.
+    private func sessionExpiredAlertBinding(isInCover: Bool) -> Binding<Bool> {
+        Binding(
+            get: { store.isSessionExpiredAlertPresented && (store.home.detailCover != nil) == isInCover },
+            set: { if !$0 { store.send(.view(.sessionExpiredAlert(.dismissed))) } }
+        )
+    }
+
+    private var sessionExpiredAlertConfiguration: AppAlertConfiguration {
+        AppAlertConfiguration(
+            title: SessionExpiryNotice.title,
+            message: SessionExpiryNotice.body,
+            primaryButton: .init(
+                title: "로그인",
+                style: .primary,
+                action: { store.send(.view(.sessionExpiredAlert(.loginTapped))) }
+            ),
+            secondaryButton: .init(
+                title: "닫기",
+                style: .neutral,
+                action: { store.send(.view(.sessionExpiredAlert(.closeTapped))) }
+            )
         )
     }
 
