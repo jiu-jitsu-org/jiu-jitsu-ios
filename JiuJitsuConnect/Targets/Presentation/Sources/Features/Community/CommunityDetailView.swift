@@ -102,6 +102,7 @@ public struct CommunityDetailView: View {
                 onLoadingFailed: { store.send(.internal(.loadingFailed)) },
                 onLoadingCommitted: { store.send(.internal(.loadingCommitted)) },
                 onWebProcessTerminated: { store.send(.internal(.webProcessTerminated)) },
+                onKeyboardVisibilityChanged: { store.send(.internal(.keyboardVisibilityChanged($0))) },
                 onBridgeMessage: { store.send(.internal(.bridgeMessageReceived($0))) },
                 onOutboundDelivered: { store.send(.internal(.outboundDelivered(id: $0))) }
             )

@@ -74,6 +74,8 @@ struct BridgeWebView: UIViewRepresentable {
     var onLoadingCommitted: (() -> Void)?
     // 웹 프로세스가 죽음(#352). 화면은 흰 채로 남고 웹 헤더 · BACK_PRESSED 응답도 없어, 받는 화면(상세)이 오류로 돌린다.
     var onWebProcessTerminated: (() -> Void)?
+    // 키보드가 뜨고 내림. 받는 화면(상세)만 넘긴다(#383).
+    var onKeyboardVisibilityChanged: ((Bool) -> Void)?
     // 웹 → 네이티브 인바운드 메시지(AppBridge) 수신 콜백.
     let onBridgeMessage: (WebBridgeInboundMessage) -> Void
     // 아웃바운드 메시지를 evaluateJavaScript로 실제 전달한 뒤 호출.
@@ -238,6 +240,7 @@ struct BridgeWebView: UIViewRepresentable {
         let tabRootScroll: TabRootScrollAction? = extendsUnderTabBar ? context.environment.tabRootScroll : nil
         let keyboardAvoidingContainer = container as? KeyboardAvoidingWebContainer
         keyboardAvoidingContainer?.onScroll = tabRootScroll?.report
+        keyboardAvoidingContainer?.onKeyboardVisibilityChanged = onKeyboardVisibilityChanged
         // 웹 시트가 열린 동안 가린 높이를 0으로 돌리고 탭 바를 숨긴다(#314).
         context.coordinator.onSheetOpenChanged = extendsUnderTabBar
             ? { [weak keyboardAvoidingContainer] isOpen in
