@@ -30,7 +30,7 @@ public struct AppAlertView: View {
                 Text(configuration.message)
                     .font(.pretendard.bodyM)
                     .foregroundColor(Color.component.dialog.descriptionText)
-                    .lineLimit(3)
+                    .lineLimit(configuration.messageLineLimit)
                     .lineSpacing(4) // .lineHeight(8) 대신 사용
                 
                 HStack(spacing: 8) {

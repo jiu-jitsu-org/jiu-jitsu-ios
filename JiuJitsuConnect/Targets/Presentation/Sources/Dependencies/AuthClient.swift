@@ -18,6 +18,8 @@ public struct AuthClient {
     public var refreshSession: @Sendable () async throws -> String
     /// 탈퇴 시 Apple 재인증으로 새 authorizationCode를 받아 반환(서버 revoke용). Apple 외 provider면 nil(#41).
     public var appleAuthorizationCodeForWithdrawal: @Sendable () async throws -> String?
+    /// 이 기기에 저장된 로그인 수단(#398). 탈퇴 알럿이 Apple 확인 창을 미리 알린다.
+    public var storedProvider: @Sendable () -> Domain.SNSProvider?
 
     public init(
         loginWithGoogle: @Sendable @escaping () async throws -> Domain.SNSUser,
@@ -30,7 +32,8 @@ public struct AuthClient {
         hasValidToken: @Sendable @escaping () -> Bool,
         storedAccessToken: @Sendable @escaping () -> String?,
         refreshSession: @Sendable @escaping () async throws -> String,
-        appleAuthorizationCodeForWithdrawal: @Sendable @escaping () async throws -> String?
+        appleAuthorizationCodeForWithdrawal: @Sendable @escaping () async throws -> String?,
+        storedProvider: @Sendable @escaping () -> Domain.SNSProvider?
     ) {
         self.loginWithGoogle = loginWithGoogle
         self.loginWithApple = loginWithApple
@@ -43,6 +46,7 @@ public struct AuthClient {
         self.storedAccessToken = storedAccessToken
         self.refreshSession = refreshSession
         self.appleAuthorizationCodeForWithdrawal = appleAuthorizationCodeForWithdrawal
+        self.storedProvider = storedProvider
     }
 }
 
@@ -92,6 +96,9 @@ extension AuthClient: DependencyKey {
         },
         appleAuthorizationCodeForWithdrawal: {
             "test-authorization-code"
+        },
+        storedProvider: {
+            nil
         }
     )
 }
@@ -138,6 +145,9 @@ extension AuthClient {
         },
         appleAuthorizationCodeForWithdrawal: {
             fatalError("unimplemented.appleAuthorizationCodeForWithdrawal is not implemented")
+        },
+        storedProvider: {
+            fatalError("unimplemented.storedProvider is not implemented")
         }
     )
 }

@@ -207,9 +207,14 @@ public struct SettingsView: View {
         case .withdrawal:
             return .init(
                 title: "회원 탈퇴",
-                message: "30일 뒤 계정이 영구 삭제됩니다. 작성한 게시물과 댓글은 익명으로 남으며, 기간 내 재로그인 시 탈퇴가 취소됩니다.",
+                message: store.isAppleWithdrawal
+                    // Apple은 탈퇴 직전 재인증 창이 떠서 미리 알린다(#398). 예고 없이 뜨면 왜 다시 로그인하는지 몰라 닫게 된다.
+                    ? "30일 뒤 계정이 영구 삭제됩니다. 작성한 게시물과 댓글은 익명으로 남으며, 기간 내 재로그인 시 탈퇴가 취소됩니다. 확인을 위해 Apple 로그인 창이 한 번 더 열립니다."
+                    : "30일 뒤 계정이 영구 삭제됩니다. 작성한 게시물과 댓글은 익명으로 남으며, 기간 내 재로그인 시 탈퇴가 취소됩니다.",
                 primaryButton: .init(title: "탈퇴하기", style: .destructive, action: { store.send(.view(.confirmWithdrawal)) }),
-                secondaryButton: .init(title: "취소", style: .neutral, action: { store.send(.view(.alertDismissed)) })
+                secondaryButton: .init(title: "취소", style: .neutral, action: { store.send(.view(.alertDismissed)) }),
+                // 30일 · 익명 · 재로그인 취소 · Apple 확인 창까지 다 읽어야 해 줄 수를 막지 않는다.
+                messageLineLimit: nil
             )
         case .none:
             // Alert가 보이지 않을 때를 위한 기본값. 내용은 중요하지 않습니다.

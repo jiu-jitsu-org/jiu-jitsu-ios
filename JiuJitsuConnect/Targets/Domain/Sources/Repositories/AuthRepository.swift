@@ -17,6 +17,10 @@ public protocol AuthRepository: Sendable {
     /// 서버가 Apple 토큰 revoke에 쓰며, 로그인 때 받은 code는 이미 만료되어 쓸 수 없다(#41, BE #149).
     /// 현재 로그인 provider가 Apple이 아니면 재인증 없이 `nil`을 반환한다(카카오/구글은 iOS 작업 불필요).
     func appleAuthorizationCodeForWithdrawal() async throws -> String?
+
+    /// 이 기기에 저장된 로그인 수단. 탈퇴 안내가 Apple 재인증 여부를 미리 알릴 때 쓴다(#398) —
+    /// `appleAuthorizationCodeForWithdrawal`과 같은 값으로 판단해야 안내와 실제 동작이 어긋나지 않는다.
+    func storedProvider() -> SNSProvider?
     
     func serverLogin(user: SNSUser) async throws -> AuthInfo
     /// `fcmToken`을 함께 보내면 서버가 이 기기의 푸시 토큰 연결을 지운다(#269).
