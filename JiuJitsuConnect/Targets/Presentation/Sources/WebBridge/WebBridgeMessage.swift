@@ -191,6 +191,8 @@ private extension WebBridgeOutboundMessage {
             return "PHOTOS_PICKED  reqId=\(requestId) files=\(files.count) base64=[\(sizes)]"
         case .profileUpdated:
             return "PROFILE_UPDATED"
+        case let .userBlockChanged(userId, blocked):
+            return "USER_BLOCK_CHANGED  userId=\(userId) blocked=\(blocked)"
         }
     }
 }
@@ -749,6 +751,8 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
     case photosPicked(requestId: String, files: [PickedPhoto])
     /// MY에서 프로필(띠 등)을 저장함 → 웹이 들고 있는 내 프로필을 다시 불러온다(jiu-jitsu-frontend#413).
     case profileUpdated
+    /// 남의 프로필 ⋯에서 회원을 차단·해제함(#328) → 웹이 떠 있는 화면을 다시 불러와 그 회원 글·댓글을 가리거나 다시 보인다(jiu-jitsu-frontend#488).
+    case userBlockChanged(userId: Int, blocked: Bool)
 
     private var type: String {
         switch self {
@@ -761,6 +765,7 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         case .selectSheetResult: return "SELECT_SHEET_RESULT"
         case .photosPicked: return "PHOTOS_PICKED"
         case .profileUpdated: return "PROFILE_UPDATED"
+        case .userBlockChanged: return "USER_BLOCK_CHANGED"
         }
     }
 
@@ -770,6 +775,8 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
             return ["accessToken": accessToken]
         case .authLoginCancelled, .authSessionExpired, .authLogout, .backPressed, .profileUpdated:
             return nil
+        case let .userBlockChanged(userId, blocked):
+            return ["userId": userId, "blocked": blocked]
         case let .confirmDialogResult(requestId, outcome):
             return ["requestId": requestId, "result": outcome.rawValue]
         case let .selectSheetResult(requestId, outcome):

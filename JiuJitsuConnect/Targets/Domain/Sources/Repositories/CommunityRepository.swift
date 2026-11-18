@@ -25,4 +25,21 @@ public protocol CommunityRepository: Sendable {
     /// - Returns: 공개 프로필 (체급·성별·특기 제외)
     /// - Throws: DomainError — 없는 회원·탈퇴한 회원은 `apiError(.userNotFound)`
     func fetchPublicProfile(userId: Int) async throws -> CommunityPublicProfile
+
+    /// 회원을 신고합니다 (`POST /reports`, reportType USER)
+    /// - Parameters:
+    ///   - userId: 신고할 회원 ID
+    ///   - reason: 신고 사유 코드 (`ABUSE` 등)
+    ///   - detail: '기타'로 입력한 내용. 없으면 보내지 않습니다
+    /// - Throws: DomainError — 이미 신고한 회원은 `apiError(.alreadyReported)`
+    func reportUser(userId: Int, reason: String, detail: String?) async throws
+
+    /// 회원을 차단합니다 (`POST /user/block/{id}`)
+    /// - Returns: 서버가 돌려준 차단 상태 (true = 차단)
+    /// - Throws: DomainError
+    func blockUser(userId: Int) async throws -> Bool
+
+    /// 회원 차단을 해제합니다 (`DELETE /user/block/{id}`)
+    /// - Throws: DomainError
+    func unblockUser(userId: Int) async throws
 }

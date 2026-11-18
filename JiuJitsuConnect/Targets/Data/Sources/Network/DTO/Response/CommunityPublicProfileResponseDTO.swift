@@ -21,6 +21,8 @@ struct CommunityPublicProfileResponseDTO: Decodable {
     let favoriteTechnique: String?
     let favoriteSubmission: String?
     let competitions: [CompetitionDTO]?
+    /// 내가 이 회원을 차단했는지 — 비로그인이면 null, 아직 내려 주지 않는 서버에서는 키가 없다(#328)
+    let isBlocked: Bool?
 
     func toDomain() -> CommunityPublicProfile {
         CommunityPublicProfile(
@@ -34,7 +36,8 @@ struct CommunityPublicProfileResponseDTO: Decodable {
             favoritePosition: favoritePosition.flatMap { PositionType(rawValue: $0) },
             favoriteTechnique: favoriteTechnique.flatMap { TechniqueType(rawValue: $0) },
             favoriteSubmission: favoriteSubmission.flatMap { SubmissionType(rawValue: $0) },
-            competitions: competitions?.flatMap { $0.toDomain() } ?? []
+            competitions: competitions?.flatMap { $0.toDomain() } ?? [],
+            isBlocked: isBlocked
         )
     }
 }
