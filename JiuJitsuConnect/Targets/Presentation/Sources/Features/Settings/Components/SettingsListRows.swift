@@ -128,6 +128,8 @@ struct SettingsToggleRow: View {
                         .foregroundStyle(Color.component.list.setting.subText)
                 }
             }
+            // 스위치가 행 제목으로 읽히므로 같은 글을 두 번 읽지 않게 숨긴다(부제는 힌트로)
+            .accessibilityHidden(true)
 
             Spacer()
 
@@ -138,8 +140,10 @@ struct SettingsToggleRow: View {
                     .fill(Color.semantic.surface.disabled)
                     .frame(width: Self.toggleSize.width, height: Self.toggleSize.height)
             } else {
-                Toggle("", isOn: $isOn)
+                // VoiceOver가 이름 없는 스위치로 읽지 않게 행 제목을 라벨로 준다(화면에는 숨김)
+                Toggle(text, isOn: $isOn)
                     .labelsHidden()
+                    .accessibilityHint(subtitle ?? "")
                     .tint(Color.component.switch.on.bg)
             }
         }

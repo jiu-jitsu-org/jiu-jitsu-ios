@@ -21,6 +21,8 @@ extension AppFeature {
         var pendingOpen: AnalyticsEvent.AppState?
         /// 돌아오기 전에 먼저 온 입구(푸시 탭이 `.active`보다 먼저 올 때).
         var pendingSource: AnalyticsEvent.OpenSource?
+        /// 마지막으로 보낸 계정 속성(MY 프로필 기준). 같은 값은 다시 보내지 않는다.
+        var sentProfileProperties: [AnalyticsUserProperty: String?] = [:]
     }
 
     /// 루트 분석 리듀서. 상태는 `AnalyticsState`만 바꾸고 화면 흐름에는 끼어들지 않는다.
@@ -41,6 +43,14 @@ extension AppFeature {
         @Dependency(\.continuousClock) var clock
 
         func reduce(into state: inout State, action: Action) -> Effect<Action> {
+            let effect = reduceEvent(into: &state, action: action)
+            if case .destination(.presented(.appTab)) = action {
+                syncProfileProperties(&state)
+            }
+            return effect
+        }
+
+        private func reduceEvent(into state: inout State, action: Action) -> Effect<Action> {
             switch action {
             // MARK: app_open · push_enabled
 
@@ -101,24 +111,14 @@ extension AppFeature {
                 updateLoginMethod()
                 return .none
 
-            case let .destination(.presented(.appTab(.myPage(.internal(.profileResponse(.success(profile))))))),
-                 let .destination(.presented(.appTab(.myPage(.internal(.refreshProfileResponse(.success(profile), _)))))):
-                updateProfileProperties(profile)
-                return .none
-
-            case let .destination(.presented(.appTab(.myPage(.internal(.userProfileResponse(.success(profile))))))),
-                 let .destination(.presented(.appTab(.myPage(.internal(.refreshUserProfileResponse(.success(profile))))))):
-                analyticsClient.setUserProperty(Self.flag(profile.userRole == .owner), .coachRole)
-                return .none
-
             case .destination(.presented(.appTab(.internal(.webLogoutCompleted)))),
                  .destination(.presented(.appTab(.internal(.handleSessionExpired)))):
                 // 다음에 이 기기로 들어오는 사람에게 이전 계정 값이 붙지 않게 지운다.
-                clearMemberProperties()
+                clearMemberProperties(&state)
                 return .none
 
             case .destination(.presented(.appTab(.myPage(.delegate(.settings(.didWithdrawSuccessfully)))))):
-                clearMemberProperties()
+                clearMemberProperties(&state)
                 analyticsClient.resetAnalyticsData()
                 return .none
 
@@ -189,15 +189,30 @@ extension AppFeature {
             analyticsClient.setUserProperty(provider.rawValue.lowercased(), .loginMethod)
         }
 
-        private func updateProfileProperties(_ profile: CommunityProfile) {
-            analyticsClient.setUserProperty(profile.beltRank?.rawValue.lowercased() ?? "none", .belt)
-            analyticsClient.setUserProperty(profile.beltRank == nil ? nil : profile.beltStripe.map { String($0.count) }, .stripes)
-            analyticsClient.setUserProperty(Self.flag(!profile.competitions.isEmpty), .hasCompRecord)
-            analyticsClient.setUserProperty(Self.flag(!(profile.academyName ?? "").isEmpty), .hasGym)
+        /// MY가 화면에 반영한 프로필(조회 · 재조회 · 저장 결과 모두)을 기준으로 바뀐 속성만 보낸다.
+        /// 응답이 아니라 상태를 보므로 화면이 버린 늦은 재조회 응답은 쓰지 않는다.
+        private func syncProfileProperties(_ state: inout State) {
+            guard case let .appTab(appTab)? = state.destination, !appTab.authInfo.isGuest else { return }
+            var properties: [AnalyticsUserProperty: String?] = [:]
+            if let profile = appTab.myPage.communityProfile {
+                properties[.belt] = profile.beltRank?.rawValue.lowercased() ?? "none"
+                properties[.stripes] = profile.beltRank == nil ? nil : profile.beltStripe.map { String($0.count) }
+                properties[.hasCompRecord] = Self.flag(!profile.competitions.isEmpty)
+                properties[.hasGym] = Self.flag(!(profile.academyName ?? "").isEmpty)
+            }
+            if let userProfile = appTab.myPage.userProfile {
+                properties[.coachRole] = Self.flag(userProfile.userRole == .owner)
+            }
+            for (property, value) in properties.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
+                guard state.analytics.sentProfileProperties[property] != .some(value) else { continue }
+                state.analytics.sentProfileProperties[property] = .some(value)
+                analyticsClient.setUserProperty(value, property)
+            }
         }
 
         /// 기기 권한(`push_enabled`)은 계정과 무관해 남긴다.
-        private func clearMemberProperties() {
+        private func clearMemberProperties(_ state: inout State) {
+            state.analytics.sentProfileProperties = [:]
             for property in AnalyticsUserProperty.allCases where property != .pushEnabled {
                 analyticsClient.setUserProperty(nil, property)
             }

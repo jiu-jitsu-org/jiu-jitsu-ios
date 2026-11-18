@@ -30,7 +30,11 @@ enum AnalyticsClientFactory {
                 guard isCollectionEnabled(defaults) else { return }
                 let problems = AnalyticsValidation.violations(of: event)
                 guard problems.isEmpty else {
-                    report("이벤트 \(event.name.rawValue) 버림: \(problems.joined(separator: ", "))")
+                    // 웹뷰에서 온 기록은 외부 입력이라 Debug에서도 멈추지 않고 버리기만 한다.
+                    report(
+                        "이벤트 \(event.name.rawValue)(\(event.surface.rawValue)) 버림: \(problems.joined(separator: ", "))",
+                        stopsInDebug: event.surface == .native
+                    )
                     return
                 }
                 var parameters: [String: Any] = ["surface": event.surface.rawValue]
@@ -46,7 +50,7 @@ enum AnalyticsClientFactory {
             setUserProperty: { value, property in
                 let problems = AnalyticsValidation.violations(of: property, value: value)
                 guard problems.isEmpty else {
-                    report("사용자 속성 \(property.rawValue) 버림: \(problems.joined(separator: ", "))")
+                    report("사용자 속성 \(property.rawValue) 버림: \(problems.joined(separator: ", "))", stopsInDebug: true)
                     return
                 }
                 Log.trace("[Analytics] user property \(property.rawValue)=\(value ?? "nil")", category: .debug, level: .info)
@@ -69,11 +73,13 @@ enum AnalyticsClientFactory {
         defaults.object(forKey: collectionEnabledKey) as? Bool ?? true
     }
 
-    /// 사전 위반은 코드 실수라 Debug에서는 바로 멈춰 알린다. 그 밖에는 기록만 버린다.
-    private static func report(_ message: String) {
+    /// 앱 코드의 사전 위반은 실수라 Debug에서는 바로 멈춰 알린다. 그 밖에는 기록만 버린다.
+    private static func report(_ message: String, stopsInDebug: Bool) {
         Log.trace("[Analytics] \(message)", category: .debug, level: .error)
         #if DEBUG
-        assertionFailure(message)
+        if stopsInDebug {
+            assertionFailure(message)
+        }
         #endif
     }
 }
