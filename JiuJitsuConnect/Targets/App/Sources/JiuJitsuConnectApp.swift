@@ -44,6 +44,7 @@ struct JiuJitsuConnectApp: App {
                 reducer: { AppFeature() },
                 withDependencies: {
                     $0.firebaseClient = firebaseClient
+                    $0.analyticsClient = DependencyContainer.shared.configureAnalyticsClient()
                     $0.authClient = DependencyContainer.shared.configureAuthClient()
                     $0.userClient = DependencyContainer.shared.configureUserClient()
                     $0.communityClient = DependencyContainer.shared.configureCommunityClient()

@@ -78,7 +78,8 @@ public struct SplashFeature: Sendable {
         public enum InternalAction: Sendable {
             case minimumDisplayElapsed
             case autoLoginFinished(AuthInfo?, isSessionExpired: Bool = false)
-            case autoLoginConnectionFailed
+            /// 저장된 로그인은 있는데 서버에 닿지 못함. 시간 초과인지는 분석(`session_restore`)이 가른다(#423).
+            case autoLoginConnectionFailed(isTimedOut: Bool)
             case versionChecked(AppUpdateRequirement)
         }
 
@@ -264,12 +265,12 @@ public struct SplashFeature: Sendable {
                 if case let .apiError(code, _)? = error as? DomainError, code.endsSession {
                     await send(.internal(.autoLoginFinished(nil, isSessionExpired: true)))
                 } else {
-                    await send(.internal(.autoLoginConnectionFailed))
+                    await send(.internal(.autoLoginConnectionFailed(isTimedOut: false)))
                 }
             case .timedOut:
                 // 저장된 토큰은 지우지 않는다. 요청은 계속 돌고, [다시 시도]가 그 결과에 합류한다.
                 Log.trace("⚠️ Auto login timed out after \(Self.maximumWaitDuration)", category: .debug, level: .error)
-                await send(.internal(.autoLoginConnectionFailed))
+                await send(.internal(.autoLoginConnectionFailed(isTimedOut: true)))
             }
         }
         .cancellable(id: CancelID.onAppearLaunch, cancelInFlight: true)

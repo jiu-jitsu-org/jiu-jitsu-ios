@@ -33,6 +33,8 @@ public struct AppFeature: Sendable {
         var isLaunchSyncDeferred = false
         /// 꼭 필요한 업데이트(#326). 닫을 수 없는 안내로 앱 전체를 막는다 — 업데이트하면 앱이 새로 켜진다.
         var isUpdateRequired = false
+        /// 분석 기록이 쓰는 생명주기 기억(#423)
+        var analytics = AnalyticsState()
 
         public init() {}
     }
@@ -52,6 +54,8 @@ public struct AppFeature: Sendable {
             case onAppear
             /// 앱이 다시 활성화됐다(포그라운드 복귀, 제어 센터 닫힘 등).
             case sceneBecameActive
+            /// 앱이 백그라운드로 갔다. 복귀(`app_open`)와 권한 창 · 제어 센터 닫힘을 가르는 데 쓴다(#423).
+            case sceneEnteredBackground
             /// 유니버설 링크 수신(`NSUserActivityTypeBrowsingWeb`).
             case deepLinkReceived(URL)
             /// 인사가 끝났거나 눌러서 건너뛰어 홈이 아래에서 올라오기 시작한다.
@@ -67,6 +71,8 @@ public struct AppFeature: Sendable {
             case pushNotificationTapped(PushActionPayload)
             /// 켜 둔 앱을 다시 열 때 버전을 다시 확인했더니 꼭 필요한 업데이트(#326).
             case updateRequiredOnResume
+            /// `app_open`의 입구(푸시 · 링크)를 기다리는 시간이 지남(#423)
+            case appOpenSourceWaitElapsed
         }
     }
 
@@ -202,6 +208,8 @@ public struct AppFeature: Sendable {
         }
         // ifLet runs AFTER parent logic to handle child state
         .ifLet(\.$destination, action: \.destination)
+        // 분석 기록(#423). 화면 흐름은 바꾸지 않고 지나가는 액션만 본다.
+        Analytics()
         // 로그인 화면이 동작을 처리한 뒤에 본다(#375). 가입 중에 받아 둔 링크가 있는데 가입 흐름이 끝나 첫 로그인 화면으로
         // 돌아왔으면(그만두기 · 약관 시트 닫기 · 서버 로그인 실패 · 가입 시간 만료) 둘러보기와 같이 게스트로 그 화면을 연다.
         // 로그인 · 가입을 마친 경우는 위에서 이미 탭 화면으로 바뀌어 여기 걸리지 않는다.

@@ -258,6 +258,10 @@ public final class DependencyContainer {
         return sharedFirebaseClient
     }
 
+    public func configureAnalyticsClient() -> AnalyticsClient {
+        AnalyticsClientFactory.make()
+    }
+
     /// 스플래시 · 앱 복귀 · 설정이 같은 버전 확인 결과를 보도록 한 벌만 둔다(#326).
     private let appVersionPolicyCache = AppVersionPolicyCache()
     private static let dismissedRecommendedVersionKey = "jj.appVersion.dismissed_recommended"
