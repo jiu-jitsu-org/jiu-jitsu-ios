@@ -193,6 +193,8 @@ public struct CommunityDetailFeature: Sendable {
         case sessionExpired
         /// MY에서 프로필을 저장함 — 세션 변화는 아니지만 열린 웹뷰 모두에 알리는 같은 통로를 쓴다.
         case profileUpdated
+        /// 남의 프로필에서 회원을 차단·해제함(#328) — PROFILE_UPDATED와 같은 통로로 열린 웹뷰 모두에 알린다.
+        case userBlockChanged(userId: Int, blocked: Bool)
     }
 
     @Dependency(\.dismiss) var dismiss
@@ -472,6 +474,8 @@ public struct CommunityDetailFeature: Sendable {
             enqueue(.authSessionExpired, into: &state)
         case .profileUpdated:
             enqueue(.profileUpdated, into: &state)
+        case let .userBlockChanged(userId, blocked):
+            enqueue(.userBlockChanged(userId: userId, blocked: blocked), into: &state)
         }
     }
 

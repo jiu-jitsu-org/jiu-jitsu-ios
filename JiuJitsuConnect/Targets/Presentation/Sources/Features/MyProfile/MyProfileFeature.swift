@@ -162,6 +162,8 @@ public struct MyProfileFeature: Sendable {
             case webSubview(CommunityDetailFeature.Action.DelegateAction)
             // 띠·도장 등 프로필 저장이 서버에 반영됨 → 부모가 열린 웹뷰 모두에 PROFILE_UPDATED를 보낸다(jiu-jitsu-frontend#413).
             case profileUpdated
+            // 이 스택에 쌓인 남의 프로필에서 회원을 차단·해제함(#328) → 부모가 열린 웹뷰 모두에 USER_BLOCK_CHANGED를 보낸다.
+            case userBlockChanged(userId: Int, blocked: Bool)
             // 비로그인 MY의 '로그인하기'(#242) → 부모가 로그인 화면을 띄운다.
             case loginRequested
             // MY 스택에 연 설정의 위임(로그아웃·탈퇴·로그인·차단한 회원) → 부모가 설정 탭이던 때와 같이 처리한다.
@@ -867,6 +869,9 @@ public struct MyProfileFeature: Sendable {
 
             case let .path(.element(id: _, action: .communityDetail(.delegate(delegate)))):
                 return .send(.delegate(.webSubview(delegate)))
+
+            case let .path(.element(id: _, action: .userProfile(.delegate(.blockChanged(userId, blocked))))):
+                return .send(.delegate(.userBlockChanged(userId: userId, blocked: blocked)))
 
             case let .openUserProfile(userId):
                 // 연타·중복 전달로 같은 프로필이 겹쳐 쌓이지 않게 한다
