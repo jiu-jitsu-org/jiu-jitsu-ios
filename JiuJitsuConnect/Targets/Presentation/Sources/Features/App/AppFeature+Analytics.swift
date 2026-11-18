@@ -196,7 +196,9 @@ extension AppFeature {
             var properties: [AnalyticsUserProperty: String?] = [:]
             if let profile = appTab.myPage.communityProfile {
                 properties[.belt] = profile.beltRank?.rawValue.lowercased() ?? "none"
-                properties[.stripes] = profile.beltRank == nil ? nil : profile.beltStripe.map { String($0.count) }
+                // 띠가 없으면 nil 값으로 남겨 속성을 지운다(첨자 대입에 nil을 넣으면 키가 사라진다).
+                let stripes: String? = profile.beltRank == nil ? nil : profile.beltStripe.map { String($0.count) }
+                properties.updateValue(stripes, forKey: .stripes)
                 properties[.hasCompRecord] = Self.flag(!profile.competitions.isEmpty)
                 properties[.hasGym] = Self.flag(!(profile.academyName ?? "").isEmpty)
             }

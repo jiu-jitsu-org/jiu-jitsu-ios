@@ -128,8 +128,9 @@ struct SettingsToggleRow: View {
                         .foregroundStyle(Color.component.list.setting.subText)
                 }
             }
-            // 스위치가 행 제목으로 읽히므로 같은 글을 두 번 읽지 않게 숨긴다(부제는 힌트로)
-            .accessibilityHidden(true)
+            // 스위치가 행 제목으로 읽히므로 같은 글을 두 번 읽지 않게 숨긴다(부제는 힌트로).
+            // 로딩 중에는 스위치 대신 라벨 없는 자리표시라 글을 그대로 읽게 둔다.
+            .accessibilityHidden(!isLoading)
 
             Spacer()
 
