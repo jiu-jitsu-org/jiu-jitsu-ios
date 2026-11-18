@@ -30,10 +30,6 @@ let package = Package(
             branch: "main"
         ),
         .package(
-            url: "https://github.com/onevcat/Kingfisher",
-            branch: "master"
-        ),
-        .package(
             url: "https://github.com/kakao/kakao-ios-sdk",
             branch: "master"
         ),

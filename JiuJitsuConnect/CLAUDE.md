@@ -24,7 +24,7 @@
 | 경고 정책 | Warnings as Errors (Swift / GCC 모두 ON) |
 
 **주요 외부 의존성:** `swift-composable-architecture` 1.22.2+, `firebase-ios-sdk` 12.12.1+,
-`kakao-ios-sdk`, `GoogleSignIn-iOS`, `Pulse`, `Lottie` 4.5.2+, `Kingfisher`.
+`kakao-ios-sdk`, `GoogleSignIn-iOS`, `Pulse`, `Lottie` 4.5.2+.
 
 ---
 
@@ -499,6 +499,10 @@ private enum Metrics {
   - 줄인 효과는 원본이 아니라 빌드 결과물(`.app`·`Assets.car`)로 잰다.
   - 폰트는 실제로 쓰는 굵기만 넣는다 (현재 Pretendard SemiBold·Medium, CookieRun Black). 굵기를 추가할 때는 파일, `Project.swift`의 `UIAppFonts`, `Font+.swift`의 목록과 `Weight`를 함께 고친다.
   - 움직임이 있는 화면은 반영 전에 실기기에서 끊김을 확인한다.
+- **오픈소스 라이선스 고지 (#371):** 앱에 들어가는 패키지 · 폰트의 라이선스는 iOS 설정 앱 › OSS › 오픈소스 라이선스(`Targets/App/Resources/Settings.bundle`)로 고지한다. 앱 안 화면은 없다.
+  - 목록은 LicensePlist가 `Tuist/Package.resolved`와 받아 둔 소스(`Tuist/.build`)에서 만들고, 결과를 커밋한다. 다시 만들기: `brew install licenseplist` 후 `sh scripts/update-licenses.sh`
+  - 패키지를 더하거나 빼면 앱 빌드의 `Update Open Source Licenses` 단계가 낡은 목록을 알아채 LicensePlist가 있으면 다시 만든다(바뀐 `Settings.bundle` · `Licenses/inputs.sha256`을 함께 커밋). 없으면 경고만 남긴다
+  - 폰트처럼 패키지가 아닌 것은 `Licenses/license_plist.yml`의 `manual`에 적고 전문은 `Licenses/manual/`에 둔다. 폰트를 더하면 여기에도 더한다
 - **리소스 위치 (#224):** 같은 파일을 앱 본체와 `DesignSystem.framework`에 두 벌 넣지 않는다. 폰트 파일은 `Targets/DesignSystem/Resources/Fonts`에 두되 앱 타깃만 담고(`UIAppFonts`는 앱 본체에서 찾는다), 이미지·색·로티는 DesignSystem 타깃만 담는다. 앱 아이콘과 런치 화면 그림·색은 `Targets/App/Resources/AppAssets.xcassets`에 둔다. 이 중 `Splash` 그림과 `Blue-500-Primary`는 런치 화면(앱 본체)과 앱 코드(프레임워크)가 각각 읽어야 해서 사본이므로, 바꿀 때 양쪽을 함께 고친다.
 
 ---
