@@ -69,7 +69,7 @@ enum FirebaseClientFactory {
                 _ = try await FirebaseAPNSTokenBridge.waitForDeviceToken()
 
                 return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-                    Messaging.messaging().token { token, error in
+                    Messaging.messaging().legacyTokenAPI.token { token, error in
                         if let error {
                             continuation.resume(throwing: error)
                         } else if let token {
@@ -131,7 +131,7 @@ enum FirebaseClientFactory {
 
     private static func deleteToken() async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            Messaging.messaging().deleteToken { error in
+            Messaging.messaging().legacyTokenAPI.deleteToken { error in
                 if let error = error as NSError?,
                    error.domain == MessagingErrorDomain, error.code == failedToCheckInCode {
                     // checkin 정보가 없으면 이 설치는 토큰을 발급받은 적이 없어 폐기할 것도 없다(알림 권한 거절 등).
@@ -162,4 +162,20 @@ private actor PendingDeletion {
         tail = task
         try await task.value
     }
+}
+
+// MARK: - FCM 토큰 API (#423)
+
+/// firebase-ios-sdk 12.18에서 토큰 API가 설치 ID(FID) 기반 `register` · `unregister`로 바뀌며 deprecated 됐다.
+/// 서버는 아직 FCM 토큰으로 보내므로 토큰 API를 그대로 쓴다. 경고=오류라 프로토콜을 거쳐 부른다.
+/// FID 방식으로 옮기려면 서버 발송 방식부터 바뀌어야 해 별도 작업으로 한다.
+private protocol LegacyFCMTokenAPI {
+    func token(completion: @Sendable @escaping (String?, Error?) -> Void)
+    func deleteToken(completion: @Sendable @escaping (Error?) -> Void)
+}
+
+extension Messaging: LegacyFCMTokenAPI {}
+
+private extension Messaging {
+    var legacyTokenAPI: LegacyFCMTokenAPI { self }
 }
