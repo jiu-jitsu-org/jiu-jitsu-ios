@@ -44,6 +44,22 @@ let crashlyticsDSYMUploadScript: TargetScript = .post(
     basedOnDependencyAnalysis: false
 )
 
+// MARK: - 오픈소스 라이선스 고지 (#371)
+// 목록(Targets/App/Resources/Settings.bundle)은 커밋된 결과를 쓴다. 패키지 · 설정이 바뀌어 낡았으면
+// LicensePlist가 있는 기기에서는 다시 만들고(결과를 커밋), 없으면(Xcode Cloud 등) 경고만 남기고 빌드는 그대로 간다.
+let licensesScript: TargetScript = .pre(
+    script: """
+    cd "${SRCROOT}"
+    if [ "$(sh scripts/update-licenses.sh --hash)" = "$(cat Licenses/inputs.sha256 2>/dev/null)" ]; then
+        exit 0
+    fi
+    sh scripts/update-licenses.sh \\
+        || echo "warning: 오픈소스 라이선스 목록이 패키지와 다릅니다 — scripts/update-licenses.sh 실행 후 커밋"
+    """,
+    name: "Update Open Source Licenses",
+    basedOnDependencyAnalysis: false
+)
+
 // MARK: - SwiftLint (스킴 `SwiftLint`로만 실행 — 일반 앱 빌드에서는 스크립트 미실행)
 let swiftlintScript: TargetScript = .pre(
     script: """
@@ -203,7 +219,7 @@ let project = Project(
                 // UIAppFonts는 앱 본체에서 찾으므로 폰트 파일은 앱 타깃에만 넣는다(#224).
                 .glob(pattern: .relativeToRoot("Targets/DesignSystem/Resources/Fonts/**"))
             ],
-            scripts: [releaseInfoPlistScript, crashlyticsDSYMUploadScript],
+            scripts: [licensesScript, releaseInfoPlistScript, crashlyticsDSYMUploadScript],
             dependencies: [
                 .target(name: "Presentation"),
                 .target(name: "Data"),

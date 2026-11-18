@@ -1,0 +1,12 @@
+# LicensePlist 설정 (#371) — scripts/update-licenses.sh가 읽는다.
+# 패키지(Tuist/Package.resolved)는 자동으로 모이고, 여기에는 패키지가 아닌 것만 적는다.
+manual:
+  - name: "Pretendard"
+    source: "https://github.com/orioncactus/pretendard"
+    file: "manual/Pretendard.txt"
+  - name: "CookieRun"
+    source: "https://www.cookierunfont.com"
+    file: "manual/CookieRun.txt"
+  - name: "KakaoSDK - Apple Sample Code"
+    source: "https://github.com/kakao/kakao-ios-sdk"
+    file: "manual/KakaoSDK-Apple.txt"
