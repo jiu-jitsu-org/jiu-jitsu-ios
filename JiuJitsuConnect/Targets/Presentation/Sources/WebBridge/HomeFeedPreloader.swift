@@ -58,8 +58,9 @@ enum HomeFeedPreloader {
     }
 
     /// 홈 피드 웹뷰의 브릿지 기능 목록 — 홈 웹뷰(BridgeWebView)가 알리는 목록과 같아야 이어받는다.
+    /// 카테고리 칩(HOME_CATEGORY_TABS)은 홈 웹뷰가 직접 넘기고,
     /// 분석 기록(#424) · 관심 대회 알림 결과(#395)는 모든 웹뷰, 시트 열림은 탭 바 밑까지 그리는 웹(#314)에 BridgeWebView가 붙인다.
-    static let capabilities: [WebBridgeCapability] = [.analyticsEvent, .competitionAlertsEnabled, .setSheetOpen]
+    static let capabilities: [WebBridgeCapability] = [.homeCategoryTabs, .analyticsEvent, .competitionAlertsEnabled, .setSheetOpen]
 
     /// 홈 웹뷰가 미리 불러 둔 화면을 이어받는다. 주소·설정이 다르면 이어받지 않고 새로 만들게 둔다.
     static func take(url: URL, capabilities: [WebBridgeCapability]) -> HomeFeedPreload? {

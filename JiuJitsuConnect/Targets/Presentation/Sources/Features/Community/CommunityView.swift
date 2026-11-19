@@ -22,6 +22,14 @@ public struct CommunityView: View {
         // 검색 버튼에서 사용(알림함 종은 NotificationInboxButton이 같은 값으로 그린다)
         static let trailingIconSize: CGFloat = 24
         static let trailingIconButtonSize: CGFloat = 40
+        // 머리줄 카테고리 칩(웹 홈 칩과 같은 규격)
+        static let leadingInset: CGFloat = 16
+        // 큰 글씨에서 잘리지 않게 최소 높이로 둔다.
+        static let chipMinHeight: CGFloat = 32
+        static let chipHorizontalPadding: CGFloat = 12
+        static let chipSpacing: CGFloat = 8
+        // 칩 줄 오른쪽 끝이 종·검색 앞에서 흐려지는 폭
+        static let chipFadeWidth: CGFloat = 24
     }
 
     public var body: some View {
@@ -39,9 +47,13 @@ public struct CommunityView: View {
                         // 리스트 피드 웹 배경과 맞춰, 바운스 때 다른 색이 드러나지 않게 한다.
                         overscrollBackground: Color.primitive.bw.white,
                         extendsUnderTabBar: true,
+                        // 카테고리 칩은 머리줄(gnb)이 그린다 — 웹은 이걸 보고 자기 칩 줄을 숨긴다.
+                        capabilities: CommunityFeature.listCapabilities,
                         onLoadingStarted: { store.send(.internal(.loadingStarted)) },
                         onLoadingFinished: { store.send(.internal(.loadingFinished)) },
                         onLoadingFailed: { store.send(.internal(.loadingFailed)) },
+                        // 새로고침 중 누른 칩이 새 웹에 닿지 않고 사라지지 않게, 다시 불러오는 동안은 누름을 막는다.
+                        onRefreshStarted: { store.send(.internal(.refreshStarted)) },
                         onBridgeMessage: { store.send(.internal(.bridgeMessageReceived($0))) },
                         onOutboundDelivered: { store.send(.internal(.outboundDelivered(id: $0))) }
                     )
@@ -71,17 +83,23 @@ public struct CommunityView: View {
     }
 
     private var gnb: some View {
-        // 대회 탭 머리줄과 같이 왼쪽에 탭 이름, 오른쪽에 아이콘을 둔다(#435). 카테고리는 웹 피드 위 탭이 맡는다.
+        // 대회 탭 머리줄과 같이 왼쪽에 탭 이름, 오른쪽에 아이콘을 둔다(#435).
+        // 홈 웹이 카테고리 칩을 알려 오면 탭 이름 자리에 칩 줄을 그린다(웹은 자기 칩 줄을 숨긴다).
         ZStack(alignment: .bottom) {
             Rectangle()
                 .fill(Color.component.navibar.container.divider)
                 .frame(height: 1)
 
             HStack(spacing: 0) {
-                Text("홈")
-                    .font(Font.pretendard.title3)
-                    .foregroundStyle(Color.component.header.text)
-                Spacer(minLength: 0)
+                if store.homeCategoryTabs.isEmpty {
+                    Text("홈")
+                        .font(Font.pretendard.title3)
+                        .foregroundStyle(Color.component.header.text)
+                        .padding(.leading, Metrics.leadingInset)
+                    Spacer(minLength: 0)
+                } else {
+                    categoryChips
+                }
                 HStack(spacing: 0) {
                     #if DEBUG || BETA
                     Button {
@@ -116,7 +134,6 @@ public struct CommunityView: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.leading, 16)
             .padding(.trailing, 8)
         }
         .frame(height: 44)
@@ -126,6 +143,64 @@ public struct CommunityView: View {
             Color.component.header.background
                 .ignoresSafeArea(edges: .top)
         }
+    }
+
+    /// 밀어서 보는 카테고리 칩 줄. 밀면 칩이 화면 왼쪽 끝까지 가도록 앞 여백은 스크롤 내용 안쪽에 둔다.
+    private var categoryChips: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Metrics.chipSpacing) {
+                    ForEach(store.homeCategoryTabs, id: \.id) { tab in
+                        categoryChip(tab)
+                            .id(tab.id)
+                    }
+                }
+                // 끝까지 밀어도 마지막 칩이 흐림에 묻히지 않게 뒤에도 여백을 둔다.
+                .padding(.horizontal, Metrics.leadingInset)
+            }
+            .mask {
+                HStack(spacing: 0) {
+                    Rectangle()
+                    LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: Metrics.chipFadeWidth)
+                }
+            }
+            .onAppear {
+                proxy.scrollTo(store.selectedHomeCategoryId, anchor: .center)
+            }
+            .onChange(of: store.selectedHomeCategoryId) { _, selectedId in
+                withAnimation {
+                    proxy.scrollTo(selectedId, anchor: .center)
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("카테고리")
+    }
+
+    private func categoryChip(_ tab: HomeCategoryTab) -> some View {
+        let isSelected = tab.id == store.selectedHomeCategoryId
+        return Button {
+            store.send(.view(.homeCategoryTapped(tab.id)))
+        } label: {
+            Text(tab.name)
+                .font(Font.pretendard.buttonS)
+                .foregroundStyle(isSelected ? Color.semantic.primary.primary : Color.semantic.text.primary)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, Metrics.chipHorizontalPadding)
+                .frame(minHeight: Metrics.chipMinHeight)
+                .background(Capsule().fill(isSelected ? Color.semantic.surface.primarySubtle : Color.clear))
+                .overlay(
+                    Capsule().strokeBorder(
+                        isSelected ? Color.semantic.primary.primary : Color.semantic.border.disabled,
+                        lineWidth: 1
+                    )
+                )
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var errorOverlay: some View {
