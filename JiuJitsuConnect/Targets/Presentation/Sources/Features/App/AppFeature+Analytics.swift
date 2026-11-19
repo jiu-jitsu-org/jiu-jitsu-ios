@@ -219,12 +219,9 @@ extension AppFeature {
             let previous = state.analytics.loggedScreen
             state.analytics.loggedScreen = screen
             guard let screen, let event = screen.event else { return }
+            forgetClosedScreens(below: screen, previous: previous, state: &state)
             let isShownAgain = state.analytics.shownScreens[screen.id] == event
             state.analytics.shownScreens[screen.id] = event
-            // 탭 첫 화면이 다시 보이면 그 위에 쌓였던 화면은 모두 닫힌 것이라 기억에서 뺀다.
-            if ScreenView.tab(of: screen.id) != nil, !screen.id.contains("/") {
-                state.analytics.shownScreens = state.analytics.shownScreens.filter { !$0.key.hasPrefix("\(screen.id)/") }
-            }
             let from: String? = if isResuming {
                 "resume"
             } else if isShownAgain {
@@ -234,6 +231,22 @@ extension AppFeature {
                 nil
             }
             log(from.map(event.replacingFrom) ?? event)
+        }
+
+        /// 지금 화면 위에 떠 있던 화면은 모두 닫혔다 — 다시 열면 처음 보이는 것이라 기억에서 뺀다.
+        /// 위치 id는 위에 뜨는 화면이 아래 화면 id 뒤에 붙는다(`my` → `my/edit/belt`, `my/<스택>` → `my/<스택>/notification`).
+        private func forgetClosedScreens(below screen: VisibleScreen, previous: VisibleScreen?, state: inout State) {
+            // 첫 로그인 화면에서 탭 화면으로 오면 탭 화면을 새로 만든 것이라 기억을 모두 비운다.
+            if let previousID = previous?.id, previousID == "login" || previousID.hasPrefix("login/") {
+                state.analytics.shownScreens = [:]
+                return
+            }
+            state.analytics.shownScreens = state.analytics.shownScreens.filter { key, _ in
+                if key.hasPrefix("\(screen.id)/") { return false }
+                // 탭 화면이 보이면 로그인 모달은 닫힌 것
+                if ScreenView.tab(of: screen.id) != nil, key.hasPrefix(ScreenView.loginCoverID) { return false }
+                return true
+            }
         }
 
         /// 직전에 남긴 화면과 다른 탭의 화면인지. 로그인 모달 등 탭 밖 화면에서 돌아온 것은 탭 전환이 아니다.
@@ -337,8 +350,6 @@ extension AppFeature {
 
         /// 로그인 · 가입 · 복원 응답의 분석용 ID와 계정 구분. 값이 없으면 지워 이전 계정 값이 남지 않게 한다.
         private func updateMember(_ userInfo: AuthInfo.UserInfo?, state: inout State) {
-            // 로그인하면 탭 화면을 새로 만든다 — 같은 위치에 다시 뜬 화면은 다시 보임이 아니다.
-            state.analytics.shownScreens = [:]
             sendUserID(Self.nonEmpty(userInfo?.analyticsId), state: &state)
             let accountType = AnalyticsUserProperty.accountTypeValue(userInfo?.accountType)
             guard state.analytics.sentProfileProperties[.accountType] != .some(accountType) else { return }
@@ -354,8 +365,6 @@ extension AppFeature {
 
         /// 기기 권한(`push_enabled`)은 계정과 무관해 남긴다. 회원 ID는 빈 문자열이 아니라 nil로 지운다.
         private func clearMemberProperties(_ state: inout State) {
-            // 로그아웃 · 만료 · 탈퇴는 탭 화면을 게스트로 새로 만든다 — 다시 보임 기억도 비운다.
-            state.analytics.shownScreens = [:]
             state.analytics.sentUserID = .some(nil)
             analyticsClient.setUserID(nil)
             state.analytics.sentProfileProperties = [:]
