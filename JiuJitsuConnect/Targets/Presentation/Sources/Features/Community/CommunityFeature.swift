@@ -284,6 +284,10 @@ public struct CommunityFeature: Sendable {
             // 뒤로가기는 검색 결과 → 홈 순서로 돌아온다. 비로그인도 쓸 수 있어 로그인을 묻지 않는다.
             case .view(.searchTapped):
                 guard let base = state.url, let url = Self.searchURL(base: base) else { return .none }
+                // 연타로 검색 화면이 두 겹 쌓이지 않게 — 이미 맨 위가 검색이면 그대로 둔다.
+                if let id = state.path.ids.last, case let .detail(top)? = state.path[id: id], WebOrigin.isSamePage(top.url, url) {
+                    return .none
+                }
                 state.path.append(.detail(Self.subview(url: url, accessToken: state.accessToken)))
                 return .none
 
@@ -777,9 +781,27 @@ public struct CommunityFeature: Sendable {
 
     /// 대회 이야기 '모두 보기'(#437): 홈 피드를 `/?competitionId=<번호>`로 다시 불러온다. 웹이 '대회' 탭을 고르고
     /// 그 대회 글만 보여 준다(jiu-jitsu-frontend#598). 다른 카테고리를 보고 있었거나 같은 주소여도 다시 불러와 그 대회로 맞춘다.
-    public static func reloadFeed(competitionId: Int, into state: inout State) {
+    /// 대회 번호 없이 홈으로 오면(오늘의 게임·커뮤니티에서 더 보기 등) 앞서 건 대회 필터만 풀고, 필터가 없으면 보던 피드를 그대로 둔다.
+    public static func reloadFeed(competitionId: Int?, into state: inout State) {
         guard let base = makeCommunityURL() else { return }
-        reloadCommunity(&state, url: URL(string: "/?competitionId=\(competitionId)", relativeTo: base)?.absoluteURL)
+        let target: URL?
+        if let competitionId {
+            target = URL(string: "/?\(competitionIdQueryName)=\(competitionId)", relativeTo: base)?.absoluteURL
+        } else if let current = state.url, hasCompetitionFilter(current) {
+            target = base
+        } else {
+            return
+        }
+        // 같은 주소를 이미 불러오는 중이면(같은 신호가 잇달아 옴) 다시 부르지 않는다 — 진행 중인 로드를 끊으면 오류 화면이 뜬다.
+        if state.isLoading, state.url == target { return }
+        reloadCommunity(&state, url: target)
+    }
+
+    private static let competitionIdQueryName = "competitionId"
+
+    private static func hasCompetitionFilter(_ url: URL) -> Bool {
+        URLComponents(url: url, resolvingAgainstBaseURL: true)?
+            .queryItems?.contains { $0.name == competitionIdQueryName } ?? false
     }
 
     /// 로그아웃·탈퇴 때 이전 계정으로 연 MY 화면(#197)과 대회 기록 추가(#304)를 닫는다. 그 위에 쌓인 화면도 함께 닫는다.

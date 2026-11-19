@@ -16,12 +16,10 @@ extension AppTabFeature {
     ///   알림함을 거쳐 왔으면 뒤로가기(popFrom)를 거치지 않고 닫히므로 새 알림 점을 여기서 다시 조회한다.
     /// - MY(#386): MY에 열어 둔 화면(커뮤니티 활동)을 닫고 홈 탭으로
     /// 탭을 바꾸면 홈 진입 처리(새 알림 점 갱신)는 탭 선택이 함께 한다.
-    /// 대회 번호가 오면(대회 이야기 '모두 보기', #437) 피드를 그 대회 글만 보이게 다시 불러온다. 없으면 보던 피드 그대로다.
+    /// 대회 번호가 오면(대회 이야기 '모두 보기', #437) 피드를 그 대회 글만 보이게 다시 불러온다. 없으면 앞서 건 대회 필터만 푼다.
     static func showHomeFeed(from tab: Tab, competitionId: Int?, into state: inout State) -> Effect<Action> {
         CommunityFeature.closeToFeed(into: &state.home)
-        if let competitionId {
-            CommunityFeature.reloadFeed(competitionId: competitionId, into: &state.home)
-        }
+        CommunityFeature.reloadFeed(competitionId: competitionId, into: &state.home)
         switch tab {
         case .home:
             return .send(.home(.unreadNotificationRefreshRequested))
