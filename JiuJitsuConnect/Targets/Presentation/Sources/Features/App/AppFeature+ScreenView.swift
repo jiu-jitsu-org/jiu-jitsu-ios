@@ -33,12 +33,12 @@ extension AppFeature {
         static func visibleScreen(in state: State) -> VisibleScreen? {
             switch state.destination {
             case let .login(login)?:
-                return loginScreen(login, from: "launch", id: "login")
+                return loginScreen(login, from: AnalyticsEvent.LoginEntry.launch.rawValue, id: "login")
             case let .appTab(appTab)?:
                 if let login = appTab.loginCover {
                     // '내 기록에 남기기'(#250)로 연 모달은 그 기록을 기다리는 동안 record.
-                    let from = state.analytics.loginCoverFrom ?? (appTab.pendingCompetitionRecord != nil ? "record" : nil)
-                    return loginScreen(login, from: from, id: loginCoverID)
+                    let entry: AnalyticsEvent.LoginEntry? = state.analytics.loginCoverFrom ?? (appTab.pendingCompetitionRecord != nil ? .record : nil)
+                    return loginScreen(login, from: entry?.rawValue, id: loginCoverID)
                 }
                 // 첫 홈은 인사 장면이 끝난 뒤에 센다.
                 guard !appTab.isGreetingShowing else { return nil }

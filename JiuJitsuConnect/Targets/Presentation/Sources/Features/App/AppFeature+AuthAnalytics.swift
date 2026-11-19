@@ -12,8 +12,8 @@ import Foundation
 
 extension AppFeature.Analytics {
     func reduceAuthEvent(into state: inout State, action: Action) {
-        if let (loginAction, isCover) = Self.loginAction(of: action) {
-            reduceLogin(loginAction, isCover: isCover, state: &state)
+        if let login = Self.loginAction(of: action) {
+            reduceLogin(login.action, isCover: login.isCover, state: &state)
         }
         reducePromptEvent(into: &state, action: action)
         reducePushEvent(into: &state, action: action)
@@ -25,7 +25,7 @@ extension AppFeature.Analytics {
 
     private func reduceLogin(_ action: LoginFeature.Action, isCover: Bool, state: inout State) {
         // 첫 화면은 launch, 모달은 띄운 곳 · 이유. 성공하면 모달이 바로 닫히지만 비우는 건 이 다음(updateVisibleScreen)이다.
-        let from = isCover ? state.analytics.loginCoverFrom : "launch"
+        let from: AnalyticsEvent.LoginEntry? = isCover ? state.analytics.loginCoverFrom : .launch
         let reason = isCover ? state.analytics.loginCoverReason : nil
         let login = Self.loginState(in: state, isCover: isCover)
 
@@ -72,8 +72,8 @@ extension AppFeature.Analytics {
     private func startLogin(
         _ method: AnalyticsEvent.LoginMethod,
         login: LoginFeature.State?,
-        from: String?,
-        reason: String?,
+        from: AnalyticsEvent.LoginEntry?,
+        reason: AnalyticsEvent.LoginReason?,
         state: inout State
     ) {
         guard login?.isLoading == false else { return }
@@ -81,8 +81,7 @@ extension AppFeature.Analytics {
         log(.loginStart(method: method, from: from, reason: reason))
     }
 
-    /// 앱 첫 화면 또는 탭 안 모달의 로그인 액션. 두 번째 값은 모달인지.
-    private static func loginAction(of action: Action) -> (LoginFeature.Action, Bool)? {
+    private static func loginAction(of action: Action) -> (action: LoginFeature.Action, isCover: Bool)? {
         switch action {
         case let .destination(.presented(.login(loginAction))):
             (loginAction, false)
@@ -104,7 +103,7 @@ extension AppFeature.Analytics {
         }
     }
 
-    static func loginFailReason(_ error: any Error, isServerStage: Bool) -> AnalyticsEvent.LoginFailReason {
+    private static func loginFailReason(_ error: any Error, isServerStage: Bool) -> AnalyticsEvent.LoginFailReason {
         let fallback: AnalyticsEvent.LoginFailReason = isServerStage ? .serverError : .snsError
         guard let domainError = error as? DomainError else { return fallback }
         switch domainError {
@@ -129,11 +128,11 @@ extension AppFeature.Analytics {
         case let .destination(.presented(.appTab(.home(.delegate(.loginPromptRequested(reason)))))),
              let .destination(.presented(.appTab(.competition(.delegate(.webSubview(.loginPromptRequested(reason))))))),
              let .destination(.presented(.appTab(.myPage(.delegate(.webSubview(.loginPromptRequested(reason))))))):
-            state.analytics.loginPromptReason = reason
+            state.analytics.loginPromptReason = reason.flatMap(AnalyticsEvent.LoginReason.init(rawValue:))
 
         case .destination(.presented(.appTab(.home(.delegate(.myProfileRequested))))):
             guard case let .appTab(appTab)? = state.destination, appTab.authInfo.isGuest else { return }
-            state.analytics.loginPromptReason = "profile"
+            state.analytics.loginPromptReason = .profile
 
         case .destination(.presented(.appTab(.view(.loginPromptCancelTapped)))),
              .destination(.presented(.appTab(.view(.loginPromptDismissed)))):
@@ -163,7 +162,7 @@ extension AppFeature.Analytics {
 
         let isExpiryShown = appTab?.isSessionExpiredAlertPresented == true
         if isExpiryShown, !state.analytics.isSessionExpiredPromptShown {
-            log(.loginPromptView(reason: "session_expired", from: from))
+            log(.loginPromptView(reason: .sessionExpired, from: from))
         }
         state.analytics.isSessionExpiredPromptShown = isExpiryShown
     }
@@ -175,7 +174,7 @@ extension AppFeature.Analytics {
             from != "back", from != "resume",
             case let .appTab(appTab)? = state.destination, appTab.authInfo.isGuest
         else { return }
-        log(.loginPromptView(reason: "my_tab", from: Self.screenName(of: screen)))
+        log(.loginPromptView(reason: .myTab, from: Self.screenName(of: screen)))
     }
 
     private static func screenName(of screen: AppFeature.VisibleScreen?) -> String? {
@@ -187,21 +186,24 @@ extension AppFeature.Analytics {
 
     private func reducePushEvent(into state: inout State, action: Action) {
         switch action {
-        case let .destination(.presented(.appTab(.internal(.notificationPermissionAnswered(granted, trigger))))):
-            log(.pushPermissionResult(granted: granted, trigger: trigger))
+        case let .destination(.presented(.appTab(.internal(.notificationPromptPermissionAnswered(granted))))):
+            logPermissionAnswer(granted: granted, trigger: .contentCreate, state: &state)
+
+        case let .destination(.presented(.appTab(.internal(.competitionSettingPermissionAnswered(granted))))):
+            logPermissionAnswer(granted: granted, trigger: .settingsCompetition, state: &state)
 
         case let .destination(.presented(.appTab(.myPage(.path(.element(
             id: _,
             action: .settings(.destination(.presented(.notificationSetting(.internal(.devicePermissionAnswered(granted))))))
         )))))):
-            log(.pushPermissionResult(granted: granted, trigger: .settingsDevice))
+            logPermissionAnswer(granted: granted, trigger: .settingsDevice, state: &state)
 
         // 웹의 관심 대회 '알림 받기'(#395). 권한 창은 웹 화면 Feature가 띄우고 결과만 올라온다.
         case let .destination(.presented(.appTab(.home(.delegate(.competitionAlertsChecked(check)))))),
              let .destination(.presented(.appTab(.competition(.delegate(.competitionAlertsChecked(check)))))),
              let .destination(.presented(.appTab(.myPage(.delegate(.webSubview(.competitionAlertsChecked(check))))))):
             if check == .grantedNow || check == .deniedNow {
-                log(.pushPermissionResult(granted: check == .grantedNow, trigger: .competitionAlert))
+                logPermissionAnswer(granted: check == .grantedNow, trigger: .competitionAlert, state: &state)
             }
             // 꺼짐 안내는 로그인 동안 한 번만 뜬다 — 이번에 실제로 떴을 때만 기억한다.
             if case let .appTab(appTab)? = state.destination, appTab.isDeviceNotificationAlertPresented,
@@ -222,6 +224,15 @@ extension AppFeature.Analytics {
         default:
             break
         }
+        // 버튼 없이 닫힌 안내(로그아웃 · 세션 만료 · 탈퇴로 게스트가 됨)의 곳을 다음 안내로 넘기지 않는다.
+        if case let .appTab(appTab)? = state.destination, appTab.isDeviceNotificationAlertPresented { return }
+        state.analytics.deviceAlertTrigger = nil
+    }
+
+    private func logPermissionAnswer(granted: Bool, trigger: AnalyticsEvent.PushTrigger, state: inout State) {
+        guard !state.analytics.didLogPermissionAnswer else { return }
+        state.analytics.didLogPermissionAnswer = true
+        log(.pushPermissionResult(granted: granted, trigger: trigger))
     }
 
     private func answerDeviceAlert(_ action: AnalyticsEvent.PushSettingsAction, state: inout State) {

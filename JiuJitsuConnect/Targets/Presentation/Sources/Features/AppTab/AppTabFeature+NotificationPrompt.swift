@@ -65,10 +65,10 @@ extension AppTabFeature {
                 case .granted:
                     await send(.internal(.notificationPermissionGranted))
                 case .grantedNow:
-                    await send(.internal(.notificationPermissionAnswered(granted: true, trigger: .contentCreate)))
+                    await send(.internal(.notificationPromptPermissionAnswered(granted: true)))
                     await send(.internal(.notificationPermissionGranted))
                 case .deniedNow:
-                    await send(.internal(.notificationPermissionAnswered(granted: false, trigger: .contentCreate)))
+                    await send(.internal(.notificationPromptPermissionAnswered(granted: false)))
                 case .denied:
                     return
                 }
@@ -98,12 +98,12 @@ extension AppTabFeature {
             case .granted:
                 return
             case .grantedNow:
-                await send(.internal(.notificationPermissionAnswered(granted: true, trigger: .settingsCompetition)))
+                await send(.internal(.competitionSettingPermissionAnswered(granted: true)))
                 await send(.internal(.notificationPermissionGranted))
             case .denied:
                 await send(.internal(.showDeviceNotificationAlert))
             case .deniedNow:
-                await send(.internal(.notificationPermissionAnswered(granted: false, trigger: .settingsCompetition)))
+                await send(.internal(.competitionSettingPermissionAnswered(granted: false)))
                 await send(.internal(.showDeviceNotificationAlert))
             }
         }

@@ -35,16 +35,18 @@ extension AppFeature {
         /// 백그라운드로 나갈 때 맨 위였던 화면. 백그라운드 중 푸시 · 링크가 화면을 바꿨으면 그 화면은 resume이 아니다.
         var backgroundScreenID: String?
         /// 로그인 모달을 띄운 곳(login_prompt · web_modal · record · my_profile · settings). 모달이 닫히면 비운다.
-        var loginCoverFrom: String?
+        var loginCoverFrom: AnalyticsEvent.LoginEntry?
         /// 로그인 모달을 띄운 이유(사전 "로그인 안내", #426). 로그인 시작 · 성공 · 가입까지 싣고 모달이 닫히면 비운다.
-        var loginCoverReason: String?
+        var loginCoverReason: AnalyticsEvent.LoginReason?
         /// 로그인 안내 알럿을 띄운 이유. [로그인]이면 모달로 넘기고, 취소 · 닫힘이면 버린다.
-        var loginPromptReason: String?
+        var loginPromptReason: AnalyticsEvent.LoginReason?
         /// 로그인 안내 · 만료 안내가 떠 있다. 뜬 순간만 login_prompt_view로 센다.
         var isLoginPromptShown = false
         var isSessionExpiredPromptShown = false
         /// 마지막으로 누른 SNS. 실패 · 성공 · 가입에 싣는다.
         var loginMethod: AnalyticsEvent.LoginMethod?
+        /// 시스템 권한 창 답을 남겼다. 창은 설치당 한 번만 뜨지만, 떠 있는 동안 웹의 확인이 겹치면 같은 답이 여러 번 올라온다.
+        var didLogPermissionAnswer = false
         /// 기기 알림 꺼짐 안내를 띄운 곳. 첫 답에서 비운다 — 버튼 뒤 닫힘 바인딩이 한 번 더 와도 두 번 세지 않게.
         var deviceAlertTrigger: AnalyticsEvent.PushTrigger?
         /// 꼭 필요한 업데이트 안내가 뜬 곳(launch · resume)
@@ -191,38 +193,38 @@ extension AppFeature {
                 return scheduleScreenViewSettle()
 
             case .destination(.presented(.appTab(.view(.loginPromptLoginTapped)))):
-                state.analytics.loginCoverFrom = "login_prompt"
+                state.analytics.loginCoverFrom = .loginPrompt
                 state.analytics.loginCoverReason = state.analytics.loginPromptReason
                 state.analytics.loginPromptReason = nil
                 return .none
 
             case .destination(.presented(.appTab(.view(.sessionExpiredAlert(.loginTapped))))):
-                state.analytics.loginCoverFrom = "login_prompt"
-                state.analytics.loginCoverReason = "session_expired"
+                state.analytics.loginCoverFrom = .loginPrompt
+                state.analytics.loginCoverReason = .sessionExpired
                 return .none
 
             case .destination(.presented(.appTab(.myPage(.delegate(.loginRequested))))):
-                state.analytics.loginCoverFrom = "my_profile"
-                state.analytics.loginCoverReason = "my_tab"
+                state.analytics.loginCoverFrom = .myProfile
+                state.analytics.loginCoverReason = .myTab
                 return .none
 
             case .destination(.presented(.appTab(.myPage(.delegate(.settings(.loginRequested)))))):
-                state.analytics.loginCoverFrom = "settings"
-                state.analytics.loginCoverReason = "my_tab"
+                state.analytics.loginCoverFrom = .settings
+                state.analytics.loginCoverReason = .myTab
                 return .none
 
             // 비로그인으로 누른 '내 기록에 남기기'(#250) — 앱이 바로 로그인 모달을 연다.
             case .destination(.presented(.appTab(.competition(.delegate(.competitionRecordRequested))))),
                  .destination(.presented(.appTab(.home(.delegate(.competitionRecordRequested))))):
                 guard case let .appTab(appTab)? = state.destination, appTab.pendingCompetitionRecord != nil else { return .none }
-                state.analytics.loginCoverFrom = "record"
-                state.analytics.loginCoverReason = "record"
+                state.analytics.loginCoverFrom = .record
+                state.analytics.loginCoverReason = .record
                 return .none
 
             case .destination(.presented(.appTab(.home(.delegate(.loginModalRequested))))),
                  .destination(.presented(.appTab(.myPage(.delegate(.webSubview(.loginModalRequested)))))),
                  .destination(.presented(.appTab(.competition(.delegate(.webSubview(.loginModalRequested)))))):
-                state.analytics.loginCoverFrom = "web_modal"
+                state.analytics.loginCoverFrom = .webModal
                 return .none
 
             default:

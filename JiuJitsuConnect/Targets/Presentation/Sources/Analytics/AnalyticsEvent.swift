@@ -187,6 +187,32 @@ extension AnalyticsEvent {
         case kakao, google, apple
     }
 
+    /// 로그인 화면이 열린 입구(사전 "from 값" 중 로그인).
+    public enum LoginEntry: String, Sendable {
+        /// 앱 첫 로그인 화면
+        case launch
+        /// 로그인 안내 · 만료 안내의 [로그인]
+        case loginPrompt = "login_prompt"
+        /// 웹이 바로 연 로그인 모달
+        case webModal = "web_modal"
+        /// 비로그인으로 누른 '내 기록에 남기기'
+        case record
+        case myProfile = "my_profile"
+        case settings
+    }
+
+    /// 로그인 안내 이유(사전 "로그인 안내"). 웹이 보낸 값은 이 목록에 있는 것만 싣는다 — 외부 입력이 GA에 새 분류로 쌓이지 않게.
+    public enum LoginReason: String, Sendable {
+        case write, comment, reply, like, save, vote, interest
+        case interestFilter = "interest_filter"
+        case alert
+        case infoReport = "info_report"
+        case record, report, block
+        case myTab = "my_tab"
+        case profile
+        case sessionExpired = "session_expired"
+    }
+
     /// `login_fail`의 reason(사전 "로그인 실패").
     public enum LoginFailReason: String, Sendable {
         case cancel
@@ -234,25 +260,25 @@ extension AnalyticsEvent {
     }
 
     /// `reason`: 로그인 안내 이유(사전 "로그인 안내"). `from` · `reason`은 모르면 싣지 않는다.
-    public static func loginPromptView(reason: String?, from: String?) -> Self {
-        Self(.loginPromptView, parameters: strings(["reason": reason, "from": from]))
+    public static func loginPromptView(reason: LoginReason?, from: String?) -> Self {
+        Self(.loginPromptView, parameters: strings(["reason": reason?.rawValue, "from": from]))
     }
 
-    public static func loginStart(method: LoginMethod, from: String?, reason: String?) -> Self {
-        Self(.loginStart, parameters: strings(["method": method.rawValue, "from": from, "reason": reason]))
+    public static func loginStart(method: LoginMethod, from: LoginEntry?, reason: LoginReason?) -> Self {
+        Self(.loginStart, parameters: strings(["method": method.rawValue, "from": from?.rawValue, "reason": reason?.rawValue]))
     }
 
     /// `restored`: 탈퇴 유예 중 다시 로그인해 탈퇴가 취소됨.
-    public static func login(method: LoginMethod?, from: String?, restored: Bool) -> Self {
-        Self(.login, parameters: strings(["method": method?.rawValue, "from": from, "restored": flag(restored)]))
+    public static func login(method: LoginMethod?, from: LoginEntry?, restored: Bool) -> Self {
+        Self(.login, parameters: strings(["method": method?.rawValue, "from": from?.rawValue, "restored": flag(restored)]))
     }
 
     public static func loginFail(method: LoginMethod?, reason: LoginFailReason) -> Self {
         Self(.loginFail, parameters: strings(["method": method?.rawValue, "reason": reason.rawValue]))
     }
 
-    public static func signUp(method: LoginMethod?, marketing: Bool?, from: String?) -> Self {
-        Self(.signUp, parameters: strings(["method": method?.rawValue, "marketing": marketing.map(flag), "from": from]))
+    public static func signUp(method: LoginMethod?, marketing: Bool?, from: LoginEntry?) -> Self {
+        Self(.signUp, parameters: strings(["method": method?.rawValue, "marketing": marketing.map(flag), "from": from?.rawValue]))
     }
 
     public static func logout() -> Self {
