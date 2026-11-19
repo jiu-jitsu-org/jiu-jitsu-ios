@@ -67,6 +67,9 @@ public struct AppTabFeature: Sendable {
         var toast: ToastState?
         // 관심 대회 알림을 켰는데 기기 알림이 꺼져 있을 때 설정 앱으로 안내하는 AppAlert 표시 여부(#257)
         var isDeviceNotificationAlertPresented: Bool = false
+        // 웹의 관심 대회 알림에서 꺼짐 안내를 띄웠는지(#395). 웹은 관심 등록마다 알려 와서, 여러 개 누를 때마다 뜨지 않게 한다.
+        // 로그인하면 이 State가 새로 만들어져 다시 한 번 띄운다.
+        var didShowWebDeviceNotificationAlert = false
         // 첫 글 · 댓글을 올린 뒤 알림 권한을 묻기 전 한 줄 안내(#333) 표시 여부
         var isNotificationPromptPresented: Bool = false
         // 로그인 모달이 어느 탭 웹뷰의 행위(글쓰기·관심 등록 등)에서 트리거됐는지(홈·대회).
@@ -407,20 +410,20 @@ public struct AppTabFeature: Sendable {
                  .myPage(.delegate(.webSubview(.contentCreated))):
                 return promptNotificationPermissionIfNeeded(state)
 
-            // 관심 대회 첫 등록 시트의 '알림 받기'(#257). 웹은 홈 피드(글 속 대회 카드)·글 상세·알림함·대회 화면 어디서든 보내므로
-            // 모든 탭의 웹을 한곳에서 받는다. 설정 값은 웹이 서버에 저장했으니(#281) 열려 있는 설정 › 알림만 다시 읽힌다.
-            case let .competition(.delegate(.competitionAlertsEnabled(competitionId))),
-                 let .home(.delegate(.competitionAlertsEnabled(competitionId))),
-                 let .myPage(.delegate(.webSubview(.competitionAlertsEnabled(competitionId)))):
-                return .merge(
-                    enableCompetitionAlerts(competitionId: competitionId),
-                    Self.refreshOpenNotificationSetting(state)
-                )
+            // 관심 대회 '알림 받기' · 상세 종(#257 · #395). 웹은 홈 피드(글 속 대회 카드)·글 상세·알림함·대회 화면 어디서든 보내므로
+            // 모든 탭의 웹을 한곳에서 받는다. 기기 알림은 메시지를 받은 웹 화면이 보고 답했다.
+            // 설정 값은 웹이 서버에 저장했으니(#281) 열려 있는 설정 › 알림만 다시 읽힌다.
+            case let .competition(.delegate(.competitionAlertsChecked(check))),
+                 let .home(.delegate(.competitionAlertsChecked(check))),
+                 let .myPage(.delegate(.webSubview(.competitionAlertsChecked(check)))):
+                let refresh = Self.refreshOpenNotificationSetting(state)
+                return .merge(Self.handleWebCompetitionAlertsCheck(check, into: &state), refresh)
 
             // 설정 › 알림에서 '관심 대회 알림'을 켬(#257). 웹의 '알림 받기'와 같이 기기 알림 상태를 보고 안내한다.
+            // 직접 켠 동작이라 꺼짐 안내는 실행당 한 번으로 줄이지 않는다.
             // 안내 알럿은 이 화면의 최상위 덮개라 MY 스택에 쌓인 설정 화면 위에도 그려진다.
             case .myPage(.delegate(.settings(.competitionAlertTurnedOn))):
-                return enableCompetitionAlerts(competitionId: nil)
+                return enableCompetitionAlerts()
 
             // 대회 탭에서 연 알림함을 닫음(#258) → 홈의 새 알림 점을 다시 조회한다. 대회 탭의 종도 같은 값을 그린다.
             case .competition(.delegate(.unreadNotificationRefreshRequested)):
@@ -509,10 +512,12 @@ public struct AppTabFeature: Sendable {
             case .internal(.notificationPermissionGranted):
                 // 방금 허용했으면 푸시 등록·FCM 토큰 발급·서버 등록을 앱 진입 동기화와 같은 흐름으로 잇는다.
                 // 비로그인은 서버에 기기를 등록할 수 없어 권한만 받아 두고, 로그인 때 FCM 동기화가 등록한다.
+                // 권한 창이 떠 있는 동안 웹이 관심 대회 알림을 연달아 보내면 허용이 여러 번 올 수 있어 등록은 하나만 돌린다(#395).
                 guard !state.authInfo.isGuest else { return .none }
                 return .run { _ in
                     await FCMAppInfoSync.syncOnAppLaunch(firebaseClient: firebaseClient, userClient: userClient)
                 }
+                .cancellable(id: CancelID.deviceTokenSync, cancelInFlight: true)
 
             case let .internal(.fcmTokenRefreshed(token)):
                 // 서버에는 옛 토큰이 남아 다음 콜드 스타트까지 푸시가 가지 않는다. 비로그인은 등록할 계정이 없다.
@@ -745,26 +750,6 @@ public struct AppTabFeature: Sendable {
 // MARK: - 기기 알림 권한 · FCM 토큰
 
 extension AppTabFeature {
-    /// '관심 대회 알림'을 켰을 때 기기 알림 상태를 본다(#257). 설정 값은 서버에 있어(#281) 웹·설정 화면이 저장하고, 여기서는 안내만 한다.
-    /// 이미 허용이면 할 일이 없고, 거절(또는 기기 설정에서 끔)이면 앱이 다시 물을 수 없어 설정 앱으로 안내한다.
-    /// 한 번도 묻지 않았으면 iOS 설정에 알림 줄조차 없으니 여기서 시스템 권한 창을 띄운다.
-    private func enableCompetitionAlerts(competitionId: Int?) -> Effect<Action> {
-        Log.trace("관심 대회 알림 켬: competitionId=\(competitionId.map(String.init) ?? "-")", category: .view, level: .info)
-        return .run { send in
-            switch await notificationPermissionClient.status() {
-            case .granted:
-                return
-            case .denied:
-                await send(.internal(.showDeviceNotificationAlert))
-            case .notDetermined:
-                if await firebaseClient.requestPermission() {
-                    await send(.internal(.notificationPermissionGranted))
-                }
-            }
-        }
-        .cancellable(id: CancelID.notificationPermission, cancelInFlight: true)
-    }
-
     /// 앱 복귀 때 기기 토큰을 서버에 다시 등록한다(#332). 첫 권한 창에서 거절한 뒤 iOS 설정에서 켜고 돌아오면
     /// 서버에 이 기기 토큰이 없고, 앱 진입 등록이 오프라인으로 실패했어도 마찬가지다. 서버는 같은 토큰이면 OS 버전만 고친다.
     /// 아직 묻지 않았으면 등록 과정이 권한 창을 띄우므로 허용일 때만 한다 — 권한은 알림이 필요한 때에 묻는다.

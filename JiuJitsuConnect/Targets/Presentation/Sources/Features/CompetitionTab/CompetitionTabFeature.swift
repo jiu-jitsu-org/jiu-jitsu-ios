@@ -84,8 +84,8 @@ public struct CompetitionTabFeature: Sendable {
             // 웹의 인증류 위임 → 부모가 커뮤니티와 같은 흐름으로 처리한다.
             case webSubview(CommunityDetailFeature.Action.DelegateAction)
             case myTabRequested
-            // 관심 대회 첫 등록 시트의 '알림 받기'(#257) → 부모가 알림 설정을 켜고 기기 알림 상태를 본다.
-            case competitionAlertsEnabled(competitionId: Int?)
+            // 관심 대회 '알림 받기' · 상세 종의 기기 알림 상태(#257 · #395) → 부모가 꺼짐 안내 · 토큰 등록을 맡는다.
+            case competitionAlertsChecked(DeviceNotificationCheck)
             // 이 탭에서 연 알림함을 닫음(#258) → 부모가 홈의 새 알림 점을 다시 조회시킨다(이 탭의 종도 같은 값을 그린다).
             case unreadNotificationRefreshRequested
             // 대회 상세의 '커뮤니티에서 더 보기'(#250) → 부모가 이 스택을 닫고 홈 탭으로 바꾼다.
@@ -131,8 +131,8 @@ public struct CompetitionTabFeature: Sendable {
             case .web(.delegate(.myTabRequested)):
                 return .send(.delegate(.myTabRequested))
 
-            case let .web(.delegate(.competitionAlertsEnabled(competitionId))):
-                return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
+            case let .web(.delegate(.competitionAlertsChecked(check))):
+                return .send(.delegate(.competitionAlertsChecked(check)))
 
             case let .web(.delegate(.competitionRecordRequested(payload))):
                 return .send(.delegate(.competitionRecordRequested(payload)))
@@ -170,8 +170,8 @@ public struct CompetitionTabFeature: Sendable {
             case .path(.element(id: _, action: .communityDetail(.delegate(.myTabRequested)))):
                 return .send(.delegate(.myTabRequested))
 
-            case let .path(.element(id: _, action: .communityDetail(.delegate(.competitionAlertsEnabled(competitionId))))):
-                return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
+            case let .path(.element(id: _, action: .communityDetail(.delegate(.competitionAlertsChecked(check))))):
+                return .send(.delegate(.competitionAlertsChecked(check)))
 
             case .path(.element(id: _, action: .communityDetail(.delegate(.homeFeedRequested)))):
                 return .send(.delegate(.homeFeedRequested))

@@ -176,6 +176,8 @@ public struct CommunityFeature: Sendable {
             // View가 outbox의 메시지를 evaluateJavaScript로 전달 완료했음을 통지.
             case outboundDelivered(id: UUID)
             case unreadNotificationResponse(TaskResult<Bool>)
+            // COMPETITION_ALERTS_ENABLED를 받고 기기 알림 상태를 봄(#395). requestId가 있으면 리스트 웹에 답한다.
+            case competitionAlertsChecked(requestId: String?, DeviceNotificationCheck)
         }
 
         public enum DelegateAction: Sendable {
@@ -192,8 +194,8 @@ public struct CommunityFeature: Sendable {
             case myProfileRequested
             // 테스트용 '딥링크로 열기'(DEBUG/BETA) → 부모가 실제 유니버설 링크와 같은 경로(.deepLink)로 보낸다.
             case debugDeepLinkRequested(DeepLink)
-            // 홈 웹(피드·글 상세·알림함)의 관심 대회 '알림 받기'(#257) → 부모가 알림 설정을 켜고 기기 알림 상태를 본다.
-            case competitionAlertsEnabled(competitionId: Int?)
+            // 홈 웹(피드·글 상세·알림함)의 관심 대회 '알림 받기' · 상세 종의 기기 알림 상태(#257 · #395) → 부모가 꺼짐 안내 · 토큰 등록을 맡는다.
+            case competitionAlertsChecked(DeviceNotificationCheck)
             // 이 스택에 쌓인 MY에서 프로필을 저장함 → 부모가 열린 웹뷰 모두에 PROFILE_UPDATED를 보낸다.
             case profileUpdated
             // 이 스택에 쌓인 남의 프로필에서 회원을 차단·해제함(#328) → 부모가 열린 웹뷰 모두에 USER_BLOCK_CHANGED를 보낸다.
@@ -258,6 +260,8 @@ public struct CommunityFeature: Sendable {
 
     @Dependency(\.noticeClient) var noticeClient
     @Dependency(\.analyticsClient) var analyticsClient
+    @Dependency(\.notificationPermissionClient) var notificationPermissionClient
+    @Dependency(\.firebaseClient) var firebaseClient
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -463,9 +467,9 @@ public struct CommunityFeature: Sendable {
                     }
                     return .send(.delegate(.myProfileRequested))
 
-                case let .competitionAlertsEnabled(competitionId):
-                    // 홈 피드 글 속 대회 카드에서도 관심 첫 등록 시트가 뜬다(#257) → 부모(AppTab)가 대회 탭과 같이 처리한다.
-                    return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
+                case let .competitionAlertsEnabled(competitionId, requestId):
+                    // 홈 피드 글 속 대회 카드에서도 관심 첫 등록 시트가 뜬다(#257). 웹에 답한 뒤 부모(AppTab)가 대회 탭과 같이 안내한다(#395).
+                    return checkCompetitionAlerts(competitionId: competitionId, requestId: requestId)
 
                 case .contentCreated:
                     return .send(.delegate(.contentCreated))
@@ -484,6 +488,12 @@ public struct CommunityFeature: Sendable {
                     Log.trace("WebBridge 미지원 메시지 무시: \(type)", category: .network, level: .info)
                     return .none
                 }
+
+            case let .internal(.competitionAlertsChecked(requestId, check)):
+                if let requestId {
+                    Self.enqueue(.competitionAlertsResult(requestId: requestId, deviceEnabled: check.isEnabled), into: &state)
+                }
+                return .send(.delegate(.competitionAlertsChecked(check)))
 
             case let .internal(.outboundDelivered(id)):
                 state.outbox.removeAll { $0.id == id }
@@ -711,8 +721,8 @@ public struct CommunityFeature: Sendable {
         case let .userProfileRequested(userId):
             // 모달 안이면 openUserProfile이 모달 스택에 쌓는다
             return .send(.openUserProfile(userId: userId))
-        case let .competitionAlertsEnabled(competitionId):
-            return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
+        case let .competitionAlertsChecked(check):
+            return .send(.delegate(.competitionAlertsChecked(check)))
         case .homeFeedRequested:
             return .send(.delegate(.homeFeedRequested))
         case let .competitionRecordRequested(payload):
@@ -929,6 +939,15 @@ public struct CommunityFeature: Sendable {
         }
         state.pendingSelectSheet = payload
         return .none
+    }
+
+    /// 기기 알림 상태를 본다. 아직 묻지 않았으면 시스템 권한 창의 답까지 기다린다(#395).
+    private func checkCompetitionAlerts(competitionId: Int?, requestId: String?) -> Effect<Action> {
+        Log.trace("관심 대회 알림 켬: competitionId=\(competitionId.map(String.init) ?? "-")", category: .view, level: .info)
+        return .run { send in
+            let check = await DeviceNotificationCheck.current(permission: notificationPermissionClient, firebase: firebaseClient)
+            await send(.internal(.competitionAlertsChecked(requestId: requestId, check)))
+        }
     }
 
     /// 아웃바운드 메시지를 식별자와 함께 대기열에 추가한다.

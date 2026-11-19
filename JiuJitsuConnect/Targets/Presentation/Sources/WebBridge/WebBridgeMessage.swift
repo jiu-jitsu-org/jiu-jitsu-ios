@@ -149,8 +149,8 @@ private extension WebBridgeInboundMessage {
             return "OPEN_HOME_FEED"
         case let .openCompetitionRecord(payload):
             return "OPEN_COMPETITION_RECORD  competitionId=\(payload.competitionId.map(String.init) ?? "-") year=\(payload.year)"
-        case let .competitionAlertsEnabled(competitionId):
-            return "COMPETITION_ALERTS_ENABLED  competitionId=\(competitionId.map(String.init) ?? "-")"
+        case let .competitionAlertsEnabled(competitionId, requestId):
+            return "COMPETITION_ALERTS_ENABLED  competitionId=\(competitionId.map(String.init) ?? "-") reqId=\(requestId ?? "-")"
         case let .competitionHeaderTint(hex):
             return "COMPETITION_HEADER_TINT  color=\(hex ?? "null")"
         case let .setSheetOpen(open):
@@ -195,6 +195,8 @@ private extension WebBridgeOutboundMessage {
             return "PROFILE_UPDATED"
         case let .userBlockChanged(userId, blocked):
             return "USER_BLOCK_CHANGED  userId=\(userId) blocked=\(blocked)"
+        case let .competitionAlertsResult(requestId, deviceEnabled):
+            return "COMPETITION_ALERTS_RESULT  reqId=\(requestId) deviceEnabled=\(deviceEnabled)"
         }
     }
 }
@@ -250,10 +252,11 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     case openHomeFeed
     /// 끝난 대회 배너의 '내 기록에 남기기'(#250). 대회 이름·연도를 채운 채 내 대회 기록 추가 흐름을 열어 달라는 요청이다.
     case openCompetitionRecord(OpenCompetitionRecordPayload)
-    /// 관심 대회 첫 등록 시트에서 '알림 받기'를 고름(#257). 웹은 앱 안이면 늘 보낸다(capability 확인 없음).
+    /// 관심 대회 첫 등록 시트의 '알림 받기' · 대회 상세 종 켜기(#257 · jiu-jitsu-frontend#600). 웹은 앱 안이면 늘 보낸다.
     /// '관심 대회 알림' 설정은 웹이 서버에 저장하고(#281), 네이티브는 기기 알림이 꺼져 있으면 설정 앱으로 안내한다.
+    /// capability가 있는 웹은 requestId를 실어 COMPETITION_ALERTS_RESULT를 기다렸다가 성공 토스트를 정한다(#395). 없으면 답하지 않는다.
     /// competitionId는 서버 대회 id(숫자)로 로그에만 남긴다 — 없어도 안내는 한다.
-    case competitionAlertsEnabled(competitionId: Int?)
+    case competitionAlertsEnabled(competitionId: Int?, requestId: String?)
     /// 대회 목록 맨 위 띠 색 그라데이션에 맞춰 앱 대회 탭 머리줄(상태바 포함)을 칠해 달라는 요청.
     /// hex는 `#RRGGBB`, nil이면 앱 기본 머리줄 색으로 돌린다. 스크롤하며 조금씩 옅어진 색을 여러 번 보낸다.
     case competitionHeaderTint(hex: String?)
@@ -435,7 +438,8 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             return .openCompetitionRecord(record)
         case .competitionAlertsEnabled:
             let competitionId = OpenCompetitionRecordPayload.parseCompetitionId(payload?["competitionId"])
-            return .competitionAlertsEnabled(competitionId: competitionId)
+            let requestId = (payload?["requestId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            return .competitionAlertsEnabled(competitionId: competitionId, requestId: requestId)
         case .competitionHeaderTint:
             // `#RRGGBB`만 받는다. 형식이 어긋나면 null과 같이 기본색으로 돌린다(엉뚱한 색이 남지 않게).
             let hex = (payload?["color"] as? String).flatMap {
@@ -733,6 +737,9 @@ enum WebBridgeCapability: String, Equatable, Sendable {
     case setSheetOpen = "SET_SHEET_OPEN"
     /// 모든 웹뷰가 알린다(#424, BridgeWebView가 붙임). 목록이 없으면 웹은 기록을 버린다. 있으면 서브뷰 주소에 `?from=`을 싣는다.
     case analyticsEvent = "ANALYTICS_EVENT"
+    /// 모든 웹뷰가 알린다(#395, BridgeWebView가 붙임). 있으면 웹은 requestId를 실어 보내고 COMPETITION_ALERTS_RESULT를 기다린다.
+    /// 없으면(옛 앱) 지금처럼 바로 성공 토스트를 띄운다.
+    case competitionAlertsEnabled = "COMPETITION_ALERTS_ENABLED"
 
     /// `window.AppBridgeCapabilities = [...]`를 정의하는 스크립트 소스. 직렬화 실패 시 nil.
     static func injectionScriptSource(for capabilities: [WebBridgeCapability]) -> String? {
@@ -809,6 +816,8 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
     case profileUpdated
     /// 남의 프로필 ⋯에서 회원을 차단·해제함(#328) → 웹이 떠 있는 화면을 다시 불러와 그 회원 글·댓글을 가리거나 다시 보인다(jiu-jitsu-frontend#488).
     case userBlockChanged(userId: Int, blocked: Bool)
+    /// COMPETITION_ALERTS_ENABLED의 결과(#395). 기기 알림이 켜져 있을 때(방금 허용 포함)만 true — 웹은 true일 때만 성공 토스트를 띄운다.
+    case competitionAlertsResult(requestId: String, deviceEnabled: Bool)
 
     private var type: String {
         switch self {
@@ -822,6 +831,7 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         case .photosPicked: return "PHOTOS_PICKED"
         case .profileUpdated: return "PROFILE_UPDATED"
         case .userBlockChanged: return "USER_BLOCK_CHANGED"
+        case .competitionAlertsResult: return "COMPETITION_ALERTS_RESULT"
         }
     }
 
@@ -833,6 +843,8 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
             return nil
         case let .userBlockChanged(userId, blocked):
             return ["userId": userId, "blocked": blocked]
+        case let .competitionAlertsResult(requestId, deviceEnabled):
+            return ["requestId": requestId, "deviceEnabled": deviceEnabled]
         case let .confirmDialogResult(requestId, outcome):
             return ["requestId": requestId, "result": outcome.rawValue]
         case let .selectSheetResult(requestId, outcome):

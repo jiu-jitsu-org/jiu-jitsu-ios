@@ -50,6 +50,30 @@ extension NotificationPermissionClient: DependencyKey {
     )
 }
 
+/// '관심 대회 알림'을 켠 뒤 본 기기 알림 상태(#257 · #395). 웹의 '알림 받기' · 상세 종과 설정 › 알림이 같이 쓴다.
+public enum DeviceNotificationCheck: Equatable, Sendable {
+    /// 이미 허용 — 할 일이 없다.
+    case granted
+    /// 방금 시스템 권한 창에서 허용 — 푸시 등록 · FCM 토큰 등록을 잇는다.
+    case grantedNow
+    /// 방금 권한 창에서 거절했거나, 전에 거절 · 기기 설정에서 끔 — 앱이 다시 물을 수 없어 설정 앱으로 안내한다.
+    case denied
+
+    var isEnabled: Bool { self != .denied }
+
+    /// 지금 상태를 본다. 한 번도 묻지 않았으면 iOS 설정에 알림 줄조차 없으니 시스템 권한 창을 띄우고 답을 기다린다.
+    static func current(permission: NotificationPermissionClient, firebase: FirebaseClient) async -> Self {
+        switch await permission.status() {
+        case .granted:
+            return .granted
+        case .denied:
+            return .denied
+        case .notDetermined:
+            return await firebase.requestPermission() ? .grantedNow : .denied
+        }
+    }
+}
+
 extension DependencyValues {
     public var notificationPermissionClient: NotificationPermissionClient {
         get { self[NotificationPermissionClient.self] }
