@@ -21,18 +21,6 @@ public struct CommunityFeature: Sendable {
         case unreadNotification
     }
 
-    public enum Tab: String, CaseIterable, Sendable, Equatable {
-        case feed
-        case category
-
-        var title: String {
-            switch self {
-            case .feed: return "피드"
-            case .category: return "카테고리"
-            }
-        }
-    }
-
     /// 테스트용 도메인 변경 다이얼로그에서 한 번에 전환할 수 있는 서버 후보.
     /// 값은 Info.plist에 구성별로 주입되며, Release 구성에서는 비어 있다(버튼도 노출되지 않음).
     public enum DebugServer: String, CaseIterable, Sendable, Equatable {
@@ -60,7 +48,6 @@ public struct CommunityFeature: Sendable {
 
     @ObservableState
     public struct State: Equatable {
-        var selectedTab: Tab = .feed
         /// 이 목록 웹뷰가 마지막으로 알린 화면(screen_view, #425). 보일 때 루트 분석 리듀서가 기록한다.
         var analyticsScreen: AnalyticsEvent?
         var url: URL?
@@ -142,7 +129,6 @@ public struct CommunityFeature: Sendable {
             // 앱이 포그라운드로 복귀.
             case sceneBecameActive
             case retryTapped
-            case tabSelected(Tab)
             case notificationTapped
             case searchTapped
 
@@ -281,10 +267,6 @@ public struct CommunityFeature: Sendable {
                 state.scrollToTopToken = UUID()
                 return .none
 
-            case let .view(.tabSelected(tab)):
-                state.selectedTab = tab
-                return .none
-
             // 알림함은 iOS/Android 공용 웹 화면이다. 상세와 같은 chromeless 서브뷰로 열어
             // 알림 항목 탭(OPEN_SUBVIEW)·뒤로가기(CLOSE_SUBVIEW)를 기존 브릿지 흐름 그대로 쓴다.
             // `PushActionRouter`는 푸시 탭 전용으로 남는다. (#45)
@@ -297,8 +279,11 @@ public struct CommunityFeature: Sendable {
                 state.path.append(.detail(Self.subview(url: url, accessToken: state.accessToken)))
                 return .none
 
-            // FIXME: 검색 화면 진입 (커뮤니티 검색 기능 도입 시 구현)
+            // 글 검색은 웹 화면이다(jiu-jitsu-frontend#591, #435). 알림함처럼 서브뷰로 열어, 결과 글은 그 위에 쌓이고
+            // 뒤로가기는 검색 결과 → 홈 순서로 돌아온다. 비로그인도 쓸 수 있어 로그인을 묻지 않는다.
             case .view(.searchTapped):
+                guard let base = state.url, let url = Self.searchURL(base: base) else { return .none }
+                state.path.append(.detail(Self.subview(url: url, accessToken: state.accessToken)))
                 return .none
 
             case .view(.retryTapped):
@@ -688,6 +673,13 @@ public struct CommunityFeature: Sendable {
 
     static func blockedUsersURL(base: URL) -> URL? {
         URL(string: blockedUsersPath, relativeTo: base)?.absoluteURL
+    }
+
+    /// 글 검색 웹 라우트(`/community/search`, #435). 검색어 없이 열면 웹이 '최근 검색'을 보여 준다.
+    private static let searchPath = "/\(DeepLinkParser.communitySegment)/search"
+
+    static func searchURL(base: URL) -> URL? {
+        URL(string: searchPath, relativeTo: base)?.absoluteURL
     }
 
     /// 닫힐 때 새 알림 점을 다시 읽을 화면 — 알림함과 글 · 밸런스 게임 상세(열면 그 글 알림이 읽음 처리된다, #401).

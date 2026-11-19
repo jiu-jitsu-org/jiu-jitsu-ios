@@ -71,19 +71,16 @@ public struct CommunityView: View {
     }
 
     private var gnb: some View {
-        // 디바이더(1pt)를 탭 콘텐츠보다 뒤 레이어에 깔아야
-        // 탭 인디케이터(2pt)가 디바이더에 가려지지 않고 온전히 그려진다.
+        // 대회 탭 머리줄과 같이 왼쪽에 탭 이름, 오른쪽에 아이콘을 둔다(#435). 카테고리는 웹 피드 위 탭이 맡는다.
         ZStack(alignment: .bottom) {
             Rectangle()
                 .fill(Color.component.navibar.container.divider)
                 .frame(height: 1)
 
             HStack(spacing: 0) {
-                HStack(spacing: 16) {
-                    ForEach(CommunityFeature.Tab.allCases, id: \.self) { tab in
-                        tabButton(tab)
-                    }
-                }
+                Text("홈")
+                    .font(Font.pretendard.title3)
+                    .foregroundStyle(Color.component.header.text)
                 Spacer(minLength: 0)
                 HStack(spacing: 0) {
                     #if DEBUG || BETA
@@ -129,33 +126,6 @@ public struct CommunityView: View {
             Color.component.header.background
                 .ignoresSafeArea(edges: .top)
         }
-    }
-
-    private func tabButton(_ tab: CommunityFeature.Tab) -> some View {
-        let isSelected = store.selectedTab == tab
-        return Button {
-            store.send(.view(.tabSelected(tab)))
-        } label: {
-            Text(tab.title)
-                .font(Font.pretendard.bodyM)
-                .foregroundStyle(
-                    isSelected
-                    ? Color.component.tabBar.selected.text
-                    : Color.component.tabBar.unselected.text
-                )
-                .frame(maxHeight: .infinity)
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(
-                            isSelected
-                            ? Color.component.tabBar.selected.underline
-                                : Color.clear
-                        )
-                        .frame(height: 2)
-                }
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     private var errorOverlay: some View {
