@@ -29,6 +29,10 @@ public struct AnalyticsEvent: Equatable, Sendable {
         case pushOpen = "push_open"
         case deeplinkOpen = "deeplink_open"
 
+        // 대회 기록(#454)
+        case competitionRecordStart = "competition_record_start"
+        case competitionRecordSave = "competition_record_save"
+
         // 웹뷰가 ANALYTICS_EVENT로 보내는 기록(#424). 이벤트 사전 v2에서 범위에 FE가 있는 것.
         // 사전에 없는 이름은 브리지가 버린다 — 웹에 이벤트를 더하면 여기에도 더한다.
         case screenView = "screen_view"
@@ -345,6 +349,53 @@ extension AnalyticsEvent {
             "app_state": appState.rawValue,
             "from": from.rawValue
         ]))
+    }
+
+    // MARK: 대회 기록 (#454)
+
+    /// 대회 기록 추가 화면이 열린 입구(사전 "from 값"). 웹 요청은 어느 배너든 record — 배너는 웹 `banner_click`이 남긴다.
+    public enum CompetitionRecordEntry: String, Sendable {
+        /// MY "대회 추가"
+        case myProfile = "my_profile"
+        /// MY "부문 추가"
+        case divisionAdd = "division_add"
+        /// 웹의 '내 기록에 남기기'(`OPEN_COMPETITION_RECORD`)
+        case record
+    }
+
+    /// 대회 기록 결과(사전 `medal`).
+    public enum Medal: String, Sendable {
+        case gold, silver, bronze, participation
+    }
+
+    /// 대회명 입력 방법(사전 `method`). 등록된 대회와 이어졌으면(목록에서 고름 · 웹이 넘겨줌) autocomplete.
+    public enum CompetitionNameMethod: String, Sendable {
+        case autocomplete
+        case typed
+    }
+
+    /// `competitionId`: 등록된 대회와 이어졌을 때만.
+    public static func competitionRecordStart(from entry: CompetitionRecordEntry, competitionId: Int?) -> Self {
+        Self(.competitionRecordStart, parameters: strings([
+            "from": entry.rawValue,
+            "competition_id": competitionId.map(competitionIDValue)
+        ]))
+    }
+
+    /// method는 이어진 대회가 있는지로 정한다 — 이어졌으면 autocomplete, 직접 친 이름이면 typed.
+    public static func competitionRecordSave(from entry: CompetitionRecordEntry, medal: Medal, competitionId: Int?) -> Self {
+        let method: CompetitionNameMethod = competitionId == nil ? .typed : .autocomplete
+        return Self(.competitionRecordSave, parameters: strings([
+            "from": entry.rawValue,
+            "medal": medal.rawValue,
+            "competition_id": competitionId.map(competitionIDValue),
+            "method": method.rawValue
+        ]))
+    }
+
+    /// 사전 `competition_id` 모양(`comp_45`).
+    static func competitionIDValue(_ id: Int) -> String {
+        "comp_\(id)"
     }
 
     /// nil 값은 꼬리표에서 뺀다.

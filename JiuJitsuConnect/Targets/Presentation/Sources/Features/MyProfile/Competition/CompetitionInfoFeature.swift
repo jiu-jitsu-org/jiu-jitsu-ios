@@ -39,9 +39,21 @@ public struct CompetitionInfoFeature: Sendable {
         }
     }
 
+    /// 새 기록 화면을 연 곳(#454). 첫 저장 뒤 '부문 추가'로 이어 쓰면 상태만으로는 처음에 어디서 열었는지 알 수 없어 따로 둔다.
+    public enum Entry: Equatable, Sendable {
+        /// MY "대회 추가"
+        case myProfile
+        /// MY "부문 추가"
+        case divisionAdd
+        /// 대회 상세 웹의 '내 기록에 남기기'
+        case competitionDetail
+    }
+
     @ObservableState
     public struct State: Equatable, Sendable {
         var mode: Mode = .add
+        /// 새 기록 화면을 연 곳. 수정 화면은 nil.
+        private(set) var entry: Entry?
         var step: Step = .result
         // 마지막 단계 이동이 뒤로 가기였는지. 화면이 단계 전환을 어느 쪽으로 밀지 정하는 데 쓴다.
         var isMovingBack = false
@@ -171,6 +183,7 @@ public struct CompetitionInfoFeature: Sendable {
             self.profileBelt = currentBelt
             switch mode {
             case .add:
+                self.entry = .myProfile
                 self.belt = currentBelt
                 self.recentWeightLimit = recentWeightLimit
                 self.applyWeightLimit(recentWeightLimit)
@@ -223,6 +236,7 @@ public struct CompetitionInfoFeature: Sendable {
         ) {
             self.init(mode: .add, currentBelt: currentBelt, recentWeightLimit: recentWeightLimit)
             guard let last = entries.last else { return }
+            self.entry = .divisionAdd
             self.savedRecords = entries
             self.name = last.competitionName
             self.linkedCompetition = last.competitionId.map {
@@ -245,6 +259,7 @@ public struct CompetitionInfoFeature: Sendable {
             recentWeightLimit: CompetitionWeightLimit? = nil
         ) {
             self.init(mode: .add, currentBelt: currentBelt, recentWeightLimit: recentWeightLimit)
+            self.entry = .competitionDetail
             self.name = prefilledName
             self.linkedCompetition = competitionId.map {
                 LinkedCompetition(id: $0, name: prefilledName, year: year)

@@ -93,6 +93,7 @@ extension AppFeature {
             let screenEffect = reduceScreenEvent(into: &state, action: action)
             // 로그아웃 · 탈퇴 기록은 회원 정보를 지우기 전에 남겨야 해 reduceEvent보다 먼저 본다.
             reduceAuthEvent(into: &state, action: action)
+            reduceCompetitionRecordEvent(into: &state, action: action)
             let effect = reduceEvent(into: &state, action: action)
             if case .destination(.presented(.appTab)) = action {
                 syncProfileProperties(&state)
@@ -308,6 +309,10 @@ extension AppFeature {
             }
             log(from.map(event.replacingFrom) ?? event)
             logMyTabLoginPrompt(screen: screen, from: from, state: state)
+            // 처음 보인 기록 추가 화면만 연 것으로 센다 — 열자마자 나갔다 돌아와 resume으로 남은 것도 처음 보인 것이다.
+            if !isShownAgain, event == .screenView(.competitionRecordAdd) {
+                logCompetitionRecordStart(state)
+            }
         }
 
         /// 지금 화면 위에 떠 있던 화면은 모두 닫혔다 — 다시 열면 처음 보이는 것이라 기억에서 뺀다.
