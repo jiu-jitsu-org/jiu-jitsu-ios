@@ -15,7 +15,7 @@ enum CatalogPage: String, CaseIterable, Hashable, Identifiable {
     case color, typography, asset
     // 부품
     case button, textField, toast, alert, segmentControl
-    case ctaButton, beltSelectButton, bottomSheet, selectSheet, termsRow, sheetPicker, lottie, beltCharacter
+    case topHeader, ctaButton, beltSelectButton, bottomSheet, selectSheet, termsRow, sheetPicker, lottie, beltCharacter
 
     var id: String { rawValue }
 
@@ -36,6 +36,7 @@ enum CatalogPage: String, CaseIterable, Hashable, Identifiable {
         case .toast: "토스트"
         case .alert: "알림창"
         case .segmentControl: "세그먼트"
+        case .topHeader: "머리줄"
         case .ctaButton: "CTA 버튼"
         case .beltSelectButton: "띠 고르기 버튼"
         case .bottomSheet: "바텀시트"
@@ -57,6 +58,7 @@ enum CatalogPage: String, CaseIterable, Hashable, Identifiable {
         case .toast: "아래에서 떠오르는 짧은 알림"
         case .alert: "확인을 받는 가운데 알림창"
         case .segmentControl: "둘 중 하나를 고르는 칸"
+        case .topHeader: "뒤로가기·제목·오른쪽 글자 버튼"
         case .ctaButton: "화면 아래 꽉 찬 주요 버튼"
         case .beltSelectButton: "띠 색·그랄을 고르는 버튼"
         case .bottomSheet: "아래에서 올라오는 시트 틀"
@@ -82,6 +84,7 @@ enum CatalogPage: String, CaseIterable, Hashable, Identifiable {
         case .toast: ToastDoc()
         case .alert: AlertDoc()
         case .segmentControl: SegmentControlDoc()
+        case .topHeader: TopHeaderDoc()
         case .ctaButton: CTAButtonDoc()
         case .beltSelectButton: BeltSelectButtonDoc()
         case .bottomSheet: BottomSheetDoc()
