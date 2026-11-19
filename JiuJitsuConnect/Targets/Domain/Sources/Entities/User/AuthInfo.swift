@@ -23,14 +23,29 @@ public struct AuthInfo: Equatable, Sendable {
         public let profileImageUrl: String?
         public let snsProvider: String?
         public let deactivatedWithinGrace: Bool?
+        /// 분석용 회원 ID(GA 회원 ID). 회원 번호와 달리 바뀌지 않는 무작위 값(#423, BE #272).
+        public let analyticsId: String?
+        /// 계정 구분(MEMBER · OPERATOR · INTERNAL). 운영 · 팀 계정을 분석에서 가르는 데 쓴다.
+        public let accountType: String?
         
-        public init(userId: Int, email: String?, nickname: String?, profileImageUrl: String?, snsProvider: String?, deactivatedWithinGrace: Bool?) {
+        public init(
+            userId: Int,
+            email: String?,
+            nickname: String?,
+            profileImageUrl: String?,
+            snsProvider: String?,
+            deactivatedWithinGrace: Bool?,
+            analyticsId: String? = nil,
+            accountType: String? = nil
+        ) {
             self.userId = userId
             self.email = email
             self.nickname = nickname
             self.profileImageUrl = profileImageUrl
             self.snsProvider = snsProvider
             self.deactivatedWithinGrace = deactivatedWithinGrace
+            self.analyticsId = analyticsId
+            self.accountType = accountType
         }
     }
     

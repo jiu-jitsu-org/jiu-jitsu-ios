@@ -56,6 +56,10 @@ enum AnalyticsClientFactory {
                 Log.trace("[Analytics] user property \(property.rawValue)=\(value ?? "nil")", category: .debug, level: .info)
                 Analytics.setUserProperty(value, forName: property.rawValue)
             },
+            setUserID: { userID in
+                Log.trace("[Analytics] user id \(userID == nil ? "nil" : "set")", category: .debug, level: .info)
+                Analytics.setUserID(userID)
+            },
             isCollectionEnabled: {
                 isCollectionEnabled(defaults)
             },

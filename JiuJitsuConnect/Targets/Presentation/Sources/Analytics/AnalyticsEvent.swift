@@ -80,8 +80,9 @@ extension AnalyticsEvent {
 
 // MARK: - 사용자 속성
 
-/// GA 사용자 속성(사전 "사용자 속성"). `account_type` · `signup_week`는 서버 값이 생기면 더한다(BE #262).
+/// GA 사용자 속성(사전 "사용자 속성"). `signup_week`는 서버 값이 생기면 더한다.
 public enum AnalyticsUserProperty: String, CaseIterable, Sendable {
+    case accountType = "account_type"
     case belt
     case stripes
     case coachRole = "coach_role"
@@ -89,6 +90,13 @@ public enum AnalyticsUserProperty: String, CaseIterable, Sendable {
     case pushEnabled = "push_enabled"
     case hasCompRecord = "has_comp_record"
     case hasGym = "has_gym"
+
+    /// 서버 계정 구분(MEMBER · OPERATOR · INTERNAL) → `account_type` 값(member · operator · internal).
+    /// 사전에 없는 값은 nil — 모르는 값을 GA에 새 분류로 쌓지 않는다.
+    public static func accountTypeValue(_ serverValue: String?) -> String? {
+        guard let value = serverValue?.lowercased(), ["member", "operator", "internal"].contains(value) else { return nil }
+        return value
+    }
 }
 
 // MARK: - 사전 검사

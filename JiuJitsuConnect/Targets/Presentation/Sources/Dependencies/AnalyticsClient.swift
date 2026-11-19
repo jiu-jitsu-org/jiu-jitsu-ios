@@ -14,6 +14,8 @@ public struct AnalyticsClient: Sendable {
     public var logEvent: @Sendable (AnalyticsEvent) -> Void
     /// nil이면 그 속성을 지운다.
     public var setUserProperty: @Sendable (_ value: String?, _ property: AnalyticsUserProperty) -> Void
+    /// GA 회원 ID(서버가 준 분석용 ID). 지울 때는 빈 문자열이 아니라 nil.
+    public var setUserID: @Sendable (String?) -> Void
     /// 설정 "이용 통계". 기기에 남아 다음 실행에도 유지된다(기본 켬).
     public var isCollectionEnabled: @Sendable () -> Bool
     public var setCollectionEnabled: @Sendable (Bool) -> Void
@@ -23,12 +25,14 @@ public struct AnalyticsClient: Sendable {
     public init(
         logEvent: @Sendable @escaping (AnalyticsEvent) -> Void,
         setUserProperty: @Sendable @escaping (_ value: String?, _ property: AnalyticsUserProperty) -> Void,
+        setUserID: @Sendable @escaping (String?) -> Void,
         isCollectionEnabled: @Sendable @escaping () -> Bool,
         setCollectionEnabled: @Sendable @escaping (Bool) -> Void,
         resetAnalyticsData: @Sendable @escaping () -> Void
     ) {
         self.logEvent = logEvent
         self.setUserProperty = setUserProperty
+        self.setUserID = setUserID
         self.isCollectionEnabled = isCollectionEnabled
         self.setCollectionEnabled = setCollectionEnabled
         self.resetAnalyticsData = resetAnalyticsData
@@ -43,6 +47,7 @@ extension AnalyticsClient: DependencyKey {
     static let noop = Self(
         logEvent: { _ in },
         setUserProperty: { _, _ in },
+        setUserID: { _ in },
         isCollectionEnabled: { true },
         setCollectionEnabled: { _ in },
         resetAnalyticsData: {}

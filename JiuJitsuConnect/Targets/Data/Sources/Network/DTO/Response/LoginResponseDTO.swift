@@ -21,5 +21,7 @@ struct LoginResponseDTO: Decodable, Equatable {
         let profileImageUrl: String?
         let snsProvider: String?
         let deactivatedWithinGrace: Bool?
+        let analyticsId: String?
+        let accountType: String?
     }
 }
