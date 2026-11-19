@@ -187,7 +187,8 @@ public struct CommunityFeature: Sendable {
             // 이 스택에 쌓인 남의 프로필에서 회원을 차단·해제함(#328) → 부모가 열린 웹뷰 모두에 USER_BLOCK_CHANGED를 보낸다.
             case userBlockChanged(userId: Int, blocked: Bool)
             // 홈에 쌓인 대회 상세의 '커뮤니티에서 더 보기'(#304) → 부모가 홈에 쌓인 화면을 닫아 피드를 보인다.
-            case homeFeedRequested
+            // 대회 번호가 있으면 그 대회 글만 보이게 피드를 다시 연다(#437).
+            case homeFeedRequested(competitionId: Int?)
             // 홈에 쌓인 끝난 대회 상세의 '내 기록에 남기기'(#304) → 부모가 프로필을 보고 기록 추가를 그 상세 위에 쌓는다.
             case competitionRecordRequested(OpenCompetitionRecordPayload)
             // 홈 웹에서 글 · 댓글을 올림(#333) → 부모(AppTab)가 알림 권한 안내를 띄울지 정한다.
@@ -715,8 +716,8 @@ public struct CommunityFeature: Sendable {
             return .send(.openUserProfile(userId: userId))
         case let .competitionAlertsChecked(check):
             return .send(.delegate(.competitionAlertsChecked(check)))
-        case .homeFeedRequested:
-            return .send(.delegate(.homeFeedRequested))
+        case let .homeFeedRequested(competitionId):
+            return .send(.delegate(.homeFeedRequested(competitionId: competitionId)))
         case let .competitionRecordRequested(payload):
             return .send(.delegate(.competitionRecordRequested(payload)))
         case .competitionHeaderTintChanged:
@@ -772,6 +773,13 @@ public struct CommunityFeature: Sendable {
         state.detailCover = nil
         state.coverPath.removeAll()
         state.scrollToTopToken = UUID()
+    }
+
+    /// 대회 이야기 '모두 보기'(#437): 홈 피드를 `/?competitionId=<번호>`로 다시 불러온다. 웹이 '대회' 탭을 고르고
+    /// 그 대회 글만 보여 준다(jiu-jitsu-frontend#598). 다른 카테고리를 보고 있었거나 같은 주소여도 다시 불러와 그 대회로 맞춘다.
+    public static func reloadFeed(competitionId: Int, into state: inout State) {
+        guard let base = makeCommunityURL() else { return }
+        reloadCommunity(&state, url: URL(string: "/?competitionId=\(competitionId)", relativeTo: base)?.absoluteURL)
     }
 
     /// 로그아웃·탈퇴 때 이전 계정으로 연 MY 화면(#197)과 대회 기록 추가(#304)를 닫는다. 그 위에 쌓인 화면도 함께 닫는다.
@@ -1014,8 +1022,7 @@ public struct CommunityFeature: Sendable {
     // MARK: - 테스트용 도메인 오버라이드 (UserDefaults)
 
     /// 입력 주소로 URL을 다시 만들고 강제 reload되도록 상태를 초기화한다.
-    private static func reloadCommunity(_ state: inout State) {
-        let url = makeCommunityURL()
+    private static func reloadCommunity(_ state: inout State, url: URL? = makeCommunityURL()) {
         state.url = url
         // URL이 동일해도 View가 reload를 인지하도록 토큰을 갱신한다.
         state.loadToken = UUID()

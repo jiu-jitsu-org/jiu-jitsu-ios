@@ -145,8 +145,8 @@ private extension WebBridgeInboundMessage {
             return "PICK_PHOTOS  reqId=\(payload.requestId) limit=\(payload.limit)"
         case let .openUserProfile(payload):
             return "OPEN_USER_PROFILE  userId=\(payload.userId) isMe=\(payload.isMe)"
-        case .openHomeFeed:
-            return "OPEN_HOME_FEED"
+        case let .openHomeFeed(competitionId):
+            return "OPEN_HOME_FEED  competitionId=\(competitionId.map(String.init) ?? "-")"
         case let .openCompetitionRecord(payload):
             return "OPEN_COMPETITION_RECORD  competitionId=\(payload.competitionId.map(String.init) ?? "-") year=\(payload.year)"
         case let .competitionAlertsEnabled(competitionId, requestId):
@@ -249,7 +249,8 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     case openUserProfile(OpenUserProfilePayload)
     /// 대회 상세의 '커뮤니티에서 더 보기'(#250). 서브뷰를 닫고 홈 피드로 보내 달라는 요청이다.
     /// 웹은 capability 목록에 이 타입이 있을 때만 보내고, 없으면 OPEN_SUBVIEW('/')로 대신한다.
-    case openHomeFeed
+    /// 대회 이야기 '모두 보기'는 대회 번호를 실어 보낸다(#437 · jiu-jitsu-frontend#598). 옛 웹은 payload 없이 보내 nil이다.
+    case openHomeFeed(competitionId: Int?)
     /// 끝난 대회 배너의 '내 기록에 남기기'(#250). 대회 이름·연도를 채운 채 내 대회 기록 추가 흐름을 열어 달라는 요청이다.
     case openCompetitionRecord(OpenCompetitionRecordPayload)
     /// 관심 대회 첫 등록 시트의 '알림 받기' · 대회 상세 종 켜기(#257 · jiu-jitsu-frontend#600). 웹은 앱 안이면 늘 보낸다.
@@ -429,7 +430,7 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             }
             return .openUserProfile(OpenUserProfilePayload(userId: userId, isMe: isMe))
         case .openHomeFeed:
-            return .openHomeFeed
+            return .openHomeFeed(competitionId: OpenCompetitionRecordPayload.parseCompetitionId(payload?["competitionId"]))
         case .openCompetitionRecord:
             guard let record = OpenCompetitionRecordPayload(payload: payload) else {
                 Log.trace("OPEN_COMPETITION_RECORD payload 필수 필드 누락", category: .network, level: .error)

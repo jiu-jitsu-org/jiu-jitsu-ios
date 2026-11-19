@@ -89,7 +89,7 @@ public struct CompetitionTabFeature: Sendable {
             // 이 탭에서 연 알림함을 닫음(#258) → 부모가 홈의 새 알림 점을 다시 조회시킨다(이 탭의 종도 같은 값을 그린다).
             case unreadNotificationRefreshRequested
             // 대회 상세의 '커뮤니티에서 더 보기'(#250) → 부모가 이 스택을 닫고 홈 탭으로 바꾼다.
-            case homeFeedRequested
+            case homeFeedRequested(competitionId: Int?)
             // 끝난 대회의 '내 기록에 남기기'(#250) → 부모가 로그인 여부를 보고 기록 추가를 이 스택에 쌓는다.
             case competitionRecordRequested(OpenCompetitionRecordPayload)
             // 이 스택에 쌓인 남의 프로필에서 회원을 차단·해제함(#328) → 부모가 열린 웹뷰 모두에 USER_BLOCK_CHANGED를 보낸다.
@@ -173,8 +173,8 @@ public struct CompetitionTabFeature: Sendable {
             case let .path(.element(id: _, action: .communityDetail(.delegate(.competitionAlertsChecked(check))))):
                 return .send(.delegate(.competitionAlertsChecked(check)))
 
-            case .path(.element(id: _, action: .communityDetail(.delegate(.homeFeedRequested)))):
-                return .send(.delegate(.homeFeedRequested))
+            case let .path(.element(id: _, action: .communityDetail(.delegate(.homeFeedRequested(competitionId))))):
+                return .send(.delegate(.homeFeedRequested(competitionId: competitionId)))
 
             case let .path(.element(id: _, action: .communityDetail(.delegate(.competitionRecordRequested(payload))))):
                 return .send(.delegate(.competitionRecordRequested(payload)))
