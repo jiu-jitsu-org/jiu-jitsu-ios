@@ -24,6 +24,8 @@ struct GetUserProfileResponseDTO: Decodable {
     let ownerVerification: OwnerVerificationDTO?
     let role: String?
     let status: String?
+    let analyticsId: String?
+    let accountType: String?
 
     func toDomain() -> UserProfile {
         UserProfile(
@@ -38,7 +40,9 @@ struct GetUserProfileResponseDTO: Decodable {
             snsProvider: snsProvider,
             ownerVerification: ownerVerification?.toDomain() ?? .notRequested,
             role: role,
-            status: status
+            status: status,
+            analyticsId: analyticsId,
+            accountType: accountType
         )
     }
 

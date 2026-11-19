@@ -62,6 +62,10 @@ public struct UserProfile: Equatable, Sendable {
     public let ownerVerification: OwnerVerification
     public let role: String?
     public let status: String?
+    /// 분석용 회원 ID(GA 회원 ID, #423).
+    public let analyticsId: String?
+    /// 계정 구분(MEMBER · OPERATOR · INTERNAL).
+    public let accountType: String?
 
     /// BE `role` 문자열을 타입 안전한 `UserRole`로 변환.
     /// 알 수 없는 값은 `.user`(기본값)로 처리해 UI가 깨지지 않도록 한다.
@@ -78,7 +82,9 @@ public struct UserProfile: Equatable, Sendable {
         snsProvider: String? = nil,
         ownerVerification: OwnerVerification = .notRequested,
         role: String? = nil,
-        status: String? = nil
+        status: String? = nil,
+        analyticsId: String? = nil,
+        accountType: String? = nil
     ) {
         self.userId = userId
         self.email = email
@@ -89,6 +95,8 @@ public struct UserProfile: Equatable, Sendable {
         self.ownerVerification = ownerVerification
         self.role = role
         self.status = status
+        self.analyticsId = analyticsId
+        self.accountType = accountType
     }
 
     /// 실제로 렌더링 가능한 프로필 이미지 URL이 설정되어 있는지 여부.
@@ -115,7 +123,9 @@ public struct UserProfile: Equatable, Sendable {
             snsProvider: snsProvider,
             ownerVerification: ownerVerification,
             role: role,
-            status: status
+            status: status,
+            analyticsId: analyticsId,
+            accountType: accountType
         )
     }
 
@@ -130,7 +140,9 @@ public struct UserProfile: Equatable, Sendable {
             snsProvider: snsProvider,
             ownerVerification: ownerVerification,
             role: role,
-            status: status
+            status: status,
+            analyticsId: analyticsId,
+            accountType: accountType
         )
     }
 }

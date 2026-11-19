@@ -23,6 +23,8 @@ extension AppFeature {
         var pendingSource: AnalyticsEvent.OpenSource?
         /// 마지막으로 보낸 계정 속성(MY 프로필 기준). 같은 값은 다시 보내지 않는다.
         var sentProfileProperties: [AnalyticsUserProperty: String?] = [:]
+        /// 마지막으로 보낸 회원 ID. 같은 값은 다시 보내지 않는다. 바깥 nil은 아직 안 보냄 — GA는 이전 실행의 값을 기억한다.
+        var sentUserID: String??
     }
 
     /// 루트 분석 리듀서. 상태는 `AnalyticsState`만 바꾸고 화면 흐름에는 끼어들지 않는다.
@@ -90,11 +92,14 @@ extension AppFeature {
             // MARK: session_restore
 
             case let .destination(.presented(.splash(.internal(.autoLoginFinished(authInfo, isSessionExpired))))):
-                if authInfo != nil {
+                if let authInfo {
                     log(.sessionRestore(.restored))
                     updateLoginMethod()
+                    updateMember(authInfo.userInfo, state: &state)
                 } else {
                     log(.sessionRestore(isSessionExpired ? .fail : .guest))
+                    // GA는 회원 ID · 속성을 실행 사이에 기억한다. 지난 실행이 로그인 채로 끝났으면 여기서 지운다.
+                    clearMemberProperties(&state)
                 }
                 return .none
 
@@ -104,11 +109,12 @@ extension AppFeature {
 
             // MARK: 사용자 속성 — 이미 받는 응답에서
 
-            case .destination(.presented(.login(.delegate(.didLogin)))),
-                 .destination(.presented(.login(.delegate(.didSignup)))),
-                 .destination(.presented(.appTab(.loginCover(.presented(.delegate(.didLogin)))))),
-                 .destination(.presented(.appTab(.loginCover(.presented(.delegate(.didSignup)))))):
+            case let .destination(.presented(.login(.delegate(.didLogin(authInfo))))),
+                 let .destination(.presented(.login(.delegate(.didSignup(authInfo))))),
+                 let .destination(.presented(.appTab(.loginCover(.presented(.delegate(.didLogin(authInfo))))))),
+                 let .destination(.presented(.appTab(.loginCover(.presented(.delegate(.didSignup(authInfo))))))):
                 updateLoginMethod()
+                updateMember(authInfo.userInfo, state: &state)
                 return .none
 
             case .destination(.presented(.appTab(.internal(.webLogoutCompleted)))),
@@ -204,6 +210,13 @@ extension AppFeature {
             }
             if let userProfile = appTab.myPage.userProfile {
                 properties[.coachRole] = Self.flag(userProfile.userRole == .owner)
+                // 로그인 응답 뒤 관리자가 계정 구분을 바꿨을 수 있어 프로필 값으로도 맞춘다. 모르는 값이면 그대로 둔다.
+                if let accountType = AnalyticsUserProperty.accountTypeValue(userProfile.accountType) {
+                    properties[.accountType] = accountType
+                }
+                if let analyticsId = Self.nonEmpty(userProfile.analyticsId) {
+                    sendUserID(analyticsId, state: &state)
+                }
             }
             for (property, value) in properties.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
                 guard state.analytics.sentProfileProperties[property] != .some(value) else { continue }
@@ -212,8 +225,25 @@ extension AppFeature {
             }
         }
 
-        /// 기기 권한(`push_enabled`)은 계정과 무관해 남긴다.
+        /// 로그인 · 가입 · 복원 응답의 분석용 ID와 계정 구분. 값이 없으면 지워 이전 계정 값이 남지 않게 한다.
+        private func updateMember(_ userInfo: AuthInfo.UserInfo?, state: inout State) {
+            sendUserID(Self.nonEmpty(userInfo?.analyticsId), state: &state)
+            let accountType = AnalyticsUserProperty.accountTypeValue(userInfo?.accountType)
+            guard state.analytics.sentProfileProperties[.accountType] != .some(accountType) else { return }
+            state.analytics.sentProfileProperties[.accountType] = .some(accountType)
+            analyticsClient.setUserProperty(accountType, .accountType)
+        }
+
+        private func sendUserID(_ userID: String?, state: inout State) {
+            guard state.analytics.sentUserID != .some(userID) else { return }
+            state.analytics.sentUserID = .some(userID)
+            analyticsClient.setUserID(userID)
+        }
+
+        /// 기기 권한(`push_enabled`)은 계정과 무관해 남긴다. 회원 ID는 빈 문자열이 아니라 nil로 지운다.
         private func clearMemberProperties(_ state: inout State) {
+            state.analytics.sentUserID = .some(nil)
+            analyticsClient.setUserID(nil)
             state.analytics.sentProfileProperties = [:]
             for property in AnalyticsUserProperty.allCases where property != .pushEnabled {
                 analyticsClient.setUserProperty(nil, property)
@@ -222,6 +252,11 @@ extension AppFeature {
 
         private func log(_ event: AnalyticsEvent) {
             analyticsClient.logEvent(event)
+        }
+
+        private static func nonEmpty(_ value: String?) -> String? {
+            guard let value, !value.isEmpty else { return nil }
+            return value
         }
 
         private static func flag(_ value: Bool) -> String {

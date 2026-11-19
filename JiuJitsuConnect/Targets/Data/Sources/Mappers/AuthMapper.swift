@@ -38,7 +38,9 @@ extension LoginResponseDTO.UserInfo {
             // BE sentinel "default" → nil 정규화
             profileImageUrl: ProfileImageSentinel.normalize(self.profileImageUrl),
             snsProvider: self.snsProvider,
-            deactivatedWithinGrace: self.deactivatedWithinGrace
+            deactivatedWithinGrace: self.deactivatedWithinGrace,
+            analyticsId: self.analyticsId,
+            accountType: self.accountType
         )
     }
 }
@@ -64,7 +66,9 @@ extension RefreshResponseDTO.UserInfo {
             // BE sentinel "default" → nil 정규화
             profileImageUrl: ProfileImageSentinel.normalize(self.profileImageUrl),
             snsProvider: self.snsProvider,
-            deactivatedWithinGrace: self.deactivatedWithinGrace
+            deactivatedWithinGrace: self.deactivatedWithinGrace,
+            analyticsId: self.analyticsId,
+            accountType: self.accountType
         )
     }
 }
