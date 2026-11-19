@@ -24,6 +24,8 @@ public struct CommunityDetailFeature: Sendable {
     public struct State: Equatable, Sendable {
         // OPEN_SUBVIEW에서 검증된 동일 origin 절대 URL.
         let url: URL
+        /// 이 웹뷰가 마지막으로 알린 화면(screen_view, #425). 맨 위에 보일 때 루트 분석 리듀서가 기록한다.
+        var analyticsScreen: AnalyticsEvent?
         // 웹 헤더 렌더 전 임시 제목(선택). 네이티브 크롬이 없어 현재는 보관만 한다.
         let title: String?
         // 같은 URL로 재시도 시 View가 reload를 인지하도록 토큰을 갱신한다.
@@ -422,9 +424,7 @@ public struct CommunityDetailFeature: Sendable {
                     return .send(.delegate(.competitionHeaderTintChanged(hex: hex)))
 
                 case let .analyticsEvent(event):
-                    // 화면 기록(screen_view)은 웹이 알린 "지금 화면"이라 이 웹뷰가 실제로 보일 때 남긴다(#425). 그 밖은 바로 남긴다.
-                    guard event.name != .screenView else { return .none }
-                    analyticsClient.logEvent(event)
+                    WebAnalytics.receive(event, lastScreen: &state.analyticsScreen, client: analyticsClient)
                     return .none
 
                 case .setSheetOpen:

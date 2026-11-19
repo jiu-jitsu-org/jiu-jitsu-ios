@@ -194,6 +194,12 @@ public struct MyProfileView: View {
                 ])
                 .presentationBackground(Color.component.bottomSheet.selected.container.background)
             }
+            .onChange(of: competitionSheet != nil) { _, isPresented in
+                store.send(.view(.competitionSheetPresentedChanged(isPresented)))
+            }
+            .onChange(of: isPatternSheetPresented) { _, isPresented in
+                store.send(.view(.patternSheetPresentedChanged(isPresented)))
+            }
             .sheet(isPresented: $isPatternSheetPresented) {
                 if let beltRank = store.communityProfile?.beltRank {
                     MyHeaderPatternSheetView(current: headerPattern, beltRank: beltRank) { pattern in

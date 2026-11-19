@@ -23,6 +23,17 @@ extension AppFeature {
         var pendingSource: AnalyticsEvent.OpenSource?
         /// 마지막으로 보낸 계정 속성(MY 프로필 기준). 같은 값은 다시 보내지 않는다.
         var sentProfileProperties: [AnalyticsUserProperty: String?] = [:]
+        /// 지금 맨 위에 보이는 화면(#425).
+        var visibleScreen: VisibleScreen?
+        /// 마지막으로 screen_view를 남긴 화면. 맨 위 화면이 잠깐 그대로 있은 뒤 이것과 다를 때만 남긴다.
+        var loggedScreen: VisibleScreen?
+        /// 앱으로 돌아왔을 때 맨 위였던 화면. 그 화면이 그대로면 from=resume으로 다시 남긴다(새 세션의 첫 화면이 비지 않게).
+        /// 푸시 · 링크로 돌아와 다른 화면이 뜨면 그 화면은 웹 · 앱이 정한 입구로 남는다.
+        var resumingScreenID: String?
+        /// 백그라운드로 나갈 때 맨 위였던 화면. 백그라운드 중 푸시 · 링크가 화면을 바꿨으면 그 화면은 resume이 아니다.
+        var backgroundScreenID: String?
+        /// 로그인 모달을 띄운 곳(login_prompt · web_modal). 모달이 닫히면 비운다.
+        var loginCoverFrom: String?
         /// 마지막으로 보낸 회원 ID. 같은 값은 다시 보내지 않는다. 바깥 nil은 아직 안 보냄 — GA는 이전 실행의 값을 기억한다.
         var sentUserID: String??
     }
@@ -34,10 +45,14 @@ extension AppFeature {
 
         private enum CancelID: Hashable, Sendable {
             case openSourceWait
+            case screenViewSettle
         }
 
         /// 입구를 기다리는 시간. 넘으면 아이콘으로 연 것으로 센다.
         static let openSourceWaitDuration: Duration = .seconds(1)
+        /// 맨 위 화면이 이만큼 그대로 있어야 본 것으로 센다. 링크 · 푸시는 탭을 바꾼 뒤 다음 액션에서 상세를 쌓아,
+        /// 그 사이 잠깐 맨 위였던 탭 첫 화면을 세지 않게 한다.
+        static let screenViewSettleDuration: Duration = .milliseconds(500)
 
         @Dependency(\.analyticsClient) var analyticsClient
         @Dependency(\.authClient) var authClient
@@ -45,11 +60,12 @@ extension AppFeature {
         @Dependency(\.continuousClock) var clock
 
         func reduce(into state: inout State, action: Action) -> Effect<Action> {
+            let screenEffect = reduceScreenEvent(into: &state, action: action)
             let effect = reduceEvent(into: &state, action: action)
             if case .destination(.presented(.appTab)) = action {
                 syncProfileProperties(&state)
             }
-            return effect
+            return .merge(effect, screenEffect, updateVisibleScreen(&state))
         }
 
         private func reduceEvent(into state: inout State, action: Action) -> Effect<Action> {
@@ -88,6 +104,10 @@ extension AppFeature {
 
             case .internal(.appOpenSourceWaitElapsed):
                 return flushPendingOpen(&state)
+
+            case .internal(.screenViewSettled):
+                logSettledScreen(&state)
+                return .none
 
             // MARK: session_restore
 
@@ -130,6 +150,73 @@ extension AppFeature {
 
             default:
                 return .none
+            }
+        }
+
+        // MARK: - screen_view
+
+        /// 화면 기록에 필요한 앱 생명주기 · 로그인 입구. 복귀 판정(isInBackground)을 reduceEvent가 바꾸기 전에 본다.
+        private func reduceScreenEvent(into state: inout State, action: Action) -> Effect<Action> {
+            switch action {
+            case .view(.sceneEnteredBackground):
+                state.analytics.backgroundScreenID = state.analytics.visibleScreen?.id
+                // 나가기 직전 연 화면은 보지 않은 것이라 기다리던 기록을 버린다.
+                return .cancel(id: CancelID.screenViewSettle)
+
+            case .view(.sceneBecameActive):
+                guard state.analytics.isInBackground else { return .none }
+                let currentID = state.analytics.visibleScreen?.id
+                state.analytics.resumingScreenID = currentID == state.analytics.backgroundScreenID ? currentID : nil
+                state.analytics.backgroundScreenID = nil
+                return scheduleScreenViewSettle()
+
+            case .destination(.presented(.appTab(.view(.loginPromptLoginTapped)))):
+                state.analytics.loginCoverFrom = "login_prompt"
+                return .none
+
+            case .destination(.presented(.appTab(.home(.delegate(.loginModalRequested))))),
+                 .destination(.presented(.appTab(.myPage(.delegate(.webSubview(.loginModalRequested)))))),
+                 .destination(.presented(.appTab(.competition(.delegate(.webSubview(.loginModalRequested)))))):
+                state.analytics.loginCoverFrom = "web_modal"
+                return .none
+
+            default:
+                return .none
+            }
+        }
+
+        /// 액션이 지나갈 때마다 맨 위 화면을 다시 계산한다. 바뀌었으면(다른 화면 · 다시 보임 · 웹뷰 안 화면 이동)
+        /// 잠깐 기다렸다가, 그때도 맨 위인 화면을 남긴다.
+        private func updateVisibleScreen(_ state: inout State) -> Effect<Action> {
+            // 로그인 모달은 입구 액션 다음 액션에서 뜬다 — 입구는 모달이 떠 있다 닫힐 때 비운다.
+            if state.analytics.visibleScreen?.id.hasPrefix(ScreenView.loginCoverID) == true,
+               case let .appTab(appTab)? = state.destination, appTab.loginCover == nil {
+                state.analytics.loginCoverFrom = nil
+            }
+            let screen = ScreenView.visibleScreen(in: state)
+            guard screen != state.analytics.visibleScreen else { return .none }
+            state.analytics.visibleScreen = screen
+            // 백그라운드에서 바뀐 화면(늦게 온 웹 화면 알림 등)은 보지 않은 것 — 돌아올 때 resume으로 남긴다.
+            guard !state.analytics.isInBackground else { return .none }
+            return scheduleScreenViewSettle()
+        }
+
+        private func scheduleScreenViewSettle() -> Effect<Action> {
+            .run { send in
+                try await clock.sleep(for: Self.screenViewSettleDuration)
+                await send(.internal(.screenViewSettled))
+            }
+            .cancellable(id: CancelID.screenViewSettle, cancelInFlight: true)
+        }
+
+        private func logSettledScreen(_ state: inout State) {
+            let screen = state.analytics.visibleScreen
+            let isResuming = screen != nil && screen?.id == state.analytics.resumingScreenID
+            state.analytics.resumingScreenID = nil
+            guard isResuming || screen != state.analytics.loggedScreen else { return }
+            state.analytics.loggedScreen = screen
+            if let event = screen?.event {
+                log(isResuming ? event.replacingFrom("resume") : event)
             }
         }
 
