@@ -358,6 +358,12 @@ public struct ComponentColors {
         public let background = Color.semantic.surface.container
         public let iconButton = Color.semantic.icon.primary
         public let destructiveText = Color.semantic.destructive.destructive
+        // 머리줄 오른쪽 글자 버튼(삭제·취소) — 화면마다 다르던 색을 회색 하나로 맞춘다
+        public let actionText = Color.semantic.text.secondary
+        public let actionDisabledText = Color.semantic.text.disabled
+        // 머리줄 뒤로가기 — 옅은 파랑 칸 안의 화살표
+        public let backButtonBackground = Color.primitive.blue.b50
+        public let backButtonIcon = Color.semantic.interactive.primary
         // 커뮤니티 헤더 내 사진 버튼 — 사진이 없을 때의 원 배경(E5E7EB, 스케일에 대응 값 없음)과 기본 사람 아이콘
         public let avatarPlaceholder = Color(hex: "#E5E7EB")
         public let avatarDefaultIcon = Color.semantic.icon.primary
