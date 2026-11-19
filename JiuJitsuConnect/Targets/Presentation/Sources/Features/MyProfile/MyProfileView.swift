@@ -69,7 +69,7 @@ public struct MyProfileView: View {
 
     /// 처음 불러오기에 실패해 보여 줄 프로필이 없음(#387)
     private var isProfileLoadFailed: Bool {
-        store.profileLoadFailed && store.communityProfile == nil
+        store.profileLoadFailed && store.communityProfile == nil && !store.authInfo.isGuest
     }
     
     // MARK: - Body

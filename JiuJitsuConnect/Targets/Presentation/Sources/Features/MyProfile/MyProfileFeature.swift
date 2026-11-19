@@ -407,6 +407,8 @@ public struct MyProfileFeature: Sendable {
                 
             case let .internal(.profileResponse(.failure(error))):
                 state.isLoadingProfile = false
+                // 불러오는 사이 로그아웃·탈퇴로 비로그인이 됐으면 늦게 온 실패는 버린다 — 비로그인 카드는 '로그인하기'여야 한다.
+                guard !state.authInfo.isGuest else { return .none }
                 // 실패는 카드 자리에 안내와 다시 시도로 남긴다 — 같은 말을 토스트로 한 번 더 하지 않는다(#387).
                 state.profileLoadFailed = true
                 Log.trace("Failed to load profile: \(error)", category: .network, level: .error)
