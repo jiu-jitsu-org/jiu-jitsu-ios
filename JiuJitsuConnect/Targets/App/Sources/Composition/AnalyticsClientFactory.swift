@@ -69,6 +69,10 @@ enum AnalyticsClientFactory {
             },
             resetAnalyticsData: {
                 Analytics.resetAnalyticsData()
+            },
+            handleOpen: { url in
+                guard isCollectionEnabled(defaults) else { return }
+                Analytics.handleOpen(url)
             }
         )
     }

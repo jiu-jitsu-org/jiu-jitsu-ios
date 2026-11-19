@@ -44,6 +44,7 @@ public extension DependencyValues {
 ///
 /// 콜드 스타트에서는 `didReceive` 콜백이 AppFeature의 구독보다 먼저 올 수 있다. 그때의 탭을
 /// 잃지 않도록 구독자가 없으면 마지막 payload를 보관했다가 첫 구독자에게 넘긴다.
+/// 보관한 탭은 콜드 스타트로 표시한다 — 분석이 앱을 켠 탭인지 가린다(#427).
 /// (탭은 사용자 의도 하나이므로 여러 개가 쌓여도 마지막 것만 유효하다.)
 public final class PushNotificationTapRelay: Sendable {
     private let storage = Storage()
@@ -92,7 +93,9 @@ public final class PushNotificationTapRelay: Sendable {
             lock.lock()
             let snapshot = Array(continuations.values)
             if snapshot.isEmpty {
-                pending = payload
+                var held = payload
+                held.isColdStart = true
+                pending = held
             }
             lock.unlock()
             snapshot.forEach { $0.yield(payload) }

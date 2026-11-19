@@ -21,6 +21,8 @@ extension AppFeature {
         var pendingOpen: AnalyticsEvent.AppState?
         /// 돌아오기 전에 먼저 온 입구(푸시 탭이 `.active`보다 먼저 올 때).
         var pendingSource: AnalyticsEvent.OpenSource?
+        /// 마지막으로 받은 링크. 유니버설 링크는 두 창구로 같이 올 수 있어 곧바로 다시 온 같은 링크는 세지 않는다(#427).
+        var lastLink: LinkReceipt?
         /// 마지막으로 보낸 계정 속성(MY 프로필 기준). 같은 값은 다시 보내지 않는다.
         var sentProfileProperties: [AnalyticsUserProperty: String?] = [:]
         /// 지금 맨 위에 보이는 화면(#425).
@@ -55,6 +57,11 @@ extension AppFeature {
         var isRecommendedUpdateShown = false
         /// 마지막으로 보낸 회원 ID. 같은 값은 다시 보내지 않는다. 바깥 nil은 아직 안 보냄 — GA는 이전 실행의 값을 기억한다.
         var sentUserID: String??
+
+        struct LinkReceipt: Equatable, Sendable {
+            let url: URL
+            let receivedAt: Date
+        }
     }
 
     /// 루트 분석 리듀서. 상태는 `AnalyticsState`만 바꾸고 화면 흐름에는 끼어들지 않는다.
@@ -72,11 +79,14 @@ extension AppFeature {
         /// 맨 위 화면이 이만큼 그대로 있어야 본 것으로 센다. 링크 · 푸시는 탭을 바꾼 뒤 다음 액션에서 상세를 쌓아,
         /// 그 사이 잠깐 맨 위였던 탭 첫 화면을 세지 않게 한다.
         static let screenViewSettleDuration: Duration = .milliseconds(500)
+        /// 같은 링크가 이 안에 다시 오면 한 번 받은 것으로 본다(`onContinueUserActivity` · `onOpenURL`).
+        static let duplicateLinkInterval: TimeInterval = 1
 
         @Dependency(\.analyticsClient) var analyticsClient
         @Dependency(\.authClient) var authClient
         @Dependency(\.notificationPermissionClient) var notificationPermissionClient
         @Dependency(\.continuousClock) var clock
+        @Dependency(\.date) var date
 
         func reduce(into state: inout State, action: Action) -> Effect<Action> {
             let screenEffect = reduceScreenEvent(into: &state, action: action)
@@ -115,13 +125,32 @@ extension AppFeature {
                 }
                 return .merge(beginAppOpen(.warm, state: &state), pushEnabled)
 
-            case .internal(.pushNotificationTapped):
+            case let .internal(.pushNotificationTapped(payload)):
+                // 앱 상태는 입구를 처리하기 전에 본다 — 처리하면 기다리던 app_open이 비워진다.
+                if let appState = entryAppState(state, isColdStart: payload.isColdStart) {
+                    log(.pushOpen(
+                        noticeType: .init(serverValue: payload.pushType),
+                        contentType: Self.contentType(ofPushAction: payload.actionType),
+                        appState: appState
+                    ))
+                }
                 return openSourceArrived(.push, state: &state)
 
             case let .view(.deepLinkReceived(url)):
                 // 로그인 SDK 콜백(카카오 · 구글 스킴)은 입구가 아니다.
-                guard DeepLinkParser.parse(url) != nil else { return .none }
-                return openSourceArrived(Self.openSource(of: url), state: &state)
+                guard let link = DeepLinkParser.parse(url) else { return .none }
+                let now = date.now
+                if let last = state.analytics.lastLink, last.url == url,
+                   now.timeIntervalSince(last.receivedAt) < Self.duplicateLinkInterval {
+                    return .none
+                }
+                state.analytics.lastLink = AnalyticsState.LinkReceipt(url: url, receivedAt: now)
+                let source = Self.openSource(of: url)
+                if let appState = entryAppState(state, isColdStart: false) {
+                    log(.deeplinkOpen(contentType: Self.contentType(of: link), appState: appState, from: source))
+                }
+                analyticsClient.handleOpen(Self.innerURL(of: url) ?? url)
+                return openSourceArrived(source, state: &state)
 
             case .internal(.appOpenSourceWaitElapsed):
                 return flushPendingOpen(&state)
@@ -335,19 +364,49 @@ extension AppFeature {
             return .cancel(id: CancelID.openSourceWait)
         }
 
+        /// 푸시 · 링크가 앱을 켰거나(cold) 앞으로 불러왔나(warm). 앱을 쓰는 중이면 nil — 앱을 연 것이 아니다.
+        /// 콜드 스타트 푸시 탭은 받을 화면이 없어 보관됐던 것(`isColdStart`)이라, 입구 대기가 끝난 뒤에 와도 cold로 안다.
+        private func entryAppState(_ state: State, isColdStart: Bool) -> AnalyticsEvent.AppState? {
+            if isColdStart { return .cold }
+            if let pending = state.analytics.pendingOpen { return pending }
+            return state.analytics.isInBackground ? .warm : nil
+        }
+
         /// 공유 링크(`utm_medium=share`)가 먼저, 그다음 전송 수단(앱 주소 · 유니버설 링크)으로 가른다.
         /// 앱 주소는 안에 실린 https 링크의 꼬리표를 본다.
         static func openSource(of url: URL) -> AnalyticsEvent.OpenSource {
             let isScheme = url.scheme?.lowercased() != "https"
-            let inner = isScheme
-                ? URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                    .queryItems?.first(where: { $0.name == "url" })?.value.flatMap(URL.init(string:))
-                : url
+            let inner = isScheme ? innerURL(of: url) : url
             let medium = inner
                 .flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }?
                 .queryItems?.first(where: { $0.name == "utm_medium" })?.value
             if medium == "share" { return .shareLink }
             return isScheme ? .scheme : .deeplink
+        }
+
+        /// 앱 주소(`bjjossapp://...?url=`)에 실린 https 링크. 앱 주소가 아니면 nil.
+        static func innerURL(of url: URL) -> URL? {
+            guard url.scheme?.lowercased() != "https" else { return nil }
+            return URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "url" })?.value.flatMap(URL.init(string:))
+        }
+
+        static func contentType(of link: DeepLink) -> AnalyticsEvent.OpenContentType {
+            switch link {
+            case .communityPost: return .post
+            case .balanceGame: return .balanceGame
+            case .competitionDetail: return .competition
+            }
+        }
+
+        /// 푸시 `type`(이동 화면) → 연 대상. 모르는 값은 nil.
+        static func contentType(ofPushAction rawValue: String?) -> AnalyticsEvent.OpenContentType? {
+            switch rawValue.flatMap({ PushActionType(rawValue: $0.uppercased()) }) {
+            case .boardDetail: return .post
+            case .balanceDetail: return .balanceGame
+            case .competitionDetail: return .competition
+            case nil: return nil
+            }
         }
 
         // MARK: - 사용자 속성

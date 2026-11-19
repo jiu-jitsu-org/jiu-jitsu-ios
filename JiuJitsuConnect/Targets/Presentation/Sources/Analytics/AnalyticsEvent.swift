@@ -25,6 +25,10 @@ public struct AnalyticsEvent: Equatable, Sendable {
         case pushSettingsPrompt = "push_settings_prompt"
         case appUpdatePrompt = "app_update_prompt"
 
+        // 푸시 · 링크로 열기(#427)
+        case pushOpen = "push_open"
+        case deeplinkOpen = "deeplink_open"
+
         // 웹뷰가 ANALYTICS_EVENT로 보내는 기록(#424). 이벤트 사전 v2에서 범위에 FE가 있는 것.
         // 사전에 없는 이름은 브리지가 버린다 — 웹에 이벤트를 더하면 여기에도 더한다.
         case screenView = "screen_view"
@@ -300,6 +304,47 @@ extension AnalyticsEvent {
     /// `from`: 스플래시에서 뜨면 launch, 켜 둔 앱을 다시 열 때 확인해 뜨면 resume.
     public static func appUpdatePrompt(_ type: UpdateType, action: UpdatePromptAction, from: String) -> Self {
         Self(.appUpdatePrompt, parameters: strings(["update_type": type.rawValue, "action": action.rawValue, "from": from]))
+    }
+
+    /// 푸시 · 알림함 항목의 종류(사전 `notice_type`). 서버 `FcmPushType` 이름의 소문자다.
+    public enum NoticeType: String, Sendable {
+        case newComments = "new_comments"
+        case newChildComments = "new_child_comments"
+        case contentsLike = "contents_like"
+        case commentsLike = "comments_like"
+        case competitionEarlyBirdDeadline = "competition_early_bird_deadline"
+        case competitionRegistrationDeadline = "competition_registration_deadline"
+
+        /// 서버 값(`NEW_COMMENTS` 등). 사전에 없는 값은 nil — 새 종류가 GA에 새 분류로 쌓이지 않게.
+        public init?(serverValue: String?) {
+            guard let value = serverValue?.lowercased() else { return nil }
+            self.init(rawValue: value)
+        }
+    }
+
+    /// 푸시 · 링크로 연 대상의 종류(사전 `content_type` 중 앱이 여는 것).
+    public enum OpenContentType: String, Sendable {
+        case post
+        case balanceGame = "balance_game"
+        case competition
+    }
+
+    /// `noticeType` · `contentType`은 모르면 싣지 않는다(구버전 서버 · 새 종류). 열림 수는 남긴다.
+    public static func pushOpen(noticeType: NoticeType?, contentType: OpenContentType?, appState: AppState) -> Self {
+        Self(.pushOpen, parameters: strings([
+            "notice_type": noticeType?.rawValue,
+            "content_type": contentType?.rawValue,
+            "app_state": appState.rawValue
+        ]))
+    }
+
+    /// `from`: 유니버설 링크(deeplink) · 앱 주소(scheme) · 공유 링크(share_link).
+    public static func deeplinkOpen(contentType: OpenContentType, appState: AppState, from: OpenSource) -> Self {
+        Self(.deeplinkOpen, parameters: strings([
+            "content_type": contentType.rawValue,
+            "app_state": appState.rawValue,
+            "from": from.rawValue
+        ]))
     }
 
     /// nil 값은 꼬리표에서 뺀다.

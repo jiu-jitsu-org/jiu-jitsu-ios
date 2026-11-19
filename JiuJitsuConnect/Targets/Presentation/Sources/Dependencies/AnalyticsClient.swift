@@ -21,6 +21,8 @@ public struct AnalyticsClient: Sendable {
     public var setCollectionEnabled: @Sendable (Bool) -> Void
     /// 탈퇴 때 이 기기의 분석 식별 정보를 지운다.
     public var resetAnalyticsData: @Sendable () -> Void
+    /// 앱을 연 링크를 Firebase에 넘긴다. 링크의 `utm_*`가 캠페인으로 남는다(#427).
+    public var handleOpen: @Sendable (URL) -> Void
 
     public init(
         logEvent: @Sendable @escaping (AnalyticsEvent) -> Void,
@@ -28,7 +30,8 @@ public struct AnalyticsClient: Sendable {
         setUserID: @Sendable @escaping (String?) -> Void,
         isCollectionEnabled: @Sendable @escaping () -> Bool,
         setCollectionEnabled: @Sendable @escaping (Bool) -> Void,
-        resetAnalyticsData: @Sendable @escaping () -> Void
+        resetAnalyticsData: @Sendable @escaping () -> Void,
+        handleOpen: @Sendable @escaping (URL) -> Void
     ) {
         self.logEvent = logEvent
         self.setUserProperty = setUserProperty
@@ -36,6 +39,7 @@ public struct AnalyticsClient: Sendable {
         self.isCollectionEnabled = isCollectionEnabled
         self.setCollectionEnabled = setCollectionEnabled
         self.resetAnalyticsData = resetAnalyticsData
+        self.handleOpen = handleOpen
     }
 }
 
@@ -50,7 +54,8 @@ extension AnalyticsClient: DependencyKey {
         setUserID: { _ in },
         isCollectionEnabled: { true },
         setCollectionEnabled: { _ in },
-        resetAnalyticsData: {}
+        resetAnalyticsData: {},
+        handleOpen: { _ in }
     )
 }
 
