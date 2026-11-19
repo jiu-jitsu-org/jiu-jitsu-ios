@@ -23,14 +23,22 @@ public struct BeltCardView: View {
 
     // 비로그인 MY(#242)는 같은 빈 카드에서 로그인으로 보낸다.
     var registerButtonTitle: String = "벨트 등록하기"
+    // 프로필을 받기 전(처음 불러오는 중) · 받지 못함(실패) — 새 회원의 빈 카드와 구분한다(#387).
+    var isLoading: Bool = false
+    var isFailed: Bool = false
     let onBeltTapped: () -> Void
     let onRegisterTapped: () -> Void
+    var onRetryTapped: () -> Void = { }
 
     // MARK: - Body
 
     public var body: some View {
         Group {
-            if let beltRank {
+            if isLoading {
+                loadingContent
+            } else if isFailed {
+                failedContent
+            } else if let beltRank {
                 // 흰 카드 왼쪽 타일에 작은 띠 그림(#320) — 띠 고르기 칩과 같은 BeltIcon.
                 BeltSection(
                     beltRank: beltRank,
@@ -51,6 +59,51 @@ public struct BeltCardView: View {
             y: 4
         )
         .padding(.horizontal, 20)
+    }
+
+    // MARK: - Loading Content
+
+    /// 띠가 있는 카드(BeltSection)와 같은 자리 · 크기의 회색 자리 표시 — 응답 뒤 카드가 덜 흔들린다.
+    private var loadingContent: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.semantic.surface.disabled)
+                .frame(width: 40, height: 40)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Capsule()
+                    .fill(Color.semantic.surface.disabled)
+                    .frame(width: 32, height: 12)
+                Capsule()
+                    .fill(Color.semantic.surface.disabled)
+                    .frame(width: 112, height: 18)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 24)
+        .padding(.horizontal, 20)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("프로필을 불러오는 중")
+    }
+
+    // MARK: - Failed Content
+
+    private var failedContent: some View {
+        VStack(spacing: 24) {
+            Text("프로필을 불러오지 못했어요")
+                .font(Font.pretendard.title3)
+                .foregroundStyle(Color.component.beltCard.default.text)
+                .padding(.top, 24)
+
+            Button {
+                onRetryTapped()
+            } label: {
+                AppButtonConfiguration(title: "다시 시도", size: .medium)
+            }
+            .appButtonStyle(.primary, size: .medium, height: 38)
+            .padding(.bottom, 24)
+        }
     }
 
     // MARK: - Empty Content
@@ -138,6 +191,14 @@ private struct BeltSection: View {
         onBeltTapped: { },
         onRegisterTapped: { }
     )
+    .background(Color.component.background.default)
+}
+
+#Preview("BeltCardView - 불러오는 중 · 실패") {
+    VStack(spacing: 20) {
+        BeltCardView(beltRank: nil, beltStripe: nil, isLoading: true, onBeltTapped: { }, onRegisterTapped: { })
+        BeltCardView(beltRank: nil, beltStripe: nil, isFailed: true, onBeltTapped: { }, onRegisterTapped: { })
+    }
     .background(Color.component.background.default)
 }
 
