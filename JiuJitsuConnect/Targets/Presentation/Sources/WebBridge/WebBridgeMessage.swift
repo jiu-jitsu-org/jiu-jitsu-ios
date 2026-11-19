@@ -159,6 +159,8 @@ private extension WebBridgeInboundMessage {
             return "CONTENT_CREATED  kind=\(kind.rawValue)"
         case let .analyticsEvent(event):
             return "ANALYTICS_EVENT  name=\(event.name.rawValue) params=\(event.parameters.count)"
+        case let .homeCategoryTabs(payload):
+            return "HOME_CATEGORY_TABS  tabs=\(payload.tabs.count) selectedId=\(payload.selectedId.map(String.init) ?? "null")"
         case let .unknown(type):
             return "\(type)  (unsupported)"
         }
@@ -197,6 +199,8 @@ private extension WebBridgeOutboundMessage {
             return "USER_BLOCK_CHANGED  userId=\(userId) blocked=\(blocked)"
         case let .competitionAlertsResult(requestId, deviceEnabled):
             return "COMPETITION_ALERTS_RESULT  reqId=\(requestId) deviceEnabled=\(deviceEnabled)"
+        case let .homeCategorySelect(categoryId):
+            return "HOME_CATEGORY_SELECT  categoryId=\(categoryId.map(String.init) ?? "null")"
         }
     }
 }
@@ -272,6 +276,9 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 사전에 있는 이름 · 문자열 또는 정수 값만 받고, `surface`는 webview로 붙인다. 회신 없음.
     /// OSS 도메인에서 온 것만 받는 검사는 메시지를 받은 프레임을 아는 BridgeWebView가 한다.
     case analyticsEvent(AnalyticsEvent)
+    /// 홈 피드의 카테고리 칩 목록과 고른 칩(jiu-jitsu-frontend 홈 칩 → 앱 머리줄). capability가 있는 리스트 웹만 보낸다.
+    /// 피드가 뜰 때와 고른 칩이 바뀔 때마다 오고, 같은 내용이 거푸 올 수 있다. 회신 없음.
+    case homeCategoryTabs(HomeCategoryTabsPayload)
     /// 계약에 없는 타입(상위 버전/오타 등) — 무시 대상.
     case unknown(type: String)
 
@@ -296,6 +303,7 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case setSheetOpen = "SET_SHEET_OPEN"
         case contentCreated = "CONTENT_CREATED"
         case analyticsEvent = "ANALYTICS_EVENT"
+        case homeCategoryTabs = "HOME_CATEGORY_TABS"
     }
 
     /// `WKScriptMessage.body`를 파싱한다.
@@ -454,6 +462,8 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             return decodeContentCreated(payload)
         case .analyticsEvent:
             return decodeAnalyticsEvent(payload)
+        case .homeCategoryTabs:
+            return decodeHomeCategoryTabs(payload)
         case .none:
             return .unknown(type: rawType)
         }
@@ -482,6 +492,34 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             return nil
         }
         return .contentCreated(kind)
+    }
+
+    /// 이름이 없는 칩은 그릴 수 없어 건너뛴다. id가 없는('전체') 칩은 맨 앞 하나만 받고, 나머지는 id가 정수여야 한다.
+    /// 같은 id가 거푸 오면 앞의 것만 둔다(칩 줄이 id로 칩을 구분한다). selectedId가 정수가 아니면 '전체'로 본다.
+    private static func decodeHomeCategoryTabs(_ payload: [String: Any]?) -> WebBridgeInboundMessage? {
+        guard let rawTabs = payload?["tabs"] as? [[String: Any]] else {
+            Log.trace("HOME_CATEGORY_TABS payload tabs 누락", category: .network, level: .error)
+            return nil
+        }
+        var tabs: [HomeCategoryTab] = []
+        var seenIds: Set<Int?> = []
+        for (index, raw) in rawTabs.enumerated() {
+            guard let name = raw["name"] as? String, !name.isEmpty else { continue }
+            let id = jsonInteger(raw["id"])
+            let isAll = index == 0 && (raw["id"] == nil || raw["id"] is NSNull)
+            guard id != nil || isAll, seenIds.insert(id).inserted else { continue }
+            tabs.append(HomeCategoryTab(id: id, name: name))
+        }
+        let selectedId = jsonInteger(payload?["selectedId"])
+        return .homeCategoryTabs(HomeCategoryTabsPayload(tabs: tabs, selectedId: selectedId))
+    }
+
+    /// JSON 정수만 Int로 읽는다. 참거짓도 NSNumber로 오므로 거르고, 소수·null·문자열은 nil.
+    private static func jsonInteger(_ raw: Any?) -> Int? {
+        guard let number = raw as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
+        let double = number.doubleValue
+        guard double.isFinite, double == double.rounded(), abs(double) <= 9_007_199_254_740_991 else { return nil }
+        return number.intValue
     }
 
     /// 사전에 없는 이름, 문자열 · 정수가 아닌 값(참거짓 · 소수 · 객체)이 하나라도 있으면 기록 전체를 버린다.
@@ -547,6 +585,30 @@ public struct OpenUserProfilePayload: Equatable, Sendable {
     public init(userId: Int, isMe: Bool) {
         self.userId = userId
         self.isMe = isMe
+    }
+}
+
+// MARK: - HOME_CATEGORY_TABS Payload
+
+/// 홈 피드 카테고리 칩 하나. `id`가 nil이면 '전체'다.
+public struct HomeCategoryTab: Equatable, Sendable {
+    public let id: Int?
+    public let name: String
+
+    public init(id: Int?, name: String) {
+        self.id = id
+        self.name = name
+    }
+}
+
+/// `HOME_CATEGORY_TABS` 페이로드. `selectedId`가 nil이면 '전체'를 고른 상태다.
+public struct HomeCategoryTabsPayload: Equatable, Sendable {
+    public let tabs: [HomeCategoryTab]
+    public let selectedId: Int?
+
+    public init(tabs: [HomeCategoryTab], selectedId: Int?) {
+        self.tabs = tabs
+        self.selectedId = selectedId
     }
 }
 
@@ -741,6 +803,8 @@ enum WebBridgeCapability: String, Equatable, Sendable {
     /// 모든 웹뷰가 알린다(#395, BridgeWebView가 붙임). 있으면 웹은 requestId를 실어 보내고 COMPETITION_ALERTS_RESULT를 기다린다.
     /// 없으면(옛 앱) 지금처럼 바로 성공 토스트를 띄운다.
     case competitionAlertsEnabled = "COMPETITION_ALERTS_ENABLED"
+    /// 홈 리스트 웹만 알린다. 있으면 웹은 자기 카테고리 칩 줄을 숨기고 HOME_CATEGORY_TABS로 앱 머리줄에 칩을 맡긴다.
+    case homeCategoryTabs = "HOME_CATEGORY_TABS"
 
     /// `window.AppBridgeCapabilities = [...]`를 정의하는 스크립트 소스. 직렬화 실패 시 nil.
     static func injectionScriptSource(for capabilities: [WebBridgeCapability]) -> String? {
@@ -819,6 +883,8 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
     case userBlockChanged(userId: Int, blocked: Bool)
     /// COMPETITION_ALERTS_ENABLED의 결과(#395). 기기 알림이 켜져 있을 때(방금 허용 포함)만 true — 웹은 true일 때만 성공 토스트를 띄운다.
     case competitionAlertsResult(requestId: String, deviceEnabled: Bool)
+    /// 앱 머리줄에서 카테고리 칩을 누름 → 웹이 피드를 그 카테고리로 바꾸고 HOME_CATEGORY_TABS로 다시 알린다. nil이면 '전체'.
+    case homeCategorySelect(categoryId: Int?)
 
     private var type: String {
         switch self {
@@ -833,6 +899,7 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         case .profileUpdated: return "PROFILE_UPDATED"
         case .userBlockChanged: return "USER_BLOCK_CHANGED"
         case .competitionAlertsResult: return "COMPETITION_ALERTS_RESULT"
+        case .homeCategorySelect: return "HOME_CATEGORY_SELECT"
         }
     }
 
@@ -846,6 +913,9 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
             return ["userId": userId, "blocked": blocked]
         case let .competitionAlertsResult(requestId, deviceEnabled):
             return ["requestId": requestId, "deviceEnabled": deviceEnabled]
+        case let .homeCategorySelect(categoryId):
+            // '전체'도 키를 빼지 않고 JSON null로 싣는다(계약).
+            return ["categoryId": categoryId.map { $0 as Any } ?? NSNull()]
         case let .confirmDialogResult(requestId, outcome):
             return ["requestId": requestId, "result": outcome.rawValue]
         case let .selectSheetResult(requestId, outcome):

@@ -73,6 +73,8 @@ struct BridgeWebView: UIViewRepresentable {
     // 첫 응답이 와서 문서를 그리기 시작함(didCommit). 그 전까지는 웹이 아무것도 그릴 수 없어, 그 사이만 네이티브가
     // 로딩을 알리는 화면(상세)이 받는다. 당겨서 새로고침 중엔 띠가 로딩을 알리므로 보내지 않는다.
     var onLoadingCommitted: (() -> Void)?
+    // 당겨서 새로고침을 시작함. 이때는 로딩 시작(onLoadingStarted)을 보내지 않아, 웹을 다시 불러오는 걸 알아야 하는 화면(홈)만 넘긴다.
+    var onRefreshStarted: (() -> Void)?
     // 웹 프로세스가 죽음(#352). 화면은 흰 채로 남고 웹 헤더 · BACK_PRESSED 응답도 없어, 받는 화면(상세)이 오류로 돌린다.
     var onWebProcessTerminated: (() -> Void)?
     // 키보드가 뜨고 내림. 받는 화면(상세)만 넘긴다(#383).
@@ -92,6 +94,7 @@ struct BridgeWebView: UIViewRepresentable {
             onOutboundDelivered: onOutboundDelivered
         )
         coordinator.onLoadingCommitted = onLoadingCommitted
+        coordinator.onRefreshStarted = onRefreshStarted
         coordinator.onWebProcessTerminated = onWebProcessTerminated
         return coordinator
     }
@@ -238,6 +241,7 @@ struct BridgeWebView: UIViewRepresentable {
             onOutboundDelivered: onOutboundDelivered
         )
         context.coordinator.onLoadingCommitted = onLoadingCommitted
+        context.coordinator.onRefreshStarted = onRefreshStarted
         context.coordinator.onWebProcessTerminated = onWebProcessTerminated
         context.coordinator.scrollToTop(token: scrollToTopToken)
         context.coordinator.setPullToRefreshBackground(pullToRefreshBackground.map { UIColor($0) })
@@ -281,6 +285,7 @@ struct BridgeWebView: UIViewRepresentable {
         private var onBridgeMessage: (WebBridgeInboundMessage) -> Void
         private var onOutboundDelivered: (UUID) -> Void
         var onLoadingCommitted: (() -> Void)?
+        var onRefreshStarted: (() -> Void)?
         var onWebProcessTerminated: (() -> Void)?
 
         private var lastLoadedURL: URL?
@@ -441,6 +446,7 @@ struct BridgeWebView: UIViewRepresentable {
         private func beginRefresh() {
             guard let webView else { return }
             isRefreshing = true
+            onRefreshStarted?()
             // 리프레시로 웹 컨텍스트가 재초기화되므로 전달 기록을 비워
             // 재로드 후 WEBVIEW_READY 핸드셰이크에서 상태가 다시 동기화되게 한다.
             deliveredOutboundIDs.removeAll()
