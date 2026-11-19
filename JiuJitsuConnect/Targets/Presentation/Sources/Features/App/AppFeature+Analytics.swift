@@ -34,8 +34,23 @@ extension AppFeature {
         var resumingScreenID: String?
         /// 백그라운드로 나갈 때 맨 위였던 화면. 백그라운드 중 푸시 · 링크가 화면을 바꿨으면 그 화면은 resume이 아니다.
         var backgroundScreenID: String?
-        /// 로그인 모달을 띄운 곳(login_prompt · web_modal). 모달이 닫히면 비운다.
+        /// 로그인 모달을 띄운 곳(login_prompt · web_modal · record · my_profile · settings). 모달이 닫히면 비운다.
         var loginCoverFrom: String?
+        /// 로그인 모달을 띄운 이유(사전 "로그인 안내", #426). 로그인 시작 · 성공 · 가입까지 싣고 모달이 닫히면 비운다.
+        var loginCoverReason: String?
+        /// 로그인 안내 알럿을 띄운 이유. [로그인]이면 모달로 넘기고, 취소 · 닫힘이면 버린다.
+        var loginPromptReason: String?
+        /// 로그인 안내 · 만료 안내가 떠 있다. 뜬 순간만 login_prompt_view로 센다.
+        var isLoginPromptShown = false
+        var isSessionExpiredPromptShown = false
+        /// 마지막으로 누른 SNS. 실패 · 성공 · 가입에 싣는다.
+        var loginMethod: AnalyticsEvent.LoginMethod?
+        /// 기기 알림 꺼짐 안내를 띄운 곳. 첫 답에서 비운다 — 버튼 뒤 닫힘 바인딩이 한 번 더 와도 두 번 세지 않게.
+        var deviceAlertTrigger: AnalyticsEvent.PushTrigger?
+        /// 꼭 필요한 업데이트 안내가 뜬 곳(launch · resume)
+        var requiredUpdateFrom: String?
+        /// 권장 업데이트 안내가 떠 있고 아직 답하지 않았다.
+        var isRecommendedUpdateShown = false
         /// 마지막으로 보낸 회원 ID. 같은 값은 다시 보내지 않는다. 바깥 nil은 아직 안 보냄 — GA는 이전 실행의 값을 기억한다.
         var sentUserID: String??
     }
@@ -63,6 +78,8 @@ extension AppFeature {
 
         func reduce(into state: inout State, action: Action) -> Effect<Action> {
             let screenEffect = reduceScreenEvent(into: &state, action: action)
+            // 로그아웃 · 탈퇴 기록은 회원 정보를 지우기 전에 남겨야 해 reduceEvent보다 먼저 본다.
+            reduceAuthEvent(into: &state, action: action)
             let effect = reduceEvent(into: &state, action: action)
             if case .destination(.presented(.appTab)) = action {
                 syncProfileProperties(&state)
@@ -141,6 +158,7 @@ extension AppFeature {
 
             case .destination(.presented(.appTab(.internal(.webLogoutCompleted)))),
                  .destination(.presented(.appTab(.internal(.handleSessionExpired)))):
+                // logout · 세션 만료 기록은 reduceAuthEvent가 먼저 남겼다.
                 // 다음에 이 기기로 들어오는 사람에게 이전 계정 값이 붙지 않게 지운다.
                 clearMemberProperties(&state)
                 return .none
@@ -174,6 +192,31 @@ extension AppFeature {
 
             case .destination(.presented(.appTab(.view(.loginPromptLoginTapped)))):
                 state.analytics.loginCoverFrom = "login_prompt"
+                state.analytics.loginCoverReason = state.analytics.loginPromptReason
+                state.analytics.loginPromptReason = nil
+                return .none
+
+            case .destination(.presented(.appTab(.view(.sessionExpiredAlert(.loginTapped))))):
+                state.analytics.loginCoverFrom = "login_prompt"
+                state.analytics.loginCoverReason = "session_expired"
+                return .none
+
+            case .destination(.presented(.appTab(.myPage(.delegate(.loginRequested))))):
+                state.analytics.loginCoverFrom = "my_profile"
+                state.analytics.loginCoverReason = "my_tab"
+                return .none
+
+            case .destination(.presented(.appTab(.myPage(.delegate(.settings(.loginRequested)))))):
+                state.analytics.loginCoverFrom = "settings"
+                state.analytics.loginCoverReason = "my_tab"
+                return .none
+
+            // 비로그인으로 누른 '내 기록에 남기기'(#250) — 앱이 바로 로그인 모달을 연다.
+            case .destination(.presented(.appTab(.competition(.delegate(.competitionRecordRequested))))),
+                 .destination(.presented(.appTab(.home(.delegate(.competitionRecordRequested))))):
+                guard case let .appTab(appTab)? = state.destination, appTab.pendingCompetitionRecord != nil else { return .none }
+                state.analytics.loginCoverFrom = "record"
+                state.analytics.loginCoverReason = "record"
                 return .none
 
             case .destination(.presented(.appTab(.home(.delegate(.loginModalRequested))))),
@@ -194,6 +237,7 @@ extension AppFeature {
             if state.analytics.visibleScreen?.id.hasPrefix(ScreenView.loginCoverID) == true,
                case let .appTab(appTab)? = state.destination, appTab.loginCover == nil {
                 state.analytics.loginCoverFrom = nil
+                state.analytics.loginCoverReason = nil
             }
             let screen = ScreenView.visibleScreen(in: state)
             guard screen != state.analytics.visibleScreen else { return .none }
@@ -231,6 +275,7 @@ extension AppFeature {
                 nil
             }
             log(from.map(event.replacingFrom) ?? event)
+            logMyTabLoginPrompt(screen: screen, from: from, state: state)
         }
 
         /// 지금 화면 위에 떠 있던 화면은 모두 닫혔다 — 다시 열면 처음 보이는 것이라 기억에서 뺀다.
@@ -373,7 +418,7 @@ extension AppFeature {
             }
         }
 
-        private func log(_ event: AnalyticsEvent) {
+        func log(_ event: AnalyticsEvent) {
             analyticsClient.logEvent(event)
         }
 

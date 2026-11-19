@@ -108,6 +108,8 @@ public struct NotificationSettingFeature: Sendable {
             case showToast(ToastState)
             case toastDismissed
             case deviceNotificationStatusLoaded(NotificationPermissionClient.Status)
+            // 기기 알림 켜기로 띄운 시스템 권한 창에 답함(#426). 루트의 분석 기록만 본다.
+            case devicePermissionAnswered(granted: Bool)
         }
 
         public enum DelegateAction: Sendable {
@@ -142,12 +144,17 @@ public struct NotificationSettingFeature: Sendable {
                 state.deviceNotificationStatus = status
                 return .none
 
+            case .internal(.devicePermissionAnswered):
+                return .none
+
             case .view(.deviceNotificationTurnOnTapped):
                 switch state.deviceNotificationStatus {
                 case .notDetermined:
                     // 허용하면 앱 진입과 같은 흐름으로 푸시 등록 · FCM 토큰 발급 · 서버 등록을 잇는다. 이 화면은 로그인해야 열린다.
                     return .run { send in
-                        if await firebaseClient.requestPermission() {
+                        let isGranted = await firebaseClient.requestPermission()
+                        await send(.internal(.devicePermissionAnswered(granted: isGranted)))
+                        if isGranted {
                             await FCMAppInfoSync.syncOnAppLaunch(firebaseClient: firebaseClient, userClient: userClient)
                         }
                         await send(.internal(.deviceNotificationStatusLoaded(notificationPermissionClient.status())))

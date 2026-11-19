@@ -54,7 +54,7 @@ extension AppFeature {
 
         // MARK: - 로그인 · 가입
 
-        /// from: 로그인 첫 화면은 launch, 로그인 모달은 띄운 곳(안내 창 · 웹이 바로 연 모달 · 내 기록에 남기기). 그 밖(설정 · 만료 안내 등)은 싣지 않는다.
+        /// from: 로그인 첫 화면은 launch, 로그인 모달은 띄운 곳(안내 창 · 만료 안내 · 웹이 바로 연 모달 · 내 기록에 남기기 · MY · 설정, #426).
         private static func loginScreen(_ login: LoginFeature.State, from: String?, id: String) -> VisibleScreen {
             if case let .termsAgreement(terms)? = login.sheet {
                 if let policy = terms.termsWebCover {

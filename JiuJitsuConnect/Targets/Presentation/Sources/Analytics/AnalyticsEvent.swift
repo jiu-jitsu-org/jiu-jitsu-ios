@@ -13,6 +13,18 @@ public struct AnalyticsEvent: Equatable, Sendable {
         case appOpen = "app_open"
         case sessionRestore = "session_restore"
 
+        // 시작 · 가입 · 로그인 · 권한(#426). login_prompt_view는 웹과 같이 쓴다(아래 웹 목록).
+        case guestStart = "guest_start"
+        case loginStart = "login_start"
+        case login
+        case loginFail = "login_fail"
+        case signUp = "sign_up"
+        case logout
+        case accountDelete = "account_delete"
+        case pushPermissionResult = "push_permission_result"
+        case pushSettingsPrompt = "push_settings_prompt"
+        case appUpdatePrompt = "app_update_prompt"
+
         // 웹뷰가 ANALYTICS_EVENT로 보내는 기록(#424). 이벤트 사전 v2에서 범위에 FE가 있는 것.
         // 사전에 없는 이름은 브리지가 버린다 — 웹에 이벤트를 더하면 여기에도 더한다.
         case screenView = "screen_view"
@@ -164,6 +176,113 @@ extension AnalyticsEvent {
         var parameters = parameters
         parameters["from"] = .string(from)
         return Self(name, parameters: parameters, surface: surface)
+    }
+}
+
+// MARK: - 시작 · 가입 · 로그인 · 권한 (#426)
+
+extension AnalyticsEvent {
+    /// 로그인 SNS(사전 `method`).
+    public enum LoginMethod: String, Sendable {
+        case kakao, google, apple
+    }
+
+    /// `login_fail`의 reason(사전 "로그인 실패").
+    public enum LoginFailReason: String, Sendable {
+        case cancel
+        /// 탈퇴 처리 · 영구 삭제 등 계정 문제
+        case accountProblem = "account_problem"
+        case permissionRequired = "permission_required"
+        case missingProfile = "missing_profile"
+        /// SNS 단계의 그 밖 실패
+        case snsError = "sns_error"
+        /// 서버 로그인 단계의 그 밖 실패(네트워크 포함)
+        case serverError = "server_error"
+    }
+
+    /// 알림 권한을 물은 순간(사전 `trigger`). 앱 진입 · 로그인 직후는 #333부터 묻지 않는다.
+    public enum PushTrigger: String, Sendable {
+        /// 글 · 댓글을 올린 뒤 안내의 [알림 받기](#333)
+        case contentCreate = "content_create"
+        /// 웹의 관심 대회 '알림 받기'(#257)
+        case competitionAlert = "competition_alert"
+        /// 설정 › 알림의 관심 대회 알림 켜기
+        case settingsCompetition = "settings_competition"
+        /// 설정 › 알림의 기기 알림 켜기
+        case settingsDevice = "settings_device"
+    }
+
+    /// "기기 알림이 꺼져 있어요" 안내의 답(사전 `action`).
+    public enum PushSettingsAction: String, Sendable {
+        case openSettings = "open_settings"
+        /// [나중에] · 닫힘
+        case later
+    }
+
+    public enum UpdateType: String, Sendable {
+        case force
+        case optional
+    }
+
+    /// 업데이트 안내가 뜸(`view`)과 답(사전 `action`).
+    public enum UpdatePromptAction: String, Sendable {
+        case view, update, later
+    }
+
+    public static func guestStart() -> Self {
+        Self(.guestStart)
+    }
+
+    /// `reason`: 로그인 안내 이유(사전 "로그인 안내"). `from` · `reason`은 모르면 싣지 않는다.
+    public static func loginPromptView(reason: String?, from: String?) -> Self {
+        Self(.loginPromptView, parameters: strings(["reason": reason, "from": from]))
+    }
+
+    public static func loginStart(method: LoginMethod, from: String?, reason: String?) -> Self {
+        Self(.loginStart, parameters: strings(["method": method.rawValue, "from": from, "reason": reason]))
+    }
+
+    /// `restored`: 탈퇴 유예 중 다시 로그인해 탈퇴가 취소됨.
+    public static func login(method: LoginMethod?, from: String?, restored: Bool) -> Self {
+        Self(.login, parameters: strings(["method": method?.rawValue, "from": from, "restored": flag(restored)]))
+    }
+
+    public static func loginFail(method: LoginMethod?, reason: LoginFailReason) -> Self {
+        Self(.loginFail, parameters: strings(["method": method?.rawValue, "reason": reason.rawValue]))
+    }
+
+    public static func signUp(method: LoginMethod?, marketing: Bool?, from: String?) -> Self {
+        Self(.signUp, parameters: strings(["method": method?.rawValue, "marketing": marketing.map(flag), "from": from]))
+    }
+
+    public static func logout() -> Self {
+        Self(.logout)
+    }
+
+    public static func accountDelete() -> Self {
+        Self(.accountDelete)
+    }
+
+    public static func pushPermissionResult(granted: Bool, trigger: PushTrigger) -> Self {
+        Self(.pushPermissionResult, parameters: strings(["result": granted ? "granted" : "denied", "trigger": trigger.rawValue]))
+    }
+
+    public static func pushSettingsPrompt(_ action: PushSettingsAction, trigger: PushTrigger) -> Self {
+        Self(.pushSettingsPrompt, parameters: strings(["action": action.rawValue, "trigger": trigger.rawValue]))
+    }
+
+    /// `from`: 스플래시에서 뜨면 launch, 켜 둔 앱을 다시 열 때 확인해 뜨면 resume.
+    public static func appUpdatePrompt(_ type: UpdateType, action: UpdatePromptAction, from: String) -> Self {
+        Self(.appUpdatePrompt, parameters: strings(["update_type": type.rawValue, "action": action.rawValue, "from": from]))
+    }
+
+    /// nil 값은 꼬리표에서 뺀다.
+    private static func strings(_ values: [String: String?]) -> [String: Value] {
+        values.compactMapValues { $0.map(Value.string) }
+    }
+
+    private static func flag(_ value: Bool) -> String {
+        value ? "true" : "false"
     }
 }
 
