@@ -59,9 +59,18 @@ extension AppTabFeature {
         case .allowTapped:
             // 시스템 권한 창. 허용하면 관심 대회 알림과 같이 푸시 등록 · FCM 토큰 발급 · 서버 등록을 잇는다.
             state.isNotificationPromptPresented = false
+            // 그사이 다른 곳(관심 대회 알림 등)에서 답했으면 창이 뜨지 않아 답으로 세지 않는다.
             return .run { send in
-                if await firebaseClient.requestPermission() {
+                switch await DeviceNotificationCheck.current(permission: notificationPermissionClient, firebase: firebaseClient) {
+                case .granted:
                     await send(.internal(.notificationPermissionGranted))
+                case .grantedNow:
+                    await send(.internal(.notificationPromptPermissionAnswered(granted: true)))
+                    await send(.internal(.notificationPermissionGranted))
+                case .deniedNow:
+                    await send(.internal(.notificationPromptPermissionAnswered(granted: false)))
+                case .denied:
+                    return
                 }
             }
             .cancellable(id: CancelID.notificationPermission, cancelInFlight: true)
@@ -89,8 +98,12 @@ extension AppTabFeature {
             case .granted:
                 return
             case .grantedNow:
+                await send(.internal(.competitionSettingPermissionAnswered(granted: true)))
                 await send(.internal(.notificationPermissionGranted))
             case .denied:
+                await send(.internal(.showDeviceNotificationAlert))
+            case .deniedNow:
+                await send(.internal(.competitionSettingPermissionAnswered(granted: false)))
                 await send(.internal(.showDeviceNotificationAlert))
             }
         }
@@ -106,7 +119,7 @@ extension AppTabFeature {
             return .none
         case .grantedNow:
             return .send(.internal(.notificationPermissionGranted))
-        case .denied:
+        case .denied, .deniedNow:
             guard !state.authInfo.isGuest, !state.didShowWebDeviceNotificationAlert else { return .none }
             state.didShowWebDeviceNotificationAlert = true
             state.isDeviceNotificationAlertPresented = true

@@ -145,6 +145,10 @@ public struct AppTabFeature: Sendable {
             case showDeviceNotificationAlert
             // 관심 대회 알림 켜기(#257) · 알림 권한 안내(#333) 중 권한 창에서 허용함. 그 사이 로그아웃했을 수 있어 지금 상태를 보고 FCM을 등록한다.
             case notificationPermissionGranted
+            // 알림 권한 안내(#333) · 설정의 관심 대회 알림 켜기로 띄운 시스템 권한 창에 답함(#426).
+            // 루트의 분석 기록만 본다 — 동작은 notificationPermissionGranted · showDeviceNotificationAlert가 맡는다.
+            case notificationPromptPermissionAnswered(granted: Bool)
+            case competitionSettingPermissionAnswered(granted: Bool)
             // 알림 권한 안내(#333)를 띄울 때가 됨 — 그사이 다른 알럿 · 덮개가 떴으면 건너뛴다.
             case presentNotificationPrompt
             // 앱이 켜져 있는 동안 FCM 토큰이 바뀜(#332).

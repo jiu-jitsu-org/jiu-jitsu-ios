@@ -33,12 +33,12 @@ extension AppFeature {
         static func visibleScreen(in state: State) -> VisibleScreen? {
             switch state.destination {
             case let .login(login)?:
-                return loginScreen(login, from: "launch", id: "login")
+                return loginScreen(login, from: AnalyticsEvent.LoginEntry.launch.rawValue, id: "login")
             case let .appTab(appTab)?:
                 if let login = appTab.loginCover {
                     // '내 기록에 남기기'(#250)로 연 모달은 그 기록을 기다리는 동안 record.
-                    let from = state.analytics.loginCoverFrom ?? (appTab.pendingCompetitionRecord != nil ? "record" : nil)
-                    return loginScreen(login, from: from, id: loginCoverID)
+                    let entry: AnalyticsEvent.LoginEntry? = state.analytics.loginCoverFrom ?? (appTab.pendingCompetitionRecord != nil ? .record : nil)
+                    return loginScreen(login, from: entry?.rawValue, id: loginCoverID)
                 }
                 // 첫 홈은 인사 장면이 끝난 뒤에 센다.
                 guard !appTab.isGreetingShowing else { return nil }
@@ -54,7 +54,7 @@ extension AppFeature {
 
         // MARK: - 로그인 · 가입
 
-        /// from: 로그인 첫 화면은 launch, 로그인 모달은 띄운 곳(안내 창 · 웹이 바로 연 모달 · 내 기록에 남기기). 그 밖(설정 · 만료 안내 등)은 싣지 않는다.
+        /// from: 로그인 첫 화면은 launch, 로그인 모달은 띄운 곳(안내 창 · 만료 안내 · 웹이 바로 연 모달 · 내 기록에 남기기 · MY · 설정, #426).
         private static func loginScreen(_ login: LoginFeature.State, from: String?, id: String) -> VisibleScreen {
             if case let .termsAgreement(terms)? = login.sheet {
                 if let policy = terms.termsWebCover {

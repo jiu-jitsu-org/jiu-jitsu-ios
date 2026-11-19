@@ -56,10 +56,12 @@ public enum DeviceNotificationCheck: Equatable, Sendable {
     case granted
     /// 방금 시스템 권한 창에서 허용 — 푸시 등록 · FCM 토큰 등록을 잇는다.
     case grantedNow
-    /// 방금 권한 창에서 거절했거나, 전에 거절 · 기기 설정에서 끔 — 앱이 다시 물을 수 없어 설정 앱으로 안내한다.
+    /// 전에 거절 · 기기 설정에서 끔 — 앱이 다시 물을 수 없어 설정 앱으로 안내한다.
     case denied
+    /// 방금 시스템 권한 창에서 거절 — `denied`와 같이 안내한다. 창에 답한 것만 따로 세려고 나눈다(#426).
+    case deniedNow
 
-    var isEnabled: Bool { self != .denied }
+    var isEnabled: Bool { self == .granted || self == .grantedNow }
 
     /// 지금 상태를 본다. 한 번도 묻지 않았으면 iOS 설정에 알림 줄조차 없으니 시스템 권한 창을 띄우고 답을 기다린다.
     static func current(permission: NotificationPermissionClient, firebase: FirebaseClient) async -> Self {
@@ -69,7 +71,7 @@ public enum DeviceNotificationCheck: Equatable, Sendable {
         case .denied:
             return .denied
         case .notDetermined:
-            return await firebase.requestPermission() ? .grantedNow : .denied
+            return await firebase.requestPermission() ? .grantedNow : .deniedNow
         }
     }
 }
