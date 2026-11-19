@@ -33,19 +33,28 @@ public struct PushActionPayload: Equatable, Sendable {
     public let data: String?
     /// 알림 종류(서버 `FcmPushType` 이름, 예: `NEW_COMMENTS`). 분석 기록에만 쓴다(#427). 알림함 응답에는 없다.
     public let pushType: String?
+    /// 댓글 알림(새 댓글 · 답글 · 댓글 좋아요)이 가리키는 댓글 id(backend#271). 글 상세 주소에 붙여 웹이 맨 위에 보인다(#436).
+    public let commentId: String?
     /// 앱이 꺼져 있다 이 탭으로 켜졌다. 받을 화면이 아직 없어 릴레이가 보관했던 탭이다(`PushNotificationTapRelay`).
     public let isColdStart: Bool
 
-    public init(actionType: String?, data: String?, pushType: String? = nil, isColdStart: Bool = false) {
+    public init(
+        actionType: String?,
+        data: String?,
+        pushType: String? = nil,
+        commentId: String? = nil,
+        isColdStart: Bool = false
+    ) {
         self.actionType = actionType
         self.data = data
         self.pushType = pushType
+        self.commentId = commentId
         self.isColdStart = isColdStart
     }
 
     /// 같은 탭을 콜드 스타트로 표시한 사본. 필드를 여기서만 나열해, 필드가 늘어도 콜드 경로에서 빠지지 않게 한다.
     func markedColdStart() -> Self {
-        Self(actionType: actionType, data: data, pushType: pushType, isColdStart: true)
+        Self(actionType: actionType, data: data, pushType: pushType, commentId: commentId, isColdStart: true)
     }
 
     /// FCM 데이터 메시지는 `putData`한 키가 `userInfo` 최상위에 문자열로 실린다(`FcmPushService`).
@@ -53,7 +62,8 @@ public struct PushActionPayload: Equatable, Sendable {
         self.init(
             actionType: userInfo[Keys.type] as? String,
             data: userInfo[Keys.data] as? String,
-            pushType: userInfo[Keys.pushType] as? String
+            pushType: userInfo[Keys.pushType] as? String,
+            commentId: userInfo[Keys.commentId] as? String
         )
     }
 
@@ -61,6 +71,7 @@ public struct PushActionPayload: Equatable, Sendable {
         static let type = "type"
         static let data = "data"
         static let pushType = "pushType"
+        static let commentId = "commentId"
     }
 }
 
@@ -88,14 +99,20 @@ enum PushActionRouter {
         let url: URL
         switch actionType {
         case .boardDetail:
-            url = origin
-                .appending(path: DeepLinkParser.communitySegment)
-                .appending(path: contentId)
+            url = appendingCommentId(
+                payload.commentId,
+                to: origin
+                    .appending(path: DeepLinkParser.communitySegment)
+                    .appending(path: contentId)
+            )
         case .balanceDetail:
-            url = origin
-                .appending(path: DeepLinkParser.communitySegment)
-                .appending(path: DeepLinkParser.balanceSegment)
-                .appending(path: contentId)
+            url = appendingCommentId(
+                payload.commentId,
+                to: origin
+                    .appending(path: DeepLinkParser.communitySegment)
+                    .appending(path: DeepLinkParser.balanceSegment)
+                    .appending(path: contentId)
+            )
         case .competitionDetail:
             // `/`·`..`처럼 다른 경로로 새는 값은 주소를 만들기 전에 거른다(파서도 같은 검사를 한다).
             guard DeepLinkParser.isCompetitionId(contentId) else {
@@ -108,5 +125,16 @@ enum PushActionRouter {
         }
         Log.trace("푸시 액션 → 딥링크: \(rawType) \(contentId) → \(url.absoluteString)", category: .system, level: .info)
         return url
+    }
+
+    /// 댓글 알림이면 상세 주소에 `?commentId=`를 붙인다(#436). 숫자가 아니면 붙이지 않고 상세만 연다 —
+    /// 웹도 무시하는 값이지만, 서버가 보낸 문자열을 주소에 그대로 싣지 않으려고 여기서 거른다.
+    private static func appendingCommentId(_ commentId: String?, to url: URL) -> URL {
+        guard let commentId, !commentId.isEmpty else { return url }
+        guard DeepLinkParser.isNumericId(commentId) else {
+            Log.trace("푸시 댓글 번호 무시(숫자 아님): \(commentId)", category: .system, level: .error)
+            return url
+        }
+        return url.appending(queryItems: [URLQueryItem(name: DeepLinkParser.commentIdQueryName, value: commentId)])
     }
 }

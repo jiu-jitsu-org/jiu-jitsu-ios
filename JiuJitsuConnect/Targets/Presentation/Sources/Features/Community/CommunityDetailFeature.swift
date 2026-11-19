@@ -22,8 +22,8 @@ public struct CommunityDetailFeature: Sendable {
 
     @ObservableState
     public struct State: Equatable, Sendable {
-        // OPEN_SUBVIEW에서 검증된 동일 origin 절대 URL.
-        let url: URL
+        // OPEN_SUBVIEW에서 검증된 동일 origin 절대 URL. 같은 글을 다른 쿼리로 다시 열 때만 바뀐다(`reload(_:url:)`).
+        fileprivate(set) var url: URL
         /// 이 웹뷰가 마지막으로 알린 화면(screen_view, #425). 맨 위에 보일 때 루트 분석 리듀서가 기록한다.
         var analyticsScreen: AnalyticsEvent?
         // 웹 헤더 렌더 전 임시 제목(선택). 네이티브 크롬이 없어 현재는 보관만 한다.
@@ -461,8 +461,10 @@ public struct CommunityDetailFeature: Sendable {
     /// 같은 주소를 처음부터 다시 불러온다 — 다시 시도 버튼, 보고 있는 글의 푸시 · 링크(#383).
     /// 쓰던 댓글은 웹이 이 웹뷰의 sessionStorage에 들고 있다가 되살린다.
     /// 재시도 없이 뒤로가기만 두는 화면(#352)은 다시 불러오면 글쓰기 주소가 빈 화면으로 열려 건드리지 않는다.
-    static func reload(_ state: inout State) {
+    /// `url`을 주면 그 주소로 불러온다 — 같은 글이라도 댓글 푸시는 `?commentId=`가 달라 웹이 보여 줄 댓글이 바뀐다(#436).
+    static func reload(_ state: inout State, url: URL? = nil) {
         guard !state.hidesRetry else { return }
+        if let url { state.url = url }
         state.hasError = false
         state.hasLostDraft = false
         state.isLoading = true
