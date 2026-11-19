@@ -91,6 +91,13 @@ struct CompetitionInfoView: View {
             onSwipe: { store.send(.view(.toastSwiped)) },
             onButtonTapped: { _ in store.send(.view(.toastSwiped)) }
         )
+        .appAlert(
+            isPresented: Binding(
+                get: { store.isDeleteAlertPresented },
+                set: { if !$0 { store.send(.view(.deleteAlertDismissed)) } }
+            ),
+            configuration: deleteAlertConfiguration
+        )
         // 저장 중에는 다시 누르거나 화면을 떠나지 못하게 막는다(중복 저장 방지).
         .disabled(store.isSaving)
         .navigationBarHidden(true)
@@ -190,6 +197,28 @@ struct CompetitionInfoView: View {
         .animation(.default, value: store.step)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(segmentCount)단계 중 \(currentIndex + 1)단계")
+    }
+
+    // MY 목록의 삭제 확인(MyProfileView)과 같은 문구·버튼.
+    private var deleteAlertConfiguration: AppAlertConfiguration {
+        var title = ""
+        if case let .edit(original) = store.mode {
+            title = CompetitionGroup.grouped([original]).first?.titleWithYear ?? ""
+        }
+        return AppAlertConfiguration(
+            title: "대회 기록을 삭제할까요?",
+            message: "\(title) 기록이 삭제돼요.",
+            primaryButton: .init(
+                title: "삭제",
+                style: .destructive,
+                action: { store.send(.view(.deleteConfirmed)) }
+            ),
+            secondaryButton: .init(
+                title: "취소",
+                style: .neutral,
+                action: { store.send(.view(.deleteAlertDismissed)) }
+            )
+        )
     }
 
 }

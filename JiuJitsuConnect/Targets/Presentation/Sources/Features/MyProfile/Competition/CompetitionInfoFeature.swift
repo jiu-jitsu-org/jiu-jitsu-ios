@@ -57,6 +57,8 @@ public struct CompetitionInfoFeature: Sendable {
         var celebratesOnDone = false
         // 저장 실패 안내. 이 화면이 MY 화면 위에 push돼 있어 MY 화면 토스트는 가려지므로 여기서 띄운다.
         var toast: ToastState?
+        // 수정 화면 머리줄 '삭제' 확인 알럿. 되돌릴 수 없어 MY 목록의 삭제처럼 한 번 더 묻는다(#377).
+        var isDeleteAlertPresented = false
 
         var isAddingDivision: Bool { !savedRecords.isEmpty }
 
@@ -303,6 +305,8 @@ public struct CompetitionInfoFeature: Sendable {
             case nextButtonTapped
             case cancelButtonTapped
             case deleteButtonTapped
+            case deleteConfirmed
+            case deleteAlertDismissed
             case yearOptionSelected(YearOption)
             case resultSelected(CompetitionRank)
             case suggestionTapped(RegisteredCompetition)
@@ -448,8 +452,18 @@ public struct CompetitionInfoFeature: Sendable {
                 return .run { _ in await self.dismiss() }
 
             case .view(.deleteButtonTapped):
+                guard state.mode.isEdit else { return .none }
+                state.isDeleteAlertPresented = true
+                return .none
+
+            case .view(.deleteConfirmed):
+                state.isDeleteAlertPresented = false
                 guard case let .edit(original) = state.mode else { return .none }
                 return .send(.delegate(.didDelete(original)))
+
+            case .view(.deleteAlertDismissed):
+                state.isDeleteAlertPresented = false
+                return .none
 
             case let .view(.yearOptionSelected(option)):
                 // 직접 고른 연도라 목록은 그대로 둔다(굴리는 중에 목록이 바뀌면 칸이 밀린다).
