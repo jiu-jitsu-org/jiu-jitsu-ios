@@ -120,6 +120,28 @@ extension AnalyticsEvent {
     public static func sessionRestore(_ result: SessionRestoreResult) -> Self {
         Self(.sessionRestore, parameters: ["result": .string(result.rawValue)])
     }
+
+    /// 앱이 그리는 화면(사전 "화면 이름" 중 native). 웹뷰 화면 이름은 웹이 알린 값을 그대로 쓴다(#425).
+    public enum NativeScreen: String, Sendable {
+        case login
+        case signupTerms = "signup_terms"
+        case signupNickname = "signup_nickname"
+        case signupComplete = "signup_complete"
+        case myProfile = "my_profile"
+        case myProfileEdit = "my_profile_edit"
+        case beltPromotion = "belt_promotion"
+        case competitionRecordAdd = "competition_record_add"
+        case userProfile = "user_profile"
+        case settings
+        case notificationSettings = "notification_settings"
+    }
+
+    /// `section`: 한 화면 안의 부분(MY 편집 항목 등, 사전 "section").
+    public static func screenView(_ screen: NativeScreen, section: String? = nil) -> Self {
+        var parameters: [String: Value] = ["screen_name": .string(screen.rawValue), "screen_class": .string("native")]
+        if let section { parameters["section"] = .string(section) }
+        return Self(.screenView, parameters: parameters)
+    }
 }
 
 // MARK: - 사용자 속성

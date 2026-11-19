@@ -61,6 +61,8 @@ public struct CommunityFeature: Sendable {
     @ObservableState
     public struct State: Equatable {
         var selectedTab: Tab = .feed
+        /// 이 목록 웹뷰가 마지막으로 알린 화면(screen_view, #425). 보일 때 루트 분석 리듀서가 기록한다.
+        var analyticsScreen: AnalyticsEvent?
         var url: URL?
         // 같은 URL로 재시도 시 View가 reload를 인지하도록 토큰을 갱신한다.
         var loadToken: UUID = UUID()
@@ -469,9 +471,7 @@ public struct CommunityFeature: Sendable {
                     return .send(.delegate(.contentCreated))
 
                 case let .analyticsEvent(event):
-                    // 화면 기록(screen_view)은 웹이 알린 "지금 화면"이라 이 웹뷰가 실제로 보일 때 남긴다(#425). 그 밖은 바로 남긴다.
-                    guard event.name != .screenView else { return .none }
-                    analyticsClient.logEvent(event)
+                    WebAnalytics.receive(event, lastScreen: &state.analyticsScreen, client: analyticsClient)
                     return .none
 
                 case .openHomeFeed, .openCompetitionRecord, .competitionHeaderTint, .setSheetOpen:

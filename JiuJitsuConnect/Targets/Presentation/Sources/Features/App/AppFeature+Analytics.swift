@@ -23,6 +23,10 @@ extension AppFeature {
         var pendingSource: AnalyticsEvent.OpenSource?
         /// 마지막으로 보낸 계정 속성(MY 프로필 기준). 같은 값은 다시 보내지 않는다.
         var sentProfileProperties: [AnalyticsUserProperty: String?] = [:]
+        /// 지금 맨 위에 보이는 화면(#425).
+        var visibleScreen: VisibleScreen?
+        /// 마지막으로 screen_view를 남긴 화면. 맨 위 화면이 잠깐 그대로 있은 뒤 이것과 다를 때만 남긴다.
+        var loggedScreen: VisibleScreen?
         /// 마지막으로 보낸 회원 ID. 같은 값은 다시 보내지 않는다. 바깥 nil은 아직 안 보냄 — GA는 이전 실행의 값을 기억한다.
         var sentUserID: String??
     }
@@ -34,10 +38,14 @@ extension AppFeature {
 
         private enum CancelID: Hashable, Sendable {
             case openSourceWait
+            case screenViewSettle
         }
 
         /// 입구를 기다리는 시간. 넘으면 아이콘으로 연 것으로 센다.
         static let openSourceWaitDuration: Duration = .seconds(1)
+        /// 맨 위 화면이 이만큼 그대로 있어야 본 것으로 센다. 링크 · 푸시는 탭을 바꾼 뒤 다음 액션에서 상세를 쌓아,
+        /// 그 사이 잠깐 맨 위였던 탭 첫 화면을 세지 않게 한다.
+        static let screenViewSettleDuration: Duration = .milliseconds(500)
 
         @Dependency(\.analyticsClient) var analyticsClient
         @Dependency(\.authClient) var authClient
@@ -49,7 +57,7 @@ extension AppFeature {
             if case .destination(.presented(.appTab)) = action {
                 syncProfileProperties(&state)
             }
-            return effect
+            return .merge(effect, updateVisibleScreen(&state))
         }
 
         private func reduceEvent(into state: inout State, action: Action) -> Effect<Action> {
@@ -88,6 +96,10 @@ extension AppFeature {
 
             case .internal(.appOpenSourceWaitElapsed):
                 return flushPendingOpen(&state)
+
+            case .internal(.screenViewSettled):
+                logSettledScreen(&state)
+                return .none
 
             // MARK: session_restore
 
@@ -130,6 +142,30 @@ extension AppFeature {
 
             default:
                 return .none
+            }
+        }
+
+        // MARK: - screen_view
+
+        /// 액션이 지나갈 때마다 맨 위 화면을 다시 계산한다. 바뀌었으면(다른 화면 · 다시 보임 · 웹뷰 안 화면 이동)
+        /// 잠깐 기다렸다가, 그때도 맨 위인 화면을 남긴다.
+        private func updateVisibleScreen(_ state: inout State) -> Effect<Action> {
+            let screen = ScreenView.visibleScreen(in: state)
+            guard screen != state.analytics.visibleScreen else { return .none }
+            state.analytics.visibleScreen = screen
+            return .run { send in
+                try await clock.sleep(for: Self.screenViewSettleDuration)
+                await send(.internal(.screenViewSettled))
+            }
+            .cancellable(id: CancelID.screenViewSettle, cancelInFlight: true)
+        }
+
+        private func logSettledScreen(_ state: inout State) {
+            let screen = state.analytics.visibleScreen
+            guard screen != state.analytics.loggedScreen else { return }
+            state.analytics.loggedScreen = screen
+            if let event = screen?.event {
+                log(event)
             }
         }
 

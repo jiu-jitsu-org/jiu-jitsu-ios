@@ -73,6 +73,8 @@ public struct AppFeature: Sendable {
             case updateRequiredOnResume
             /// `app_open`의 입구(푸시 · 링크)를 기다리는 시간이 지남(#423)
             case appOpenSourceWaitElapsed
+            /// 맨 위 화면이 잠깐 동안 그대로 있었다 — 화면 기록을 남길 때(#425).
+            case screenViewSettled
         }
     }
 
