@@ -260,6 +260,8 @@ public struct CommunityFeature: Sendable {
 
     @Dependency(\.noticeClient) var noticeClient
     @Dependency(\.analyticsClient) var analyticsClient
+    @Dependency(\.notificationPermissionClient) var notificationPermissionClient
+    @Dependency(\.firebaseClient) var firebaseClient
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -467,10 +469,7 @@ public struct CommunityFeature: Sendable {
 
                 case let .competitionAlertsEnabled(competitionId, requestId):
                     // 홈 피드 글 속 대회 카드에서도 관심 첫 등록 시트가 뜬다(#257). 웹에 답한 뒤 부모(AppTab)가 대회 탭과 같이 안내한다(#395).
-                    Log.trace("관심 대회 알림 켬: competitionId=\(competitionId.map(String.init) ?? "-")", category: .view, level: .info)
-                    return .run { send in
-                        await send(.internal(.competitionAlertsChecked(requestId: requestId, DeviceNotificationCheck.current())))
-                    }
+                    return checkCompetitionAlerts(competitionId: competitionId, requestId: requestId)
 
                 case .contentCreated:
                     return .send(.delegate(.contentCreated))
@@ -940,6 +939,15 @@ public struct CommunityFeature: Sendable {
         }
         state.pendingSelectSheet = payload
         return .none
+    }
+
+    /// 기기 알림 상태를 본다. 아직 묻지 않았으면 시스템 권한 창의 답까지 기다린다(#395).
+    private func checkCompetitionAlerts(competitionId: Int?, requestId: String?) -> Effect<Action> {
+        Log.trace("관심 대회 알림 켬: competitionId=\(competitionId.map(String.init) ?? "-")", category: .view, level: .info)
+        return .run { send in
+            let check = await DeviceNotificationCheck.current(permission: notificationPermissionClient, firebase: firebaseClient)
+            await send(.internal(.competitionAlertsChecked(requestId: requestId, check)))
+        }
     }
 
     /// 아웃바운드 메시지를 식별자와 함께 대기열에 추가한다.

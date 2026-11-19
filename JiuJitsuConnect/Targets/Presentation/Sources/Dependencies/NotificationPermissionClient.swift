@@ -62,16 +62,14 @@ public enum DeviceNotificationCheck: Equatable, Sendable {
     var isEnabled: Bool { self != .denied }
 
     /// 지금 상태를 본다. 한 번도 묻지 않았으면 iOS 설정에 알림 줄조차 없으니 시스템 권한 창을 띄우고 답을 기다린다.
-    static func current() async -> Self {
-        @Dependency(\.notificationPermissionClient) var notificationPermissionClient
-        @Dependency(\.firebaseClient) var firebaseClient
-        switch await notificationPermissionClient.status() {
+    static func current(permission: NotificationPermissionClient, firebase: FirebaseClient) async -> Self {
+        switch await permission.status() {
         case .granted:
             return .granted
         case .denied:
             return .denied
         case .notDetermined:
-            return await firebaseClient.requestPermission() ? .grantedNow : .denied
+            return await firebase.requestPermission() ? .grantedNow : .denied
         }
     }
 }

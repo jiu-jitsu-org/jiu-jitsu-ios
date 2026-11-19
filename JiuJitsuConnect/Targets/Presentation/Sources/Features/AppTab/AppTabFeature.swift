@@ -67,7 +67,8 @@ public struct AppTabFeature: Sendable {
         var toast: ToastState?
         // 관심 대회 알림을 켰는데 기기 알림이 꺼져 있을 때 설정 앱으로 안내하는 AppAlert 표시 여부(#257)
         var isDeviceNotificationAlertPresented: Bool = false
-        // 웹의 관심 대회 알림에서 꺼짐 안내를 이번 실행에 띄웠는지(#395). 웹은 관심 등록마다 알려 와서, 여러 개 누를 때마다 뜨지 않게 한다.
+        // 웹의 관심 대회 알림에서 꺼짐 안내를 띄웠는지(#395). 웹은 관심 등록마다 알려 와서, 여러 개 누를 때마다 뜨지 않게 한다.
+        // 로그인하면 이 State가 새로 만들어져 다시 한 번 띄운다.
         var didShowWebDeviceNotificationAlert = false
         // 첫 글 · 댓글을 올린 뒤 알림 권한을 묻기 전 한 줄 안내(#333) 표시 여부
         var isNotificationPromptPresented: Bool = false
@@ -511,10 +512,12 @@ public struct AppTabFeature: Sendable {
             case .internal(.notificationPermissionGranted):
                 // 방금 허용했으면 푸시 등록·FCM 토큰 발급·서버 등록을 앱 진입 동기화와 같은 흐름으로 잇는다.
                 // 비로그인은 서버에 기기를 등록할 수 없어 권한만 받아 두고, 로그인 때 FCM 동기화가 등록한다.
+                // 권한 창이 떠 있는 동안 웹이 관심 대회 알림을 연달아 보내면 허용이 여러 번 올 수 있어 등록은 하나만 돌린다(#395).
                 guard !state.authInfo.isGuest else { return .none }
                 return .run { _ in
                     await FCMAppInfoSync.syncOnAppLaunch(firebaseClient: firebaseClient, userClient: userClient)
                 }
+                .cancellable(id: CancelID.deviceTokenSync, cancelInFlight: true)
 
             case let .internal(.fcmTokenRefreshed(token)):
                 // 서버에는 옛 토큰이 남아 다음 콜드 스타트까지 푸시가 가지 않는다. 비로그인은 등록할 계정이 없다.

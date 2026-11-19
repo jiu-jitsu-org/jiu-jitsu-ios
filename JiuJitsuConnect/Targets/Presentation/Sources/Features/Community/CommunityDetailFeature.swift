@@ -204,6 +204,8 @@ public struct CommunityDetailFeature: Sendable {
 
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.analyticsClient) var analyticsClient
+    @Dependency(\.notificationPermissionClient) var notificationPermissionClient
+    @Dependency(\.firebaseClient) var firebaseClient
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -417,7 +419,7 @@ public struct CommunityDetailFeature: Sendable {
                 case let .competitionAlertsEnabled(competitionId, requestId):
                     // 웹은 앱 안이면 늘 보낸다(홈 피드의 대회 카드·글 상세·알림함·대회 화면). 결과를 기다리는 웹에 답해야 해서
                     // 기기 알림은 이 화면이 보고, 안내 · 토큰 등록은 어느 탭이든 부모가 AppTab까지 올린다(#395).
-                    return Self.checkCompetitionAlerts(competitionId: competitionId, requestId: requestId)
+                    return checkCompetitionAlerts(competitionId: competitionId, requestId: requestId)
 
                 case .contentCreated:
                     return .send(.delegate(.contentCreated))
@@ -534,10 +536,11 @@ public struct CommunityDetailFeature: Sendable {
     }
 
     /// 기기 알림 상태를 본다. 아직 묻지 않았으면 시스템 권한 창의 답까지 기다린다(#395).
-    private static func checkCompetitionAlerts(competitionId: Int?, requestId: String?) -> Effect<Action> {
+    private func checkCompetitionAlerts(competitionId: Int?, requestId: String?) -> Effect<Action> {
         Log.trace("관심 대회 알림 켬: competitionId=\(competitionId.map(String.init) ?? "-")", category: .view, level: .info)
         return .run { send in
-            await send(.internal(.competitionAlertsChecked(requestId: requestId, DeviceNotificationCheck.current())))
+            let check = await DeviceNotificationCheck.current(permission: notificationPermissionClient, firebase: firebaseClient)
+            await send(.internal(.competitionAlertsChecked(requestId: requestId, check)))
         }
     }
 

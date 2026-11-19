@@ -85,7 +85,7 @@ extension AppTabFeature {
     func enableCompetitionAlerts() -> Effect<Action> {
         Log.trace("관심 대회 알림 켬: 설정", category: .view, level: .info)
         return .run { send in
-            switch await DeviceNotificationCheck.current() {
+            switch await DeviceNotificationCheck.current(permission: notificationPermissionClient, firebase: firebaseClient) {
             case .granted:
                 return
             case .grantedNow:
@@ -98,7 +98,8 @@ extension AppTabFeature {
     }
 
     /// 웹이 관심 대회 알림을 켠 뒤 그 웹 화면이 본 기기 알림 상태(#395). 웹의 성공 토스트는 기기 알림이 켜져 있을 때만 뜨므로,
-    /// 꺼져 있으면 이 안내가 유일한 답이다. 관심 등록마다 오므로 꺼짐 안내는 이번 실행에 한 번만 띄운다.
+    /// 꺼져 있으면 이 안내가 유일한 답이다. 관심 등록마다 오므로 꺼짐 안내는 로그인 동안 한 번만 띄운다.
+    /// 권한 창을 기다리는 사이 로그아웃 · 세션 만료로 게스트가 됐으면 띄우지 않는다.
     static func handleWebCompetitionAlertsCheck(_ check: DeviceNotificationCheck, into state: inout State) -> Effect<Action> {
         switch check {
         case .granted:
@@ -106,7 +107,7 @@ extension AppTabFeature {
         case .grantedNow:
             return .send(.internal(.notificationPermissionGranted))
         case .denied:
-            guard !state.didShowWebDeviceNotificationAlert else { return .none }
+            guard !state.authInfo.isGuest, !state.didShowWebDeviceNotificationAlert else { return .none }
             state.didShowWebDeviceNotificationAlert = true
             state.isDeviceNotificationAlertPresented = true
             return .none
