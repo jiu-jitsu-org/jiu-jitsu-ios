@@ -91,8 +91,24 @@ struct CompetitionInfoView: View {
             onSwipe: { store.send(.view(.toastSwiped)) },
             onButtonTapped: { _ in store.send(.view(.toastSwiped)) }
         )
+        .appAlert(
+            isPresented: Binding(
+                get: { store.isDeleteAlertPresented },
+                set: { if !$0 { store.send(.view(.deleteAlertDismissed)) } }
+            ),
+            configuration: deleteAlertConfiguration
+        )
         // 저장 중에는 다시 누르거나 화면을 떠나지 못하게 막는다(중복 저장 방지).
         .disabled(store.isSaving)
+        // 단계는 한 화면 안의 상태라, 시스템 스와이프 백은 단계가 아니라 화면 전체를 닫는다.
+        // 뒤로가기가 화면을 닫지 않는 단계에서는 스와이프를 막고 뒤로가기 버튼과 같이 한 단계 뒤로 보낸다(#390).
+        .background {
+            if store.blocksSwipeBack {
+                InteractivePopBlocker {
+                    store.send(.view(.backButtonTapped))
+                }
+            }
+        }
         .navigationBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
     }
@@ -122,10 +138,11 @@ struct CompetitionInfoView: View {
                 Button {
                     store.send(.view(.deleteButtonTapped))
                 } label: {
+                    // 자주 쓰지 않는 되돌릴 수 없는 동작이라 눈길을 끌지 않게 회색으로 둔다. 빨강은 확인 알럿의 [삭제]에만 쓴다.
                     Text("삭제")
-                        .font(Font.pretendard.buttonS)
-                        .foregroundColor(Color.component.header.destructiveText)
-                        .frame(width: 48, height: 32)
+                        .font(Font.pretendard.bodyM)
+                        .foregroundStyle(Color.semantic.text.secondary)
+                        .frame(height: 36)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -190,6 +207,28 @@ struct CompetitionInfoView: View {
         .animation(.default, value: store.step)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(segmentCount)단계 중 \(currentIndex + 1)단계")
+    }
+
+    // MY 목록의 삭제 확인(MyProfileView)과 같은 문구·버튼.
+    private var deleteAlertConfiguration: AppAlertConfiguration {
+        var title = ""
+        if case let .edit(original) = store.mode {
+            title = CompetitionGroup.grouped([original]).first?.titleWithYear ?? ""
+        }
+        return AppAlertConfiguration(
+            title: "대회 기록을 삭제할까요?",
+            message: "\(title) 기록이 삭제돼요.",
+            primaryButton: .init(
+                title: "삭제",
+                style: .destructive,
+                action: { store.send(.view(.deleteConfirmed)) }
+            ),
+            secondaryButton: .init(
+                title: "취소",
+                style: .neutral,
+                action: { store.send(.view(.deleteAlertDismissed)) }
+            )
+        )
     }
 
 }

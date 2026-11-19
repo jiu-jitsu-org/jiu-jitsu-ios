@@ -57,12 +57,26 @@ public struct CompetitionInfoFeature: Sendable {
         var celebratesOnDone = false
         // 저장 실패 안내. 이 화면이 MY 화면 위에 push돼 있어 MY 화면 토스트는 가려지므로 여기서 띄운다.
         var toast: ToastState?
+        // 수정 화면 머리줄 '삭제' 확인 알럿. 되돌릴 수 없어 MY 목록의 삭제처럼 한 번 더 묻는다(#377).
+        var isDeleteAlertPresented = false
 
         var isAddingDivision: Bool { !savedRecords.isEmpty }
 
         /// 지금 흐름에서 입력받는 단계 — 진행 막대 칸 수와 위치의 기준.
         var inputSteps: [Step] {
             isAddingDivision ? [.result, .division] : [.result, .name, .year, .division]
+        }
+
+        /// 시스템 스와이프 백을 막을지 — 뒤로가기 버튼이 화면을 닫지 않는 단계에서는 스와이프도 한 단계 뒤로만 가게 한다(#390).
+        /// 첫 단계(부문 추가 중 돌아갈 완료 화면이 없을 때)와 완료 화면은 지금처럼 닫히고, 저장 중에는 막는다.
+        var blocksSwipeBack: Bool {
+            // 삭제 확인 알럿이 떠 있는 동안에도 막는다 — 알럿 뒤 화면이 스와이프로 닫히지 않게.
+            if isSaving || isDeleteAlertPresented { return true }
+            switch step {
+            case .result: return hasSavedInThisFlow
+            case .name, .year, .division: return true
+            case .done: return false
+            }
         }
 
         var headerTitle: String {
@@ -303,6 +317,8 @@ public struct CompetitionInfoFeature: Sendable {
             case nextButtonTapped
             case cancelButtonTapped
             case deleteButtonTapped
+            case deleteConfirmed
+            case deleteAlertDismissed
             case yearOptionSelected(YearOption)
             case resultSelected(CompetitionRank)
             case suggestionTapped(RegisteredCompetition)
@@ -418,7 +434,8 @@ public struct CompetitionInfoFeature: Sendable {
                 return .cancel(id: CancelID.toast)
 
             case .view(.backButtonTapped):
-                guard !state.isSaving else { return .none }
+                // 띠 휠·삭제 확인이 덮은 동안에는 막힌 스와이프가 들어와도 단계를 옮기지 않는다(덮개가 남은 채 넘어가지 않게).
+                guard !state.isSaving, !state.isBeltPickerPresented, !state.isDeleteAlertPresented else { return .none }
                 state.isMovingBack = true
                 switch state.step {
                 case .result:
@@ -448,8 +465,19 @@ public struct CompetitionInfoFeature: Sendable {
                 return .run { _ in await self.dismiss() }
 
             case .view(.deleteButtonTapped):
-                guard case let .edit(original) = state.mode else { return .none }
+                guard state.mode.isEdit else { return .none }
+                state.isDeleteAlertPresented = true
+                return .none
+
+            case .view(.deleteConfirmed):
+                // 알럿 [삭제]를 한 번에 두 번 눌러도 지우기는 한 번만 보낸다.
+                guard state.isDeleteAlertPresented, case let .edit(original) = state.mode else { return .none }
+                state.isDeleteAlertPresented = false
                 return .send(.delegate(.didDelete(original)))
+
+            case .view(.deleteAlertDismissed):
+                state.isDeleteAlertPresented = false
+                return .none
 
             case let .view(.yearOptionSelected(option)):
                 // 직접 고른 연도라 목록은 그대로 둔다(굴리는 중에 목록이 바뀌면 칸이 밀린다).
