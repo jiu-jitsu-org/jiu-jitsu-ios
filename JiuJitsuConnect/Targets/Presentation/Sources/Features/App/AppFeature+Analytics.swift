@@ -98,6 +98,7 @@ extension AppFeature {
             if case .destination(.presented(.appTab)) = action {
                 syncProfileProperties(&state)
             }
+            reduceSafetyEvent(action: action)
             return .merge(effect, screenEffect, updateVisibleScreen(&state))
         }
 
