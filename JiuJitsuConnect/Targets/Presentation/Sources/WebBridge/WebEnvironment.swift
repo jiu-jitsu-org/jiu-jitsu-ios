@@ -29,6 +29,34 @@ enum WebEnvironment {
         return Set(candidates.compactMap { URL(string: $0)?.host?.lowercased() })
     }
 
+    /// 브리지 메시지를 보낸 프레임이 OSS 웹인지(#424). 분석 기록은 OSS 웹에서 온 것만 받는다.
+    /// Debug · Beta는 테스트용 도메인 오버라이드(로컬 웹 등)로 띄운 웹도 받는다.
+    @MainActor
+    static func isOSSFrame(_ frame: WKFrameInfo) -> Bool {
+        guard frame.isMainFrame else { return false }
+        let host = frame.securityOrigin.host.lowercased()
+        guard !host.isEmpty else { return false }
+        if allowedHosts.contains(host) { return true }
+#if DEBUG || BETA
+        return debugOverrideURL()?.host?.lowercased() == host
+#else
+        return false
+#endif
+    }
+
+    /// 테스트용 도메인 오버라이드(커뮤니티 설정에서 입력, UserDefaults).
+    static let debugURLOverrideKey = "debug.community.webURLOverride"
+
+#if DEBUG || BETA
+    static func debugOverrideURL() -> URL? {
+        guard
+            let override = UserDefaults.standard.string(forKey: debugURLOverrideKey),
+            !override.isEmpty
+        else { return nil }
+        return URL(string: override)
+    }
+#endif
+
     /// 웹뷰 User-Agent 끝에 붙이는 앱 표시(#370). 웹 서버가 앱 안인지 · 앱 버전을 첫 요청부터 안다
     /// (jiu-jitsu-frontend#510). 웹은 `OSSApp/`으로 찾으므로 형식을 바꾸면 웹과 같이 바꾼다.
     static var appUserAgentToken: String {

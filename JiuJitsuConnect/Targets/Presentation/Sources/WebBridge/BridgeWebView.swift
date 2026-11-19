@@ -57,9 +57,10 @@ struct BridgeWebView: UIViewRepresentable {
     // 이 웹뷰를 소유한 Feature가 실제로 처리하는 '사전 확인형' 메시지. 처리하지 않는 웹뷰가 지원한다고
     // 알리면 웹이 요청을 보내 놓고 응답 없이 기다리므로, 처리하는 화면만 넘긴다.
     var capabilities: [WebBridgeCapability] = []
-    // 웹에 실제로 알리는 목록. 탭 바 밑까지 그리는 웹은 시트 열림을 이 웹뷰가 직접 처리하므로 덧붙인다(#314).
+    // 웹에 실제로 알리는 목록. 분석 기록은 브리지를 받는 모든 Feature(목록 · 상세)가 처리하므로 모든 웹뷰에 붙인다(#424).
+    // 탭 바 밑까지 그리는 웹은 시트 열림을 이 웹뷰가 직접 처리하므로 덧붙인다(#314).
     private var injectedCapabilities: [WebBridgeCapability] {
-        extendsUnderTabBar ? capabilities + [.setSheetOpen] : capabilities
+        capabilities + [.analyticsEvent] + (extendsUnderTabBar ? [.setSheetOpen] : [])
     }
     // 진입 시간 측정의 시작 시각·경로(#298). 위에 쌓이는 상세만 넘기고, nil이면 재지 않는다.
     var entryOrigin: WebEntryTrace.Origin?
@@ -515,16 +516,21 @@ struct BridgeWebView: UIViewRepresentable {
             didReceive message: WKScriptMessage
         ) {
             guard message.name == WebBridge.appBridgeHandlerName else { return }
-            receiveBridgeMessage(message.body)
+            receiveBridgeMessage(message.body, isFromOSS: WebEnvironment.isOSSFrame(message.frameInfo))
         }
 
         /// 웹이 보낸 브릿지 메시지를 처리한다. 미리 불러 둔 홈 피드가 받아 둔 메시지도 이리로 넘긴다(#270).
-        func receiveBridgeMessage(_ body: Any) {
+        /// isFromOSS: 보낸 프레임이 OSS 웹의 메인 프레임인지. 아니면 분석 기록을 버린다(#424).
+        func receiveBridgeMessage(_ body: Any, isFromOSS: Bool) {
             guard !isDeactivated else { return }
             // 해석 결과와 별개로, 웹이 보낸 원본을 먼저 남긴다(파싱 실패·계약 위반도 추적 가능하도록).
             WebBridge.logInboundRaw(body, source: source)
             guard let inbound = WebBridgeInboundMessage.decode(from: body) else { return }
             WebBridge.logInbound(inbound, source: source)
+            if case .analyticsEvent = inbound, !isFromOSS {
+                WebBridge.logEvent("OSS 웹이 아닌 프레임의 ANALYTICS_EVENT — 버림", source: source)
+                return
+            }
             if case let .setSheetOpen(isOpen) = inbound {
                 setWebSheetOpen(isOpen)
                 return

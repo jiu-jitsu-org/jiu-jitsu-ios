@@ -157,6 +157,8 @@ private extension WebBridgeInboundMessage {
             return "SET_SHEET_OPEN  open=\(open)"
         case let .contentCreated(kind):
             return "CONTENT_CREATED  kind=\(kind.rawValue)"
+        case let .analyticsEvent(event):
+            return "ANALYTICS_EVENT  name=\(event.name.rawValue) params=\(event.parameters.count)"
         case let .unknown(type):
             return "\(type)  (unsupported)"
         }
@@ -262,6 +264,10 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 글 · 댓글(답글 · 밸런스 게임 댓글 포함) 등록 성공(#333 · jiu-jitsu-frontend#495). 웹은 매번 보내고(capability 확인 없음),
     /// 알림 권한 안내를 띄울지는 앱(AppTab)이 정한다.
     case contentCreated(ContentCreatedKind)
+    /// 웹 화면의 분석 기록(#424 · jiu-jitsu-frontend#585). 앱이 웹 대신 GA에 남겨 한 사람이 한 명으로 세어진다.
+    /// 사전에 있는 이름 · 문자열 또는 정수 값만 받고, `surface`는 webview로 붙인다. 회신 없음.
+    /// OSS 도메인에서 온 것만 받는 검사는 메시지를 받은 프레임을 아는 BridgeWebView가 한다.
+    case analyticsEvent(AnalyticsEvent)
     /// 계약에 없는 타입(상위 버전/오타 등) — 무시 대상.
     case unknown(type: String)
 
@@ -285,11 +291,14 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case competitionHeaderTint = "COMPETITION_HEADER_TINT"
         case setSheetOpen = "SET_SHEET_OPEN"
         case contentCreated = "CONTENT_CREATED"
+        case analyticsEvent = "ANALYTICS_EVENT"
     }
 
     /// `WKScriptMessage.body`를 파싱한다.
     /// iOS는 `postMessage(객체)` 형태라 보통 `[String: Any]`(NSDictionary)로 들어오지만,
     /// 플랫폼/구현차로 JSON 문자열이 올 수도 있어 둘 다 허용한다.
+    // 메시지 종류마다 case 하나인 평평한 분기라 종류가 늘면 복잡도도 는다 — 나누면 계약이 한눈에 안 보인다.
+    // swiftlint:disable:next cyclomatic_complexity
     static func decode(from body: Any) -> WebBridgeInboundMessage? {
         guard let object = normalizedObject(from: body) else {
             Log.trace("WebBridge inbound 파싱 실패: \(body)", category: .network, level: .error)
@@ -438,6 +447,8 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             return .setSheetOpen((payload?["open"] as? Bool) ?? false)
         case .contentCreated:
             return decodeContentCreated(payload)
+        case .analyticsEvent:
+            return decodeAnalyticsEvent(payload)
         case .none:
             return .unknown(type: rawType)
         }
@@ -466,6 +477,38 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             return nil
         }
         return .contentCreated(kind)
+    }
+
+    /// 사전에 없는 이름, 문자열 · 정수가 아닌 값(참거짓 · 소수 · 객체)이 하나라도 있으면 기록 전체를 버린다.
+    /// 값 하나만 빼고 보내면 계약이 어긋난 채 잘못된 기록이 쌓인다. 길이 · 개수 검사는 분석 클라이언트가 한다.
+    private static func decodeAnalyticsEvent(_ payload: [String: Any]?) -> WebBridgeInboundMessage? {
+        guard let rawName = payload?["name"] as? String else {
+            Log.trace("ANALYTICS_EVENT payload name 누락", category: .network, level: .error)
+            return nil
+        }
+        guard let name = AnalyticsEvent.Name(rawValue: rawName) else {
+            Log.trace("ANALYTICS_EVENT 사전에 없는 이름이라 버림: \(rawName)", category: .network, level: .error)
+            return nil
+        }
+        var parameters: [String: AnalyticsEvent.Value] = [:]
+        for (key, raw) in payload?["params"] as? [String: Any] ?? [:] {
+            guard let value = analyticsValue(raw) else {
+                Log.trace("ANALYTICS_EVENT \(rawName) 꼬리표 \(key) 값 형식이 달라 버림", category: .network, level: .error)
+                return nil
+            }
+            parameters[key] = value
+        }
+        return .analyticsEvent(AnalyticsEvent(name, parameters: parameters, surface: .webview))
+    }
+
+    /// JSON 문자열은 그대로, JSON 숫자(NSNumber)는 정수일 때만. 참거짓도 NSNumber로 오므로 따로 거른다.
+    /// 범위는 웹(JS)이 정확히 나타낼 수 있는 정수(±2^53)까지 — 그 밖은 웹에서 이미 값이 틀어져 온다.
+    private static func analyticsValue(_ raw: Any) -> AnalyticsEvent.Value? {
+        if let text = raw as? String { return .string(text) }
+        guard let number = raw as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
+        let double = number.doubleValue
+        guard double.isFinite, double == double.rounded(), abs(double) <= 9_007_199_254_740_991 else { return nil }
+        return .int(number.intValue)
     }
 
     private static func normalizedObject(from body: Any) -> [String: Any]? {
@@ -688,6 +731,8 @@ enum WebBridgeCapability: String, Equatable, Sendable {
     case competitionHeaderTint = "COMPETITION_HEADER_TINT"
     /// 탭 첫 화면 웹(떠 있는 탭 바 밑까지 그리는 웹뷰)만 알린다(#314). 목록이 없으면 웹은 시트 열림을 보내지 않는다.
     case setSheetOpen = "SET_SHEET_OPEN"
+    /// 모든 웹뷰가 알린다(#424, BridgeWebView가 붙임). 목록이 없으면 웹은 기록을 버린다. 있으면 서브뷰 주소에 `?from=`을 싣는다.
+    case analyticsEvent = "ANALYTICS_EVENT"
 
     /// `window.AppBridgeCapabilities = [...]`를 정의하는 스크립트 소스. 직렬화 실패 시 nil.
     static func injectionScriptSource(for capabilities: [WebBridgeCapability]) -> String? {
@@ -707,6 +752,17 @@ enum WebOrigin {
     static func isSameOrigin(_ lhs: URL, as rhs: URL) -> Bool {
         guard let lhsKey = originKey(lhs), let rhsKey = originKey(rhs) else { return false }
         return lhsKey == rhsKey
+    }
+
+    /// 같은 웹 화면인지 — 호스트와 경로만 본다(끝 `/` 무시). 웹은 서브뷰 주소에 `?from=`(#424)을, 공유 주소에 utm을 붙여
+    /// 같은 글도 쿼리가 다를 수 있다. 같은 글 푸시 · 링크가 보고 있는 상세를 하나 더 쌓지 않게 쓴다.
+    static func isSamePage(_ lhs: URL, _ rhs: URL) -> Bool {
+        func key(_ url: URL) -> String {
+            var path = url.path
+            while path.count > 1, path.hasSuffix("/") { path.removeLast() }
+            return "\(url.host?.lowercased() ?? "")\(path)"
+        }
+        return key(lhs) == key(rhs)
     }
 
     private static func originKey(_ url: URL) -> String? {

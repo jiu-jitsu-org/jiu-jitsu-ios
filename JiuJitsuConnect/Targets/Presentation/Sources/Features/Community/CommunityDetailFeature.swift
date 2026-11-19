@@ -198,6 +198,7 @@ public struct CommunityDetailFeature: Sendable {
     }
 
     @Dependency(\.dismiss) var dismiss
+    @Dependency(\.analyticsClient) var analyticsClient
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -419,6 +420,12 @@ public struct CommunityDetailFeature: Sendable {
                     // 대회 탭 목록 웹만 알린다. 다른 웹뷰에서 오면 칠할 머리줄이 없어 무시한다.
                     guard state.capabilities.contains(.competitionHeaderTint) else { return .none }
                     return .send(.delegate(.competitionHeaderTintChanged(hex: hex)))
+
+                case let .analyticsEvent(event):
+                    // 화면 기록(screen_view)은 웹이 알린 "지금 화면"이라 이 웹뷰가 실제로 보일 때 남긴다(#425). 그 밖은 바로 남긴다.
+                    guard event.name != .screenView else { return .none }
+                    analyticsClient.logEvent(event)
+                    return .none
 
                 case .setSheetOpen:
                     // BridgeWebView가 받아 탭 바만 숨긴다(#314). 여기까지 오지 않는다.
