@@ -27,6 +27,8 @@ extension AppFeature {
         var visibleScreen: VisibleScreen?
         /// 마지막으로 screen_view를 남긴 화면. 맨 위 화면이 잠깐 그대로 있은 뒤 이것과 다를 때만 남긴다.
         var loggedScreen: VisibleScreen?
+        /// 화면 위치(id)별로 마지막에 남긴 기록. 같은 위치 · 같은 화면이 다시 맨 위가 되면 다시 보임(from=back)이다.
+        var shownScreens: [String: AnalyticsEvent] = [:]
         /// 앱으로 돌아왔을 때 맨 위였던 화면. 그 화면이 그대로면 from=resume으로 다시 남긴다(새 세션의 첫 화면이 비지 않게).
         /// 푸시 · 링크로 돌아와 다른 화면이 뜨면 그 화면은 웹 · 앱이 정한 입구로 남는다.
         var resumingScreenID: String?
@@ -214,10 +216,44 @@ extension AppFeature {
             let isResuming = screen != nil && screen?.id == state.analytics.resumingScreenID
             state.analytics.resumingScreenID = nil
             guard isResuming || screen != state.analytics.loggedScreen else { return }
+            let previous = state.analytics.loggedScreen
             state.analytics.loggedScreen = screen
-            if let event = screen?.event {
-                log(isResuming ? event.replacingFrom("resume") : event)
+            guard let screen, let event = screen.event else { return }
+            forgetClosedScreens(below: screen, previous: previous, state: &state)
+            let isShownAgain = state.analytics.shownScreens[screen.id] == event
+            state.analytics.shownScreens[screen.id] = event
+            let from: String? = if isResuming {
+                "resume"
+            } else if isShownAgain {
+                // 위 화면이 닫히거나 뒤로 가 다시 보이면 back(입구 집계에서 뺌). 탭을 바꿔 다시 보이면 tab_bar.
+                Self.isTabSwitch(from: previous, to: screen) ? "tab_bar" : "back"
+            } else {
+                nil
             }
+            log(from.map(event.replacingFrom) ?? event)
+        }
+
+        /// 지금 화면 위에 떠 있던 화면은 모두 닫혔다 — 다시 열면 처음 보이는 것이라 기억에서 뺀다.
+        /// 위치 id는 위에 뜨는 화면이 아래 화면 id 뒤에 붙는다(`my` → `my/edit/belt`, `my/<스택>` → `my/<스택>/notification`).
+        private func forgetClosedScreens(below screen: VisibleScreen, previous: VisibleScreen?, state: inout State) {
+            // 첫 로그인 화면에서 탭 화면으로 오면 탭 화면을 새로 만든 것이라 기억을 모두 비운다.
+            if let previousID = previous?.id, previousID == "login" || previousID.hasPrefix("login/") {
+                state.analytics.shownScreens = [:]
+                return
+            }
+            state.analytics.shownScreens = state.analytics.shownScreens.filter { key, _ in
+                if key.hasPrefix("\(screen.id)/") { return false }
+                // 탭 화면이 보이면 로그인 모달은 닫힌 것
+                if ScreenView.tab(of: screen.id) != nil, key.hasPrefix(ScreenView.loginCoverID) { return false }
+                return true
+            }
+        }
+
+        /// 직전에 남긴 화면과 다른 탭의 화면인지. 로그인 모달 등 탭 밖 화면에서 돌아온 것은 탭 전환이 아니다.
+        private static func isTabSwitch(from previous: VisibleScreen?, to screen: VisibleScreen) -> Bool {
+            guard let previousTab = previous.flatMap({ ScreenView.tab(of: $0.id) }),
+                  let tab = ScreenView.tab(of: screen.id) else { return false }
+            return previousTab != tab
         }
 
         // MARK: - app_open
