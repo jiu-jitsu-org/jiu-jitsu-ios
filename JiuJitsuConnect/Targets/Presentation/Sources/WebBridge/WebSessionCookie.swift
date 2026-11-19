@@ -27,7 +27,9 @@ enum WebSessionCookie {
     /// 아무것도 심지 않는다. 게스트 전환 때 지우는 건 `clear`가 한다.
     @MainActor
     static func sync(accessToken: String?, for url: URL, into store: WKHTTPCookieStore) async {
+        // 앱 웹 주소에만 심는다. 그 밖 주소는 불러오지도 않지만(메인 프레임 이동 정책) 토큰은 여기서 한 번 더 막는다.
         guard
+            WebEnvironment.isAllowedWebURL(url),
             let accessToken,
             let cookie = make(accessToken: accessToken, url: url)
         else { return }

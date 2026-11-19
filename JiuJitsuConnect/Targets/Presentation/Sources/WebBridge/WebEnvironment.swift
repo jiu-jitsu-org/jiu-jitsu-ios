@@ -29,21 +29,6 @@ enum WebEnvironment {
         return Set(candidates.compactMap { URL(string: $0)?.host?.lowercased() })
     }
 
-    /// 브리지 메시지를 보낸 프레임이 OSS 웹인지(#424). 분석 기록은 OSS 웹에서 온 것만 받는다.
-    /// Debug · Beta는 테스트용 도메인 오버라이드(로컬 웹 등)로 띄운 웹도 받는다.
-    @MainActor
-    static func isOSSFrame(_ frame: WKFrameInfo) -> Bool {
-        guard frame.isMainFrame else { return false }
-        let host = frame.securityOrigin.host.lowercased()
-        guard !host.isEmpty else { return false }
-        if allowedHosts.contains(host) { return true }
-#if DEBUG || BETA
-        return debugOverrideURL()?.host?.lowercased() == host
-#else
-        return false
-#endif
-    }
-
     /// 테스트용 도메인 오버라이드(커뮤니티 설정에서 입력, UserDefaults).
     static let debugURLOverrideKey = "debug.community.webURLOverride"
 
@@ -56,6 +41,62 @@ enum WebEnvironment {
         return URL(string: override)
     }
 #endif
+
+    /// 앱 웹뷰가 문서를 띄우고 브리지를 주고받는 호스트. 유니버설 링크 호스트에
+    /// Debug · Beta의 테스트용 도메인 오버라이드(IP · http 포함) 주소를 더한다(딥링크 검증의 `allowedHosts`는 그대로 둔다).
+    static var webViewHosts: Set<String> {
+        var hosts = allowedHosts
+#if DEBUG || BETA
+        if let host = debugOverrideURL()?.host?.lowercased() {
+            hosts.insert(host)
+        }
+#endif
+        return hosts
+    }
+
+    /// 앱 웹뷰가 그대로 띄워도 되는 주소인지 — http(s)이고 앱 웹 호스트일 때만. 세션 쿠키 · 아웃바운드 메시지도 이때만 넣는다.
+    static func isAllowedWebURL(_ url: URL?) -> Bool {
+        guard let url, let scheme = url.scheme, let host = url.host else { return false }
+        return isAllowed(scheme: scheme, host: host)
+    }
+
+    /// 브리지 메시지를 보낸 프레임이 OSS 웹(앱 웹 호스트)의 메인 프레임인지. 아니면(iframe · 바깥 문서) 메시지를 받지 않는다.
+    @MainActor
+    static func isOSSFrame(_ frame: WKFrameInfo) -> Bool {
+        frame.isMainFrame && isAllowed(scheme: frame.securityOrigin.protocol, host: frame.securityOrigin.host)
+    }
+
+    private static func isAllowed(scheme: String, host: String) -> Bool {
+        let scheme = scheme.lowercased()
+        return (scheme == "https" || scheme == "http") && webViewHosts.contains(host.lowercased())
+    }
+
+    /// 메인 프레임 이동을 어디서 열지.
+    enum MainFrameRoute: Equatable {
+        /// 웹뷰에서 그대로 연다(앱 웹 주소 · 빈 문서).
+        case webView
+        /// 앱 위 브라우저로 연다(바깥 http(s) 주소). 다른 앱이 맡는 유니버설 링크면 그 앱으로.
+        case inAppBrowser
+        /// 시스템에 넘긴다(전화 · 메일).
+        case system
+        /// 열지 않는다(그 밖 스킴).
+        case blocked
+    }
+
+    /// 웹뷰 메인 프레임 이동의 갈 곳. iframe 이동에는 쓰지 않고, 새 창은 전화 · 메일 판정에만 쓴다.
+    static func mainFrameRoute(for url: URL) -> MainFrameRoute {
+        switch url.scheme?.lowercased() {
+        case "https", "http":
+            return isAllowedWebURL(url) ? .webView : .inAppBrowser
+        case "tel", "mailto":
+            return .system
+        case "about":
+            // 빈 문서는 바깥 내용을 싣지 않는다. 주소가 앱 웹이 아니라 토큰 · 아웃바운드 메시지는 넣지 않는다.
+            return .webView
+        default:
+            return .blocked
+        }
+    }
 
     /// 웹뷰 User-Agent 끝에 붙이는 앱 표시(#370). 웹 서버가 앱 안인지 · 앱 버전을 첫 요청부터 안다
     /// (jiu-jitsu-frontend#510). 웹은 `OSSApp/`으로 찾으므로 형식을 바꾸면 웹과 같이 바꾼다.

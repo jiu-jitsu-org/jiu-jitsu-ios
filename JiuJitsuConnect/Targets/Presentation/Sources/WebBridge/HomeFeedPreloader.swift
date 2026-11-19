@@ -150,8 +150,8 @@ final class HomeFeedPreload {
                     coordinator.webView(webView, didFinish: nil)
                 case let .failed(error):
                     coordinator.webView(webView, didFail: nil, withError: error)
-                case let .message(body, isFromOSS):
-                    coordinator.receiveBridgeMessage(body, isFromOSS: isFromOSS)
+                case let .message(body):
+                    coordinator.receiveBridgeMessage(body)
                 }
             }
         }
@@ -164,8 +164,8 @@ private final class HomeFeedPreloadRecorder: NSObject, WKNavigationDelegate, WKS
         case started
         case finished
         case failed(Error)
-        /// isFromOSS: 받을 때 본 프레임 출처(#424). 넘길 때는 프레임 정보가 없어 미리 판정해 둔다.
-        case message(Any, isFromOSS: Bool)
+        /// 보낸 프레임 검사(OSS 웹 메인 프레임)를 받을 때 마친 메시지. 넘길 때는 프레임 정보가 없다.
+        case message(Any)
     }
 
     private var events: [Event] = []
@@ -177,8 +177,13 @@ private final class HomeFeedPreloadRecorder: NSObject, WKNavigationDelegate, WKS
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.name == WebBridge.appBridgeHandlerName else { return }
+        // 홈 웹뷰와 같이 앱 웹의 메인 프레임이 보낸 것만 받아 둔다(넘길 때는 프레임 정보가 없다).
+        guard WebEnvironment.isOSSFrame(message.frameInfo) else {
+            Log.trace("🏠 home-preload: 앱 웹 메인 프레임이 아닌 메시지 무시", category: .view, level: .info)
+            return
+        }
         Log.trace("🏠 home-preload: \(Self.messageType(of: message.body)) 받아 둠", category: .view, level: .info)
-        events.append(.message(message.body, isFromOSS: WebEnvironment.isOSSFrame(message.frameInfo)))
+        events.append(.message(message.body))
     }
 
     // 로그용 메시지 종류. 웹은 봉투를 객체 또는 JSON 문자열로 보낸다.
@@ -204,6 +209,25 @@ private final class HomeFeedPreloadRecorder: NSObject, WKNavigationDelegate, WKS
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         events.append(.failed(error))
+    }
+
+    // 홈 웹뷰와 같은 메인 프레임 이동 정책. 스플래시 위라 앱 위 브라우저는 띄우지 않고 막기만 한다
+    // (홈 주소의 첫 로드가 막히면 실패로 기록돼, 이어받은 홈이 오류 화면 · 다시 시도를 보인다).
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
+        guard
+            navigationAction.targetFrame?.isMainFrame == true,
+            let url = navigationAction.request.url,
+            WebEnvironment.mainFrameRoute(for: url) != .webView
+        else {
+            decisionHandler(.allow)
+            return
+        }
+        Log.trace("🏠 home-preload: 앱 웹 주소가 아닌 이동 막음", category: .view, level: .info)
+        decisionHandler(.cancel)
     }
 
     // HTTP 4xx/5xx는 WKWebView 관점에서 정상 로드라, 홈 웹뷰(BridgeWebView)와 같이 직접 실패로 처리한다.
