@@ -357,6 +357,46 @@ extension AnalyticsEvent {
     }
 }
 
+// MARK: - 신고 · 차단 (#428)
+
+extension AnalyticsEvent {
+    /// 신고 사유(사전 `reason` 중 신고). 서버 신고 사유 코드의 소문자 — 웹 글 · 댓글 신고(FE #580)와 같은 값을 쓴다.
+    /// 사전의 6개에 `rights_violation` · `illegal_filming`을 더했다: 급히 처리해야 하는 신고를 '기타'와 나눠 받는 사유라(FE #514)
+    /// other로 합치면 GA에서 그 구분이 사라진다.
+    public enum ReportReason: String, Sendable {
+        case spam, abuse, adult, harassment, incitement
+        case rightsViolation = "rights_violation"
+        case illegalFilming = "illegal_filming"
+        case other
+
+        /// 서버 값(`ABUSE` 등). 모르는 값은 nil — 새 사유가 GA에 새 분류로 쌓이지 않게.
+        public init?(serverValue: String) {
+            self.init(rawValue: serverValue.lowercased())
+        }
+    }
+
+    /// 앱이 신고 · 차단하는 곳은 다른 회원 프로필의 ⋯ 메뉴뿐이다(#328). 글 · 댓글 신고, 댓글 차단, 차단한 회원 목록은 웹이 남긴다(FE #580).
+    static let userProfileEntry = "user_profile"
+
+    /// 신고 제출 성공(이미 신고한 회원 포함). 앱이 신고하는 대상은 회원뿐이라 content_type은 user.
+    /// `reason`은 모르면 싣지 않는다 — 신고 수는 남긴다.
+    public static func reportSubmit(reason: ReportReason?) -> Self {
+        Self(.reportSubmit, parameters: strings([
+            "content_type": "user",
+            "reason": reason?.rawValue,
+            "from": userProfileEntry
+        ]))
+    }
+
+    /// 차단(on) · 차단 해제(off) 성공.
+    public static func userBlock(blocked: Bool) -> Self {
+        Self(.userBlock, parameters: strings([
+            "state": blocked ? "on" : "off",
+            "from": userProfileEntry
+        ]))
+    }
+}
+
 // MARK: - 사용자 속성
 
 /// GA 사용자 속성(사전 "사용자 속성"). `signup_week`는 서버 값이 생기면 더한다.

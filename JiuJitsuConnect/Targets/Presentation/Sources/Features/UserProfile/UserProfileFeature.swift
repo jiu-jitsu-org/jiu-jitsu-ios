@@ -111,7 +111,8 @@ public struct UserProfileFeature: Sendable {
             case myProfileResponse(TaskResult<CommunityProfile>)
             /// ⋯ 메뉴를 보일지 — 내 회원 번호(#328)
             case viewerResponse(TaskResult<UserProfile>)
-            case reportResponse(TaskResult<Void>)
+            /// 사유는 분석 기록(`report_submit`)에 싣는다 — 시트가 제출 때 닫혀 응답 시점엔 상태에 없다(#428)
+            case reportResponse(reason: String, TaskResult<Void>)
             case blockResponse(afterReport: Bool, TaskResult<Bool>)
             case unblockResponse(TaskResult<Void>)
             case showToast(ToastState)
@@ -205,12 +206,12 @@ public struct UserProfileFeature: Sendable {
                 // 자유 입력은 '기타'를 골라 입력했을 때만 싣는다
                 let detail = customText?.trimmingCharacters(in: .whitespacesAndNewlines)
                 return .run { send in
-                    await send(.internal(.reportResponse(TaskResult {
+                    await send(.internal(.reportResponse(reason: reason, TaskResult {
                         try await communityClient.reportUser(userId, reason, detail?.isEmpty == false ? detail : nil)
                     })))
                 }
 
-            case .internal(.reportResponse(.success)):
+            case .internal(.reportResponse(_, .success)):
                 state.isMenuRequestInFlight = false
                 // 차단 여부를 모르면(서버가 아직 내려 주지 않음) 차단을 묻지 않는다 — 지금 서버의 차단은 토글이라 이미 차단한 회원이면 풀린다
                 guard state.isBlocked == false, let profile = state.profile else {
@@ -227,7 +228,7 @@ public struct UserProfileFeature: Sendable {
                 )
                 return .none
 
-            case let .internal(.reportResponse(.failure(error))):
+            case let .internal(.reportResponse(_, .failure(error))):
                 state.isMenuRequestInFlight = false
                 if case .apiError(code: .alreadyReported, _)? = error as? DomainError {
                     return showToast("이미 신고한 회원이에요", status: .info)
