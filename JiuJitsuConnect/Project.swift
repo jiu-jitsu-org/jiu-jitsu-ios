@@ -405,7 +405,11 @@ let project = Project(
             name: "App-Beta",
             shared: true,
             buildAction: .buildAction(targets: [.target("App")]),
-            runAction: .runAction(configuration: "Beta"),
+            // Xcode에서 실행할 때만 GA 기록을 DebugView에 바로 보낸다. 아카이브(TestFlight)에는 실행 인자가 들어가지 않는다
+            runAction: .runAction(
+                configuration: "Beta",
+                arguments: .arguments(launchArguments: [.launchArgument(name: "-FIRDebugEnabled", isEnabled: true)])
+            ),
             archiveAction: .archiveAction(configuration: "Beta")
         ),
         .scheme(
