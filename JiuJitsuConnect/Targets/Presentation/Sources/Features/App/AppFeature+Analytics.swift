@@ -27,6 +27,8 @@ extension AppFeature {
         var visibleScreen: VisibleScreen?
         /// 마지막으로 screen_view를 남긴 화면. 맨 위 화면이 잠깐 그대로 있은 뒤 이것과 다를 때만 남긴다.
         var loggedScreen: VisibleScreen?
+        /// 화면 위치(id)별로 마지막에 남긴 기록. 같은 위치 · 같은 화면이 다시 맨 위가 되면 다시 보임(from=back)이다.
+        var shownScreens: [String: AnalyticsEvent] = [:]
         /// 앱으로 돌아왔을 때 맨 위였던 화면. 그 화면이 그대로면 from=resume으로 다시 남긴다(새 세션의 첫 화면이 비지 않게).
         /// 푸시 · 링크로 돌아와 다른 화면이 뜨면 그 화면은 웹 · 앱이 정한 입구로 남는다.
         var resumingScreenID: String?
@@ -214,10 +216,31 @@ extension AppFeature {
             let isResuming = screen != nil && screen?.id == state.analytics.resumingScreenID
             state.analytics.resumingScreenID = nil
             guard isResuming || screen != state.analytics.loggedScreen else { return }
+            let previous = state.analytics.loggedScreen
             state.analytics.loggedScreen = screen
-            if let event = screen?.event {
-                log(isResuming ? event.replacingFrom("resume") : event)
+            guard let screen, let event = screen.event else { return }
+            let isShownAgain = state.analytics.shownScreens[screen.id] == event
+            state.analytics.shownScreens[screen.id] = event
+            // 탭 첫 화면이 다시 보이면 그 위에 쌓였던 화면은 모두 닫힌 것이라 기억에서 뺀다.
+            if ScreenView.tab(of: screen.id) != nil, !screen.id.contains("/") {
+                state.analytics.shownScreens = state.analytics.shownScreens.filter { !$0.key.hasPrefix("\(screen.id)/") }
             }
+            let from: String? = if isResuming {
+                "resume"
+            } else if isShownAgain {
+                // 위 화면이 닫히거나 뒤로 가 다시 보이면 back(입구 집계에서 뺌). 탭을 바꿔 다시 보이면 tab_bar.
+                Self.isTabSwitch(from: previous, to: screen) ? "tab_bar" : "back"
+            } else {
+                nil
+            }
+            log(from.map(event.replacingFrom) ?? event)
+        }
+
+        /// 직전에 남긴 화면과 다른 탭의 화면인지. 로그인 모달 등 탭 밖 화면에서 돌아온 것은 탭 전환이 아니다.
+        private static func isTabSwitch(from previous: VisibleScreen?, to screen: VisibleScreen) -> Bool {
+            guard let previousTab = previous.flatMap({ ScreenView.tab(of: $0.id) }),
+                  let tab = ScreenView.tab(of: screen.id) else { return false }
+            return previousTab != tab
         }
 
         // MARK: - app_open
@@ -314,6 +337,8 @@ extension AppFeature {
 
         /// 로그인 · 가입 · 복원 응답의 분석용 ID와 계정 구분. 값이 없으면 지워 이전 계정 값이 남지 않게 한다.
         private func updateMember(_ userInfo: AuthInfo.UserInfo?, state: inout State) {
+            // 로그인하면 탭 화면을 새로 만든다 — 같은 위치에 다시 뜬 화면은 다시 보임이 아니다.
+            state.analytics.shownScreens = [:]
             sendUserID(Self.nonEmpty(userInfo?.analyticsId), state: &state)
             let accountType = AnalyticsUserProperty.accountTypeValue(userInfo?.accountType)
             guard state.analytics.sentProfileProperties[.accountType] != .some(accountType) else { return }
@@ -329,6 +354,8 @@ extension AppFeature {
 
         /// 기기 권한(`push_enabled`)은 계정과 무관해 남긴다. 회원 ID는 빈 문자열이 아니라 nil로 지운다.
         private func clearMemberProperties(_ state: inout State) {
+            // 로그아웃 · 만료 · 탈퇴는 탭 화면을 게스트로 새로 만든다 — 다시 보임 기억도 비운다.
+            state.analytics.shownScreens = [:]
             state.analytics.sentUserID = .some(nil)
             analyticsClient.setUserID(nil)
             state.analytics.sentProfileProperties = [:]

@@ -22,6 +22,13 @@ extension AppFeature {
         typealias NativeScreen = AnalyticsEvent.NativeScreen
 
         static let loginCoverID = "loginCover"
+        static let tabIDs: Set<String> = ["home", "competition", "my"]
+
+        /// 화면 위치가 속한 탭(id의 첫 마디). 로그인 화면 · 모달은 nil.
+        static func tab(of id: String) -> String? {
+            let first = String(id.prefix { $0 != "/" })
+            return tabIDs.contains(first) ? first : nil
+        }
 
         static func visibleScreen(in state: State) -> VisibleScreen? {
             switch state.destination {
