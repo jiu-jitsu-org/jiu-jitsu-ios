@@ -57,15 +57,16 @@ enum HomeFeedPreloader {
         scheduleRelease()
     }
 
-    /// 홈 피드 웹뷰의 브릿지 기능 목록. 탭 바 밑까지 그리는 웹은 BridgeWebView가 시트 열림 알림을 덧붙인다(#314).
-    static let capabilities: [WebBridgeCapability] = [.setSheetOpen]
+    /// 홈 피드 웹뷰의 브릿지 기능 목록 — 홈 웹뷰(BridgeWebView)가 알리는 목록과 같아야 이어받는다.
+    /// 분석 기록(#424)은 모든 웹뷰, 시트 열림은 탭 바 밑까지 그리는 웹(#314)에 BridgeWebView가 붙인다.
+    static let capabilities: [WebBridgeCapability] = [.analyticsEvent, .setSheetOpen]
 
     /// 홈 웹뷰가 미리 불러 둔 화면을 이어받는다. 주소·설정이 다르면 이어받지 않고 새로 만들게 둔다.
     static func take(url: URL, capabilities: [WebBridgeCapability]) -> HomeFeedPreload? {
         guard let preload = pending else { return nil }
         pending = nil
         // 미리 부를 때는 홈 피드와 같은 기능 알림만 넣으므로, 다른 설정이 필요한 웹뷰는 이어받을 수 없다
-        guard preload.url == url, capabilities == Self.capabilities else {
+        guard preload.url == url, Set(capabilities) == Set(Self.capabilities) else {
             discard(preload)
             return nil
         }
@@ -149,8 +150,8 @@ final class HomeFeedPreload {
                     coordinator.webView(webView, didFinish: nil)
                 case let .failed(error):
                     coordinator.webView(webView, didFail: nil, withError: error)
-                case let .message(body):
-                    coordinator.receiveBridgeMessage(body)
+                case let .message(body, isFromOSS):
+                    coordinator.receiveBridgeMessage(body, isFromOSS: isFromOSS)
                 }
             }
         }
@@ -163,7 +164,8 @@ private final class HomeFeedPreloadRecorder: NSObject, WKNavigationDelegate, WKS
         case started
         case finished
         case failed(Error)
-        case message(Any)
+        /// isFromOSS: 받을 때 본 프레임 출처(#424). 넘길 때는 프레임 정보가 없어 미리 판정해 둔다.
+        case message(Any, isFromOSS: Bool)
     }
 
     private var events: [Event] = []
@@ -176,7 +178,7 @@ private final class HomeFeedPreloadRecorder: NSObject, WKNavigationDelegate, WKS
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.name == WebBridge.appBridgeHandlerName else { return }
         Log.trace("🏠 home-preload: \(Self.messageType(of: message.body)) 받아 둠", category: .view, level: .info)
-        events.append(.message(message.body))
+        events.append(.message(message.body, isFromOSS: WebEnvironment.isOSSFrame(message.frameInfo)))
     }
 
     // 로그용 메시지 종류. 웹은 봉투를 객체 또는 JSON 문자열로 보낸다.

@@ -255,6 +255,7 @@ public struct CommunityFeature: Sendable {
     }
 
     @Dependency(\.noticeClient) var noticeClient
+    @Dependency(\.analyticsClient) var analyticsClient
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -466,6 +467,12 @@ public struct CommunityFeature: Sendable {
 
                 case .contentCreated:
                     return .send(.delegate(.contentCreated))
+
+                case let .analyticsEvent(event):
+                    // 화면 기록(screen_view)은 웹이 알린 "지금 화면"이라 이 웹뷰가 실제로 보일 때 남긴다(#425). 그 밖은 바로 남긴다.
+                    guard event.name != .screenView else { return .none }
+                    analyticsClient.logEvent(event)
+                    return .none
 
                 case .openHomeFeed, .openCompetitionRecord, .competitionHeaderTint, .setSheetOpen:
                     // 대회 화면만 알리는 신호(#250)라 홈 피드 웹에서는 오지 않아야 한다. 받을 곳이 없어 무시한다.
@@ -876,7 +883,7 @@ public struct CommunityFeature: Sendable {
         return .none
     }
 
-    /// 해당 컨테이너의 최상단에 같은 URL의 상세가 떠 있으면 그 상태를 고치고 true를 돌려준다.
+    /// 해당 컨테이너의 최상단에 같은 글(호스트 · 경로, 쿼리 무시 — `?from=` · utm)의 상세가 떠 있으면 그 상태를 고치고 true를 돌려준다.
     private static func updateTopDetail(
         url: URL,
         in state: inout State,
@@ -885,18 +892,18 @@ public struct CommunityFeature: Sendable {
     ) -> Bool {
         switch container {
         case .push:
-            guard let id = state.path.ids.last, case var .detail(top)? = state.path[id: id], top.url == url else { return false }
+            guard let id = state.path.ids.last, case var .detail(top)? = state.path[id: id], WebOrigin.isSamePage(top.url, url) else { return false }
             update(&top)
             state.path[id: id] = .detail(top)
             return true
         case .modal:
             if let id = state.coverPath.ids.last {
-                guard case var .detail(top)? = state.coverPath[id: id], top.url == url else { return false }
+                guard case var .detail(top)? = state.coverPath[id: id], WebOrigin.isSamePage(top.url, url) else { return false }
                 update(&top)
                 state.coverPath[id: id] = .detail(top)
                 return true
             }
-            guard var top = state.detailCover, top.url == url else { return false }
+            guard var top = state.detailCover, WebOrigin.isSamePage(top.url, url) else { return false }
             update(&top)
             state.detailCover = top
             return true
@@ -1022,7 +1029,7 @@ public struct CommunityFeature: Sendable {
     }
 
 #if DEBUG || BETA
-    private static func debugOverrideURL() -> URL? {
+    static func debugOverrideURL() -> URL? {
         guard
             let override = UserDefaults.standard.string(forKey: debugURLOverrideKey),
             !override.isEmpty,

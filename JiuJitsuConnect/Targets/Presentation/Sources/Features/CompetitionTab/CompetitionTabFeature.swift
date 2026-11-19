@@ -215,7 +215,7 @@ public struct CompetitionTabFeature: Sendable {
             case let .openDetail(url, accessToken):
                 // 같은 대회가 이미 맨 위면 다시 쌓지 않는다(링크 재탭·중복 전달, 홈 딥링크의 updateTopDetail과 같은 이유).
                 // 공유 링크엔 꼬리(?utm=…, 끝 '/')가 붙을 수 있어 주소 전체가 아니라 호스트·경로로 같은 대회인지 본다.
-                if case let .communityDetail(top)? = state.path.last, Self.isSameDetail(top.url, url) {
+                if case let .communityDetail(top)? = state.path.last, WebOrigin.isSamePage(top.url, url) {
                     Log.trace("대회 딥링크 무시(이미 최상단): \(url.absoluteString)", category: .view, level: .info)
                     return .none
                 }
@@ -232,16 +232,6 @@ public struct CompetitionTabFeature: Sendable {
             CommunityDetailFeature()
         }
         .forEach(\.path, action: \.path)
-    }
-
-    /// 두 상세 주소가 같은 화면인지 — 호스트와 끝 '/'를 뗀 경로만 비교한다(쿼리·조각은 무시).
-    private static func isSameDetail(_ lhs: URL, _ rhs: URL) -> Bool {
-        func key(_ url: URL) -> String {
-            var path = url.path
-            while path.count > 1, path.hasSuffix("/") { path.removeLast() }
-            return "\(url.host?.lowercased() ?? "")\(path)"
-        }
-        return key(lhs) == key(rhs)
     }
 
     private static func isNotificationsDetail(_ element: Path.State?) -> Bool {
