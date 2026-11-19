@@ -8,10 +8,6 @@ import ComposableArchitecture
 import DesignSystem
 
 private enum Style {
-    static let headerHeight: CGFloat = 60
-    static let horizontalPadding: CGFloat = 16
-    // 뒤로가기 버튼과, 완료 화면에서 그 자리를 비워 제목을 가운데에 두는 빈 칸이 같은 크기를 쓴다.
-    static let backButtonSize: CGFloat = 36
     // 화면 폭을 다 채우면 막대가 눈을 끌어, 가운데에 짧게 둔다.
     static let progressBarWidth: CGFloat = 160
     // 단계 사이 전환 — 한 동작(옆으로 밀기). 500ms는 '다음'을 누를 때마다 기다리는 느낌이라
@@ -116,74 +112,23 @@ struct CompetitionInfoView: View {
     // MARK: - Components
 
     private var headerView: some View {
-        HStack {
-            // 완료 화면은 이미 저장된 뒤라 되돌아갈 곳이 없고, 아래 '완료' 버튼으로만 닫는다.
-            if store.step == .done {
-                Color.clear.frame(width: Style.backButtonSize, height: Style.backButtonSize)
-            } else {
-                backButton
-            }
-
-            Spacer()
-
-            Text(store.headerTitle)
-                .font(Font.pretendard.title3)
-                .foregroundStyle(Color.component.header.text)
-
-            Spacer()
-
-            if store.step == .done {
-                Color.clear.frame(width: Style.backButtonSize, height: Style.backButtonSize)
-            } else if store.mode.isEdit {
-                Button {
-                    store.send(.view(.deleteButtonTapped))
-                } label: {
-                    // 자주 쓰지 않는 되돌릴 수 없는 동작이라 눈길을 끌지 않게 회색으로 둔다. 빨강은 확인 알럿의 [삭제]에만 쓴다.
-                    Text("삭제")
-                        .font(Font.pretendard.bodyM)
-                        .foregroundStyle(Color.semantic.text.secondary)
-                        .frame(height: 36)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            } else {
-                Button {
-                    store.send(.view(.cancelButtonTapped))
-                } label: {
-                    Text("취소")
-                        .font(Font.pretendard.bodyM)
-                        .foregroundStyle(Color.component.button.text.defaultText)
-                        .frame(height: 36)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
+        // 완료 화면은 이미 저장된 뒤라 되돌아갈 곳이 없고, 아래 '완료' 버튼으로만 닫는다.
+        let isDone = store.step == .done
+        let trailing: TopHeader.Action? = if isDone {
+            nil
+        } else if store.mode.isEdit {
+            .init("삭제") { store.send(.view(.deleteButtonTapped)) }
+        } else {
+            .init("취소") { store.send(.view(.cancelButtonTapped)) }
         }
-        .padding(.horizontal, Style.horizontalPadding)
-        .frame(height: Style.headerHeight)
+        return TopHeader(
+            title: store.headerTitle,
+            onBack: isDone ? nil : { store.send(.view(.backButtonTapped)) },
+            trailing: trailing
+        )
         // 완료 화면은 머리줄(상태 표시줄 영역까지)을 아래 캐릭터 무대와 같은 색으로 이어, 흰 띠가 따로 얹혀 보이지 않게 한다(#246).
         // 전환과 함께 바뀌도록 화면에 그려지는 단계(shownStep)를 따른다. 아래 흰 시트·홈 인디케이터 쪽은 바깥 흰 바탕 그대로다.
         .background(shownStep == .done ? Color.primitive.coolGray.cg25 : Color.clear)
-    }
-
-    private var backButton: some View {
-        Button {
-            store.send(.view(.backButtonTapped))
-        } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.primitive.blue.b50)
-
-                Assets.Common.Icon.arrowLeft.swiftUIImage
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 24, height: 24)
-                    .foregroundStyle(Color.primitive.blue.b500p)
-            }
-            .frame(width: Style.backButtonSize, height: Style.backButtonSize)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     // 지금 단계까지 칸을 채워, 남은 단계 수를 한눈에 보이게 한다.

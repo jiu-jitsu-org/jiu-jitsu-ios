@@ -2,11 +2,6 @@ import SwiftUI
 import ComposableArchitecture
 import DesignSystem
 
-private enum Style {
-    static let headerHeight: CGFloat = 60
-    static let horizontalPadding: CGFloat = 16
-}
-
 public struct NicknameSettingView: View {
 
     @Bindable var store: StoreOf<NicknameSettingFeature>
@@ -60,40 +55,10 @@ public struct NicknameSettingView: View {
 private extension NicknameSettingView {
 
     var headerView: some View {
-        HStack {
-            Button(action: { store.send(.view(.backButtonTapped)) }) {
-                ZStack {
-                    // 라운드 배경
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.primitive.blue.b50)
-
-                    // 화살표 아이콘
-                    Assets.Common.Icon.arrowLeft.swiftUIImage
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 24, height: 24)
-                        .foregroundStyle(Color.primitive.blue.b500p)
-                }
-                .frame(width: 36, height: 36)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("뒤로 가기")
-
-            Spacer()
-
-            Text(store.mode.headerTitle)
-                .font(Font.pretendard.title3)
-                .foregroundStyle(Color.component.header.text)
-
-            Spacer()
-
-            Rectangle()
-                .fill(.clear)
-                .frame(width: 32, height: 32)
-        }
-        .padding(.horizontal, Style.horizontalPadding)
-        .frame(height: Style.headerHeight)
+        TopHeader(
+            title: store.mode.headerTitle,
+            onBack: { store.send(.view(.backButtonTapped)) }
+        )
     }
 
     var titleSection: some View {

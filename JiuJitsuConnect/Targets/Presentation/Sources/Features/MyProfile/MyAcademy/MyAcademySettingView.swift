@@ -9,11 +9,6 @@ import SwiftUI
 import ComposableArchitecture
 import DesignSystem
 
-private enum Style {
-    static let headerHeight: CGFloat = 60
-    static let horizontalPadding: CGFloat = 16
-}
-
 public struct MyAcademySettingView: View {
     
     @Bindable var store: StoreOf<MyAcademySettingFeature>
@@ -53,53 +48,13 @@ public struct MyAcademySettingView: View {
 private extension MyAcademySettingView {
     
     var headerView: some View {
-        HStack {
-            Button(action: { store.send(.view(.backButtonTapped)) }) {
-                ZStack {
-                    // 라운드 배경
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.primitive.blue.b50)
-                    
-                    // 화살표 아이콘
-                    Assets.Common.Icon.arrowLeft.swiftUIImage
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 24, height: 24)
-                        .foregroundStyle(Color.primitive.blue.b500p)
-                }
-                .frame(width: 36, height: 36)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            
-            Spacer()
-            
-            Text(store.mode.headerTitle)
-                .font(Font.pretendard.title3)
-                .foregroundStyle(Color.component.header.text)
-            
-            Spacer()
-
-            if store.mode.isEdit {
-                Button {
-                    store.send(.view(.deleteButtonTapped))
-                } label: {
-                    Text("삭제")
-                        .font(Font.pretendard.buttonS)
-                        .foregroundStyle(Color.component.button.text.defaultText)
-                        .frame(width: 53, height: 32)
-                        .contentShape(Rectangle())
-                }
-                .disabled(store.isSaving)
-                .buttonStyle(.plain)
-            } else {
-                Rectangle()
-                    .fill(.clear)
-                    .frame(width: 32, height: 32)
-            }
-        }
-        .padding(.horizontal, Style.horizontalPadding)
-        .frame(height: Style.headerHeight)
+        TopHeader(
+            title: store.mode.headerTitle,
+            onBack: { store.send(.view(.backButtonTapped)) },
+            trailing: store.mode.isEdit
+                ? .init("삭제", isEnabled: !store.isSaving) { store.send(.view(.deleteButtonTapped)) }
+                : nil
+        )
     }
     
     var titleSection: some View {
