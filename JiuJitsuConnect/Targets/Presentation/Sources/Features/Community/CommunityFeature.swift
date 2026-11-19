@@ -874,11 +874,14 @@ public struct CommunityFeature: Sendable {
         // 대신 보고 있는 글의 푸시(새 댓글 등)면 다시 불러와 새 내용을 보인다(#383).
         // 아직 첫 로딩 중이면 같은 링크가 두 경로로 잇달아 들어온 중복 전달이라 그대로 둔다.
         // 댓글 · 답글을 쓰는 중(키보드 ↑)이면 답글 대상이 사라지므로 다시 불러오지 않는다.
-        // 댓글 푸시(`?commentId=`)면 그 주소로 불러와 웹이 그 댓글을 맨 위에 보이게 한다(#436).
-        let reloadURL = DeepLinkParser.hasCommentId(link.url) ? link.url : nil
+        // 댓글 푸시(`?commentId=`)면 그 주소로 불러와 웹이 그 댓글을 맨 위에 보이게 하고(#436),
+        // 아니면 앞서 붙은 댓글 번호를 빼고 불러와 예전 댓글이 다시 맨 위에 묶이지 않게 한다.
+        // 지금 주소와 다른 댓글을 가리키면 중복 전달이 아니므로 로딩 중이어도 새 주소로 다시 불러온다.
+        let commentURL = DeepLinkParser.hasCommentId(link.url) ? link.url : nil
         if updateTopDetail(url: link.url, in: &state, container: container, { top in
-            guard !top.isLoading, !top.isKeyboardVisible else { return }
-            CommunityDetailFeature.reload(&top, url: reloadURL)
+            let pointsToOtherComment = commentURL.map { $0 != top.url } ?? false
+            guard !top.isLoading || pointsToOtherComment, !top.isKeyboardVisible else { return }
+            CommunityDetailFeature.reload(&top, url: commentURL ?? DeepLinkParser.removingCommentId(from: top.url))
         }) {
             Log.trace("딥링크: 이미 최상단인 글 — 로딩 중이 아니면 다시 불러옴: \(link.url.absoluteString)", category: .view, level: .info)
             return .none

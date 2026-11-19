@@ -47,16 +47,34 @@ enum DeepLinkParser {
     /// 글 · 밸런스 게임 상세 주소에서 맨 위에 보일 댓글 번호 쿼리. 웹 FE#596과 같은 이름이다(#436).
     static let commentIdQueryName = "commentId"
 
-    /// 주소에 댓글 번호 쿼리가 있는지. 값 검사는 웹이 한다(양의 정수가 아니면 무시).
+    /// 주소에 댓글 번호 쿼리가 있는지. 푸시 주소는 `PushActionRouter`가 숫자만 붙이고,
+    /// 링크로 들어온 값은 그대로 두어 웹이 거른다(양의 정수가 아니면 무시).
     static func hasCommentId(_ url: URL) -> Bool {
         URLComponents(url: url, resolvingAgainstBaseURL: false)?
             .queryItems?.contains { $0.name == commentIdQueryName && !($0.value ?? "").isEmpty } ?? false
     }
 
+    /// 댓글 번호 쿼리만 뺀 주소. 다른 쿼리(`from` 등)는 남긴다.
+    static func removingCommentId(from url: URL) -> URL {
+        guard
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+            let items = components.queryItems,
+            items.contains(where: { $0.name == commentIdQueryName })
+        else { return url }
+        let rest = items.filter { $0.name != commentIdQueryName }
+        components.queryItems = rest.isEmpty ? nil : rest
+        return components.url ?? url
+    }
+
+    /// 주소에 이어 붙여도 되는 숫자 id인지(대회 id · 댓글 id). `/`·`..`·쿼리 문자처럼 다른 경로로 새는 값은 받지 않는다.
+    static func isNumericId(_ value: String) -> Bool {
+        !value.isEmpty && value.allSatisfy { $0.isASCII && $0.isNumber }
+    }
+
     /// 대회 id로 쓸 수 있는 값인지(#256·#280, 푸시 → 대회 상세 주소). 서버 대회 id는 숫자 문자열이다(예: "3").
     /// 주소에 이어 붙이는 값이라 `/`·`..`·쿼리 문자처럼 다른 경로로 새는 값은 받지 않는다.
     static func isCompetitionId(_ value: String) -> Bool {
-        !value.isEmpty && value.allSatisfy { $0.isASCII && $0.isNumber }
+        isNumericId(value)
     }
 
     /// 글 · 밸런스 게임 상세 주소인지(`/community/{숫자}` · `/community/balance/{숫자}`) — 열린 화면이 무엇인지 가릴 때 쓴다.

@@ -131,7 +131,7 @@ enum PushActionRouter {
     /// 웹도 무시하는 값이지만, 서버가 보낸 문자열을 주소에 그대로 싣지 않으려고 여기서 거른다.
     private static func appendingCommentId(_ commentId: String?, to url: URL) -> URL {
         guard let commentId, !commentId.isEmpty else { return url }
-        guard commentId.allSatisfy({ $0.isASCII && $0.isNumber }) else {
+        guard DeepLinkParser.isNumericId(commentId) else {
             Log.trace("푸시 댓글 번호 무시(숫자 아님): \(commentId)", category: .system, level: .error)
             return url
         }
