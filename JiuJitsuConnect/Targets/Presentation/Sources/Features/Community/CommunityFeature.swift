@@ -21,18 +21,6 @@ public struct CommunityFeature: Sendable {
         case unreadNotification
     }
 
-    public enum Tab: String, CaseIterable, Sendable, Equatable {
-        case feed
-        case category
-
-        var title: String {
-            switch self {
-            case .feed: return "피드"
-            case .category: return "카테고리"
-            }
-        }
-    }
-
     /// 테스트용 도메인 변경 다이얼로그에서 한 번에 전환할 수 있는 서버 후보.
     /// 값은 Info.plist에 구성별로 주입되며, Release 구성에서는 비어 있다(버튼도 노출되지 않음).
     public enum DebugServer: String, CaseIterable, Sendable, Equatable {
@@ -60,7 +48,6 @@ public struct CommunityFeature: Sendable {
 
     @ObservableState
     public struct State: Equatable {
-        var selectedTab: Tab = .feed
         /// 이 목록 웹뷰가 마지막으로 알린 화면(screen_view, #425). 보일 때 루트 분석 리듀서가 기록한다.
         var analyticsScreen: AnalyticsEvent?
         var url: URL?
@@ -142,7 +129,6 @@ public struct CommunityFeature: Sendable {
             // 앱이 포그라운드로 복귀.
             case sceneBecameActive
             case retryTapped
-            case tabSelected(Tab)
             case notificationTapped
             case searchTapped
 
@@ -201,7 +187,8 @@ public struct CommunityFeature: Sendable {
             // 이 스택에 쌓인 남의 프로필에서 회원을 차단·해제함(#328) → 부모가 열린 웹뷰 모두에 USER_BLOCK_CHANGED를 보낸다.
             case userBlockChanged(userId: Int, blocked: Bool)
             // 홈에 쌓인 대회 상세의 '커뮤니티에서 더 보기'(#304) → 부모가 홈에 쌓인 화면을 닫아 피드를 보인다.
-            case homeFeedRequested
+            // 대회 번호가 있으면 그 대회 글만 보이게 피드를 다시 연다(#437).
+            case homeFeedRequested(competitionId: Int?)
             // 홈에 쌓인 끝난 대회 상세의 '내 기록에 남기기'(#304) → 부모가 프로필을 보고 기록 추가를 그 상세 위에 쌓는다.
             case competitionRecordRequested(OpenCompetitionRecordPayload)
             // 홈 웹에서 글 · 댓글을 올림(#333) → 부모(AppTab)가 알림 권한 안내를 띄울지 정한다.
@@ -281,10 +268,6 @@ public struct CommunityFeature: Sendable {
                 state.scrollToTopToken = UUID()
                 return .none
 
-            case let .view(.tabSelected(tab)):
-                state.selectedTab = tab
-                return .none
-
             // 알림함은 iOS/Android 공용 웹 화면이다. 상세와 같은 chromeless 서브뷰로 열어
             // 알림 항목 탭(OPEN_SUBVIEW)·뒤로가기(CLOSE_SUBVIEW)를 기존 브릿지 흐름 그대로 쓴다.
             // `PushActionRouter`는 푸시 탭 전용으로 남는다. (#45)
@@ -297,8 +280,15 @@ public struct CommunityFeature: Sendable {
                 state.path.append(.detail(Self.subview(url: url, accessToken: state.accessToken)))
                 return .none
 
-            // FIXME: 검색 화면 진입 (커뮤니티 검색 기능 도입 시 구현)
+            // 글 검색은 웹 화면이다(jiu-jitsu-frontend#591, #435). 알림함처럼 서브뷰로 열어, 결과 글은 그 위에 쌓이고
+            // 뒤로가기는 검색 결과 → 홈 순서로 돌아온다. 비로그인도 쓸 수 있어 로그인을 묻지 않는다.
             case .view(.searchTapped):
+                guard let base = state.url, let url = Self.searchURL(base: base) else { return .none }
+                // 연타로 검색 화면이 두 겹 쌓이지 않게 — 이미 맨 위가 검색이면 그대로 둔다.
+                if let id = state.path.ids.last, case let .detail(top)? = state.path[id: id], WebOrigin.isSamePage(top.url, url) {
+                    return .none
+                }
+                state.path.append(.detail(Self.subview(url: url, accessToken: state.accessToken)))
                 return .none
 
             case .view(.retryTapped):
@@ -690,6 +680,13 @@ public struct CommunityFeature: Sendable {
         URL(string: blockedUsersPath, relativeTo: base)?.absoluteURL
     }
 
+    /// 글 검색 웹 라우트(`/community/search`, #435). 검색어 없이 열면 웹이 '최근 검색'을 보여 준다.
+    private static let searchPath = "/\(DeepLinkParser.communitySegment)/search"
+
+    static func searchURL(base: URL) -> URL? {
+        URL(string: searchPath, relativeTo: base)?.absoluteURL
+    }
+
     /// 닫힐 때 새 알림 점을 다시 읽을 화면 — 알림함과 글 · 밸런스 게임 상세(열면 그 글 알림이 읽음 처리된다, #401).
     private static func refreshesUnreadOnClose(_ element: Path.State?) -> Bool {
         guard case let .detail(detail)? = element else { return false }
@@ -723,8 +720,8 @@ public struct CommunityFeature: Sendable {
             return .send(.openUserProfile(userId: userId))
         case let .competitionAlertsChecked(check):
             return .send(.delegate(.competitionAlertsChecked(check)))
-        case .homeFeedRequested:
-            return .send(.delegate(.homeFeedRequested))
+        case let .homeFeedRequested(competitionId):
+            return .send(.delegate(.homeFeedRequested(competitionId: competitionId)))
         case let .competitionRecordRequested(payload):
             return .send(.delegate(.competitionRecordRequested(payload)))
         case .competitionHeaderTintChanged:
@@ -780,6 +777,31 @@ public struct CommunityFeature: Sendable {
         state.detailCover = nil
         state.coverPath.removeAll()
         state.scrollToTopToken = UUID()
+    }
+
+    /// 대회 이야기 '모두 보기'(#437): 홈 피드를 `/?competitionId=<번호>`로 다시 불러온다. 웹이 '대회' 탭을 고르고
+    /// 그 대회 글만 보여 준다(jiu-jitsu-frontend#598). 다른 카테고리를 보고 있었거나 같은 주소여도 다시 불러와 그 대회로 맞춘다.
+    /// 대회 번호 없이 홈으로 오면(오늘의 게임·커뮤니티에서 더 보기 등) 앞서 건 대회 필터만 풀고, 필터가 없으면 보던 피드를 그대로 둔다.
+    public static func reloadFeed(competitionId: Int?, into state: inout State) {
+        guard let base = makeCommunityURL() else { return }
+        let target: URL?
+        if let competitionId {
+            target = URL(string: "/?\(competitionIdQueryName)=\(competitionId)", relativeTo: base)?.absoluteURL
+        } else if let current = state.url, hasCompetitionFilter(current) {
+            target = base
+        } else {
+            return
+        }
+        // 같은 주소를 이미 불러오는 중이면(같은 신호가 잇달아 옴) 다시 부르지 않는다 — 진행 중인 로드를 끊으면 오류 화면이 뜬다.
+        if state.isLoading, state.url == target { return }
+        reloadCommunity(&state, url: target)
+    }
+
+    private static let competitionIdQueryName = "competitionId"
+
+    private static func hasCompetitionFilter(_ url: URL) -> Bool {
+        URLComponents(url: url, resolvingAgainstBaseURL: true)?
+            .queryItems?.contains { $0.name == competitionIdQueryName } ?? false
     }
 
     /// 로그아웃·탈퇴 때 이전 계정으로 연 MY 화면(#197)과 대회 기록 추가(#304)를 닫는다. 그 위에 쌓인 화면도 함께 닫는다.
@@ -1022,8 +1044,7 @@ public struct CommunityFeature: Sendable {
     // MARK: - 테스트용 도메인 오버라이드 (UserDefaults)
 
     /// 입력 주소로 URL을 다시 만들고 강제 reload되도록 상태를 초기화한다.
-    private static func reloadCommunity(_ state: inout State) {
-        let url = makeCommunityURL()
+    private static func reloadCommunity(_ state: inout State, url: URL? = makeCommunityURL()) {
         state.url = url
         // URL이 동일해도 View가 reload를 인지하도록 토큰을 갱신한다.
         state.loadToken = UUID()

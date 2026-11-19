@@ -172,7 +172,8 @@ public struct CommunityDetailFeature: Sendable {
             // 다른 회원의 작성자 탭(OPEN_USER_PROFILE, isMe=false) → 부모가 그 회원의 프로필을 같은 스택에 쌓는다. (#116)
             case userProfileRequested(userId: Int)
             // 대회 상세의 '커뮤니티에서 더 보기'(OPEN_HOME_FEED) → 부모가 대회 스택을 닫고 홈 탭으로 바꾼다. (#250)
-            case homeFeedRequested
+            // 대회 이야기 '모두 보기'는 대회 번호를 함께 넘겨 홈 피드가 그 대회 글만 보이게 한다. (#437)
+            case homeFeedRequested(competitionId: Int?)
             // 끝난 대회의 '내 기록에 남기기'(OPEN_COMPETITION_RECORD) → 부모가 이름·연도를 채운 대회 기록 추가를 연다. (#250)
             case competitionRecordRequested(OpenCompetitionRecordPayload)
             // 관심 대회 '알림 받기' · 상세 종(COMPETITION_ALERTS_ENABLED)의 기기 알림 상태 → 부모가 AppTab까지 올려
@@ -401,13 +402,13 @@ public struct CommunityDetailFeature: Sendable {
                     }
                     return .send(.delegate(.myTabRequested))
 
-                case .openHomeFeed:
+                case let .openHomeFeed(competitionId):
                     // 지원을 알린 웹뷰(대회 상세)만 보낸다. 알리지 않은 웹뷰에서 오면 받을 곳이 없어 무시한다.
                     guard state.capabilities.contains(.openHomeFeed) else {
                         Log.trace("OPEN_HOME_FEED 무시(capability 미지원 웹뷰)", category: .network, level: .info)
                         return .none
                     }
-                    return .send(.delegate(.homeFeedRequested))
+                    return .send(.delegate(.homeFeedRequested(competitionId: competitionId)))
 
                 case let .openCompetitionRecord(payload):
                     guard state.capabilities.contains(.openCompetitionRecord) else {
