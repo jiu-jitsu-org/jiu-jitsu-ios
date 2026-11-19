@@ -70,7 +70,8 @@ public struct CompetitionInfoFeature: Sendable {
         /// 시스템 스와이프 백을 막을지 — 뒤로가기 버튼이 화면을 닫지 않는 단계에서는 스와이프도 한 단계 뒤로만 가게 한다(#390).
         /// 첫 단계(부문 추가 중 돌아갈 완료 화면이 없을 때)와 완료 화면은 지금처럼 닫히고, 저장 중에는 막는다.
         var blocksSwipeBack: Bool {
-            if isSaving { return true }
+            // 삭제 확인 알럿이 떠 있는 동안에도 막는다 — 알럿 뒤 화면이 스와이프로 닫히지 않게.
+            if isSaving || isDeleteAlertPresented { return true }
             switch step {
             case .result: return hasSavedInThisFlow
             case .name, .year, .division: return true
@@ -469,8 +470,9 @@ public struct CompetitionInfoFeature: Sendable {
                 return .none
 
             case .view(.deleteConfirmed):
+                // 알럿 [삭제]를 한 번에 두 번 눌러도 지우기는 한 번만 보낸다.
+                guard state.isDeleteAlertPresented, case let .edit(original) = state.mode else { return .none }
                 state.isDeleteAlertPresented = false
-                guard case let .edit(original) = state.mode else { return .none }
                 return .send(.delegate(.didDelete(original)))
 
             case .view(.deleteAlertDismissed):
