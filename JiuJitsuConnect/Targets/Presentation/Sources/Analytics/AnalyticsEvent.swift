@@ -139,6 +139,13 @@ extension AnalyticsEvent {
     }
 
     /// `section`: 한 화면 안의 부분(MY 편집 항목 등, 사전 "section").
+    /// `my_profile_edit`의 section(사전 "section" 중 프로필 항목).
+    public enum ProfileSection: String, Sendable {
+        case academy, nickname, photo, belt, position, technique, submission, competition
+        case ownerCert = "owner_cert"
+        case headerPattern = "header_pattern"
+    }
+
     /// `from`: 들어온 입구(사전 "from 값"). 모르면 싣지 않는다.
     public static func screenView(
         _ screen: NativeScreen,

@@ -21,13 +21,15 @@ extension AppFeature {
     enum ScreenView {
         typealias NativeScreen = AnalyticsEvent.NativeScreen
 
+        static let loginCoverID = "loginCover"
+
         static func visibleScreen(in state: State) -> VisibleScreen? {
             switch state.destination {
             case let .login(login)?:
                 return loginScreen(login, from: "launch", id: "login")
             case let .appTab(appTab)?:
                 if let login = appTab.loginCover {
-                    return loginScreen(login, from: state.analytics.loginCoverFrom, id: "loginCover")
+                    return loginScreen(login, from: state.analytics.loginCoverFrom, id: loginCoverID)
                 }
                 // 첫 홈은 인사 장면이 끝난 뒤에 센다.
                 guard !appTab.isGreetingShowing else { return nil }
@@ -104,24 +106,27 @@ extension AppFeature {
             }
             // 편집 화면은 항목(section)마다 하나로 센다 — 사진 시트 → 자르기, 인증 시트 → 인증 사진 고르기처럼
             // 한 항목 안에서 시트가 바뀌어도 한 번만 남긴다.
-            if let section = myPage.analyticsLocalSheet {
-                return edit(section, id: id)
+            if myPage.isCompetitionSheetPresented {
+                return edit(.competition, id: id)
+            }
+            if myPage.isPatternSheetPresented {
+                return edit(.headerPattern, id: id)
             }
             if myPage.imageCropCover != nil {
-                return edit("photo", id: id)
+                return edit(.photo, id: id)
             }
             if let sheet = myPage.sheet {
                 switch sheet {
-                case .beltSetting: return edit("belt", id: id)
+                case .beltSetting: return edit(.belt, id: id)
                 case let .profileImageEdit(imageEdit):
-                    return edit(imageEdit.purpose == .instructorVerification ? "owner_cert" : "photo", id: id)
-                case .instructorVerification: return edit("owner_cert", id: id)
+                    return edit(imageEdit.purpose == .instructorVerification ? .ownerCert : .photo, id: id)
+                case .instructorVerification: return edit(.ownerCert, id: id)
                 }
             }
             if let destination = myPage.destination {
                 switch destination {
-                case .academySetting: return edit("academy", id: id)
-                case .nicknameSetting: return edit("nickname", id: id)
+                case .academySetting: return edit(.academy, id: id)
+                case .nicknameSetting: return edit(.nickname, id: id)
                 case let .myStyleSetting(style): return edit(styleSection(style.settingType), id: id)
                 case .competitionInfo: return native(.competitionRecordAdd, id: "\(id)/destination")
                 }
@@ -147,15 +152,15 @@ extension AppFeature {
             return native(.settings, id: id)
         }
 
-        private static func edit(_ section: String, id: String) -> VisibleScreen {
-            native(.myProfileEdit, section: section, id: "\(id)/edit/\(section)")
+        private static func edit(_ section: AnalyticsEvent.ProfileSection, id: String) -> VisibleScreen {
+            native(.myProfileEdit, section: section.rawValue, id: "\(id)/edit/\(section.rawValue)")
         }
 
-        private static func styleSection(_ type: MyStyleSettingType) -> String {
+        private static func styleSection(_ type: MyStyleSettingType) -> AnalyticsEvent.ProfileSection {
             switch type {
-            case .position: "position"
-            case .submission: "submission"
-            case .technique: "technique"
+            case .position: .position
+            case .submission: .submission
+            case .technique: .technique
             }
         }
 

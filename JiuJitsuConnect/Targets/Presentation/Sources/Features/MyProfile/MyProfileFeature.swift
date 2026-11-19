@@ -50,8 +50,9 @@ public struct MyProfileFeature: Sendable {
 
         /// 띠나 그랄을 올려 저장한 직후 보여 줄 축하(#278, #286). 있으면 MY 위를 덮는다.
         var promotion: BeltPromotion?
-        /// View가 혼자 띄우는 시트(대회 줄 동작 · 머리줄 무늬)의 편집 항목(사전 section). 화면 기록(#425)이 맨 위 화면을 알게 한다.
-        var analyticsLocalSheet: String?
+        /// View가 혼자 띄우는 시트(대회 줄 동작 · 머리줄 무늬)가 떠 있는지. 화면 기록(#425)이 맨 위 화면을 알게 한다.
+        var isCompetitionSheetPresented = false
+        var isPatternSheetPresented = false
         /// 띠 고르기 시트가 내려가는 중인지. 내려가는 중엔 덮개를 띄울 수 없어, 저장이 먼저 끝나면 pendingPromotion에 두었다가 다 내려간 뒤 띄운다.
         var isBeltSheetClosing = false
         /// 저장은 끝났지만 아직 띄우지 않은 축하. 띄우는 순간(presentBeltPromotion·beltSheetDidDismiss) 비운다.
@@ -174,8 +175,9 @@ public struct MyProfileFeature: Sendable {
 
         public enum ViewAction: Sendable {
             case onAppear
-            /// View 상태로 띄운 시트가 열리고 닫힘(화면 기록용, #425). nil이면 닫힘
-            case localSheetChanged(section: String?)
+            /// View 상태로 띄운 시트가 열리고 닫힘(화면 기록용, #425)
+            case competitionSheetPresentedChanged(Bool)
+            case patternSheetPresentedChanged(Bool)
             /// 헤더에 서버 사진이 그려짐(#157)
             case profileImageDisplayed(url: String)
             /// 커뮤니티에서 연 MY의 뒤로가기(#197)
@@ -285,8 +287,12 @@ public struct MyProfileFeature: Sendable {
                 state.pendingProfileImageData = nil
                 return .none
 
-            case let .view(.localSheetChanged(section)):
-                state.analyticsLocalSheet = section
+            case let .view(.competitionSheetPresentedChanged(isPresented)):
+                state.isCompetitionSheetPresented = isPresented
+                return .none
+
+            case let .view(.patternSheetPresentedChanged(isPresented)):
+                state.isPatternSheetPresented = isPresented
                 return .none
 
             case .view(.onAppear):
