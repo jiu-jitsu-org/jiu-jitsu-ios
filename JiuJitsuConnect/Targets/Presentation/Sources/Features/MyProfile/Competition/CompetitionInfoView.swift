@@ -129,10 +129,11 @@ struct CompetitionInfoView: View {
                 Button {
                     store.send(.view(.deleteButtonTapped))
                 } label: {
+                    // 자주 쓰지 않는 되돌릴 수 없는 동작이라 눈길을 끌지 않게 회색으로 둔다. 빨강은 확인 알럿의 [삭제]에만 쓴다.
                     Text("삭제")
-                        .font(Font.pretendard.buttonS)
-                        .foregroundColor(Color.component.header.destructiveText)
-                        .frame(width: 48, height: 32)
+                        .font(Font.pretendard.bodyM)
+                        .foregroundStyle(Color.semantic.text.secondary)
+                        .frame(height: 36)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
