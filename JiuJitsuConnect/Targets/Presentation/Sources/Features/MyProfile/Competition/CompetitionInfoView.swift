@@ -100,6 +100,15 @@ struct CompetitionInfoView: View {
         )
         // 저장 중에는 다시 누르거나 화면을 떠나지 못하게 막는다(중복 저장 방지).
         .disabled(store.isSaving)
+        // 단계는 한 화면 안의 상태라, 시스템 스와이프 백은 단계가 아니라 화면 전체를 닫는다.
+        // 뒤로가기가 화면을 닫지 않는 단계에서는 스와이프를 막고 뒤로가기 버튼과 같이 한 단계 뒤로 보낸다(#390).
+        .background {
+            if store.blocksSwipeBack {
+                InteractivePopBlocker {
+                    store.send(.view(.backButtonTapped))
+                }
+            }
+        }
         .navigationBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
     }
