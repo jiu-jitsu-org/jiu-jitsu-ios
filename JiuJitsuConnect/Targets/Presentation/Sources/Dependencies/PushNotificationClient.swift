@@ -96,12 +96,7 @@ public final class PushNotificationTapRelay: Sendable {
             lock.lock()
             let snapshot = Array(continuations.values)
             if snapshot.isEmpty {
-                pending = hasSubscribed ? payload : PushActionPayload(
-                    actionType: payload.actionType,
-                    data: payload.data,
-                    pushType: payload.pushType,
-                    isColdStart: true
-                )
+                pending = hasSubscribed ? payload : payload.markedColdStart()
             }
             lock.unlock()
             snapshot.forEach { $0.yield(payload) }

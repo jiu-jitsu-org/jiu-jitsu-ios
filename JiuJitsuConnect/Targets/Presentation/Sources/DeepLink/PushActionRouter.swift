@@ -43,6 +43,11 @@ public struct PushActionPayload: Equatable, Sendable {
         self.isColdStart = isColdStart
     }
 
+    /// 같은 탭을 콜드 스타트로 표시한 사본. 필드를 여기서만 나열해, 필드가 늘어도 콜드 경로에서 빠지지 않게 한다.
+    func markedColdStart() -> Self {
+        Self(actionType: actionType, data: data, pushType: pushType, isColdStart: true)
+    }
+
     /// FCM 데이터 메시지는 `putData`한 키가 `userInfo` 최상위에 문자열로 실린다(`FcmPushService`).
     public init(userInfo: [AnyHashable: Any]) {
         self.init(
