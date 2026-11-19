@@ -153,6 +153,8 @@ public struct CommunityDetailFeature: Sendable {
             case bridgeMessageReceived(WebBridgeInboundMessage)
             // View가 outbox의 메시지를 evaluateJavaScript로 전달 완료했음을 통지.
             case outboundDelivered(id: UUID)
+            // COMPETITION_ALERTS_ENABLED를 받고 기기 알림 상태를 봄(#395). requestId가 있으면 이 웹에 답한다.
+            case competitionAlertsChecked(requestId: String?, DeviceNotificationCheck)
         }
 
         public enum DelegateAction: Sendable {
@@ -173,8 +175,9 @@ public struct CommunityDetailFeature: Sendable {
             case homeFeedRequested
             // 끝난 대회의 '내 기록에 남기기'(OPEN_COMPETITION_RECORD) → 부모가 이름·연도를 채운 대회 기록 추가를 연다. (#250)
             case competitionRecordRequested(OpenCompetitionRecordPayload)
-            // 관심 대회 첫 등록 시트의 '알림 받기'(COMPETITION_ALERTS_ENABLED) → 부모가 알림 설정을 켜고 기기 알림 상태를 본다. (#257)
-            case competitionAlertsEnabled(competitionId: Int?)
+            // 관심 대회 '알림 받기' · 상세 종(COMPETITION_ALERTS_ENABLED)의 기기 알림 상태 → 부모가 AppTab까지 올려
+            // 꺼짐 안내 · 토큰 등록을 맡긴다. 웹에 답은 이 화면이 이미 했다. (#257 · #395)
+            case competitionAlertsChecked(DeviceNotificationCheck)
             // 대회 목록 맨 위 색(COMPETITION_HEADER_TINT) → 대회 탭이 머리줄을 그 색으로 칠한다. nil이면 기본색.
             case competitionHeaderTintChanged(hex: String?)
             // 글 · 댓글 등록 성공(CONTENT_CREATED) → 어느 탭이든 부모가 AppTab까지 올려 알림 권한 안내를 정한다. (#333)
@@ -411,9 +414,10 @@ public struct CommunityDetailFeature: Sendable {
                     }
                     return .send(.delegate(.competitionRecordRequested(payload)))
 
-                case let .competitionAlertsEnabled(competitionId):
-                    // 웹은 capability 없이 늘 보낸다(홈 피드의 대회 카드·글 상세·알림함·대회 화면). 어느 탭이든 부모가 AppTab까지 올린다.
-                    return .send(.delegate(.competitionAlertsEnabled(competitionId: competitionId)))
+                case let .competitionAlertsEnabled(competitionId, requestId):
+                    // 웹은 앱 안이면 늘 보낸다(홈 피드의 대회 카드·글 상세·알림함·대회 화면). 결과를 기다리는 웹에 답해야 해서
+                    // 기기 알림은 이 화면이 보고, 안내 · 토큰 등록은 어느 탭이든 부모가 AppTab까지 올린다(#395).
+                    return Self.checkCompetitionAlerts(competitionId: competitionId, requestId: requestId)
 
                 case .contentCreated:
                     return .send(.delegate(.contentCreated))
@@ -439,6 +443,12 @@ public struct CommunityDetailFeature: Sendable {
             case let .internal(.outboundDelivered(id)):
                 state.outbox.removeAll { $0.id == id }
                 return .none
+
+            case let .internal(.competitionAlertsChecked(requestId, check)):
+                if let requestId {
+                    Self.enqueue(.competitionAlertsResult(requestId: requestId, deviceEnabled: check.isEnabled), into: &state)
+                }
+                return .send(.delegate(.competitionAlertsChecked(check)))
 
             case .delegate:
                 return .none
@@ -521,6 +531,14 @@ public struct CommunityDetailFeature: Sendable {
         state.pendingPhotoPick = payload
         state.isPhotoPickerPresented = true
         return .none
+    }
+
+    /// 기기 알림 상태를 본다. 아직 묻지 않았으면 시스템 권한 창의 답까지 기다린다(#395).
+    private static func checkCompetitionAlerts(competitionId: Int?, requestId: String?) -> Effect<Action> {
+        Log.trace("관심 대회 알림 켬: competitionId=\(competitionId.map(String.init) ?? "-")", category: .view, level: .info)
+        return .run { send in
+            await send(.internal(.competitionAlertsChecked(requestId: requestId, DeviceNotificationCheck.current())))
+        }
     }
 
     /// 아웃바운드 메시지를 식별자와 함께 대기열에 추가한다.
