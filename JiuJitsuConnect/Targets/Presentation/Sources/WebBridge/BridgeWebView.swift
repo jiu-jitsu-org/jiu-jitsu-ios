@@ -314,6 +314,8 @@ struct BridgeWebView: UIViewRepresentable {
         private var isWebSheetOpen = false
         // 진입 시간 측정의 키(#298). 웹뷰를 만들 때의 loadToken — 다시 시도로 토큰이 바뀌어도 첫 진입 기록을 끝맺는다.
         var entryTraceToken: UUID?
+        // 마지막 메인 프레임 이동을 이동 정책이 막았는지. 리다이렉트를 막으면 실패 알림이 따로 와 오류와 구분한다.
+        private var didCancelMainFrameNavigation = false
 
         init(
             source: WebBridgeSource,
@@ -491,6 +493,8 @@ struct BridgeWebView: UIViewRepresentable {
         // 대기열의 아웃바운드 메시지를 순서대로 웹에 주입한다.
         func flushOutbox(_ outbox: [WebBridgeOutboundEnvelope]) {
             guard !isDeactivated, let webView else { return }
+            // 토큰 · 사진 등이 실리므로 지금 문서가 앱 웹 주소일 때만 넣는다. 아니면 전달 처리하지 않고 대기열에 남긴다.
+            guard WebEnvironment.isAllowedWebURL(webView.url) else { return }
             for envelope in outbox where !deliveredOutboundIDs.contains(envelope.id) {
                 guard let script = envelope.message.makeJavaScript() else {
                     // 직렬화 실패한 메시지는 영구히 막히지 않도록 전달 처리해 대기열에서 제거한다.
@@ -516,21 +520,22 @@ struct BridgeWebView: UIViewRepresentable {
             didReceive message: WKScriptMessage
         ) {
             guard message.name == WebBridge.appBridgeHandlerName else { return }
-            receiveBridgeMessage(message.body, isFromOSS: WebEnvironment.isOSSFrame(message.frameInfo))
+            // 앱 웹의 메인 프레임이 보낸 것만 받는다(iframe · 바깥 문서 제외).
+            guard WebEnvironment.isOSSFrame(message.frameInfo) else {
+                WebBridge.logEvent("브릿지 메시지 무시(앱 웹 메인 프레임 아님): \(message.frameInfo.securityOrigin.host)", source: source)
+                return
+            }
+            receiveBridgeMessage(message.body)
         }
 
         /// 웹이 보낸 브릿지 메시지를 처리한다. 미리 불러 둔 홈 피드가 받아 둔 메시지도 이리로 넘긴다(#270).
-        /// isFromOSS: 보낸 프레임이 OSS 웹의 메인 프레임인지. 아니면 분석 기록을 버린다(#424).
-        func receiveBridgeMessage(_ body: Any, isFromOSS: Bool) {
+        /// 보낸 프레임 검사는 받는 쪽(`userContentController`, 미리 불러오기 대리자)이 끝냈다.
+        func receiveBridgeMessage(_ body: Any) {
             guard !isDeactivated else { return }
             // 해석 결과와 별개로, 웹이 보낸 원본을 먼저 남긴다(파싱 실패·계약 위반도 추적 가능하도록).
             WebBridge.logInboundRaw(body, source: source)
             guard let inbound = WebBridgeInboundMessage.decode(from: body) else { return }
             WebBridge.logInbound(inbound, source: source)
-            if case .analyticsEvent = inbound, !isFromOSS {
-                WebBridge.logEvent("OSS 웹이 아닌 프레임의 ANALYTICS_EVENT — 버림", source: source)
-                return
-            }
             if case let .setSheetOpen(isOpen) = inbound {
                 setWebSheetOpen(isOpen)
                 return
@@ -599,6 +604,11 @@ struct BridgeWebView: UIViewRepresentable {
             Log.trace("Bridge webview didFailProvisionalNavigation: \(error)", category: .network, level: .error)
             endRefreshing(success: false, navigation: navigation)
             guard !isCancelledByRefresh(error) else { return }
+            // 이동 정책이 막은 리다이렉트: 앞 문서가 남아 있으면 오류가 아니다 — 로딩만 끝낸다. 첫 로드면 띄울 문서가 없어 실패로 둔다.
+            if consumeNavigationPolicyCancel(error), webView.backForwardList.currentItem != nil {
+                onLoadingFinished()
+                return
+            }
             if let entryTraceToken { WebEntryTrace.end(.failed, token: entryTraceToken) }
             onLoadingFailed()
         }
@@ -621,6 +631,8 @@ struct BridgeWebView: UIViewRepresentable {
                 let http = navigationResponse.response as? HTTPURLResponse,
                 !(200..<400).contains(http.statusCode)
             {
+                // 이 취소의 실패 알림은 이동 정책이 막은 것이 아니다.
+                didCancelMainFrameNavigation = false
                 Log.trace("Bridge webview HTTP error: \(http.statusCode)", category: .network, level: .error)
                 decisionHandler(.cancel)
                 endRefreshing(success: false, navigation: nil)
@@ -645,6 +657,9 @@ struct BridgeWebView: UIViewRepresentable {
                 webView.load(navigationAction.request)
             } else if url.scheme == "http" || url.scheme == "https" {
                 openExternal(url, from: webView)
+            } else if WebEnvironment.mainFrameRoute(for: url) == .system {
+                // 새 창으로 연 전화 · 메일 링크도 같은 창과 같이 시스템 앱으로 넘긴다.
+                UIApplication.shared.open(url)
             } else {
                 Log.trace("Bridge webview 새 창 요청 무시(지원하지 않는 scheme): \(url)", category: .view, level: .info)
             }
@@ -729,6 +744,41 @@ struct BridgeWebView: UIViewRepresentable {
                 return
             }
             presenter.present(viewController, animated: true)
+        }
+    }
+}
+
+// MARK: - 메인 프레임 이동 정책
+
+extension BridgeWebView.Coordinator {
+    /// 이동 정책이 막은 로드의 실패 알림이면 true를 돌려주고 표시를 지운다. WebKit은 "정책 변경으로 중단"(102)으로
+    /// 알리지만, 취소(-999)로 오는 경우도 같은 것으로 본다 — 표시는 이 코디네이터가 막았을 때만 켜진다.
+    private func consumeNavigationPolicyCancel(_ error: Error) -> Bool {
+        guard didCancelMainFrameNavigation else { return false }
+        didCancelMainFrameNavigation = false
+        let error = error as NSError
+        return (error.domain == "WebKitErrorDomain" && error.code == 102) || error.code == NSURLErrorCancelled
+    }
+
+    // 메인 프레임 이동은 앱 웹 주소만 웹뷰에서 연다. 바깥 주소는 앱 위 브라우저, 전화 · 메일은 시스템으로 넘긴다.
+    // 새 창(targetFrame nil)은 createWebViewWith가, iframe 이동은 그 문서가 맡으므로 그대로 둔다.
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
+        guard navigationAction.targetFrame?.isMainFrame == true, let url = navigationAction.request.url else {
+            decisionHandler(.allow)
+            return
+        }
+        let route = WebEnvironment.mainFrameRoute(for: url)
+        didCancelMainFrameNavigation = route != .webView
+        decisionHandler(route == .webView ? .allow : .cancel)
+        switch route {
+        case .webView: break
+        case .inAppBrowser: openExternal(url, from: webView)
+        case .system: UIApplication.shared.open(url)
+        case .blocked: Log.trace("Bridge webview 이동 무시(지원하지 않는 scheme): \(url.scheme ?? "")", category: .view, level: .info)
         }
     }
 }
