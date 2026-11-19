@@ -30,6 +30,8 @@ extension AppFeature {
         /// 앱으로 돌아왔을 때 맨 위였던 화면. 그 화면이 그대로면 from=resume으로 다시 남긴다(새 세션의 첫 화면이 비지 않게).
         /// 푸시 · 링크로 돌아와 다른 화면이 뜨면 그 화면은 웹 · 앱이 정한 입구로 남는다.
         var resumingScreenID: String?
+        /// 백그라운드로 나갈 때 맨 위였던 화면. 백그라운드 중 푸시 · 링크가 화면을 바꿨으면 그 화면은 resume이 아니다.
+        var backgroundScreenID: String?
         /// 로그인 모달을 띄운 곳(login_prompt · web_modal). 모달이 닫히면 비운다.
         var loginCoverFrom: String?
         /// 마지막으로 보낸 회원 ID. 같은 값은 다시 보내지 않는다. 바깥 nil은 아직 안 보냄 — GA는 이전 실행의 값을 기억한다.
@@ -157,12 +159,15 @@ extension AppFeature {
         private func reduceScreenEvent(into state: inout State, action: Action) -> Effect<Action> {
             switch action {
             case .view(.sceneEnteredBackground):
+                state.analytics.backgroundScreenID = state.analytics.visibleScreen?.id
                 // 나가기 직전 연 화면은 보지 않은 것이라 기다리던 기록을 버린다.
                 return .cancel(id: CancelID.screenViewSettle)
 
             case .view(.sceneBecameActive):
                 guard state.analytics.isInBackground else { return .none }
-                state.analytics.resumingScreenID = state.analytics.visibleScreen?.id
+                let currentID = state.analytics.visibleScreen?.id
+                state.analytics.resumingScreenID = currentID == state.analytics.backgroundScreenID ? currentID : nil
+                state.analytics.backgroundScreenID = nil
                 return scheduleScreenViewSettle()
 
             case .destination(.presented(.appTab(.view(.loginPromptLoginTapped)))):
