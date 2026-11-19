@@ -50,6 +50,20 @@ public struct SettingsView: View {
                         }
                     }
 
+                    // MARK: - 이용 통계 (#423) — 로그인 여부와 상관없이 보인다
+                    // TODO: 디자인 확정 아이콘으로 교체 (시안 없음, 있는 아이콘 중 version)
+                    SettingsSection {
+                        SettingsToggleRow(
+                            asset: Assets.Common.Icon.version,
+                            text: "이용 통계",
+                            subtitle: "앱을 고치는 데 쓰는 이용 기록을 보내요",
+                            isOn: Binding(
+                                get: { store.isAnalyticsEnabled },
+                                set: { store.send(.view(.analyticsToggled($0))) }
+                            )
+                        )
+                    }
+
                     // MARK: - 약관 및 정책 섹션
                     SettingsSection {
                         SettingsInteractiveRow(asset: Assets.Common.Icon.documents, text: "서비스 이용 약관") {

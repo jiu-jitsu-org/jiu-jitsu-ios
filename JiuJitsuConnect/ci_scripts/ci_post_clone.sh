@@ -4,7 +4,8 @@
 #
 # Xcode Cloud 워크플로 환경 변수 (Secret으로 표시)
 #   SECRETS_XCCONFIG_BASE64          Configs/Secrets.xcconfig 내용 (base64)
-#   GOOGLE_SERVICE_INFO_PLIST_BASE64 Secrets/GoogleService-Info.plist 내용 (base64)
+#   GOOGLE_SERVICE_INFO_PLIST_BASE64 Secrets/GoogleService-Info.plist 내용 (base64, 운영 Firebase — Release)
+#   GOOGLE_SERVICE_INFO_DEV_PLIST_BASE64 Secrets/GoogleService-Info-Dev.plist 내용 (base64, dev Firebase — Debug · Beta, #423)
 #   만들기: base64 -i Configs/Secrets.xcconfig | pbcopy
 set -eu
 
@@ -17,9 +18,11 @@ cd "$PROJECT_DIR"
 # 1) 시크릿
 : "${SECRETS_XCCONFIG_BASE64:?Xcode Cloud 환경 변수 SECRETS_XCCONFIG_BASE64가 없습니다}"
 : "${GOOGLE_SERVICE_INFO_PLIST_BASE64:?Xcode Cloud 환경 변수 GOOGLE_SERVICE_INFO_PLIST_BASE64가 없습니다}"
+: "${GOOGLE_SERVICE_INFO_DEV_PLIST_BASE64:?Xcode Cloud 환경 변수 GOOGLE_SERVICE_INFO_DEV_PLIST_BASE64가 없습니다}"
 mkdir -p Configs Secrets
 printf '%s' "$SECRETS_XCCONFIG_BASE64" | base64 --decode > Configs/Secrets.xcconfig
 printf '%s' "$GOOGLE_SERVICE_INFO_PLIST_BASE64" | base64 --decode > Secrets/GoogleService-Info.plist
+printf '%s' "$GOOGLE_SERVICE_INFO_DEV_PLIST_BASE64" | base64 --decode > Secrets/GoogleService-Info-Dev.plist
 
 # 2) 매크로(TCA 등)·패키지 플러그인은 Xcode Cloud에서 신뢰 확인 창을 띄울 수 없어 검증을 건너뛴다
 defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES

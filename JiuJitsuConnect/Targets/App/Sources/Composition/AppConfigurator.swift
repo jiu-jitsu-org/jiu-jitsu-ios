@@ -40,11 +40,13 @@ enum AppConfigurator {
 
     // MARK: - SDK Initializers
 
+    /// Firebase plist의 `CLIENT_ID`가 아니라 Info.plist `GIDClientID`(Secrets.xcconfig `GOOGLE_CLIENT_ID`)에서 읽는다.
+    /// Debug · Beta가 쓰는 dev Firebase 프로젝트 plist에는 `CLIENT_ID`가 없고, 구글 로그인은 구성과 관계없이 같은 OAuth 클라이언트를 쓴다(#423).
     private static func configureGoogleSignIn() {
-        guard let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
-              let clientId = NSDictionary(contentsOfFile: path)?["CLIENT_ID"] as? String else {
-            // 빌드/배포 시점 환경 설정 누락. 디버그 단서로 즉시 fail.
-            fatalError("GoogleService-Info.plist not found or CLIENT_ID missing")
+        guard let clientId = Bundle.main.object(forInfoDictionaryKey: "GIDClientID") as? String,
+              !clientId.hasPrefix(".") else {
+            // 빌드/배포 시점 환경 설정 누락(GOOGLE_CLIENT_ID가 비면 접미사만 남는다). 디버그 단서로 즉시 fail.
+            fatalError("GIDClientID is not set in Info.plist (GOOGLE_CLIENT_ID missing)")
         }
         GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientId)
     }

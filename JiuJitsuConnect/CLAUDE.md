@@ -529,7 +529,10 @@ mise install                                      # → tuist 4.46.1
 # 2) 시크릿 배치 (별도 채널로 받은 파일)
 #    템플릿: JiuJitsuConnect/Configs/Secrets.xcconfig.example.md
 cp <받은 파일> JiuJitsuConnect/Configs/Secrets.xcconfig
-cp <받은 파일> JiuJitsuConnect/Secrets/GoogleService-Info.plist
+cp <받은 파일> JiuJitsuConnect/Secrets/GoogleService-Info.plist       # 운영 Firebase — Release
+cp <받은 파일> JiuJitsuConnect/Secrets/GoogleService-Info-Dev.plist   # dev Firebase — Debug · Beta
+#    dev 파일은 Firebase 콘솔 OSS-BJJ-dev 프로젝트 → 프로젝트 설정 → iOS 앱에서 받는다.
+#    빌드 단계 `Copy GoogleService-Info.plist`가 구성에 맞는 파일을 앱에 `GoogleService-Info.plist`로 넣는다(#423).
 
 # 3) 의존성 + 프로젝트 생성
 #    ⚠️ 핀 버전(mise 4.46.1)이 아니라 homebrew tuist로 실행한다 — §10.5
@@ -554,6 +557,7 @@ open JiuJitsuConnect.xcworkspace
 | `Project.swift` 변경이 Xcode에 반영되지 않음 | `tuist generate` 재실행 |
 | Asset이 코드에서 인식되지 않음 | `swiftgen` 실행 후 `tuist generate` |
 | Firebase / Kakao / Google 관련 빌드 에러 | `Configs/Secrets.xcconfig` 및 `Secrets/GoogleService-Info.plist` 배치 확인 |
+| `Copy GoogleService-Info.plist` 단계에서 빌드 실패 | 그 구성의 Firebase plist가 없음. Debug · Beta는 `Secrets/GoogleService-Info-Dev.plist`(§10.2), Release는 `Secrets/GoogleService-Info.plist` |
 | Pulse 콘솔이 뜨지 않음 | Debug/Beta 빌드인지 확인(Release는 의도적으로 비활성), 시뮬레이터 흔들기 제스처 |
 | `module map file ... not found` 로 빌드 실패 | homebrew `tuist`로 `tuist install && tuist generate` 재실행 — §10.5 |
 
@@ -590,7 +594,7 @@ tuist install && tuist generate     # mise exec 아님
 
 **TestFlight 배포 (Xcode Cloud):** `main`에 PR이 머지되면 Xcode Cloud가 `App-Beta` 스킴(Beta 구성, dev 서버)을 Archive해 TestFlight 내부 테스트로 올린다. `main`은 develop → main 릴리스 PR 전용.
 - `ci_scripts/ci_post_clone.sh`: 시크릿 파일 복원 → tuist(§10.5 버전) 설치 → `tuist install && tuist generate`
-- 시크릿은 Xcode Cloud 워크플로 환경 변수 `SECRETS_XCCONFIG_BASE64`, `GOOGLE_SERVICE_INFO_PLIST_BASE64`(Secret)에 base64로 넣는다. 시크릿 파일이 바뀌면 이 값도 갱신한다.
+- 시크릿은 Xcode Cloud 워크플로 환경 변수 `SECRETS_XCCONFIG_BASE64`, `GOOGLE_SERVICE_INFO_PLIST_BASE64`(운영 Firebase), `GOOGLE_SERVICE_INFO_DEV_PLIST_BASE64`(dev Firebase, Beta 아카이브가 씀)(모두 Secret)에 base64로 넣는다. 하나라도 없으면 `ci_post_clone.sh`가 멈춘다. 시크릿 파일이 바뀌면 이 값도 갱신한다.
 - 빌드 번호는 Xcode Cloud가 매긴다. 다음 번호는 App Store Connect > Xcode Cloud 설정에서 바꾼다.
 - `Tuist/Package.resolved`는 커밋한다. 의존성을 올릴 때만 `tuist install --update` 후 함께 커밋한다.
 

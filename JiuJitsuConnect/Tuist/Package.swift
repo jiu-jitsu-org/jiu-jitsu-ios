@@ -43,7 +43,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/firebase/firebase-ios-sdk",
-            from: "12.12.1"
+            from: "12.19.3"
         )
     ]
 )

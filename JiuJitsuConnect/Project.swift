@@ -22,6 +22,29 @@ let releaseInfoPlistScript: TargetScript = .post(
     basedOnDependencyAnalysis: false
 )
 
+// MARK: - Firebase 설정 파일 (#423)
+// Debug · Beta는 dev 프로젝트(oss-bjj-dev), Release는 운영 프로젝트로 기록한다. 앱 안 이름은 SDK가 찾는
+// `GoogleService-Info.plist` 하나로 같게 넣는다. 파일이 없으면 다른 프로젝트로 조용히 섞이지 않게 빌드를 멈춘다.
+// Crashlytics dSYM 업로드가 이 결과를 읽으므로 그 스크립트보다 앞에 둔다.
+let firebaseConfigScript: TargetScript = .pre(
+    script: """
+    if [ "${CONFIGURATION}" = "Release" ]; then
+        SRC="${SRCROOT}/Secrets/GoogleService-Info.plist"
+    else
+        SRC="${SRCROOT}/Secrets/GoogleService-Info-Dev.plist"
+    fi
+    if [ ! -f "${SRC}" ]; then
+        echo "error: ${SRC} 가 없습니다 — Firebase 콘솔(Debug · Beta: OSS-BJJ-dev, Release: 운영)에서 받아 Secrets/에 넣어 주세요"
+        exit 1
+    fi
+    mkdir -p "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+    cp "${SRC}" "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleService-Info.plist"
+    """,
+    name: "Copy GoogleService-Info.plist",
+    outputPaths: ["$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist"],
+    basedOnDependencyAnalysis: false
+)
+
 // MARK: - Crashlytics dSYM 업로드 (#374)
 // 아카이브(로컬 · Xcode Cloud)에서만 올린다. 일반 빌드마다 올리면 확인용 Release 빌드도 콘솔에 섞인다.
 // Firebase 기본 `run`은 앱 dSYM만 올리는데, 앱 코드 대부분이 동적 framework(Presentation 등)에 있어
@@ -128,6 +151,8 @@ let appInfoPlist: [String: Plist.Value] = {
         ],
         "KAKAO_NATIVE_APP_KEY": "$(KAKAO_NATIVE_APP_KEY)",
         "GoogleSignIn": "$(GOOGLE_SIGN_IN)",
+        // 구글 로그인 client ID. URL 스킴과 같은 값에서 만든다 — dev Firebase plist에는 CLIENT_ID가 없다(#423).
+        "GIDClientID": "$(GOOGLE_CLIENT_ID).apps.googleusercontent.com",
         // 실제 값은 구성별로 BASE_URL_DEV / BASE_URL_PROD 중 하나가 주입된다(아래 configurations 참고).
         "BASE_URL": "$(BASE_URL)",
         "WEB_URL": "$(WEB_URL)",
@@ -150,6 +175,13 @@ let appInfoPlist: [String: Plist.Value] = {
             "kakaolink"
         ],
         "FirebaseAppDelegateProxyEnabled": false,
+        // 분석(#423): 화면 기록은 사전의 화면 이름으로 직접 남긴다(UIKit 클래스 이름이 섞이지 않게).
+        // 광고 식별 · 광고 측정은 쓰지 않는다. 수집 켜기 · 끄기는 설정 "이용 통계"가 코드로 정한다.
+        "FirebaseAutomaticScreenReportingEnabled": false,
+        "GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_STORAGE": false,
+        "GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_USER_DATA": false,
+        "GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_PERSONALIZATION_SIGNALS": false,
+        "GOOGLE_ANALYTICS_REGISTRATION_WITH_AD_NETWORK_ENABLED": false,
         // 구성별 값은 앱 타깃 configurations. Crashlytics는 문자열 "YES"/"NO"도 읽는다.
         // setCrashlyticsCollectionEnabled는 쓰지 않는다 — UserDefaults에 남아 같은 번들 id로 깐 다른 구성에도 따라간다.
         "FirebaseCrashlyticsCollectionEnabled": "$(CRASHLYTICS_COLLECTION_ENABLED)",
@@ -215,11 +247,11 @@ let project = Project(
             resources: [
                 // AppAssets: 앱 아이콘과 런치 화면 전용. 시스템이 앱 본체에서만 읽는다.
                 "Targets/App/Resources/**",
-                "Secrets/GoogleService-Info.plist",
+                // GoogleService-Info.plist는 구성별로 firebaseConfigScript가 넣는다(#423).
                 // UIAppFonts는 앱 본체에서 찾으므로 폰트 파일은 앱 타깃에만 넣는다(#224).
                 .glob(pattern: .relativeToRoot("Targets/DesignSystem/Resources/Fonts/**"))
             ],
-            scripts: [licensesScript, releaseInfoPlistScript, crashlyticsDSYMUploadScript],
+            scripts: [licensesScript, firebaseConfigScript, releaseInfoPlistScript, crashlyticsDSYMUploadScript],
             dependencies: [
                 .target(name: "Presentation"),
                 .target(name: "Data"),
@@ -229,6 +261,8 @@ let project = Project(
                 .external(name: "FirebaseCore"),
                 .external(name: "FirebaseMessaging"),
                 .external(name: "FirebaseCrashlytics"),
+                // 광고 식별자(IDFA)를 쓰지 않는 Core만 넣는다. `FirebaseAnalytics` 제품은 넣지 않는다(#423).
+                .external(name: "FirebaseAnalyticsCore"),
                 .external(name: "GoogleSignIn")
             ],
             settings: .settings(

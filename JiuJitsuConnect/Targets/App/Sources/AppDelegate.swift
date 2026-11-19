@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         FirebaseApp.configure()
+        AnalyticsClientFactory.applyStoredCollectionSetting()
         // Beta · Release가 같은 Firebase 앱 · 같은 버전 번호라 콘솔에서 구분하려고 넣는다. 회원 정보는 넣지 않는다(#374)
         Crashlytics.crashlytics().setCustomValue(Self.buildConfiguration, forKey: "build_config")
         #if DEBUG
@@ -74,6 +75,8 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     ) {
         // 배너만으로는 앱 안 종의 새 알림 점이 켜지지 않아, 앱 안으로도 알린다(#394).
         Log.trace("[Push] 앱 사용 중 알림 수신", category: .system, level: .info)
+        // 앱 프록시(스위즐링)를 꺼 두어 FCM이 알림 수신 · 열림을 스스로 기록하지 못한다(#423).
+        Messaging.messaging().appDidReceiveMessage(notification.request.content.userInfo)
         DependencyContainer.shared.deliverForegroundNotification()
         completionHandler([.banner, .sound, .badge])
     }
@@ -87,6 +90,7 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     ) {
         let userInfo = response.notification.request.content.userInfo
         Log.trace("[Push] 알림 탭 수신: \(userInfo)", category: .system, level: .info)
+        Messaging.messaging().appDidReceiveMessage(userInfo)
         DependencyContainer.shared.deliverPushNotificationTap(PushActionPayload(userInfo: userInfo))
         completionHandler()
     }
