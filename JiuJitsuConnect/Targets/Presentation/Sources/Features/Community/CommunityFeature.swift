@@ -974,7 +974,7 @@ public struct CommunityFeature: Sendable {
     static func makeCommunityURL() -> URL? {
 #if DEBUG || BETA
         // 테스트용 도메인 오버라이드가 설정돼 있으면 WEB_URL보다 우선 사용한다.
-        if let override = debugOverrideURL() {
+        if let override = WebEnvironment.debugOverrideURL() {
             Log.trace("커뮤니티 웹뷰 도메인 오버라이드 사용: \(override.absoluteString)", category: .system, level: .info)
             return override
         }
@@ -991,8 +991,6 @@ public struct CommunityFeature: Sendable {
     }
 
     // MARK: - 테스트용 도메인 오버라이드 (UserDefaults)
-
-    private static let debugURLOverrideKey = "debug.community.webURLOverride"
 
     /// 입력 주소로 URL을 다시 만들고 강제 reload되도록 상태를 초기화한다.
     private static func reloadCommunity(_ state: inout State) {
@@ -1022,24 +1020,12 @@ public struct CommunityFeature: Sendable {
     private static func setDebugOverrideURLString(_ value: String?) {
         let defaults = UserDefaults.standard
         if let value, !value.isEmpty {
-            defaults.set(value, forKey: debugURLOverrideKey)
+            defaults.set(value, forKey: WebEnvironment.debugURLOverrideKey)
         } else {
-            defaults.removeObject(forKey: debugURLOverrideKey)
+            defaults.removeObject(forKey: WebEnvironment.debugURLOverrideKey)
         }
     }
 
-#if DEBUG || BETA
-    static func debugOverrideURL() -> URL? {
-        guard
-            let override = UserDefaults.standard.string(forKey: debugURLOverrideKey),
-            !override.isEmpty,
-            let url = URL(string: override)
-        else {
-            return nil
-        }
-        return url
-    }
-#endif
 }
 
 extension CommunityFeature.Path.State: Sendable, Equatable {}

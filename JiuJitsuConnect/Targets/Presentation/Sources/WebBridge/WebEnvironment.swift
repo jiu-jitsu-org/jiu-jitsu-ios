@@ -38,11 +38,24 @@ enum WebEnvironment {
         guard !host.isEmpty else { return false }
         if allowedHosts.contains(host) { return true }
 #if DEBUG || BETA
-        return CommunityFeature.debugOverrideURL()?.host?.lowercased() == host
+        return debugOverrideURL()?.host?.lowercased() == host
 #else
         return false
 #endif
     }
+
+    /// 테스트용 도메인 오버라이드(커뮤니티 설정에서 입력, UserDefaults).
+    static let debugURLOverrideKey = "debug.community.webURLOverride"
+
+#if DEBUG || BETA
+    static func debugOverrideURL() -> URL? {
+        guard
+            let override = UserDefaults.standard.string(forKey: debugURLOverrideKey),
+            !override.isEmpty
+        else { return nil }
+        return URL(string: override)
+    }
+#endif
 
     /// 웹뷰 User-Agent 끝에 붙이는 앱 표시(#370). 웹 서버가 앱 안인지 · 앱 버전을 첫 요청부터 안다
     /// (jiu-jitsu-frontend#510). 웹은 `OSSApp/`으로 찾으므로 형식을 바꾸면 웹과 같이 바꾼다.

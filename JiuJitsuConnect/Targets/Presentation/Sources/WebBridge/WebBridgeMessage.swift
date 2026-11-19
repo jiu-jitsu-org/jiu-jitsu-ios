@@ -502,11 +502,12 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     }
 
     /// JSON 문자열은 그대로, JSON 숫자(NSNumber)는 정수일 때만. 참거짓도 NSNumber로 오므로 따로 거른다.
+    /// 범위는 웹(JS)이 정확히 나타낼 수 있는 정수(±2^53)까지 — 그 밖은 웹에서 이미 값이 틀어져 온다.
     private static func analyticsValue(_ raw: Any) -> AnalyticsEvent.Value? {
         if let text = raw as? String { return .string(text) }
         guard let number = raw as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
         let double = number.doubleValue
-        guard double.isFinite, double == double.rounded(), abs(double) <= Double(Int32.max) else { return nil }
+        guard double.isFinite, double == double.rounded(), abs(double) <= 9_007_199_254_740_991 else { return nil }
         return .int(number.intValue)
     }
 
