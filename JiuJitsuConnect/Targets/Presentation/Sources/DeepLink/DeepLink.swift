@@ -98,6 +98,11 @@ enum DeepLinkParser {
     /// `bjjossapp://open?url=<퍼센트 인코딩된 https URL>` 에서 원본 링크를 꺼낸다.
     ///
     /// `URLComponents.queryItems`가 값을 퍼센트 디코딩해 주므로 별도 디코딩은 하지 않는다.
+    /// 링크가 가리키는 https 주소. 앱 주소면 안에 실린 링크다 — 분석이 `utm_*`를 읽고 Firebase에 넘길 때 쓴다(#427).
+    static func webURL(of url: URL) -> URL? {
+        url.scheme?.lowercased() == "https" ? url : unwrapCustomScheme(url)
+    }
+
     private static func unwrapCustomScheme(_ url: URL) -> URL? {
         guard
             let components = URLComponents(url: url, resolvingAgainstBaseURL: false),

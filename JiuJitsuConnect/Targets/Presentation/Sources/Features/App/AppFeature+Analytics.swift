@@ -21,8 +21,9 @@ extension AppFeature {
         var pendingOpen: AnalyticsEvent.AppState?
         /// 돌아오기 전에 먼저 온 입구(푸시 탭이 `.active`보다 먼저 올 때).
         var pendingSource: AnalyticsEvent.OpenSource?
-        /// 마지막으로 받은 링크. 유니버설 링크는 두 창구로 같이 올 수 있어 곧바로 다시 온 같은 링크는 세지 않는다(#427).
-        var lastLink: LinkReceipt?
+        /// 마지막으로 기록한 링크. 유니버설 링크는 두 창구로 같이 올 수 있어 곧바로 다시 온 같은 링크는 세지 않는다(#427).
+        /// 화면 이동은 거르지 않는다(최상단 중복 상세는 CommunityFeature가 거른다).
+        var lastLoggedLink: LinkReceipt?
         /// 마지막으로 보낸 계정 속성(MY 프로필 기준). 같은 값은 다시 보내지 않는다.
         var sentProfileProperties: [AnalyticsUserProperty: String?] = [:]
         /// 지금 맨 위에 보이는 화면(#425).
@@ -130,7 +131,7 @@ extension AppFeature {
                 if let appState = entryAppState(state, isColdStart: payload.isColdStart) {
                     log(.pushOpen(
                         noticeType: .init(serverValue: payload.pushType),
-                        contentType: Self.contentType(ofPushAction: payload.actionType),
+                        contentType: Self.contentType(ofPush: payload),
                         appState: appState
                     ))
                 }
@@ -140,16 +141,16 @@ extension AppFeature {
                 // 로그인 SDK 콜백(카카오 · 구글 스킴)은 입구가 아니다.
                 guard let link = DeepLinkParser.parse(url) else { return .none }
                 let now = date.now
-                if let last = state.analytics.lastLink, last.url == url,
+                if let last = state.analytics.lastLoggedLink, last.url == url,
                    now.timeIntervalSince(last.receivedAt) < Self.duplicateLinkInterval {
                     return .none
                 }
-                state.analytics.lastLink = AnalyticsState.LinkReceipt(url: url, receivedAt: now)
+                state.analytics.lastLoggedLink = AnalyticsState.LinkReceipt(url: url, receivedAt: now)
                 let source = Self.openSource(of: url)
                 if let appState = entryAppState(state, isColdStart: false) {
                     log(.deeplinkOpen(contentType: Self.contentType(of: link), appState: appState, from: source))
                 }
-                analyticsClient.handleOpen(Self.innerURL(of: url) ?? url)
+                analyticsClient.handleOpen(DeepLinkParser.webURL(of: url) ?? url)
                 return openSourceArrived(source, state: &state)
 
             case .internal(.appOpenSourceWaitElapsed):
@@ -365,7 +366,8 @@ extension AppFeature {
         }
 
         /// 푸시 · 링크가 앱을 켰거나(cold) 앞으로 불러왔나(warm). 앱을 쓰는 중이면 nil — 앱을 연 것이 아니다.
-        /// 콜드 스타트 푸시 탭은 받을 화면이 없어 보관됐던 것(`isColdStart`)이라, 입구 대기가 끝난 뒤에 와도 cold로 안다.
+        /// 콜드 스타트 푸시 탭은 대개 받을 화면이 없어 보관됐던 것(`isColdStart`)이라, 입구 대기가 끝난 뒤에 와도 cold로 안다.
+        /// 한계: 입구 대기(1초) 안에 누른 앱 안 배너는 앱을 연 것으로 세고, 구독 뒤 1초 넘게 늦은 콜드 탭 · 링크는 세지 못한다.
         private func entryAppState(_ state: State, isColdStart: Bool) -> AnalyticsEvent.AppState? {
             if isColdStart { return .cold }
             if let pending = state.analytics.pendingOpen { return pending }
@@ -376,19 +378,11 @@ extension AppFeature {
         /// 앱 주소는 안에 실린 https 링크의 꼬리표를 본다.
         static func openSource(of url: URL) -> AnalyticsEvent.OpenSource {
             let isScheme = url.scheme?.lowercased() != "https"
-            let inner = isScheme ? innerURL(of: url) : url
-            let medium = inner
+            let medium = DeepLinkParser.webURL(of: url)
                 .flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }?
                 .queryItems?.first(where: { $0.name == "utm_medium" })?.value
             if medium == "share" { return .shareLink }
             return isScheme ? .scheme : .deeplink
-        }
-
-        /// 앱 주소(`bjjossapp://...?url=`)에 실린 https 링크. 앱 주소가 아니면 nil.
-        static func innerURL(of url: URL) -> URL? {
-            guard url.scheme?.lowercased() != "https" else { return nil }
-            return URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                .queryItems?.first(where: { $0.name == "url" })?.value.flatMap(URL.init(string:))
         }
 
         static func contentType(of link: DeepLink) -> AnalyticsEvent.OpenContentType {
@@ -399,14 +393,9 @@ extension AppFeature {
             }
         }
 
-        /// 푸시 `type`(이동 화면) → 연 대상. 모르는 값은 nil.
-        static func contentType(ofPushAction rawValue: String?) -> AnalyticsEvent.OpenContentType? {
-            switch rawValue.flatMap({ PushActionType(rawValue: $0.uppercased()) }) {
-            case .boardDetail: return .post
-            case .balanceDetail: return .balanceGame
-            case .competitionDetail: return .competition
-            case nil: return nil
-            }
+        /// 푸시가 실제로 연 대상. 이동하지 않는 푸시(모르는 `type` · 빈 `data`)는 nil — 화면 이동과 같은 판정을 쓴다.
+        static func contentType(ofPush payload: PushActionPayload) -> AnalyticsEvent.OpenContentType? {
+            PushActionRouter.makeURL(from: payload).flatMap(DeepLinkParser.parse).map(contentType(of:))
         }
 
         // MARK: - 사용자 속성

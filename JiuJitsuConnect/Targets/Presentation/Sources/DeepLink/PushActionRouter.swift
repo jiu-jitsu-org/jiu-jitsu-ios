@@ -34,12 +34,13 @@ public struct PushActionPayload: Equatable, Sendable {
     /// 알림 종류(서버 `FcmPushType` 이름, 예: `NEW_COMMENTS`). 분석 기록에만 쓴다(#427). 알림함 응답에는 없다.
     public let pushType: String?
     /// 앱이 꺼져 있다 이 탭으로 켜졌다. 받을 화면이 아직 없어 릴레이가 보관했던 탭이다(`PushNotificationTapRelay`).
-    public var isColdStart = false
+    public let isColdStart: Bool
 
-    public init(actionType: String?, data: String?, pushType: String? = nil) {
+    public init(actionType: String?, data: String?, pushType: String? = nil, isColdStart: Bool = false) {
         self.actionType = actionType
         self.data = data
         self.pushType = pushType
+        self.isColdStart = isColdStart
     }
 
     /// FCM 데이터 메시지는 `putData`한 키가 `userInfo` 최상위에 문자열로 실린다(`FcmPushService`).

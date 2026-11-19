@@ -99,7 +99,7 @@ public struct AnalyticsEvent: Equatable, Sendable {
 // MARK: - 사전 이벤트
 
 extension AnalyticsEvent {
-    /// `app_open`의 `from` — 앱이 열린 입구(사전 "from 값").
+    /// 앱이 열린 입구(사전 "from 값"). `app_open` · `deeplink_open`의 `from`이 같이 쓴다.
     public enum OpenSource: String, Sendable {
         case icon
         case push
@@ -111,7 +111,7 @@ extension AnalyticsEvent {
         case shareLink = "share_link"
     }
 
-    /// `app_open`의 `app_state` — 앱이 꺼져 있다 켜졌나(cold), 백그라운드에서 돌아왔나(warm).
+    /// 앱이 꺼져 있다 켜졌나(cold), 백그라운드에서 돌아왔나(warm). `app_open` · `push_open` · `deeplink_open`이 같이 쓴다.
     public enum AppState: String, Sendable {
         case cold
         case warm

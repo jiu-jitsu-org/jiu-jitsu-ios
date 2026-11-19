@@ -44,7 +44,7 @@ public extension DependencyValues {
 ///
 /// 콜드 스타트에서는 `didReceive` 콜백이 AppFeature의 구독보다 먼저 올 수 있다. 그때의 탭을
 /// 잃지 않도록 구독자가 없으면 마지막 payload를 보관했다가 첫 구독자에게 넘긴다.
-/// 보관한 탭은 콜드 스타트로 표시한다 — 분석이 앱을 켠 탭인지 가린다(#427).
+/// 첫 구독 전에 보관한 탭은 콜드 스타트로 표시한다 — 분석이 앱을 켠 탭인지 가린다(#427).
 /// (탭은 사용자 의도 하나이므로 여러 개가 쌓여도 마지막 것만 유효하다.)
 public final class PushNotificationTapRelay: Sendable {
     private let storage = Storage()
@@ -70,11 +70,14 @@ public final class PushNotificationTapRelay: Sendable {
         private let lock = NSLock()
         private var continuations: [UUID: AsyncStream<PushActionPayload>.Continuation] = [:]
         private var pending: PushActionPayload?
+        /// 구독자가 한 번이라도 있었다. 그 뒤 화면 갈래가 바뀌며 잠깐 비는 틈에 온 탭은 앱을 켠 탭이 아니다.
+        private var hasSubscribed = false
 
         func add(_ continuation: AsyncStream<PushActionPayload>.Continuation) -> UUID {
             let id = UUID()
             lock.lock()
             continuations[id] = continuation
+            hasSubscribed = true
             let pending = self.pending
             self.pending = nil
             lock.unlock()
@@ -93,9 +96,12 @@ public final class PushNotificationTapRelay: Sendable {
             lock.lock()
             let snapshot = Array(continuations.values)
             if snapshot.isEmpty {
-                var held = payload
-                held.isColdStart = true
-                pending = held
+                pending = hasSubscribed ? payload : PushActionPayload(
+                    actionType: payload.actionType,
+                    data: payload.data,
+                    pushType: payload.pushType,
+                    isColdStart: true
+                )
             }
             lock.unlock()
             snapshot.forEach { $0.yield(payload) }
