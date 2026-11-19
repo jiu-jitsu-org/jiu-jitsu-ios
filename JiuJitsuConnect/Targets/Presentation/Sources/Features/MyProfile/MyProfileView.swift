@@ -59,7 +59,17 @@ public struct MyProfileView: View {
     /// 스타일·대회 정보가 모두 없을 때만 디폴트(빈) 화면을 노출한다.
     /// 스타일이 비어 있어도 대회 정보가 1개 이상이면 빈 스타일 카드 + 대회 UI를 보여준다.
     private var showsDefaultScreen: Bool {
-        !hasStyleInfo && !hasCompetitionInfo
+        !isAwaitingProfile && !isProfileLoadFailed && !hasStyleInfo && !hasCompetitionInfo
+    }
+
+    /// 프로필을 처음 받는 중 — 새 회원 화면 대신 자리 표시(#387). 재조회 · 저장 중엔 이미 받은 화면을 그대로 둔다.
+    private var isAwaitingProfile: Bool {
+        store.isLoadingProfile && store.communityProfile == nil
+    }
+
+    /// 처음 불러오기에 실패해 보여 줄 프로필이 없음(#387)
+    private var isProfileLoadFailed: Bool {
+        store.profileLoadFailed && store.communityProfile == nil
     }
     
     // MARK: - Body
@@ -265,17 +275,26 @@ public struct MyProfileView: View {
             beltRank: store.communityProfile?.beltRank,
             beltStripe: store.communityProfile?.beltStripe,
             registerButtonTitle: store.authInfo.isGuest ? "로그인하기" : "벨트 등록하기",
+            isLoading: isAwaitingProfile,
+            isFailed: isProfileLoadFailed,
             onBeltTapped: { store.send(.view(.beltTapped)) },
             onRegisterTapped: {
                 store.send(store.authInfo.isGuest ? .view(.guestLoginTapped) : .view(.registerBeltButtonTapped))
-            }
+            },
+            onRetryTapped: { store.send(.view(.profileRetryTapped)) }
         )
     }
     
     /// 콘텐츠 영역 (대회 + 스타일)
     private var contentView: some View {
         VStack(spacing: 0) {
-            if showsDefaultScreen {
+            if isAwaitingProfile {
+                contentPlaceholder
+                    .padding(.bottom, 29)
+            } else if isProfileLoadFailed {
+                // 실패 안내는 카드 자리에만 둔다 — 아래에 빈 스타일 카드를 그리면 기록이 사라진 것처럼 보인다.
+                EmptyView()
+            } else if showsDefaultScreen {
                 EmptyStyleView(
                     showsRegisterButton: !store.authInfo.isGuest,
                     onRegisterStyleTapped: { store.send(.view(.registerStyleButtonTapped)) }
@@ -291,6 +310,20 @@ public struct MyProfileView: View {
         }
     }
     
+    /// 프로필을 받기 전 콘텐츠 자리 표시(#387) — 섹션 제목 줄과 카드 면 하나.
+    private var contentPlaceholder: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Capsule()
+                .fill(Color.semantic.surface.disabled)
+                .frame(width: 88, height: 20)
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.semantic.surface.disabled)
+                .frame(height: 120)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityHidden(true)
+    }
+
     /// 스타일 섹션
     private var styleSection: some View {
         MyProfileStyleSectionView(

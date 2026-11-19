@@ -40,6 +40,9 @@ public struct MyProfileFeature: Sendable {
         // 탭 재진입·포그라운드 복귀 시 백그라운드 재조회 중 (#69). 헤더 스피너와 묶인
         // isLoadingProfile과 분리해, 재조회 중에도 기존 화면을 깜빡임 없이 유지한다.
         var isRefreshingProfile: Bool = false
+        // 처음 불러오기가 실패해 보여 줄 프로필이 없음 — 카드 자리에 실패 안내와 다시 시도를 둔다(#387).
+        // 다시 불러오기를 시작하면 내린다.
+        var profileLoadFailed: Bool = false
 
         // user-level 프로필 — 관장사범 인증 신청 상태(ownerVerification) 등.
         // 닉네임/프로필이미지 등 community와 겹치는 필드는 표시에 쓰지 않는다(단일 소스는 communityProfile).
@@ -189,6 +192,7 @@ public struct MyProfileFeature: Sendable {
             case gymInfoButtonTapped
             case nicknameEditButtonTapped
             case registerBeltButtonTapped
+            case profileRetryTapped     // 프로필을 못 불러온 카드의 '다시 시도' (#387)
             case beltTapped             // 이미 등록된 벨트 영역 탭 → 벨트 시트 노출
             case registerStyleButtonTapped
             case styleCardEditTapped(MyStyleSettingType)  // 프로필 스타일 카드 탭 → 해당 타입 수정 모드 진입
@@ -372,6 +376,7 @@ public struct MyProfileFeature: Sendable {
             case .internal(.loadProfile):
                 guard !state.authInfo.isGuest else { return .none }
                 state.isLoadingProfile = true
+                state.profileLoadFailed = false
                 // community 프로필과 user 프로필을 병렬 조회 — 둘은 서로 다른 엔드포인트이고
                 // 의존성이 없어 직렬로 기다릴 이유가 없다. 각각 독립 TaskResult로 흘려보내
                 // user 조회 실패가 화면(community) 로딩을 막지 않게 한다.
@@ -402,8 +407,14 @@ public struct MyProfileFeature: Sendable {
                 
             case let .internal(.profileResponse(.failure(error))):
                 state.isLoadingProfile = false
+                // 실패는 카드 자리에 안내와 다시 시도로 남긴다 — 같은 말을 토스트로 한 번 더 하지 않는다(#387).
+                state.profileLoadFailed = true
                 Log.trace("Failed to load profile: \(error)", category: .network, level: .error)
-                return .send(.internal(.showToast(.init(message: "프로필을 불러오는데 실패했어요", status: .error))))
+                return .none
+
+            case .view(.profileRetryTapped):
+                guard !state.isLoadingProfile else { return .none }
+                return .send(.internal(.loadProfile))
                 
             case .view(.gymInfoButtonTapped):
                 guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
@@ -419,6 +430,8 @@ public struct MyProfileFeature: Sendable {
                 
             case .view(.nicknameEditButtonTapped):
                 guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
+                // 프로필을 못 불러왔으면 지금 닉네임을 모른다 — 빈 칸으로 열지 않고 알린다(#387).
+                guard state.communityProfile != nil else { return Self.profileUnavailableToast() }
                 // 닉네임 수정 화면으로 네비게이션
                 let currentNickname = state.communityProfile?.nickname ?? ""
                 state.destination = .nicknameSetting(
@@ -429,6 +442,8 @@ public struct MyProfileFeature: Sendable {
             case .view(.registerBeltButtonTapped), .view(.beltTapped):
                 // 저장 중엔 저장 화면을 열지 않는다 — 열린 화면 위에선 안내가 안 보이고, 고른 값이 거절돼 사라진다(#155).
                 guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
+                // 프로필을 못 불러왔으면 고른 값을 저장할 기준이 없다 — 시트를 열기 전에 알린다(#387).
+                guard state.communityProfile != nil else { return Self.profileUnavailableToast() }
                 // 벨트 시트 노출. 등록·수정 모두 벨트만 받고 바로 저장한다(프로필 체급은 받지 않음, #188)
                 state.sheet = .beltSetting(
                     BeltSettingFeature.State(
