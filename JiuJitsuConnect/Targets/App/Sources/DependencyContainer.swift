@@ -202,6 +202,15 @@ public final class DependencyContainer {
             },
             fetchPublicProfile: { userId in
                 try await self.communityRepository.fetchPublicProfile(userId: userId)
+            },
+            reportUser: { userId, reason, detail in
+                try await self.communityRepository.reportUser(userId: userId, reason: reason, detail: detail)
+            },
+            blockUser: { userId in
+                try await self.communityRepository.blockUser(userId: userId)
+            },
+            unblockUser: { userId in
+                try await self.communityRepository.unblockUser(userId: userId)
             }
         )
     }

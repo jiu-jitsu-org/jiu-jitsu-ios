@@ -364,6 +364,15 @@ public struct AppTabFeature: Sendable {
                     .send(.competition(.session(.profileUpdated))),
                     .send(.myPage(.session(.profileUpdated)))
                 )
+            // 어느 탭에서 연 남의 프로필이든 차단·해제하면 열린 웹뷰 모두가 그 회원 글·댓글을 다시 불러오게 한다(#328).
+            case let .home(.delegate(.userBlockChanged(userId, blocked))),
+                 let .competition(.delegate(.userBlockChanged(userId, blocked))),
+                 let .myPage(.delegate(.userBlockChanged(userId, blocked))):
+                return .merge(
+                    .send(.home(.session(.userBlockChanged(userId: userId, blocked: blocked)))),
+                    .send(.competition(.session(.userBlockChanged(userId: userId, blocked: blocked)))),
+                    .send(.myPage(.session(.userBlockChanged(userId: userId, blocked: blocked))))
+                )
 
             // MY 탭 웹 서브뷰는 로그인한 사람만 여는 화면(커뮤니티 활동·차단한 회원)이라 웹의 대기 중 행위를 되살릴 일이 없어
             // 웹발 로그인(pendingWebLoginTab)으로 표시하지 않는다.

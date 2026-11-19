@@ -53,4 +53,36 @@ public final class CommunityRepositoryImpl: CommunityRepository {
             throw DomainError.unknown(error.localizedDescription)
         }
     }
+
+    public func reportUser(userId: Int, reason: String, detail: String?) async throws {
+        do {
+            let requestDTO = PostReportRequestDTO(reportType: "USER", targetId: userId, reason: reason, detail: detail)
+            try await networkService.requestVoid(endpoint: CommunityEndpoint.postReport(requestDTO))
+        } catch let error as NetworkError {
+            throw error.toDomainError()
+        } catch {
+            throw DomainError.unknown(error.localizedDescription)
+        }
+    }
+
+    public func blockUser(userId: Int) async throws -> Bool {
+        do {
+            let isBlocked: Bool = try await networkService.request(endpoint: CommunityEndpoint.blockUser(userId: userId))
+            return isBlocked
+        } catch let error as NetworkError {
+            throw error.toDomainError()
+        } catch {
+            throw DomainError.unknown(error.localizedDescription)
+        }
+    }
+
+    public func unblockUser(userId: Int) async throws {
+        do {
+            try await networkService.requestVoid(endpoint: CommunityEndpoint.unblockUser(userId: userId))
+        } catch let error as NetworkError {
+            throw error.toDomainError()
+        } catch {
+            throw DomainError.unknown(error.localizedDescription)
+        }
+    }
 }

@@ -38,9 +38,15 @@ public struct UserProfileView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
-            backButton(onHeader: store.profile != nil)
-                .padding(.leading, 8)
-                .padding(.top, 2)
+            HStack(spacing: 0) {
+                backButton(onHeader: store.profile != nil)
+                Spacer(minLength: 0)
+                if store.showsMenu {
+                    menuButton
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 2)
         }
         .toast(
             store.toast,
@@ -56,6 +62,15 @@ public struct UserProfileView: View {
                 .presentationDetents([.height(BeltPromptView.contentHeight)])
                 .presentationBackground(Color.component.bottomSheet.selected.container.background)
         }
+        // 신고 사유 시트 · 차단 확인은 웹 글 · 댓글 신고가 앱에 그려 달라고 하는 것과 같은 표면을 쓴다(#328)
+        .webBridgeDialogs(
+            confirmDialog: store.menuDialog,
+            selectSheet: store.reportSheet,
+            onConfirmButton: { store.send(.view(.menuDialogButtonTapped($0))) },
+            onConfirmDismiss: { store.send(.view(.menuDialogDismissed)) },
+            onSelectSubmit: { store.send(.view(.reportSheetSubmitted(value: $0, customText: $1))) },
+            onSelectDismiss: { store.send(.view(.reportSheetDismissed)) }
+        )
         .background(Color.component.background.default)
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
@@ -158,6 +173,33 @@ public struct UserProfileView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    // MY 헤더의 ⋯와 같은 시스템 메뉴 — 바깥을 누르면 닫히고 VoiceOver가 메뉴로 읽는다(#399).
+    // 메뉴는 프로필을 받은 뒤에만 보여 늘 띠 색 헤더 위에 있다.
+    private var menuButton: some View {
+        Menu {
+            Button("신고하기") { store.send(.view(.reportMenuTapped)) }
+            // 차단 여부를 모르면 차단 항목 없이 신고만
+            if let isBlocked = store.isBlocked {
+                if isBlocked {
+                    Button("차단 해제") { store.send(.view(.unblockMenuTapped)) }
+                } else {
+                    Button("차단하기", role: .destructive) { store.send(.view(.blockMenuTapped)) }
+                }
+            }
+        } label: {
+            Assets.MyProfile.Icon.menu.swiftUIImage
+                .renderingMode(.template)
+                .resizable()
+                .frame(width: 16, height: 16)
+                .foregroundStyle(Color.component.list.setting.background)
+                .frame(width: 40, height: 40)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(store.isMenuRequestInFlight)
+        .accessibilityLabel("더 보기")
     }
 }
 

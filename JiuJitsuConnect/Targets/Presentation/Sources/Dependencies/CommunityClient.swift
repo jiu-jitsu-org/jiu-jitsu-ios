@@ -20,15 +20,30 @@ public struct CommunityClient: Sendable {
 
     /// 다른 회원의 공개 프로필을 가져오는 클로저 (#116)
     public var fetchPublicProfile: @Sendable (Int) async throws -> CommunityPublicProfile
+
+    /// 회원 신고 — (회원 id, 사유 코드, '기타' 입력) (#328)
+    public var reportUser: @Sendable (Int, String, String?) async throws -> Void
+
+    /// 회원 차단 — 서버가 돌려준 차단 상태 (#328)
+    public var blockUser: @Sendable (Int) async throws -> Bool
+
+    /// 회원 차단 해제 (#328)
+    public var unblockUser: @Sendable (Int) async throws -> Void
     
     public init(
         fetchProfile: @Sendable @escaping () async throws -> CommunityProfile,
         updateProfile: @Sendable @escaping (CommunityProfile, ProfileSection) async throws -> CommunityProfile,
-        fetchPublicProfile: @Sendable @escaping (Int) async throws -> CommunityPublicProfile
+        fetchPublicProfile: @Sendable @escaping (Int) async throws -> CommunityPublicProfile,
+        reportUser: @Sendable @escaping (Int, String, String?) async throws -> Void,
+        blockUser: @Sendable @escaping (Int) async throws -> Bool,
+        unblockUser: @Sendable @escaping (Int) async throws -> Void
     ) {
         self.fetchProfile = fetchProfile
         self.updateProfile = updateProfile
         self.fetchPublicProfile = fetchPublicProfile
+        self.reportUser = reportUser
+        self.blockUser = blockUser
+        self.unblockUser = unblockUser
     }
 }
 
@@ -78,7 +93,10 @@ extension CommunityClient: DependencyKey {
         updateProfile: { update, _ in
             update
         },
-        fetchPublicProfile: { _ in .preview }
+        fetchPublicProfile: { _ in .preview },
+        reportUser: { _, _, _ in },
+        blockUser: { _ in true },
+        unblockUser: { _ in }
     )
     /// Preview 구현 (SwiftUI 프리뷰용)
     public static let previewValue: CommunityClient = CommunityClient(
@@ -123,7 +141,10 @@ extension CommunityClient: DependencyKey {
             // 프리뷰에서는 그대로 반환
             profile
         },
-        fetchPublicProfile: { _ in .preview }
+        fetchPublicProfile: { _ in .preview },
+        reportUser: { _, _, _ in },
+        blockUser: { _ in true },
+        unblockUser: { _ in }
     )
 }
 
@@ -148,6 +169,15 @@ extension CommunityClient {
         },
         fetchPublicProfile: { _ in
             fatalError("CommunityClient.fetchPublicProfile is not implemented")
+        },
+        reportUser: { _, _, _ in
+            fatalError("CommunityClient.reportUser is not implemented")
+        },
+        blockUser: { _ in
+            fatalError("CommunityClient.blockUser is not implemented")
+        },
+        unblockUser: { _ in
+            fatalError("CommunityClient.unblockUser is not implemented")
         }
     )
 }

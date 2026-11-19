@@ -194,6 +194,8 @@ public struct CommunityFeature: Sendable {
             case competitionAlertsEnabled(competitionId: Int?)
             // 이 스택에 쌓인 MY에서 프로필을 저장함 → 부모가 열린 웹뷰 모두에 PROFILE_UPDATED를 보낸다.
             case profileUpdated
+            // 이 스택에 쌓인 남의 프로필에서 회원을 차단·해제함(#328) → 부모가 열린 웹뷰 모두에 USER_BLOCK_CHANGED를 보낸다.
+            case userBlockChanged(userId: Int, blocked: Bool)
             // 홈에 쌓인 대회 상세의 '커뮤니티에서 더 보기'(#304) → 부모가 홈에 쌓인 화면을 닫아 피드를 보인다.
             case homeFeedRequested
             // 홈에 쌓인 끝난 대회 상세의 '내 기록에 남기기'(#304) → 부모가 프로필을 보고 기록 추가를 그 상세 위에 쌓는다.
@@ -213,6 +215,8 @@ public struct CommunityFeature: Sendable {
             case sessionExpired
             /// MY에서 프로필을 저장함 → PROFILE_UPDATED
             case profileUpdated
+            /// 남의 프로필에서 회원을 차단·해제함 → USER_BLOCK_CHANGED
+            case userBlockChanged(userId: Int, blocked: Bool)
         }
     }
 
@@ -536,6 +540,11 @@ public struct CommunityFeature: Sendable {
                 Self.broadcastToDetails(.profileUpdated, into: &state)
                 return .none
 
+            case let .session(.userBlockChanged(userId, blocked)):
+                Self.enqueue(.userBlockChanged(userId: userId, blocked: blocked), into: &state)
+                Self.broadcastToDetails(.userBlockChanged(userId: userId, blocked: blocked), into: &state)
+                return .none
+
             case .unreadNotificationRefreshRequested:
                 return refreshUnreadNotification(state)
 
@@ -585,6 +594,12 @@ public struct CommunityFeature: Sendable {
             case .path(.element(id: _, action: .myProfile(.delegate(.profileUpdated)))),
                  .coverPath(.element(id: _, action: .myProfile(.delegate(.profileUpdated)))):
                 return .send(.delegate(.profileUpdated))
+
+            case let .path(.element(id: _, action: .userProfile(.delegate(.blockChanged(userId, blocked))))),
+                 let .coverPath(.element(id: _, action: .userProfile(.delegate(.blockChanged(userId, blocked))))),
+                 let .path(.element(id: _, action: .myProfile(.delegate(.userBlockChanged(userId, blocked))))),
+                 let .coverPath(.element(id: _, action: .myProfile(.delegate(.userBlockChanged(userId, blocked))))):
+                return .send(.delegate(.userBlockChanged(userId: userId, blocked: blocked)))
 
             // 알림함에서 읽은 알림 · 글 상세를 열어 서버가 읽음 처리한 그 글의 알림(#401, backend#246)을 점에 반영한다.
             // forEach · ifLet보다 먼저 실행돼 닫히는 화면이 아직 스택에 남아 있다. 여러 화면이 한 번에 닫히기도 해 닫히는 범위 전체를 본다.

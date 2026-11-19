@@ -25,6 +25,7 @@ public enum APIErrorCode: String, Equatable {
     case userNotFound = "U0011" // 존재하지 않는 회원 (탈퇴 유예 중인 작성자 포함)
     case alreadyWithdrawn = "U0004" // 이미 탈퇴 처리된 계정
     case withdrawnAccountExpired = "U0005" // 탈퇴 후 30일이 지나 영구 삭제된 계정
+    case alreadyReported = "U0008" // 이미 신고한 대상 (글 · 댓글 · 회원)
         
     /// 클라이언트에서 알 수 없는 새로운 에러 코드를 처리하기 위한 케이스
     case unknown
