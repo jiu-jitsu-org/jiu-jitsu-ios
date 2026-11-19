@@ -210,8 +210,6 @@ public struct AppFeature: Sendable {
         }
         // ifLet runs AFTER parent logic to handle child state
         .ifLet(\.$destination, action: \.destination)
-        // 분석 기록(#423). 화면 흐름은 바꾸지 않고 지나가는 액션만 본다.
-        Analytics()
         // 로그인 화면이 동작을 처리한 뒤에 본다(#375). 가입 중에 받아 둔 링크가 있는데 가입 흐름이 끝나 첫 로그인 화면으로
         // 돌아왔으면(그만두기 · 약관 시트 닫기 · 서버 로그인 실패 · 가입 시간 만료) 둘러보기와 같이 게스트로 그 화면을 연다.
         // 로그인 · 가입을 마친 경우는 위에서 이미 탭 화면으로 바뀌어 여기 걸리지 않는다.
@@ -225,6 +223,8 @@ public struct AppFeature: Sendable {
             state.destination = .appTab(.init(authInfo: .guest))
             return Self.consumePendingDeepLink(&state)
         }
+        // 분석 기록(#423). 화면 흐름은 바꾸지 않고 지나가는 액션만 본다. 맨 위 화면(#425)을 바뀐 뒤 상태로 계산하도록 맨 끝에 둔다.
+        Analytics()
     }
 
     /// 켜 둔 앱을 다시 열 때 마지막 확인 뒤 오래 지났으면 버전을 다시 확인한다(#326).

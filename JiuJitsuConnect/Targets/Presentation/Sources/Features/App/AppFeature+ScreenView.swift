@@ -12,8 +12,7 @@ import Foundation
 
 extension AppFeature {
     /// 맨 위 화면. id는 쌓인 위치(같은 이름의 다른 글로 넘어가도 새 화면으로), event는 남길 기록.
-    /// event가 nil이면 이름이 없는 화면(약관 등)이거나 웹이 아직 화면을 알리지 않은 웹뷰 — 기록하지 않지만, 거기서 돌아오면
-    /// 아래 화면을 다시 기록한다.
+    /// event가 nil이면 웹이 아직 화면을 알리지 않은 웹뷰 — 알리는 순간(맨 위에 있으면) 기록한다.
     struct VisibleScreen: Equatable, Sendable {
         let id: String
         let event: AnalyticsEvent?
@@ -25,10 +24,10 @@ extension AppFeature {
         static func visibleScreen(in state: State) -> VisibleScreen? {
             switch state.destination {
             case let .login(login)?:
-                return loginScreen(login, id: "login")
+                return loginScreen(login, from: "launch", id: "login")
             case let .appTab(appTab)?:
                 if let login = appTab.loginCover {
-                    return loginScreen(login, id: "loginCover")
+                    return loginScreen(login, from: state.analytics.loginCoverFrom, id: "loginCover")
                 }
                 // 첫 홈은 인사 장면이 끝난 뒤에 센다.
                 guard !appTab.isGreetingShowing else { return nil }
@@ -44,8 +43,12 @@ extension AppFeature {
 
         // MARK: - 로그인 · 가입
 
-        private static func loginScreen(_ login: LoginFeature.State, id: String) -> VisibleScreen {
-            if case .termsAgreement? = login.sheet {
+        /// from: 로그인 첫 화면은 launch, 로그인 모달은 띄운 곳(안내 창 · 웹이 바로 연 모달). 그 밖(설정 · 만료 안내 등)은 싣지 않는다.
+        private static func loginScreen(_ login: LoginFeature.State, from: String?, id: String) -> VisibleScreen {
+            if case let .termsAgreement(terms)? = login.sheet {
+                if let policy = terms.termsWebCover {
+                    return policyScreen(policy.url, id: "\(id)/terms/policy")
+                }
                 return native(.signupTerms, id: "\(id)/terms")
             }
             if let elementID = login.path.ids.last, let element = login.path[id: elementID] {
@@ -54,7 +57,7 @@ extension AppFeature {
                 case .signupComplete: return native(.signupComplete, id: "\(id)/\(elementID)")
                 }
             }
-            return native(.login, id: id)
+            return native(.login, from: from, id: id)
         }
 
         // MARK: - 탭
@@ -99,24 +102,28 @@ extension AppFeature {
             if myPage.promotion != nil {
                 return native(.beltPromotion, id: "\(id)/promotion")
             }
+            // 편집 화면은 항목(section)마다 하나로 센다 — 사진 시트 → 자르기, 인증 시트 → 인증 사진 고르기처럼
+            // 한 항목 안에서 시트가 바뀌어도 한 번만 남긴다.
+            if let section = myPage.analyticsLocalSheet {
+                return edit(section, id: id)
+            }
             if myPage.imageCropCover != nil {
-                return native(.myProfileEdit, section: "photo", id: "\(id)/crop")
+                return edit("photo", id: id)
             }
             if let sheet = myPage.sheet {
                 switch sheet {
-                case .beltSetting: return native(.myProfileEdit, section: "belt", id: "\(id)/sheet")
-                case .profileImageEdit: return native(.myProfileEdit, section: "photo", id: "\(id)/sheet")
-                case .instructorVerification: return native(.myProfileEdit, section: "owner_cert", id: "\(id)/sheet")
+                case .beltSetting: return edit("belt", id: id)
+                case let .profileImageEdit(imageEdit):
+                    return edit(imageEdit.purpose == .instructorVerification ? "owner_cert" : "photo", id: id)
+                case .instructorVerification: return edit("owner_cert", id: id)
                 }
             }
             if let destination = myPage.destination {
-                let destinationID = "\(id)/destination"
                 switch destination {
-                case .academySetting: return native(.myProfileEdit, section: "academy", id: destinationID)
-                case .nicknameSetting: return native(.myProfileEdit, section: "nickname", id: destinationID)
-                case let .myStyleSetting(style):
-                    return native(.myProfileEdit, section: styleSection(style.settingType), id: destinationID)
-                case .competitionInfo: return native(.competitionRecordAdd, id: destinationID)
+                case .academySetting: return edit("academy", id: id)
+                case .nicknameSetting: return edit("nickname", id: id)
+                case let .myStyleSetting(style): return edit(styleSection(style.settingType), id: id)
+                case .competitionInfo: return native(.competitionRecordAdd, id: "\(id)/destination")
                 }
             }
             if let elementID = myPage.path.ids.last, let element = myPage.path[id: elementID] {
@@ -131,14 +138,17 @@ extension AppFeature {
         }
 
         private static func settingsScreen(_ settings: SettingsFeature.State, id: String) -> VisibleScreen {
-            if settings.termsWebCover != nil {
-                // 약관 화면은 브리지가 없는 웹이라 웹이 화면을 알리지 않는다 — 이름 없는 화면으로 둔다.
-                return VisibleScreen(id: "\(id)/terms", event: nil)
+            if let policy = settings.termsWebCover {
+                return policyScreen(policy.url, id: "\(id)/policy")
             }
             if case .notificationSetting? = settings.destination {
                 return native(.notificationSettings, id: "\(id)/notification")
             }
             return native(.settings, id: id)
+        }
+
+        private static func edit(_ section: String, id: String) -> VisibleScreen {
+            native(.myProfileEdit, section: section, id: "\(id)/edit/\(section)")
         }
 
         private static func styleSection(_ type: MyStyleSettingType) -> String {
@@ -149,10 +159,26 @@ extension AppFeature {
             }
         }
 
+        /// 약관 웹뷰는 브리지가 없어 웹이 화면을 알리지 않는다 — 앱이 연 주소로 policy · section을 남긴다.
+        private static func policyScreen(_ url: URL, id: String) -> VisibleScreen {
+            let section: String? = switch url.lastPathComponent {
+            case "terms-of-service": "terms"
+            case "privacy-policy": "privacy"
+            case "marketing-consent": "marketing"
+            default: nil
+            }
+            return VisibleScreen(id: id, event: .screenView(.policy, section: section, screenClass: "webview"))
+        }
+
         // MARK: - 만들기
 
-        private static func native(_ screen: NativeScreen, section: String? = nil, id: String) -> VisibleScreen {
-            VisibleScreen(id: id, event: .screenView(screen, section: section))
+        private static func native(
+            _ screen: NativeScreen,
+            section: String? = nil,
+            from: String? = nil,
+            id: String
+        ) -> VisibleScreen {
+            VisibleScreen(id: id, event: .screenView(screen, section: section, from: from))
         }
 
         /// 웹뷰는 웹이 알린 마지막 화면을 그대로 남긴다.

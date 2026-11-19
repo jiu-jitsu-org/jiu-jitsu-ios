@@ -27,6 +27,10 @@ extension AppFeature {
         var visibleScreen: VisibleScreen?
         /// 마지막으로 screen_view를 남긴 화면. 맨 위 화면이 잠깐 그대로 있은 뒤 이것과 다를 때만 남긴다.
         var loggedScreen: VisibleScreen?
+        /// 앱으로 돌아와 지금 화면을 from=resume으로 다시 남길 차례(새 세션의 첫 화면이 비지 않게).
+        var isResumingScreen = false
+        /// 로그인 모달을 띄운 곳(login_prompt · web_modal). 모달이 닫히면 비운다.
+        var loginCoverFrom: String?
         /// 마지막으로 보낸 회원 ID. 같은 값은 다시 보내지 않는다. 바깥 nil은 아직 안 보냄 — GA는 이전 실행의 값을 기억한다.
         var sentUserID: String??
     }
@@ -53,11 +57,12 @@ extension AppFeature {
         @Dependency(\.continuousClock) var clock
 
         func reduce(into state: inout State, action: Action) -> Effect<Action> {
+            let screenEffect = reduceScreenEvent(into: &state, action: action)
             let effect = reduceEvent(into: &state, action: action)
             if case .destination(.presented(.appTab)) = action {
                 syncProfileProperties(&state)
             }
-            return .merge(effect, updateVisibleScreen(&state))
+            return .merge(effect, screenEffect, updateVisibleScreen(&state))
         }
 
         private func reduceEvent(into state: inout State, action: Action) -> Effect<Action> {
@@ -147,13 +152,47 @@ extension AppFeature {
 
         // MARK: - screen_view
 
+        /// 화면 기록에 필요한 앱 생명주기 · 로그인 입구. 복귀 판정(isInBackground)을 reduceEvent가 바꾸기 전에 본다.
+        private func reduceScreenEvent(into state: inout State, action: Action) -> Effect<Action> {
+            switch action {
+            case .view(.sceneEnteredBackground):
+                // 나가기 직전 연 화면은 보지 않은 것이라 기다리던 기록을 버린다.
+                return .cancel(id: CancelID.screenViewSettle)
+
+            case .view(.sceneBecameActive):
+                guard state.analytics.isInBackground else { return .none }
+                state.analytics.isResumingScreen = true
+                return scheduleScreenViewSettle()
+
+            case .destination(.presented(.appTab(.view(.loginPromptLoginTapped)))):
+                state.analytics.loginCoverFrom = "login_prompt"
+                return .none
+
+            case .destination(.presented(.appTab(.home(.delegate(.loginModalRequested))))),
+                 .destination(.presented(.appTab(.myPage(.delegate(.webSubview(.loginModalRequested)))))),
+                 .destination(.presented(.appTab(.competition(.delegate(.webSubview(.loginModalRequested)))))):
+                state.analytics.loginCoverFrom = "web_modal"
+                return .none
+
+            default:
+                return .none
+            }
+        }
+
         /// 액션이 지나갈 때마다 맨 위 화면을 다시 계산한다. 바뀌었으면(다른 화면 · 다시 보임 · 웹뷰 안 화면 이동)
         /// 잠깐 기다렸다가, 그때도 맨 위인 화면을 남긴다.
         private func updateVisibleScreen(_ state: inout State) -> Effect<Action> {
+            if case let .appTab(appTab)? = state.destination, appTab.loginCover == nil {
+                state.analytics.loginCoverFrom = nil
+            }
             let screen = ScreenView.visibleScreen(in: state)
             guard screen != state.analytics.visibleScreen else { return .none }
             state.analytics.visibleScreen = screen
-            return .run { send in
+            return scheduleScreenViewSettle()
+        }
+
+        private func scheduleScreenViewSettle() -> Effect<Action> {
+            .run { send in
                 try await clock.sleep(for: Self.screenViewSettleDuration)
                 await send(.internal(.screenViewSettled))
             }
@@ -162,10 +201,12 @@ extension AppFeature {
 
         private func logSettledScreen(_ state: inout State) {
             let screen = state.analytics.visibleScreen
-            guard screen != state.analytics.loggedScreen else { return }
+            let isResuming = state.analytics.isResumingScreen
+            state.analytics.isResumingScreen = false
+            guard isResuming || screen != state.analytics.loggedScreen else { return }
             state.analytics.loggedScreen = screen
             if let event = screen?.event {
-                log(event)
+                log(isResuming ? event.replacingFrom("resume") : event)
             }
         }
 

@@ -134,13 +134,29 @@ extension AnalyticsEvent {
         case userProfile = "user_profile"
         case settings
         case notificationSettings = "notification_settings"
+        /// 약관 · 처리방침(사전에선 webview). 브리지가 없는 약관 웹뷰라 웹 대신 앱이 주소로 남긴다.
+        case policy
     }
 
     /// `section`: 한 화면 안의 부분(MY 편집 항목 등, 사전 "section").
-    public static func screenView(_ screen: NativeScreen, section: String? = nil) -> Self {
-        var parameters: [String: Value] = ["screen_name": .string(screen.rawValue), "screen_class": .string("native")]
+    /// `from`: 들어온 입구(사전 "from 값"). 모르면 싣지 않는다.
+    public static func screenView(
+        _ screen: NativeScreen,
+        section: String? = nil,
+        from: String? = nil,
+        screenClass: String = "native"
+    ) -> Self {
+        var parameters: [String: Value] = ["screen_name": .string(screen.rawValue), "screen_class": .string(screenClass)]
         if let section { parameters["section"] = .string(section) }
+        if let from { parameters["from"] = .string(from) }
         return Self(.screenView, parameters: parameters)
+    }
+
+    /// 같은 기록에서 `from`만 바꾼 것(앱으로 돌아와 지금 화면을 다시 남길 때 `resume`).
+    func replacingFrom(_ from: String) -> Self {
+        var parameters = parameters
+        parameters["from"] = .string(from)
+        return Self(name, parameters: parameters, surface: surface)
     }
 }
 
