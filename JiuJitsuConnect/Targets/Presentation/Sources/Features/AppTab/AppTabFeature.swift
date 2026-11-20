@@ -190,6 +190,7 @@ public struct AppTabFeature: Sendable {
     @Dependency(\.openURL) var openURL
     @Dependency(\.pushNotificationClient) var pushNotificationClient
     @Dependency(\.continuousClock) var clock
+    @Dependency(\.analyticsClient) var analyticsClient
 
     public var body: some ReducerOf<Self> {
         Scope(state: \.home, action: \.home) {
@@ -652,6 +653,7 @@ public struct AppTabFeature: Sendable {
 
             case let .internal(.competitionRecordSaved(id, stack, _, .failure(error))):
                 Log.trace("Failed to add competition from competition detail: \(error)", category: .network, level: .error)
+                analyticsClient.logErrorShown(error)
                 // 입력 화면이 실패를 안내하고 입력값을 지켜 다시 저장하게 한다(MY와 같은 처리).
                 return Self.finishCompetitionRecordSave(.failed, id: id, stack: stack, state: state)
 

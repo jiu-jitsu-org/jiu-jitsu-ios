@@ -54,6 +54,7 @@ public struct BeltPromptFeature: Sendable {
     }
 
     @Dependency(\.communityClient) var communityClient
+    @Dependency(\.analyticsClient) var analyticsClient
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -89,6 +90,7 @@ public struct BeltPromptFeature: Sendable {
             case let .internal(.saveResponse(.failure(error))):
                 // 시트를 닫지 않고 다시 누를 수 있게 둔다
                 Log.trace("띠 저장 실패: \(error)", category: .network, level: .error)
+                analyticsClient.logErrorShown(error)
                 state.isSaving = false
                 state.hasSaveError = true
                 return .none

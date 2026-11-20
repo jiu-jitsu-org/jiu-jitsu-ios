@@ -144,8 +144,12 @@ final class HomeFeedPreload {
                 name: WebBridge.appBridgeHandlerName
             )
             let events = recorder.takeEvents()
+            // 4xx · 5xx로 막은 뒤 따라올 취소 실패가 이어받은 뒤에 오면 코디네이터가 거르도록 넘긴다(아래 재생이 .started로 지우므로 끝에).
+            defer { coordinator.didFailOnHTTPStatus = recorder.isAwaitingHTTPCancel }
             Log.trace("🏠 home-preload: 홈 웹뷰가 이어받음(adopt) — 받아 둔 이벤트 \(events.count)개", category: .view, level: .info)
-            for event in events {
+            for (event, receivedAt) in events {
+                // 걸린 시간(screen_load, #431)은 넘겨받은 때가 아니라 이벤트가 실제로 온 때로 잰다.
+                coordinator.replayingEventAt = receivedAt
                 switch event {
                 case .started:
                     coordinator.webView(webView, didStartProvisionalNavigation: nil)
@@ -157,6 +161,7 @@ final class HomeFeedPreload {
                     coordinator.receiveBridgeMessage(body)
                 }
             }
+            coordinator.replayingEventAt = nil
         }
     }
 }
@@ -171,11 +176,12 @@ private final class HomeFeedPreloadRecorder: NSObject, WKNavigationDelegate, WKS
         case message(Any)
     }
 
-    private var events: [Event] = []
+    // 받은 시각과 함께 둔다 — 이어받은 홈이 화면 속도를 실제로 온 때로 잰다(#431).
+    private var events: [(Event, ContinuousClock.Instant)] = []
     // 4xx · 5xx 응답을 막아 실패를 받아 뒀는지. 막으면 WebKit이 취소 실패를 한 번 더 알려 홈이 오류를 두 번 세지 않게 거른다.
-    private var didFailOnHTTPStatus = false
+    private(set) var isAwaitingHTTPCancel = false
 
-    func takeEvents() -> [Event] {
+    func takeEvents() -> [(Event, ContinuousClock.Instant)] {
         defer { events.removeAll() }
         return events
     }
@@ -188,7 +194,7 @@ private final class HomeFeedPreloadRecorder: NSObject, WKNavigationDelegate, WKS
             return
         }
         Log.trace("🏠 home-preload: \(Self.messageType(of: message.body)) 받아 둠", category: .view, level: .info)
-        events.append(.message(message.body))
+        events.append((.message(message.body), .now))
     }
 
     // 로그용 메시지 종류. 웹은 봉투를 객체 또는 JSON 문자열로 보낸다.
@@ -201,24 +207,24 @@ private final class HomeFeedPreloadRecorder: NSObject, WKNavigationDelegate, WKS
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-        didFailOnHTTPStatus = false
-        events.append(.started)
+        isAwaitingHTTPCancel = false
+        events.append((.started, .now))
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        events.append(.finished)
+        events.append((.finished, .now))
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        events.append(.failed(error))
+        events.append((.failed(error), .now))
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        if didFailOnHTTPStatus {
-            didFailOnHTTPStatus = false
+        if isAwaitingHTTPCancel {
+            isAwaitingHTTPCancel = false
             return
         }
-        events.append(.failed(error))
+        events.append((.failed(error), .now))
     }
 
     // 홈 웹뷰와 같은 메인 프레임 이동 정책. 스플래시 위라 앱 위 브라우저는 띄우지 않고 막기만 한다
@@ -251,8 +257,8 @@ private final class HomeFeedPreloadRecorder: NSObject, WKNavigationDelegate, WKS
            !(200..<400).contains(http.statusCode) {
             decisionHandler(.cancel)
             // 이어받은 홈이 오류 기록에 HTTP 상태를 싣도록 상태 코드를 담아 둔다(#431).
-            didFailOnHTTPStatus = true
-            events.append(.failed(WebHTTPStatusError(statusCode: http.statusCode)))
+            isAwaitingHTTPCancel = true
+            events.append((.failed(WebHTTPStatusError(statusCode: http.statusCode)), .now))
             return
         }
         decisionHandler(.allow)

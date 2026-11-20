@@ -325,6 +325,8 @@ public struct CommunityDetailFeature: Sendable {
                 return .none
 
             case .internal(.webProcessTerminated):
+                // 이미 오류 화면이면 사용자가 새로 본 오류가 아니다.
+                if !state.hasError { WebAnalytics.loadFailed(.processTerminated, client: analyticsClient) }
                 // 죽은 웹은 BACK_PRESSED에도, 떠 있는 알럿 · 시트 결과에도 답하지 않는다 — 가드를 풀고 오류 화면(뒤로가기 · 재시도)으로 돌린다.
                 // 쓰던 내용이 있었는지는 처음 연 주소가 아니라 가드로 본다 — 등록 뒤 상세로 바뀌었거나 빈 글쓰기면 웹이 가드를 껐다.
                 state.hasLostDraft = state.leaveGuardEnabled && state.isPageReady
@@ -338,7 +340,6 @@ public struct CommunityDetailFeature: Sendable {
                 state.pendingSelectSheet = nil
                 state.pendingPhotoPick = nil
                 state.isPhotoPickerPresented = false
-                WebAnalytics.loadFailed(.processTerminated, client: analyticsClient)
                 return .none
 
             // MARK: - Web Bridge (인바운드)

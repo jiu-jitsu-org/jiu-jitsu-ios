@@ -44,6 +44,7 @@ enum WebAnalytics {
 
     /// 웹뷰 오류 화면이 뜸(error_shown webview_load, #431).
     static func loadFailed(_ failure: WebLoadFailure, client: AnalyticsClient) {
+        guard !failure.isCancelled else { return }
         client.logEvent(.errorShown(.webviewLoad, code: failure.code))
     }
 }

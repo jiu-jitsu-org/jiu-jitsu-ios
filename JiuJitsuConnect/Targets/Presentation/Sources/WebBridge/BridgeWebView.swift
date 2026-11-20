@@ -297,6 +297,8 @@ struct BridgeWebView: UIViewRepresentable {
         var onScreenLoadMeasured: ((WebScreenLoad) -> Void)?
         // 재고 있는 로드의 시작 시각(#431). 결과를 올리면 비운다 — 같은 문서의 PAGE_READY가 다시 와도 한 번만 센다.
         var screenLoadStartedAt: ContinuousClock.Instant?
+        // 미리 불러 둔 홈이 받아 둔 이벤트를 다시 보내는 중이면 그 이벤트가 실제로 온 시각. 넘겨받은 때로 재면 스플래시 시간이 섞인다.
+        var replayingEventAt: ContinuousClock.Instant?
 
         private var lastLoadedURL: URL?
         private var lastLoadToken: UUID?
@@ -332,7 +334,7 @@ struct BridgeWebView: UIViewRepresentable {
         // 마지막 메인 프레임 이동을 이동 정책이 막았는지. 리다이렉트를 막으면 실패 알림이 따로 와 오류와 구분한다.
         var didCancelMainFrameNavigation = false
         // 4xx · 5xx 응답을 막아 실패를 이미 올렸는지. 막으면 WebKit이 취소 실패를 한 번 더 알려, 오류를 두 번 세지 않게 거른다.
-        private var didFailOnHTTPStatus = false
+        var didFailOnHTTPStatus = false
 
         init(
             source: WebBridgeSource,
@@ -587,6 +589,8 @@ struct BridgeWebView: UIViewRepresentable {
         }
 
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            // 뜨기 전에 죽었으면 그 로드는 실패다.
+            reportScreenLoad(.fail)
             // 웹 프로세스가 죽으면 닫힘 신호도 새 문서(didCommit)도 오지 않을 수 있다 — 시트가 열린 채였으면 탭 바를 돌려놓는다.
             setWebSheetOpen(false)
             onWebProcessTerminated?()
@@ -612,6 +616,7 @@ struct BridgeWebView: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             if let entryTraceToken { WebEntryTrace.mark(.finish, token: entryTraceToken) }
+            discardScreenLoadIfPageNeverReady()
             endRefreshing(success: true, navigation: navigation)
             onLoadingFinished()
             // 웹이 로드되며 overscroll-behavior로 바운스를 끌 수 있어 풀다운 여지를 재확보한다.
@@ -645,16 +650,10 @@ struct BridgeWebView: UIViewRepresentable {
         }
 
         /// 로드 실패를 올린다. 재던 로드면 그때까지 걸린 시간도 실패(시간 초과)로 남긴다.
+        /// 새 로드에 밀려 취소된 로드는 재던 것이 새 로드라 측정을 건드리지 않는다.
         private func fail(_ failure: WebLoadFailure) {
-            reportScreenLoad(failure.isTimeout ? .timeout : .fail)
+            if !failure.isCancelled { reportScreenLoad(failure.isTimeout ? .timeout : .fail) }
             onLoadingFailed(failure)
-        }
-
-        private func reportScreenLoad(_ result: AnalyticsEvent.ScreenLoadResult) {
-            guard let startedAt = screenLoadStartedAt else { return }
-            screenLoadStartedAt = nil
-            let milliseconds = Int(((ContinuousClock.now - startedAt) / .milliseconds(1)).rounded())
-            onScreenLoadMeasured?(WebScreenLoad(result: result, milliseconds: milliseconds))
         }
 
         /// 새로고침의 reload가 앞서 진행 중이던 로드를 취소한 알림인지. 그 로드는 실패가 아니라

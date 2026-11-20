@@ -36,16 +36,14 @@ extension AnalyticsEvent {
         ]))
     }
 
-    /// 오류를 화면 문구로 바꾼 곳에서 남길 기록. 안내하지 않는 오류(로그인 취소)와 앱이 만료 안내를 따로 띄우는
-    /// 세션 만료는 nil — 사용자가 본 오류 문구가 없다.
+    /// 오류를 화면 문구로 바꾼 곳에서 남길 기록. 안내하지 않는 오류(로그인 취소)는 nil — 사용자가 본 오류 문구가 없다.
+    /// 세션 만료로 앱이 만료 안내만 띄우는 곳은 부르는 쪽이 거른다(회원 프로필 메뉴 등).
     /// `type`: 무엇을 하다 실패했는지가 종류를 정할 때(사진 업로드는 네트워크 오류여도 upload). 코드는 그대로 싣는다.
     public static func errorShown(for error: Error, as type: ErrorType? = nil) -> Self? {
         guard let domainError = error as? DomainError else { return errorShown(type ?? .unknown) }
         let mapped: (type: ErrorType, code: String?)
         switch domainError {
         case .signInCancelled:
-            return nil
-        case let .apiError(code, _) where code.endsSession:
             return nil
         case .networkUnavailable:
             // 앱 네트워크 계층은 연결 끊김과 시간 초과를 같은 오류로 넘긴다.

@@ -156,12 +156,14 @@ public struct NicknameSettingFeature: Sendable {
                 if !(2...12).contains(state.nickname.count) {
                     state.validationState = .invalidLength
                     state.isCtaButtonEnabled = false
+                    logNicknameRejected()
                     return .none
                 }
                 
                 if !isValid(nickname: state.nickname) {
                     state.validationState = .invalidCharacters
                     state.isCtaButtonEnabled = false
+                    logNicknameRejected()
                     return .none
                 }
                 
@@ -261,6 +263,7 @@ public struct NicknameSettingFeature: Sendable {
                 } else {
                     state.validationState = .unavailable
                     state.isCtaButtonEnabled = false
+                    logNicknameRejected()
                 }
                 return .none
                 
@@ -336,14 +339,14 @@ public struct NicknameSettingFeature: Sendable {
             if code == .invalidNickname {
                 state.validationState = .invalidCharacters
                 state.isCtaButtonEnabled = false
-                logNicknameRejected(code)
+                logNicknameRejected(code.rawValue)
                 return .none
             }
             
             if code == .nicknameDuplicated {
                 state.validationState = .unavailable
                 state.isCtaButtonEnabled = false
-                logNicknameRejected(code)
+                logNicknameRejected(code.rawValue)
                 return .none
             }
             
@@ -375,12 +378,12 @@ public struct NicknameSettingFeature: Sendable {
             case .nicknameDuplicated:
                 state.validationState = .unavailable
                 state.isCtaButtonEnabled = false
-                logNicknameRejected(code)
+                logNicknameRejected(code.rawValue)
                 return .none
             case .invalidNickname:
                 state.validationState = .invalidCharacters
                 state.isCtaButtonEnabled = false
-                logNicknameRejected(code)
+                logNicknameRejected(code.rawValue)
                 return .none
             default:
                 break
@@ -394,9 +397,9 @@ public struct NicknameSettingFeature: Sendable {
         return .none
     }
 
-    /// 서버가 닉네임을 받지 않아 입력칸 아래 안내가 뜸(입력 검사 실패, #431).
-    private func logNicknameRejected(_ code: APIErrorCode) {
-        analyticsClient.logEvent(.errorShown(.validation, code: code.rawValue, field: .nickname))
+    /// 닉네임 입력칸 아래 안내(길이 · 문자 · 중복)가 뜸 — 입력 검사 실패(#431). `code`: 서버가 거절한 오류 코드.
+    private func logNicknameRejected(_ code: String? = nil) {
+        analyticsClient.logEvent(.errorShown(.validation, code: code, field: .nickname))
     }
 }
 

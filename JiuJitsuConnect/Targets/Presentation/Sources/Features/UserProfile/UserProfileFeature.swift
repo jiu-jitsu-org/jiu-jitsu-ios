@@ -163,6 +163,7 @@ public struct UserProfileFeature: Sendable {
                 state.isLoading = false
                 if case .apiError(code: .userNotFound, _)? = error as? DomainError {
                     state.isNotFoundAlertPresented = true
+                    analyticsClient.logErrorShown(error, as: .notFound)
                 } else {
                     Log.trace("공개 프로필 조회 실패: userId=\(state.userId) \(error)", category: .network, level: .error)
                     state.hasError = true
