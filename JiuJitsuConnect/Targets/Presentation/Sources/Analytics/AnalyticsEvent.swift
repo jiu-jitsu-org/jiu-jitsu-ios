@@ -40,6 +40,10 @@ public struct AnalyticsEvent: Equatable, Sendable {
         // 오류 · 화면 속도(#431). error_shown은 웹과 같이 쓴다(아래 웹 목록).
         case screenLoad = "screen_load"
 
+        // 설정(#430)
+        case notificationSettingChange = "notification_setting_change"
+        case supportContact = "support_contact"
+
         // 웹뷰가 ANALYTICS_EVENT로 보내는 기록(#424). 이벤트 사전 v2에서 범위에 FE가 있는 것.
         // 사전에 없는 이름은 브리지가 버린다 — 웹에 이벤트를 더하면 여기에도 더한다.
         case screenView = "screen_view"
@@ -538,6 +542,42 @@ extension AnalyticsEvent {
 
     public static func uiClick(_ element: UIElement) -> Self {
         Self(.uiClick, parameters: ["element": .string(element.rawValue)])
+    }
+}
+
+// MARK: - 설정 (#430)
+
+extension AnalyticsEvent {
+    /// 알림 설정 그룹(사전 `section` 중 알림 설정).
+    public enum NotificationSection: String, Sendable {
+        case security, service, community, competition, marketing
+    }
+
+    /// 문의한 곳(사전 "from 값").
+    public enum SupportContactEntry: String, Sendable {
+        case settings
+        /// 관장 사범 인증 시트의 '인증 정보 변경 문의하기'
+        case ownerCert = "owner_cert"
+    }
+
+    /// 문의 결과(사전 `result`). 메일 앱을 열지 못하면 주소를 복사해 둔다.
+    public enum SupportContactResult: String, Sendable {
+        case opened, copied
+    }
+
+    /// 저장 응답으로 확인된 그룹 하나의 켬 · 끔.
+    public static func notificationSettingChange(_ section: NotificationSection, isOn: Bool) -> Self {
+        Self(.notificationSettingChange, parameters: [
+            "section": .string(section.rawValue),
+            "state": .string(isOn ? "on" : "off")
+        ])
+    }
+
+    public static func supportContact(from: SupportContactEntry, result: SupportContactResult) -> Self {
+        Self(.supportContact, parameters: [
+            "from": .string(from.rawValue),
+            "result": .string(result.rawValue)
+        ])
     }
 }
 

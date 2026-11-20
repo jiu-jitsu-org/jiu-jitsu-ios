@@ -245,6 +245,8 @@ public struct MyProfileFeature: Sendable {
             case competitionPinUpdated(CommunityProfile, isPinned: Bool) // 대회 고정/해제 저장 완료
             case competitionOrderSaved(CommunityProfile)    // 대회 순서 저장 완료
             case competitionOrderReverted(CommunityProfile) // 대회 순서 저장 실패 — 바꾸기 전 목록으로 되돌림
+            // 알림 화면을 나간 뒤 대신 저장한 알림 설정이 서버에 반영됨. 루트의 분석 기록만 본다(#430).
+            case notificationSettingSaved(NoticeSettingUpdate)
             
             case showToast(ToastState)
             case toastDismissed
@@ -872,6 +874,7 @@ public struct MyProfileFeature: Sendable {
                 return .run { send in
                     do {
                         let saved = try await noticeClient.updateSetting(setting)
+                        await send(.internal(.notificationSettingSaved(setting)))
                         // 관심 대회 알림을 켠 채 바로 나갔으면 여기서 저장되므로, 저장 뒤 기기 알림 안내를 부모(AppTab)에 넘긴다(#281).
                         if setting.competitionEnabled == true, saved.competitionEnabled {
                             await send(.delegate(.settings(.competitionAlertTurnedOn)))
@@ -882,6 +885,9 @@ public struct MyProfileFeature: Sendable {
                         await send(.internal(.showToast(.init(message: "알림 설정을 저장하지 못했어요. 다시 시도해주세요", status: .error))))
                     }
                 }
+
+            case .internal(.notificationSettingSaved):
+                return .none
 
             case let .path(.element(id: _, action: .settings(.delegate(delegate)))):
                 return .send(.delegate(.settings(delegate)))
