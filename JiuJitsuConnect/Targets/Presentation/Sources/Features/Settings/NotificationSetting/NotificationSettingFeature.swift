@@ -125,6 +125,7 @@ public struct NotificationSettingFeature: Sendable {
     @Dependency(\.firebaseClient) var firebaseClient
     @Dependency(\.userClient) var userClient
     @Dependency(\.openURL) var openURL
+    @Dependency(\.analyticsClient) var analyticsClient
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -324,6 +325,7 @@ public struct NotificationSettingFeature: Sendable {
     }
 
     private func handleError(_ error: Error) -> Effect<Action> {
+        analyticsClient.logErrorShown(error)
         guard let domainError = error as? DomainError else {
             return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, status: .error))))
         }

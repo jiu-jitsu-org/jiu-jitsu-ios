@@ -51,7 +51,8 @@ public struct CommunityView: View {
                         capabilities: CommunityFeature.listCapabilities,
                         onLoadingStarted: { store.send(.internal(.loadingStarted)) },
                         onLoadingFinished: { store.send(.internal(.loadingFinished)) },
-                        onLoadingFailed: { store.send(.internal(.loadingFailed)) },
+                        onLoadingFailed: { store.send(.internal(.loadingFailed($0))) },
+                        onScreenLoadMeasured: { store.send(.internal(.screenLoadMeasured($0))) },
                         // 새로고침 중 누른 칩이 새 웹에 닿지 않고 사라지지 않게, 다시 불러오는 동안은 누름을 막는다.
                         onRefreshStarted: { store.send(.internal(.refreshStarted)) },
                         onBridgeMessage: { store.send(.internal(.bridgeMessageReceived($0))) },

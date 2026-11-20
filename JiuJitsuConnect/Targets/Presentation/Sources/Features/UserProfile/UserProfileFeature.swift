@@ -131,6 +131,7 @@ public struct UserProfileFeature: Sendable {
     @Dependency(\.continuousClock) var clock
     @Dependency(\.date.now) var now
     @Dependency(\.dismiss) var dismiss
+    @Dependency(\.analyticsClient) var analyticsClient
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -165,6 +166,7 @@ public struct UserProfileFeature: Sendable {
                 } else {
                     Log.trace("공개 프로필 조회 실패: userId=\(state.userId) \(error)", category: .network, level: .error)
                     state.hasError = true
+                    analyticsClient.logErrorShown(error)
                 }
                 return .none
 
@@ -378,6 +380,7 @@ public struct UserProfileFeature: Sendable {
             return .none
         }
         Log.trace("\(message): \(error)", category: .network, level: .error)
+        analyticsClient.logErrorShown(error)
         return showToast(message, status: .error)
     }
 

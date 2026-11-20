@@ -273,6 +273,8 @@ public struct SettingsFeature: Sendable {
                 if isSuccess {
                     return .send(.delegate(.didWithdrawSuccessfully))
                 } else {
+                    // 서버가 탈퇴를 처리하지 못했다고 답함(오류 코드 없음).
+                    analyticsClient.logEvent(.errorShown(.server))
                     return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, status: .error))))
                 }
 
@@ -290,6 +292,7 @@ public struct SettingsFeature: Sendable {
                 if let code = notice.code {
                     recentErrorClient.record(RecentError(code: code, occurredAt: date.now))
                 }
+                analyticsClient.logErrorShown(error)
                 return .send(.internal(.showToast(.init(message: notice.message, status: .error))))
 
             case .view(.alertDismissed):
@@ -340,6 +343,7 @@ public struct SettingsFeature: Sendable {
     }
 
     private func handleError(_ error: Error) -> Effect<Action> {
+        analyticsClient.logErrorShown(error)
         guard let domainError = error as? DomainError else {
             return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, status: .error))))
         }

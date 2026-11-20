@@ -18,4 +18,32 @@ enum WebAnalytics {
             client.logEvent(event)
         }
     }
+
+    /// 웹뷰 로드 시간(screen_load, #431). 웹은 화면 이름(screen_view)을 PAGE_READY 뒤에 알릴 수 있어(WEBVIEW_READY 뒤
+    /// 대기열), 아직 이름을 모르는 첫 로드는 이름이 올 때까지 둔다. 실패는 오류 화면이라 이름이 오지 않으니 아는 대로 바로 남긴다.
+    static func screenLoadMeasured(
+        _ load: WebScreenLoad,
+        lastScreen: AnalyticsEvent?,
+        pendingLoad: inout WebScreenLoad?,
+        client: AnalyticsClient
+    ) {
+        if load.result == .succeeded, lastScreen == nil {
+            pendingLoad = load
+            return
+        }
+        pendingLoad = nil
+        client.logEvent(.screenLoad(screenName: lastScreen?.screenName, milliseconds: load.milliseconds, result: load.result))
+    }
+
+    /// 화면 이름을 기다리던 screen_load가 있으면 웹이 알린 이 화면 이름으로 남긴다(#431).
+    static func logPendingScreenLoad(after event: AnalyticsEvent, pendingLoad: inout WebScreenLoad?, client: AnalyticsClient) {
+        guard event.name == .screenView, let load = pendingLoad else { return }
+        pendingLoad = nil
+        client.logEvent(.screenLoad(screenName: event.screenName, milliseconds: load.milliseconds, result: load.result))
+    }
+
+    /// 웹뷰 오류 화면이 뜸(error_shown webview_load, #431).
+    static func loadFailed(_ failure: WebLoadFailure, client: AnalyticsClient) {
+        client.logEvent(.errorShown(.webviewLoad, code: failure.code))
+    }
 }

@@ -50,6 +50,8 @@ public struct CommunityFeature: Sendable {
     public struct State: Equatable {
         /// 이 목록 웹뷰가 마지막으로 알린 화면(screen_view, #425). 보일 때 루트 분석 리듀서가 기록한다.
         var analyticsScreen: AnalyticsEvent?
+        /// 화면 이름(screen_view)을 기다리는 로드 시간(#431).
+        var pendingScreenLoad: WebScreenLoad?
         var url: URL?
         // 같은 URL로 재시도 시 View가 reload를 인지하도록 토큰을 갱신한다.
         var loadToken: UUID = UUID()
@@ -170,7 +172,8 @@ public struct CommunityFeature: Sendable {
         public enum InternalAction: Sendable {
             case loadingStarted
             case loadingFinished
-            case loadingFailed
+            case loadingFailed(WebLoadFailure)
+            case screenLoadMeasured(WebScreenLoad)
             // 당겨서 새로고침 시작(이때는 loadingStarted가 오지 않는다).
             case refreshStarted
             // 웹뷰가 AppBridge로 보내온 인바운드 메시지(WKScriptMessageHandler 경유).
@@ -429,10 +432,20 @@ public struct CommunityFeature: Sendable {
                 state.hasError = false
                 return .none
 
-            case .internal(.loadingFailed):
+            case let .internal(.loadingFailed(failure)):
                 state.isLoading = false
                 state.hasError = true
                 Self.resetHomeCategorySync(&state)
+                WebAnalytics.loadFailed(failure, client: analyticsClient)
+                return .none
+
+            case let .internal(.screenLoadMeasured(load)):
+                WebAnalytics.screenLoadMeasured(
+                    load,
+                    lastScreen: state.analyticsScreen,
+                    pendingLoad: &state.pendingScreenLoad,
+                    client: analyticsClient
+                )
                 return .none
 
             // MARK: - Web Bridge (인바운드)
@@ -502,6 +515,7 @@ public struct CommunityFeature: Sendable {
 
                 case let .analyticsEvent(event):
                     WebAnalytics.receive(event, lastScreen: &state.analyticsScreen, client: analyticsClient)
+                    WebAnalytics.logPendingScreenLoad(after: event, pendingLoad: &state.pendingScreenLoad, client: analyticsClient)
                     return .none
 
                 case let .homeCategoryTabs(payload):

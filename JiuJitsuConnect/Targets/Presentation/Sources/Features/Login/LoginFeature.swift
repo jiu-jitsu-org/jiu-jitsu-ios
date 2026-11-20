@@ -84,6 +84,7 @@ public struct LoginFeature: Sendable {
     @Dependency(\.continuousClock) var clock
     @Dependency(\.recentErrorClient) var recentErrorClient
     @Dependency(\.date) var date
+    @Dependency(\.analyticsClient) var analyticsClient
     
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -239,6 +240,7 @@ public struct LoginFeature: Sendable {
     
     private func handleError(state: inout State, error: Error) -> Effect<Action> {
         state.isLoading = false
+        analyticsClient.logErrorShown(error)
 
         guard let domainError = error as? DomainError else {
             Log.trace("Unknown login error: \(error)", category: .network, level: .error)

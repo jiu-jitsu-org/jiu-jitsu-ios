@@ -108,6 +108,8 @@ enum HomeFeedPreloader {
 final class HomeFeedPreload {
     let url: URL
     let webView: WKWebView
+    /// 미리 불러오기를 시작한 순간. 이어받은 홈의 화면 속도(screen_load, #431)를 여기서부터 잰다.
+    let startedAt: ContinuousClock.Instant = .now
     var isDiscarded = false
     private let recorder: HomeFeedPreloadRecorder
 
@@ -170,6 +172,8 @@ private final class HomeFeedPreloadRecorder: NSObject, WKNavigationDelegate, WKS
     }
 
     private var events: [Event] = []
+    // 4xx · 5xx 응답을 막아 실패를 받아 뒀는지. 막으면 WebKit이 취소 실패를 한 번 더 알려 홈이 오류를 두 번 세지 않게 거른다.
+    private var didFailOnHTTPStatus = false
 
     func takeEvents() -> [Event] {
         defer { events.removeAll() }
@@ -197,6 +201,7 @@ private final class HomeFeedPreloadRecorder: NSObject, WKNavigationDelegate, WKS
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        didFailOnHTTPStatus = false
         events.append(.started)
     }
 
@@ -209,6 +214,10 @@ private final class HomeFeedPreloadRecorder: NSObject, WKNavigationDelegate, WKS
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        if didFailOnHTTPStatus {
+            didFailOnHTTPStatus = false
+            return
+        }
         events.append(.failed(error))
     }
 
@@ -241,7 +250,9 @@ private final class HomeFeedPreloadRecorder: NSObject, WKNavigationDelegate, WKS
            let http = navigationResponse.response as? HTTPURLResponse,
            !(200..<400).contains(http.statusCode) {
             decisionHandler(.cancel)
-            events.append(.failed(URLError(.badServerResponse)))
+            // 이어받은 홈이 오류 기록에 HTTP 상태를 싣도록 상태 코드를 담아 둔다(#431).
+            didFailOnHTTPStatus = true
+            events.append(.failed(WebHTTPStatusError(statusCode: http.statusCode)))
             return
         }
         decisionHandler(.allow)

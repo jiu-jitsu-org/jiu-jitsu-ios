@@ -99,7 +99,8 @@ private struct CompetitionListWebView: View {
                 capabilities: store.capabilities,
                 onLoadingStarted: { store.send(.internal(.loadingStarted)) },
                 onLoadingFinished: { store.send(.internal(.loadingFinished)) },
-                onLoadingFailed: { store.send(.internal(.loadingFailed)) },
+                onLoadingFailed: { store.send(.internal(.loadingFailed($0))) },
+                onScreenLoadMeasured: { store.send(.internal(.screenLoadMeasured($0))) },
                 onBridgeMessage: { store.send(.internal(.bridgeMessageReceived($0))) },
                 onOutboundDelivered: { store.send(.internal(.outboundDelivered(id: $0))) }
             )
