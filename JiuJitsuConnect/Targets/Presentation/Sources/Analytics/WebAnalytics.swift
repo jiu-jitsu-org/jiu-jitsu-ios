@@ -5,6 +5,8 @@
 //  웹뷰가 ANALYTICS_EVENT로 넘긴 기록 처리(#424, #425). 브리지를 받는 목록 · 상세 Feature가 같이 쓴다.
 //
 
+import CoreKit
+import Domain
 import Foundation
 
 enum WebAnalytics {
@@ -16,7 +18,25 @@ enum WebAnalytics {
             lastScreen = event
         } else {
             client.logEvent(event)
+            if event.name == .beltUpdate {
+                updateBeltProperties(from: event, client: client)
+            }
         }
+    }
+
+    /// 웹의 띠 묻기 시트가 띠를 저장함(#460). 웹은 사용자 속성을 정하지 않으므로 앱이 바로 맞춘다.
+    /// 루트의 `sentProfileProperties`는 맞추지 않는다 — MY는 탭에 다시 들어올 때까지 띠 없는 옛 프로필이라,
+    /// 맞춰 두면 루트가 그 옛 값을 바뀐 값으로 보고 다시 보내 속성이 되돌아간다. MY가 새 값을 읽으면 같은 값을 한 번 더 보낼 뿐이다.
+    private static func updateBeltProperties(from event: AnalyticsEvent, client: AnalyticsClient) {
+        guard case let .string(rawBelt)? = event.parameters["belt"],
+              let belt = BeltRank(rawValue: rawBelt.uppercased()),
+              case let .int(stripes)? = event.parameters["stripes"],
+              (0...4).contains(stripes) else {
+            Log.trace("ANALYTICS_EVENT belt_update 띠 값이 달라 사용자 속성은 그대로 둠", category: .network, level: .error)
+            return
+        }
+        client.setUserProperty(belt.rawValue.lowercased(), .belt)
+        client.setUserProperty(String(stripes), .stripes)
     }
 
     /// 웹뷰 로드 시간(screen_load, #431). 웹은 화면 이름(screen_view)을 PAGE_READY 뒤에 알릴 수 있어(WEBVIEW_READY 뒤
