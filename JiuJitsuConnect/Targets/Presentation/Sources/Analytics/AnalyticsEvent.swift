@@ -29,6 +29,10 @@ public struct AnalyticsEvent: Equatable, Sendable {
         case pushOpen = "push_open"
         case deeplinkOpen = "deeplink_open"
 
+        // 프로필 · MY(#429). belt_update · belt_prompt는 웹과 같이 쓴다(아래 웹 목록).
+        case profileView = "profile_view"
+        case profileEdit = "profile_edit"
+
         // 대회 기록(#454)
         case competitionRecordStart = "competition_record_start"
         case competitionRecordSave = "competition_record_save"
@@ -445,6 +449,73 @@ extension AnalyticsEvent {
             "state": blocked ? "on" : "off",
             "from": from
         ]))
+    }
+}
+
+// MARK: - 프로필 · MY (#429)
+
+extension AnalyticsEvent {
+    /// MY 항목 저장의 종류(사전 `action`). 대회 고정 해제는 사전에 값이 없어 남기지 않는다.
+    public enum ProfileEditAction: String, Sendable {
+        case add, edit, delete, pin, reorder
+    }
+
+    /// 사진 출처(사전 `method`).
+    public enum PhotoMethod: String, Sendable {
+        case album, camera
+    }
+
+    /// 띠 저장이 어떤 변화인가(사전 `change`). 띠를 내리거나 같은 값으로 다시 저장하면 correction.
+    public enum BeltChange: String, Sendable {
+        case firstSet = "first_set"
+        case promotion
+        case stripeUp = "stripe_up"
+        case correction
+    }
+
+    /// 띠를 저장한 곳(사전 "from 값").
+    public enum BeltUpdateEntry: String, Sendable {
+        /// MY 띠 시트
+        case myProfile = "my_profile"
+        /// 다른 회원 프로필 위의 띠 묻기 시트
+        case beltPrompt = "belt_prompt"
+    }
+
+    /// 띠 묻기 시트가 뜸(view)과 답(사전 `action`). 바깥을 눌러 닫은 것도 later다.
+    public enum BeltPromptAction: String, Sendable {
+        case view, save, later
+    }
+
+    /// `from`: 프로필을 연 곳(사전 "from 값"). 모르면 싣지 않는다.
+    public static func profileView(from: String?) -> Self {
+        Self(.profileView, parameters: strings(["from": from]))
+    }
+
+    /// `method`: 사진 · 인증 사진을 고른 방법. 그 밖의 항목과 사진 삭제는 싣지 않는다.
+    public static func profileEdit(_ section: ProfileSection, action: ProfileEditAction, method: PhotoMethod? = nil) -> Self {
+        Self(.profileEdit, parameters: strings([
+            "section": section.rawValue,
+            "action": action.rawValue,
+            "method": method?.rawValue
+        ]))
+    }
+
+    /// `belt`: 띠 소문자(사용자 속성 `belt`와 같은 값), `stripes`: 그랄 수 0~4.
+    public static func beltUpdate(change: BeltChange, belt: String, stripes: Int, from: BeltUpdateEntry) -> Self {
+        Self(.beltUpdate, parameters: [
+            "change": .string(change.rawValue),
+            "belt": .string(belt),
+            "stripes": .int(stripes),
+            "from": .string(from.rawValue)
+        ])
+    }
+
+    /// 앱의 띠 묻기 시트는 다른 회원 프로필에만 뜬다(웹은 글 · 댓글 등록 직후, FE #582).
+    public static func beltPrompt(_ action: BeltPromptAction) -> Self {
+        Self(.beltPrompt, parameters: [
+            "action": .string(action.rawValue),
+            "from": .string(NativeScreen.userProfile.rawValue)
+        ])
     }
 }
 

@@ -181,6 +181,8 @@ public struct MyProfileFeature: Sendable {
             /// View 상태로 띄운 시트가 열리고 닫힘(화면 기록용, #425)
             case competitionSheetPresentedChanged(Bool)
             case patternSheetPresentedChanged(Bool)
+            /// 머리 무늬를 다른 것으로 바꿈(기록용, #429). 무늬는 View의 AppStorage에 저장돼 리듀서가 할 일은 없다.
+            case headerPatternChanged
             /// 헤더에 서버 사진이 그려짐(#157)
             case profileImageDisplayed(url: String)
             /// 커뮤니티에서 연 MY의 뒤로가기(#197)

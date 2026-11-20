@@ -23,6 +23,8 @@ extension AppFeature.Analytics {
             medal: Self.medal(competition.competitionRank),
             competitionId: competition.competitionId
         ))
+        // 어느 입구든 MY 대회 기록에 하나가 더해진 것이다(#429).
+        log(.profileEdit(.competition, action: .add))
     }
 
     /// 기록 추가 화면이 처음 보였다(그 화면의 첫 screen_view를 남긴 순간). 탭 전환 · 복귀 · 위 화면 닫힘으로 다시 보인 건 세지 않는다.
