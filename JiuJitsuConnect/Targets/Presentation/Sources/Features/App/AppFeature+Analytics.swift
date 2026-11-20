@@ -60,6 +60,10 @@ extension AppFeature {
         var isRecommendedUpdateShown = false
         /// 마지막으로 보낸 회원 ID. 같은 값은 다시 보내지 않는다. 바깥 nil은 아직 안 보냄 — GA는 이전 실행의 값을 기억한다.
         var sentUserID: String??
+        /// 응답을 기다리는 MY 띠 · 도장 저장(#429). 둘은 같은 응답 액션으로 끝나고 응답 때는 저장 전 값이 이미 바뀌어 있다.
+        var pendingProfileSave: PendingProfileSave?
+        /// MY 사진 · 인증 사진을 고른 방법(#429). 사진을 고르면 화면 상태에서 지워져 반영 응답까지 여기 둔다.
+        var pendingPhoto: PendingPhoto?
 
         struct LinkReceipt: Equatable, Sendable {
             let url: URL
@@ -101,6 +105,7 @@ extension AppFeature {
                 syncProfileProperties(&state)
             }
             reduceSafetyEvent(action: action)
+            reduceProfileEvent(into: &state, action: action)
             return .merge(effect, screenEffect, updateVisibleScreen(&state))
         }
 
@@ -315,6 +320,9 @@ extension AppFeature {
             // 처음 보인 기록 추가 화면만 연 것으로 센다 — 열자마자 나갔다 돌아와 resume으로 남은 것도 처음 보인 것이다.
             if !isShownAgain, event == .screenView(.competitionRecordAdd) {
                 logCompetitionRecordStart(state)
+            }
+            if !isShownAgain, event == .screenView(.userProfile) {
+                log(.profileView(from: Self.profileViewEntry(after: previous)))
             }
         }
 

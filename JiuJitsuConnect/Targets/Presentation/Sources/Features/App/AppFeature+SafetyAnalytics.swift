@@ -37,8 +37,8 @@ extension AppFeature.Analytics {
         }
     }
 
-    /// 다른 회원 프로필이 쌓이는 곳: 홈 path · coverPath(그 안에 쌓인 MY의 path 포함), 대회 탭 path, MY 탭 path.
-    private static func userProfileAction(of action: Action) -> UserProfileFeature.Action? {
+    /// 다른 회원 프로필이 쌓이는 곳(띠 묻기 기록도 씀, #429): 홈 path · coverPath(그 안에 쌓인 MY의 path 포함), 대회 탭 path, MY 탭 path.
+    static func userProfileAction(of action: Action) -> UserProfileFeature.Action? {
         guard case let .destination(.presented(.appTab(appTab))) = action else { return nil }
         switch appTab {
         case let .home(.path(.element(id: _, action: element))),
