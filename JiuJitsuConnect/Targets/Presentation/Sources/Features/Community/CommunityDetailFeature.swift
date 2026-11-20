@@ -146,6 +146,8 @@ public struct CommunityDetailFeature: Sendable {
         public enum InternalAction: Sendable {
             case loadingStarted
             case loadingCommitted
+            // 당겨서 새로고침 시작. 대회 탭 첫 화면의 누름 기록(#432)만 본다.
+            case refreshStarted
             case loadingFinished
             case loadingFailed(WebLoadFailure)
             case screenLoadMeasured(WebScreenLoad)
@@ -295,6 +297,9 @@ public struct CommunityDetailFeature: Sendable {
 
             case .internal(.loadingCommitted):
                 state.isAwaitingFirstResponse = false
+                return .none
+
+            case .internal(.refreshStarted):
                 return .none
 
             case .internal(.loadingFinished):

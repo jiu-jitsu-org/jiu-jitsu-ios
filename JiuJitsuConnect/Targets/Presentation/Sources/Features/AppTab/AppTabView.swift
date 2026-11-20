@@ -504,7 +504,7 @@ public struct AppTabView: View {
             let drop = CGSize(width: 0, height: size.height - frame.minY + 24)
             let identity = CircleSlotModifier(offset: .zero, opacity: 1)
             Button {
-                scrollCurrentTabToTop()
+                store.send(.view(.scrollToTopTapped))
             } label: {
                 chevronUp
                     .frame(width: DockMetrics.circleSize, height: DockMetrics.circleSize)
@@ -524,7 +524,7 @@ public struct AppTabView: View {
     private func dockTabItem(_ tab: AppTabFeature.Tab, title: String, asset: ImageAsset) -> some View {
         let isSelected = store.selectedTab == tab
         return Button {
-            store.send(.view(.tabSelected(tab)))
+            store.send(.view(.tabBarItemTapped(tab)))
         } label: {
             dockItemLabel(
                 title: title,
@@ -547,7 +547,7 @@ public struct AppTabView: View {
 
     private var dockTopItem: some View {
         Button {
-            scrollCurrentTabToTop()
+            store.send(.view(.scrollToTopTapped))
         } label: {
             dockItemLabel(title: "맨 위로", icon: chevronUp, isSelected: false)
         }
@@ -577,14 +577,6 @@ public struct AppTabView: View {
             .frame(width: 24, height: 24)
             .rotationEffect(.degrees(90))
             .foregroundStyle(Color.component.header.text)
-    }
-
-    private func scrollCurrentTabToTop() {
-        switch store.selectedTab {
-        case .home: store.send(.home(.view(.tabReselected)))
-        case .competition: store.send(.competition(.view(.tabReselected)))
-        case .myPage: break
-        }
     }
 }
 
