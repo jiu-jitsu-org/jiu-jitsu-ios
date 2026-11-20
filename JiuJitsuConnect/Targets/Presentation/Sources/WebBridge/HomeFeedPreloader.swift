@@ -145,8 +145,9 @@ final class HomeFeedPreload {
             )
             let events = recorder.takeEvents()
             // 4xx · 5xx로 막은 뒤 따라올 취소 실패가 이어받은 뒤에 오면 코디네이터가 거르도록 넘긴다(아래 재생이 .started로 지우므로 끝에).
-            defer { coordinator.didFailOnHTTPStatus = recorder.isAwaitingHTTPCancel }
+            defer { coordinator.isAwaitingHTTPCancel = recorder.isAwaitingHTTPCancel }
             Log.trace("🏠 home-preload: 홈 웹뷰가 이어받음(adopt) — 받아 둔 이벤트 \(events.count)개", category: .view, level: .info)
+            defer { coordinator.replayingEventAt = nil }
             for (event, receivedAt) in events {
                 // 걸린 시간(screen_load, #431)은 넘겨받은 때가 아니라 이벤트가 실제로 온 때로 잰다.
                 coordinator.replayingEventAt = receivedAt
@@ -161,7 +162,6 @@ final class HomeFeedPreload {
                     coordinator.receiveBridgeMessage(body)
                 }
             }
-            coordinator.replayingEventAt = nil
         }
     }
 }
@@ -178,7 +178,7 @@ private final class HomeFeedPreloadRecorder: NSObject, WKNavigationDelegate, WKS
 
     // 받은 시각과 함께 둔다 — 이어받은 홈이 화면 속도를 실제로 온 때로 잰다(#431).
     private var events: [(Event, ContinuousClock.Instant)] = []
-    // 4xx · 5xx 응답을 막아 실패를 받아 뒀는지. 막으면 WebKit이 취소 실패를 한 번 더 알려 홈이 오류를 두 번 세지 않게 거른다.
+    // 4xx · 5xx 응답을 막아 실패를 받아 뒀고 WebKit이 한 번 더 알릴 취소 실패를 기다리는 중 — 홈이 오류를 두 번 세지 않게 거른다.
     private(set) var isAwaitingHTTPCancel = false
 
     func takeEvents() -> [(Event, ContinuousClock.Instant)] {

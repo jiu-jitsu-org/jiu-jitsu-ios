@@ -296,8 +296,12 @@ struct BridgeWebView: UIViewRepresentable {
         var onWebProcessTerminated: (() -> Void)?
         var onScreenLoadMeasured: ((WebScreenLoad) -> Void)?
         // 재고 있는 로드의 시작 시각(#431). 결과를 올리면 비운다 — 같은 문서의 PAGE_READY가 다시 와도 한 번만 센다.
-        var screenLoadStartedAt: ContinuousClock.Instant?
-        // 미리 불러 둔 홈이 받아 둔 이벤트를 다시 보내는 중이면 그 이벤트가 실제로 온 시각. 넘겨받은 때로 재면 스플래시 시간이 섞인다.
+        var screenLoadStartedAt: ContinuousClock.Instant? {
+            didSet { screenLoadDeadline = nil }
+        }
+        // 문서를 받은 뒤 PAGE_READY를 기다리는 기한(BridgeWebView+ScreenLoad).
+        var screenLoadDeadline: ContinuousClock.Instant?
+        // 미리 불러 둔 홈이 받아 둔 이벤트를 다시 보내는 동안 그 이벤트가 실제로 온 시각. HomeFeedPreload.handOff가 넣고 지운다.
         var replayingEventAt: ContinuousClock.Instant?
 
         private var lastLoadedURL: URL?
@@ -333,8 +337,9 @@ struct BridgeWebView: UIViewRepresentable {
         var entryTraceToken: UUID?
         // 마지막 메인 프레임 이동을 이동 정책이 막았는지. 리다이렉트를 막으면 실패 알림이 따로 와 오류와 구분한다.
         var didCancelMainFrameNavigation = false
-        // 4xx · 5xx 응답을 막아 실패를 이미 올렸는지. 막으면 WebKit이 취소 실패를 한 번 더 알려, 오류를 두 번 세지 않게 거른다.
-        var didFailOnHTTPStatus = false
+        // 4xx · 5xx 응답을 막아 실패를 이미 올렸고 WebKit이 한 번 더 알릴 취소 실패를 기다리는 중 — 오류를 두 번 세지 않게 거른다.
+        // 미리 불러 둔 홈을 넘겨받을 때는 HomeFeedPreload.handOff가 그 웹뷰의 상태를 넣는다.
+        var isAwaitingHTTPCancel = false
 
         init(
             source: WebBridgeSource,
@@ -589,15 +594,15 @@ struct BridgeWebView: UIViewRepresentable {
         }
 
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-            // 뜨기 전에 죽었으면 그 로드는 실패다.
-            reportScreenLoad(.fail)
+            // 뜨기 전에 죽었으면 그 로드는 실패다. 오류 화면으로 받는 화면(상세)만 — 아니면 보인 오류 없이 실패만 남는다.
+            if onWebProcessTerminated != nil { reportScreenLoad(.fail) }
             // 웹 프로세스가 죽으면 닫힘 신호도 새 문서(didCommit)도 오지 않을 수 있다 — 시트가 열린 채였으면 탭 바를 돌려놓는다.
             setWebSheetOpen(false)
             onWebProcessTerminated?()
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-            didFailOnHTTPStatus = false
+            isAwaitingHTTPCancel = false
             // 풀다운 리프레시 중에는 페이지를 가리는 전면 오버레이 대신 스피너만 유지한다.
             guard !isRefreshing else { return }
             onLoadingStarted()
@@ -616,7 +621,7 @@ struct BridgeWebView: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             if let entryTraceToken { WebEntryTrace.mark(.finish, token: entryTraceToken) }
-            discardScreenLoadIfPageNeverReady()
+            markScreenLoadDocumentFinished()
             endRefreshing(success: true, navigation: navigation)
             onLoadingFinished()
             // 웹이 로드되며 overscroll-behavior로 바운스를 끌 수 있어 풀다운 여지를 재확보한다.
@@ -636,17 +641,18 @@ struct BridgeWebView: UIViewRepresentable {
             endRefreshing(success: false, navigation: navigation)
             guard !isCancelledByRefresh(error) else { return }
             // 이동 정책이 막은 리다이렉트: 앞 문서가 남아 있으면 오류가 아니다 — 로딩만 끝낸다. 첫 로드면 띄울 문서가 없어 실패로 둔다.
-            if consumeNavigationPolicyCancel(error), webView.backForwardList.currentItem != nil {
+            let isBlockedByPolicy = consumeNavigationPolicyCancel(error)
+            if isBlockedByPolicy, webView.backForwardList.currentItem != nil {
                 onLoadingFinished()
                 return
             }
             if let entryTraceToken { WebEntryTrace.end(.failed, token: entryTraceToken) }
             // 상태 코드를 보고 막은 로드의 취소 알림이다 — 실패는 그때 상태 코드와 함께 올렸다.
-            if didFailOnHTTPStatus {
-                didFailOnHTTPStatus = false
+            if isAwaitingHTTPCancel {
+                isAwaitingHTTPCancel = false
                 return
             }
-            fail(WebLoadFailure(error: error))
+            fail(isBlockedByPolicy ? .blockedByPolicy : WebLoadFailure(error: error))
         }
 
         /// 로드 실패를 올린다. 재던 로드면 그때까지 걸린 시간도 실패(시간 초과)로 남긴다.
@@ -679,7 +685,7 @@ struct BridgeWebView: UIViewRepresentable {
                 Log.trace("Bridge webview HTTP error: \(http.statusCode)", category: .network, level: .error)
                 decisionHandler(.cancel)
                 endRefreshing(success: false, navigation: nil)
-                didFailOnHTTPStatus = true
+                isAwaitingHTTPCancel = true
                 fail(WebLoadFailure(statusCode: http.statusCode))
                 return
             }

@@ -77,6 +77,7 @@ public struct CommunityDetailFeature: Sendable {
         // 이 웹뷰가 window.AppBridgeCapabilities로 알릴 '사전 확인형' 메시지. 처리하는 화면만 넣는다.
         let capabilities: [WebBridgeCapability]
         // 진입 시간 측정의 시작 시각·경로(#298). 위에 쌓이는 화면만 재므로 탭 첫 화면은 nil.
+        // 화면 속도(screen_load, #431)도 여기서부터 재므로 출시 빌드에서도 잡는다 — 단계별 로그는 WebEntryTrace가 Debug·Beta에서만 남긴다.
         var entryOrigin: WebEntryTrace.Origin?
 
         public init(url: URL, title: String? = nil, accessToken: String? = nil) {
@@ -96,9 +97,7 @@ public struct CommunityDetailFeature: Sendable {
             self.leaveGuardEnabled = Self.isWriteOrEditScreen(url)
             self.isTabRoot = isTabRoot
             self.capabilities = capabilities
-            #if DEBUG || BETA
             self.entryOrigin = isTabRoot ? nil : WebEntryTrace.Origin()
-            #endif
         }
 
         /// 글쓰기(`/community/write`)·글 수정(`/community/{id}/edit`) 화면인지.

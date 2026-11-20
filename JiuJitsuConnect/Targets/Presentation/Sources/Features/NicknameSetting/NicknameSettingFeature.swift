@@ -339,14 +339,14 @@ public struct NicknameSettingFeature: Sendable {
             if code == .invalidNickname {
                 state.validationState = .invalidCharacters
                 state.isCtaButtonEnabled = false
-                logNicknameRejected(code.rawValue)
+                logNicknameRejected(code)
                 return .none
             }
             
             if code == .nicknameDuplicated {
                 state.validationState = .unavailable
                 state.isCtaButtonEnabled = false
-                logNicknameRejected(code.rawValue)
+                logNicknameRejected(code)
                 return .none
             }
             
@@ -378,12 +378,12 @@ public struct NicknameSettingFeature: Sendable {
             case .nicknameDuplicated:
                 state.validationState = .unavailable
                 state.isCtaButtonEnabled = false
-                logNicknameRejected(code.rawValue)
+                logNicknameRejected(code)
                 return .none
             case .invalidNickname:
                 state.validationState = .invalidCharacters
                 state.isCtaButtonEnabled = false
-                logNicknameRejected(code.rawValue)
+                logNicknameRejected(code)
                 return .none
             default:
                 break
@@ -398,8 +398,8 @@ public struct NicknameSettingFeature: Sendable {
     }
 
     /// 닉네임 입력칸 아래 안내(길이 · 문자 · 중복)가 뜸 — 입력 검사 실패(#431). `code`: 서버가 거절한 오류 코드.
-    private func logNicknameRejected(_ code: String? = nil) {
-        analyticsClient.logEvent(.errorShown(.validation, code: code, field: .nickname))
+    private func logNicknameRejected(_ code: APIErrorCode? = nil) {
+        analyticsClient.logEvent(.errorShown(.validation, code: code?.rawValue, field: .nickname))
     }
 }
 

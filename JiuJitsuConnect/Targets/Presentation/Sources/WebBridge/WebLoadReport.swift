@@ -15,6 +15,8 @@ public struct WebLoadFailure: Equatable, Sendable {
     static let timeoutCode = "TIMEOUT"
     /// 웹 프로세스가 죽어 오류 화면으로 돌림(#352).
     static let processTerminated = WebLoadFailure(code: "PROCESS_TERMINATED")
+    /// 첫 문서의 리다이렉트를 이동 정책이 막아 띄울 문서가 없음. WebKit이 취소(-999)로 알려도 새 로드에 밀린 취소와 다르다.
+    static let blockedByPolicy = WebLoadFailure(code: "POLICY_BLOCKED")
 
     init(code: String) {
         self.code = code
@@ -53,29 +55,4 @@ struct WebHTTPStatusError: Error {
 public struct WebScreenLoad: Equatable, Sendable {
     public let result: AnalyticsEvent.ScreenLoadResult
     public let milliseconds: Int
-}
-
-// MARK: - 화면 속도 측정 (#431)
-
-extension BridgeWebView.Coordinator {
-    /// 문서는 다 받았는데 이만큼 지나도 PAGE_READY가 없으면 재지 않는다 — 원래 안 보내는 화면(밸런스 상세 등)이나
-    /// 웹 오류 화면이다. 남겨 두면 나중에 웹의 다시 시도가 보낸 PAGE_READY가 오래 머문 시간까지 가져간다.
-    static let pageReadyWaitAfterFinish: Duration = .seconds(10)
-
-    func reportScreenLoad(_ result: AnalyticsEvent.ScreenLoadResult) {
-        guard let startedAt = screenLoadStartedAt else { return }
-        screenLoadStartedAt = nil
-        let endedAt = replayingEventAt ?? .now
-        let milliseconds = max(0, Int(((endedAt - startedAt) / .milliseconds(1)).rounded()))
-        onScreenLoadMeasured?(WebScreenLoad(result: result, milliseconds: milliseconds))
-    }
-
-    func discardScreenLoadIfPageNeverReady() {
-        guard let startedAt = screenLoadStartedAt else { return }
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: Self.pageReadyWaitAfterFinish)
-            guard let self, self.screenLoadStartedAt == startedAt else { return }
-            self.screenLoadStartedAt = nil
-        }
-    }
 }
