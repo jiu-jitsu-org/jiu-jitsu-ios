@@ -279,6 +279,7 @@ public struct MyProfileFeature: Sendable {
     @Dependency(\.userClient) var userClient
     @Dependency(\.noticeClient) var noticeClient
     @Dependency(\.dismiss) var dismiss
+    @Dependency(\.analyticsClient) var analyticsClient
 
 
     public var body: some ReducerOf<Self> {
@@ -412,6 +413,7 @@ public struct MyProfileFeature: Sendable {
                 // 실패는 카드 자리에 안내와 다시 시도로 남긴다 — 같은 말을 토스트로 한 번 더 하지 않는다(#387).
                 state.profileLoadFailed = true
                 Log.trace("Failed to load profile: \(error)", category: .network, level: .error)
+                analyticsClient.logErrorShown(error)
                 return .none
 
             case .view(.profileRetryTapped):
@@ -798,6 +800,8 @@ public struct MyProfileFeature: Sendable {
             case let .internal(.updateProfileResponse(.failure(error))):
                 state.isLoadingProfile = false
                 Log.trace("Failed to update profile: \(error)", category: .network, level: .error)
+                // 도장 · 스타일 화면에 뜨든 MY 토스트로 뜨든 실패 안내는 한 번이다.
+                analyticsClient.logErrorShown(error)
                 // 도장 · 스타일 화면이 떠 있으면 MY 토스트는 가려지므로 그 화면이 직접 알리고 다시 저장하게 한다(#156).
                 // 저장 중엔 다른 저장 화면이 열리지 않아(#155) 떠 있는 화면이 곧 실패한 저장의 화면이다.
                 switch state.destination {
@@ -872,6 +876,7 @@ public struct MyProfileFeature: Sendable {
                         }
                     } catch {
                         Log.trace("알림 화면 이탈 후 설정 저장 실패: \(error)", category: .network, level: .error)
+                        analyticsClient.logErrorShown(error)
                         await send(.internal(.showToast(.init(message: "알림 설정을 저장하지 못했어요. 다시 시도해주세요", status: .error))))
                     }
                 }
@@ -953,6 +958,7 @@ public struct MyProfileFeature: Sendable {
                         await send(.internal(.competitionAdded(saved, competition)))
                     case .failure(let error):
                         Log.trace("Failed to add competition: \(error)", category: .network, level: .error)
+                        analyticsClient.logErrorShown(error)
                         await send(.internal(.competitionAddFailed))
                     }
                 }
@@ -1354,6 +1360,7 @@ public struct MyProfileFeature: Sendable {
                 // 업로드 실패 → 미리보기 롤백
                 state.pendingProfileImageData = nil
                 Log.trace("Failed to upload profile image: \(error)", category: .network, level: .error)
+                analyticsClient.logErrorShown(error, as: .upload)
                 return .send(.internal(.showToast(.init(
                     message: "이미지 업로드에 실패했어요. 다시 시도해주세요", status: .error
                 ))))
@@ -1381,6 +1388,7 @@ public struct MyProfileFeature: Sendable {
             case let .internal(.instructorVerificationImageUploadResponse(.failure(error))):
                 state.isUploadingInstructorVerification = false
                 Log.trace("Failed to upload instructor verification image: \(error)", category: .network, level: .error)
+                analyticsClient.logErrorShown(error, as: .upload)
                 return .send(.internal(.showToast(.init(
                     message: "사진 업로드에 실패했어요. 다시 시도해주세요", status: .error
                 ))))
@@ -1403,6 +1411,7 @@ public struct MyProfileFeature: Sendable {
             case let .internal(.instructorVerificationRequestResponse(.failure(error))):
                 state.isUploadingInstructorVerification = false
                 Log.trace("Failed to request owner verification: \(error)", category: .network, level: .error)
+                analyticsClient.logErrorShown(error)
                 return .send(.internal(.showToast(.init(
                     message: "인증 요청에 실패했어요. 다시 시도해주세요", status: .error
                 ))))
@@ -1429,6 +1438,7 @@ public struct MyProfileFeature: Sendable {
                 state.pendingProfileImageData = nil
                 state.isProfileImageDeleting = false
                 Log.trace("Failed to update profile image url: \(error)", category: .network, level: .error)
+                analyticsClient.logErrorShown(error)
                 return .send(.internal(.showToast(.init(
                     message: "프로필 저장에 실패했어요. 다시 시도해주세요", status: .error
                 ))))

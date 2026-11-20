@@ -125,6 +125,7 @@ public struct NotificationSettingFeature: Sendable {
     @Dependency(\.firebaseClient) var firebaseClient
     @Dependency(\.userClient) var userClient
     @Dependency(\.openURL) var openURL
+    @Dependency(\.analyticsClient) var analyticsClient
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -251,6 +252,7 @@ public struct NotificationSettingFeature: Sendable {
                 Log.trace("알림 설정 조회 실패: \(error)", category: .network, level: .error)
                 // 이미 불러온 뒤 다시 조회(재진입·브리지)가 실패하면 보이는 값이 그대로 쓸 만하니 로그만 남긴다.
                 guard !state.isLoaded else { return .none }
+                analyticsClient.logErrorShown(error)
                 // 토글은 스켈레톤으로 둔 채 그 자리에서 다시 불러올 수 있게 한다.
                 return .send(.internal(.showToast(.init(
                     message: "알림 설정을 불러오지 못했어요.",
@@ -324,6 +326,7 @@ public struct NotificationSettingFeature: Sendable {
     }
 
     private func handleError(_ error: Error) -> Effect<Action> {
+        analyticsClient.logErrorShown(error)
         guard let domainError = error as? DomainError else {
             return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, status: .error))))
         }

@@ -33,6 +33,9 @@ public struct AnalyticsEvent: Equatable, Sendable {
         case competitionRecordStart = "competition_record_start"
         case competitionRecordSave = "competition_record_save"
 
+        // 오류 · 화면 속도(#431). error_shown은 웹과 같이 쓴다(아래 웹 목록).
+        case screenLoad = "screen_load"
+
         // 웹뷰가 ANALYTICS_EVENT로 보내는 기록(#424). 이벤트 사전 v2에서 범위에 FE가 있는 것.
         // 사전에 없는 이름은 브리지가 버린다 — 웹에 이벤트를 더하면 여기에도 더한다.
         case screenView = "screen_view"
@@ -399,7 +402,7 @@ extension AnalyticsEvent {
     }
 
     /// nil 값은 꼬리표에서 뺀다.
-    private static func strings(_ values: [String: String?]) -> [String: Value] {
+    static func strings(_ values: [String: String?]) -> [String: Value] {
         values.compactMapValues { $0.map(Value.string) }
     }
 

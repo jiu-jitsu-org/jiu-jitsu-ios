@@ -26,6 +26,8 @@ public struct CommunityDetailFeature: Sendable {
         fileprivate(set) var url: URL
         /// 이 웹뷰가 마지막으로 알린 화면(screen_view, #425). 맨 위에 보일 때 루트 분석 리듀서가 기록한다.
         var analyticsScreen: AnalyticsEvent?
+        /// 화면 이름(screen_view)을 기다리는 로드 시간(#431).
+        var pendingScreenLoad: WebScreenLoad?
         // 웹 헤더 렌더 전 임시 제목(선택). 네이티브 크롬이 없어 현재는 보관만 한다.
         let title: String?
         // 같은 URL로 재시도 시 View가 reload를 인지하도록 토큰을 갱신한다.
@@ -75,6 +77,7 @@ public struct CommunityDetailFeature: Sendable {
         // 이 웹뷰가 window.AppBridgeCapabilities로 알릴 '사전 확인형' 메시지. 처리하는 화면만 넣는다.
         let capabilities: [WebBridgeCapability]
         // 진입 시간 측정의 시작 시각·경로(#298). 위에 쌓이는 화면만 재므로 탭 첫 화면은 nil.
+        // 화면 속도(screen_load, #431)도 여기서부터 재므로 출시 빌드에서도 잡는다 — 단계별 로그는 WebEntryTrace가 Debug·Beta에서만 남긴다.
         var entryOrigin: WebEntryTrace.Origin?
 
         public init(url: URL, title: String? = nil, accessToken: String? = nil) {
@@ -94,9 +97,7 @@ public struct CommunityDetailFeature: Sendable {
             self.leaveGuardEnabled = Self.isWriteOrEditScreen(url)
             self.isTabRoot = isTabRoot
             self.capabilities = capabilities
-            #if DEBUG || BETA
             self.entryOrigin = isTabRoot ? nil : WebEntryTrace.Origin()
-            #endif
         }
 
         /// 글쓰기(`/community/write`)·글 수정(`/community/{id}/edit`) 화면인지.
@@ -146,7 +147,8 @@ public struct CommunityDetailFeature: Sendable {
             case loadingStarted
             case loadingCommitted
             case loadingFinished
-            case loadingFailed
+            case loadingFailed(WebLoadFailure)
+            case screenLoadMeasured(WebScreenLoad)
             case webProcessTerminated
             case keyboardVisibilityChanged(Bool)
             // 웹뷰가 AppBridge로 보내온 인바운드 메시지(WKScriptMessageHandler 경유).
@@ -301,10 +303,20 @@ public struct CommunityDetailFeature: Sendable {
                 state.hasError = false
                 return .none
 
-            case .internal(.loadingFailed):
+            case let .internal(.loadingFailed(failure)):
                 state.isLoading = false
                 state.isAwaitingFirstResponse = false
                 state.hasError = true
+                WebAnalytics.loadFailed(failure, client: analyticsClient)
+                return .none
+
+            case let .internal(.screenLoadMeasured(load)):
+                WebAnalytics.screenLoadMeasured(
+                    load,
+                    lastScreen: state.analyticsScreen,
+                    pendingLoad: &state.pendingScreenLoad,
+                    client: analyticsClient
+                )
                 return .none
 
             case let .internal(.keyboardVisibilityChanged(isVisible)):
@@ -312,6 +324,8 @@ public struct CommunityDetailFeature: Sendable {
                 return .none
 
             case .internal(.webProcessTerminated):
+                // 이미 오류 화면이면 사용자가 새로 본 오류가 아니다.
+                if !state.hasError { WebAnalytics.loadFailed(.processTerminated, client: analyticsClient) }
                 // 죽은 웹은 BACK_PRESSED에도, 떠 있는 알럿 · 시트 결과에도 답하지 않는다 — 가드를 풀고 오류 화면(뒤로가기 · 재시도)으로 돌린다.
                 // 쓰던 내용이 있었는지는 처음 연 주소가 아니라 가드로 본다 — 등록 뒤 상세로 바뀌었거나 빈 글쓰기면 웹이 가드를 껐다.
                 state.hasLostDraft = state.leaveGuardEnabled && state.isPageReady
@@ -432,6 +446,7 @@ public struct CommunityDetailFeature: Sendable {
 
                 case let .analyticsEvent(event):
                     WebAnalytics.receive(event, lastScreen: &state.analyticsScreen, client: analyticsClient)
+                    WebAnalytics.logPendingScreenLoad(after: event, pendingLoad: &state.pendingScreenLoad, client: analyticsClient)
                     return .none
 
                 case .setSheetOpen:

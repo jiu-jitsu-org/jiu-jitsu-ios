@@ -122,6 +122,7 @@ public struct NicknameSettingFeature: Sendable {
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.recentErrorClient) var recentErrorClient
     @Dependency(\.date) var date
+    @Dependency(\.analyticsClient) var analyticsClient
     
     public var body: some ReducerOf<Self> {
         BindingReducer()
@@ -155,12 +156,14 @@ public struct NicknameSettingFeature: Sendable {
                 if !(2...12).contains(state.nickname.count) {
                     state.validationState = .invalidLength
                     state.isCtaButtonEnabled = false
+                    logNicknameRejected()
                     return .none
                 }
                 
                 if !isValid(nickname: state.nickname) {
                     state.validationState = .invalidCharacters
                     state.isCtaButtonEnabled = false
+                    logNicknameRejected()
                     return .none
                 }
                 
@@ -260,6 +263,7 @@ public struct NicknameSettingFeature: Sendable {
                 } else {
                     state.validationState = .unavailable
                     state.isCtaButtonEnabled = false
+                    logNicknameRejected()
                 }
                 return .none
                 
@@ -324,6 +328,7 @@ public struct NicknameSettingFeature: Sendable {
         }
         guard let domainError = error as? DomainError else {
             Log.trace("Unknown API error: \(error)", category: .network, level: .error)
+            analyticsClient.logErrorShown(error)
             state.validationState = .networkError
             state.isKeyboardVisible = false
             return .send(.delegate(.signupFailed(message: "오류가 발생했습니다. 다시 시도해주세요.")))
@@ -334,12 +339,14 @@ public struct NicknameSettingFeature: Sendable {
             if code == .invalidNickname {
                 state.validationState = .invalidCharacters
                 state.isCtaButtonEnabled = false
+                logNicknameRejected(code)
                 return .none
             }
             
             if code == .nicknameDuplicated {
                 state.validationState = .unavailable
                 state.isCtaButtonEnabled = false
+                logNicknameRejected(code)
                 return .none
             }
             
@@ -356,6 +363,7 @@ public struct NicknameSettingFeature: Sendable {
 
     /// 가입 실패를 이유 또는 오류 코드와 함께 알린다(#379).
     private func signupFailed(_ error: DomainError) -> Effect<Action> {
+        analyticsClient.logErrorShown(error)
         guard let notice = DomainErrorMapper.authFailure(from: error) else { return .none }
         if let code = notice.code {
             recentErrorClient.record(RecentError(code: code, occurredAt: date.now))
@@ -370,20 +378,28 @@ public struct NicknameSettingFeature: Sendable {
             case .nicknameDuplicated:
                 state.validationState = .unavailable
                 state.isCtaButtonEnabled = false
+                logNicknameRejected(code)
                 return .none
             case .invalidNickname:
                 state.validationState = .invalidCharacters
                 state.isCtaButtonEnabled = false
+                logNicknameRejected(code)
                 return .none
             default:
                 break
             }
         }
         // 네트워크 등 일시 오류는 같은 닉네임으로 다시 시도할 수 있게 CTA를 살려 둔다.
+        analyticsClient.logErrorShown(error)
         state.validationState = .saveFailed
         state.validatedNickname = nil
         state.isCtaButtonEnabled = true
         return .none
+    }
+
+    /// 닉네임 입력칸 아래 안내(길이 · 문자 · 중복)가 뜸 — 입력 검사 실패(#431). `code`: 서버가 거절한 오류 코드.
+    private func logNicknameRejected(_ code: APIErrorCode? = nil) {
+        analyticsClient.logEvent(.errorShown(.validation, code: code?.rawValue, field: .nickname))
     }
 }
 

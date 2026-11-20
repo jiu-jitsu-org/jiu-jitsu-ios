@@ -4,6 +4,8 @@
 //
 //  앱 전체의 분석 기록(#423). 기능 코드는 기록을 모르게 두고, 루트에서 지나가는 액션을 보고 이벤트 · 사용자 속성으로 바꾼다.
 //  이벤트를 더할 때는 여기 `reduce`에 액션 → 이벤트 한 줄을 더한다.
+//  예외: 사용자에게 보인 오류(error_shown)와 웹 화면 속도(screen_load)는 오류 · 시간이 액션에 드러나지 않아 문구를 만드는
+//  기능 쪽(`AnalyticsClient.logErrorShown`, `WebAnalytics`)에서 남긴다(#431). 여기서 다시 남기지 않는다.
 //
 
 import ComposableArchitecture

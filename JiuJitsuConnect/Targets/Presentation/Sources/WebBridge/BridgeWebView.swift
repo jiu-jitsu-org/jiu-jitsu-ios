@@ -69,7 +69,10 @@ struct BridgeWebView: UIViewRepresentable {
     var isActive: Bool = true
     let onLoadingStarted: () -> Void
     let onLoadingFinished: () -> Void
-    let onLoadingFailed: () -> Void
+    // 실패 이유(HTTP 상태 · 오류 코드)를 함께 올린다 — 오류 화면을 띄우는 Feature가 error_shown으로 남긴다(#431).
+    let onLoadingFailed: (WebLoadFailure) -> Void
+    // 웹뷰를 연 뒤 PAGE_READY까지(또는 그 전 실패까지) 걸린 시간(screen_load, #431). 당겨서 새로고침은 재지 않는다.
+    var onScreenLoadMeasured: ((WebScreenLoad) -> Void)?
     // 첫 응답이 와서 문서를 그리기 시작함(didCommit). 그 전까지는 웹이 아무것도 그릴 수 없어, 그 사이만 네이티브가
     // 로딩을 알리는 화면(상세)이 받는다. 당겨서 새로고침 중엔 띠가 로딩을 알리므로 보내지 않는다.
     var onLoadingCommitted: (() -> Void)?
@@ -96,6 +99,7 @@ struct BridgeWebView: UIViewRepresentable {
         coordinator.onLoadingCommitted = onLoadingCommitted
         coordinator.onRefreshStarted = onRefreshStarted
         coordinator.onWebProcessTerminated = onWebProcessTerminated
+        coordinator.onScreenLoadMeasured = onScreenLoadMeasured
         return coordinator
     }
 
@@ -177,6 +181,8 @@ struct BridgeWebView: UIViewRepresentable {
 
         context.coordinator.attach(webView: webView)
         context.coordinator.entryTraceToken = entryOrigin == nil ? nil : loadToken
+        // 화면을 연 때부터 잰다 — 상세는 State를 만든 순간, 미리 불러 둔 홈은 미리 불러오기를 시작한 순간.
+        context.coordinator.screenLoadStartedAt = entryOrigin?.startedAt ?? preload?.startedAt ?? .now
         // 고정 셸(상세): 키보드가 문서를 위로 스크롤해 헤더가 화면 밖으로 밀리는 것을 막는다.
         if locksDocumentScroll {
             context.coordinator.enableDocumentScrollLock(on: webView.scrollView)
@@ -243,6 +249,7 @@ struct BridgeWebView: UIViewRepresentable {
         context.coordinator.onLoadingCommitted = onLoadingCommitted
         context.coordinator.onRefreshStarted = onRefreshStarted
         context.coordinator.onWebProcessTerminated = onWebProcessTerminated
+        context.coordinator.onScreenLoadMeasured = onScreenLoadMeasured
         context.coordinator.scrollToTop(token: scrollToTopToken)
         context.coordinator.setPullToRefreshBackground(pullToRefreshBackground.map { UIColor($0) })
         // 탭 첫 화면 웹만 스크롤을 AppTabView에 알린다 — 탭 바 숨김·맨 위로 버튼(#267).
@@ -281,12 +288,21 @@ struct BridgeWebView: UIViewRepresentable {
         private let source: WebBridgeSource
         private var onLoadingStarted: () -> Void
         private var onLoadingFinished: () -> Void
-        private var onLoadingFailed: () -> Void
+        private var onLoadingFailed: (WebLoadFailure) -> Void
         private var onBridgeMessage: (WebBridgeInboundMessage) -> Void
         private var onOutboundDelivered: (UUID) -> Void
         var onLoadingCommitted: (() -> Void)?
         var onRefreshStarted: (() -> Void)?
         var onWebProcessTerminated: (() -> Void)?
+        var onScreenLoadMeasured: ((WebScreenLoad) -> Void)?
+        // 재고 있는 로드의 시작 시각(#431). 결과를 올리면 비운다 — 같은 문서의 PAGE_READY가 다시 와도 한 번만 센다.
+        var screenLoadStartedAt: ContinuousClock.Instant? {
+            didSet { screenLoadDeadline = nil }
+        }
+        // 문서를 받은 뒤 PAGE_READY를 기다리는 기한(BridgeWebView+ScreenLoad).
+        var screenLoadDeadline: ContinuousClock.Instant?
+        // 미리 불러 둔 홈이 받아 둔 이벤트를 다시 보내는 동안 그 이벤트가 실제로 온 시각. HomeFeedPreload.handOff가 넣고 지운다.
+        var replayingEventAt: ContinuousClock.Instant?
 
         private var lastLoadedURL: URL?
         private var lastLoadToken: UUID?
@@ -320,13 +336,16 @@ struct BridgeWebView: UIViewRepresentable {
         // 진입 시간 측정의 키(#298). 웹뷰를 만들 때의 loadToken — 다시 시도로 토큰이 바뀌어도 첫 진입 기록을 끝맺는다.
         var entryTraceToken: UUID?
         // 마지막 메인 프레임 이동을 이동 정책이 막았는지. 리다이렉트를 막으면 실패 알림이 따로 와 오류와 구분한다.
-        private var didCancelMainFrameNavigation = false
+        var didCancelMainFrameNavigation = false
+        // 4xx · 5xx 응답을 막아 실패를 이미 올렸고 WebKit이 한 번 더 알릴 취소 실패를 기다리는 중 — 오류를 두 번 세지 않게 거른다.
+        // 미리 불러 둔 홈을 넘겨받을 때는 HomeFeedPreload.handOff가 그 웹뷰의 상태를 넣는다.
+        var isAwaitingHTTPCancel = false
 
         init(
             source: WebBridgeSource,
             onLoadingStarted: @escaping () -> Void,
             onLoadingFinished: @escaping () -> Void,
-            onLoadingFailed: @escaping () -> Void,
+            onLoadingFailed: @escaping (WebLoadFailure) -> Void,
             onBridgeMessage: @escaping (WebBridgeInboundMessage) -> Void,
             onOutboundDelivered: @escaping (UUID) -> Void
         ) {
@@ -341,7 +360,7 @@ struct BridgeWebView: UIViewRepresentable {
         func update(
             onLoadingStarted: @escaping () -> Void,
             onLoadingFinished: @escaping () -> Void,
-            onLoadingFailed: @escaping () -> Void,
+            onLoadingFailed: @escaping (WebLoadFailure) -> Void,
             onBridgeMessage: @escaping (WebBridgeInboundMessage) -> Void,
             onOutboundDelivered: @escaping (UUID) -> Void
         ) {
@@ -359,6 +378,8 @@ struct BridgeWebView: UIViewRepresentable {
             setWebSheetOpen(false)
             isDeactivated = true
             if let entryTraceToken { WebEntryTrace.end(.closed, token: entryTraceToken) }
+            // 뜨기 전에 닫은 화면은 걸린 시간을 모른다.
+            screenLoadStartedAt = nil
             webView?.stopLoading()
             webView?.navigationDelegate = nil
             webView?.uiDelegate = nil
@@ -378,6 +399,8 @@ struct BridgeWebView: UIViewRepresentable {
             guard !isDeactivated, let webView else { return }
             // URL이 바뀌었거나 retry 토큰이 갱신된 경우에만 reload.
             guard lastLoadedURL != url || lastLoadToken != token else { return }
+            // 첫 로드는 화면을 연 때(makeUIView)부터, 다시 시도는 지금부터 잰다.
+            if lastLoadToken != nil { screenLoadStartedAt = .now }
             lastLoadedURL = url
             lastLoadToken = token
             // 재로드(재시도) 시 웹 컨텍스트가 초기화되므로 전달 기록도 비운다.
@@ -467,6 +490,8 @@ struct BridgeWebView: UIViewRepresentable {
         private func reloadForRefresh(_ webView: WKWebView) {
             // 첫 로드를 끊고 다시 불러오면 그 뒤 값은 첫 진입 시간이 아니다(#298).
             if let entryTraceToken { WebEntryTrace.end(.refreshed, token: entryTraceToken) }
+            // 새로고침은 화면을 여는 시간이 아니라 재지 않는다. 첫 로드 중에 당겼으면 그 측정도 버린다.
+            screenLoadStartedAt = nil
             refreshNavigation = webView.reload()
             // 다시 불러올 페이지가 없으면 기다릴 결과도 없으니 띠를 바로 닫는다.
             guard refreshNavigation == nil else { return }
@@ -546,6 +571,7 @@ struct BridgeWebView: UIViewRepresentable {
                 setWebSheetOpen(isOpen)
                 return
             }
+            if case .pageReady = inbound { reportScreenLoad(.succeeded) }
             if let entryTraceToken {
                 switch inbound {
                 case .webViewReady: WebEntryTrace.mark(.ready, token: entryTraceToken)
@@ -568,12 +594,15 @@ struct BridgeWebView: UIViewRepresentable {
         }
 
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            // 뜨기 전에 죽었으면 그 로드는 실패다. 오류 화면으로 받는 화면(상세)만 — 아니면 보인 오류 없이 실패만 남는다.
+            if onWebProcessTerminated != nil { reportScreenLoad(.fail) }
             // 웹 프로세스가 죽으면 닫힘 신호도 새 문서(didCommit)도 오지 않을 수 있다 — 시트가 열린 채였으면 탭 바를 돌려놓는다.
             setWebSheetOpen(false)
             onWebProcessTerminated?()
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            isAwaitingHTTPCancel = false
             // 풀다운 리프레시 중에는 페이지를 가리는 전면 오버레이 대신 스피너만 유지한다.
             guard !isRefreshing else { return }
             onLoadingStarted()
@@ -592,6 +621,7 @@ struct BridgeWebView: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             if let entryTraceToken { WebEntryTrace.mark(.finish, token: entryTraceToken) }
+            markScreenLoadDocumentFinished()
             endRefreshing(success: true, navigation: navigation)
             onLoadingFinished()
             // 웹이 로드되며 overscroll-behavior로 바운스를 끌 수 있어 풀다운 여지를 재확보한다.
@@ -603,7 +633,7 @@ struct BridgeWebView: UIViewRepresentable {
             endRefreshing(success: false, navigation: navigation)
             guard !isCancelledByRefresh(error) else { return }
             if let entryTraceToken { WebEntryTrace.end(.failed, token: entryTraceToken) }
-            onLoadingFailed()
+            fail(WebLoadFailure(error: error))
         }
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
@@ -611,12 +641,25 @@ struct BridgeWebView: UIViewRepresentable {
             endRefreshing(success: false, navigation: navigation)
             guard !isCancelledByRefresh(error) else { return }
             // 이동 정책이 막은 리다이렉트: 앞 문서가 남아 있으면 오류가 아니다 — 로딩만 끝낸다. 첫 로드면 띄울 문서가 없어 실패로 둔다.
-            if consumeNavigationPolicyCancel(error), webView.backForwardList.currentItem != nil {
+            let isBlockedByPolicy = consumeNavigationPolicyCancel(error)
+            if isBlockedByPolicy, webView.backForwardList.currentItem != nil {
                 onLoadingFinished()
                 return
             }
             if let entryTraceToken { WebEntryTrace.end(.failed, token: entryTraceToken) }
-            onLoadingFailed()
+            // 상태 코드를 보고 막은 로드의 취소 알림이다 — 실패는 그때 상태 코드와 함께 올렸다.
+            if isAwaitingHTTPCancel {
+                isAwaitingHTTPCancel = false
+                return
+            }
+            fail(isBlockedByPolicy ? .blockedByPolicy : WebLoadFailure(error: error))
+        }
+
+        /// 로드 실패를 올린다. 재던 로드면 그때까지 걸린 시간도 실패(시간 초과)로 남긴다.
+        /// 새 로드에 밀려 취소된 로드는 재던 것이 새 로드라 측정을 건드리지 않는다.
+        private func fail(_ failure: WebLoadFailure) {
+            if !failure.isCancelled { reportScreenLoad(failure.isTimeout ? .timeout : .fail) }
+            onLoadingFailed(failure)
         }
 
         /// 새로고침의 reload가 앞서 진행 중이던 로드를 취소한 알림인지. 그 로드는 실패가 아니라
@@ -642,7 +685,8 @@ struct BridgeWebView: UIViewRepresentable {
                 Log.trace("Bridge webview HTTP error: \(http.statusCode)", category: .network, level: .error)
                 decisionHandler(.cancel)
                 endRefreshing(success: false, navigation: nil)
-                onLoadingFailed()
+                isAwaitingHTTPCancel = true
+                fail(WebLoadFailure(statusCode: http.statusCode))
                 return
             }
             decisionHandler(.allow)
@@ -715,7 +759,7 @@ struct BridgeWebView: UIViewRepresentable {
 
         /// 바깥 주소를 앱 위 브라우저(SFSafariViewController)로 띄운다(#316). 닫으면(완료·아래로 쓸기) 웹뷰 화면이 그대로 남는다.
         /// 다른 앱이 맡는 유니버설 링크는 지금처럼 그 앱으로 넘기고, 아닐 때만 앱 안에서 연다.
-        private func openExternal(_ url: URL, from webView: WKWebView) {
+        func openExternal(_ url: URL, from webView: WKWebView) {
             UIApplication.shared.open(url, options: [.universalLinksOnly: true]) { [weak self, weak webView] openedInApp in
                 // 완료 콜백은 메인 액터 보장이 없으므로 UIKit 작업은 메인 액터에서 한다.
                 Task { @MainActor [weak self, weak webView] in
@@ -750,51 +794,6 @@ struct BridgeWebView: UIViewRepresentable {
                 return
             }
             presenter.present(viewController, animated: true)
-        }
-    }
-}
-
-// MARK: - 메인 프레임 이동 정책
-
-extension BridgeWebView.Coordinator {
-    /// 이동 정책이 막은 로드의 실패 알림이면 true를 돌려주고 표시를 지운다. WebKit은 "정책 변경으로 중단"(102)으로
-    /// 알리지만, 취소(-999)로 오는 경우도 같은 것으로 본다 — 표시는 이 코디네이터가 막았을 때만 켜진다.
-    private func consumeNavigationPolicyCancel(_ error: Error) -> Bool {
-        guard didCancelMainFrameNavigation else { return false }
-        didCancelMainFrameNavigation = false
-        let error = error as NSError
-        return (error.domain == "WebKitErrorDomain" && error.code == 102) || error.code == NSURLErrorCancelled
-    }
-
-    // 메인 프레임 이동은 앱 웹 주소만 웹뷰에서 연다. 바깥 주소는 앱 위 브라우저, 전화 · 메일은 시스템으로 넘긴다.
-    // 새 창(targetFrame nil)은 createWebViewWith가, iframe 이동은 그 문서가 맡으므로 그대로 둔다.
-    func webView(
-        _ webView: WKWebView,
-        decidePolicyFor navigationAction: WKNavigationAction,
-        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
-    ) {
-        guard navigationAction.targetFrame?.isMainFrame == true, let url = navigationAction.request.url else {
-            decisionHandler(.allow)
-            return
-        }
-        let route = WebEnvironment.mainFrameRoute(for: url)
-        didCancelMainFrameNavigation = route != .webView
-        decisionHandler(route == .webView ? .allow : .cancel)
-        switch route {
-        case .webView: break
-        case .inAppBrowser: openExternal(url, from: webView)
-        case .system: UIApplication.shared.open(url)
-        case .blocked: Log.trace("Bridge webview 이동 무시(지원하지 않는 scheme): \(url.scheme ?? "")", category: .view, level: .info)
-        }
-    }
-}
-
-private extension WebBridgeInboundMessage {
-    /// 이 웹뷰 위에 네이티브 화면(회원 프로필 · 서브뷰)을 쌓는 요청인지.
-    var stacksScreenOverWebView: Bool {
-        switch self {
-        case .openUserProfile, .openSubview: true
-        default: false
         }
     }
 }
