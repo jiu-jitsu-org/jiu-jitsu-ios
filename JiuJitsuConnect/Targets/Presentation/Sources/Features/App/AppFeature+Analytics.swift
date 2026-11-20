@@ -106,6 +106,7 @@ extension AppFeature {
             }
             reduceSafetyEvent(action: action)
             reduceProfileEvent(into: &state, action: action)
+            reduceUIClickEvent(state: state, action: action)
             return .merge(effect, screenEffect, updateVisibleScreen(&state))
         }
 

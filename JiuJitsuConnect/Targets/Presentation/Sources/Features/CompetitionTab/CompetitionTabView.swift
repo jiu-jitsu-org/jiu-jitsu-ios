@@ -101,6 +101,7 @@ private struct CompetitionListWebView: View {
                 onLoadingFinished: { store.send(.internal(.loadingFinished)) },
                 onLoadingFailed: { store.send(.internal(.loadingFailed($0))) },
                 onScreenLoadMeasured: { store.send(.internal(.screenLoadMeasured($0))) },
+                onRefreshStarted: { store.send(.internal(.refreshStarted)) },
                 onBridgeMessage: { store.send(.internal(.bridgeMessageReceived($0))) },
                 onOutboundDelivered: { store.send(.internal(.outboundDelivered(id: $0))) }
             )

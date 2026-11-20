@@ -519,6 +519,28 @@ extension AnalyticsEvent {
     }
 }
 
+// MARK: - 이름 없는 누름 (#432)
+
+extension AnalyticsEvent {
+    /// 이름 붙은 이벤트가 없는 앱 버튼(사전 `element`, `화면.요소`). 웹 버튼은 웹이 `data-ga`로 남긴다(FE #584).
+    public enum UIElement: String, Sendable {
+        case homeSearchButton = "home.search_button"
+        case homeNotificationButton = "home.notification_button"
+        case competitionNotificationButton = "competition.notification_button"
+        case homeScrollTop = "home.scroll_top"
+        case competitionScrollTop = "competition.scroll_top"
+        case homeTabReselect = "home.tab_reselect"
+        case competitionTabReselect = "competition.tab_reselect"
+        case homePullRefresh = "home.pull_refresh"
+        case competitionPullRefresh = "competition.pull_refresh"
+        case tabBarMy = "tab_bar.my"
+    }
+
+    public static func uiClick(_ element: UIElement) -> Self {
+        Self(.uiClick, parameters: ["element": .string(element.rawValue)])
+    }
+}
+
 // MARK: - 사용자 속성
 
 /// GA 사용자 속성(사전 "사용자 속성"). `signup_week`는 서버 값이 생기면 더한다.
