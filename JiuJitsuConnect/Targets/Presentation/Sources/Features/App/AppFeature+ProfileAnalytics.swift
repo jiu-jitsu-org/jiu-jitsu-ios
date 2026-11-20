@@ -197,7 +197,7 @@ extension AppFeature.Analytics {
     // MARK: - 화면 찾기
 
     /// MY가 받은 액션과 그 상태(액션을 처리한 뒤). MY 탭과, 홈 path · coverPath에 쌓인 MY.
-    private static func myProfileAction(
+    static func myProfileAction(
         of action: Action,
         in state: State
     ) -> (MyProfileFeature.Action, MyProfileFeature.State)? {

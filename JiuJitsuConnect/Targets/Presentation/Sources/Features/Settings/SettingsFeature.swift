@@ -109,7 +109,8 @@ public struct SettingsFeature: Sendable {
         public enum InternalAction: Sendable {
             case versionPolicyLoaded(AppVersionPolicy)
             case withdrawalResponse(TaskResult<Bool>)
-            case inquiryOpenFinished
+            // opened: 메일 앱이 열렸는지(못 열면 주소를 복사했다). 루트의 분석 기록이 본다(#430).
+            case inquiryOpenFinished(opened: Bool)
             case showToast(ToastState)
             case toastDismissed
         }
@@ -206,7 +207,8 @@ public struct SettingsFeature: Sendable {
                 }
                 state.isOpeningInquiry = true
                 return .run { send in
-                    if await !openURL(url) {
+                    let opened = await openURL(url)
+                    if !opened {
                         // 관장 사범 인증 문의와 같게, 메일 앱이 없으면 주소를 복사해 두고 알린다.
                         Log.trace("문의 메일을 열지 못함(메일 앱 없음 등)", category: .view, level: .error)
                         await MainActor.run { UIPasteboard.general.string = email }
@@ -214,7 +216,7 @@ public struct SettingsFeature: Sendable {
                             message: "메일 앱을 열 수 없어 문의 주소를 복사했어요", status: .info
                         ))))
                     }
-                    await send(.internal(.inquiryOpenFinished))
+                    await send(.internal(.inquiryOpenFinished(opened: opened)))
                 }
 
             case .internal(.inquiryOpenFinished):

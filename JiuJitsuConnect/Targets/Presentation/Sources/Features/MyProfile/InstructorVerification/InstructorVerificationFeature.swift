@@ -70,6 +70,8 @@ public struct InstructorVerificationFeature: Sendable {
         public enum DelegateAction: Sendable {
             case didSelectUpload
             case didCancel
+            /// 문의 메일 앱이 열림. 루트의 분석 기록만 본다(#430).
+            case contactOpened
             /// 메일 앱을 열지 못함(메일 앱 삭제 등). 부모가 주소를 복사하고 알려 준다.
             case mailUnavailable(email: String)
         }
@@ -99,7 +101,9 @@ public struct InstructorVerificationFeature: Sendable {
                     return .none
                 }
                 return .run { send in
-                    if await !openURL(url) {
+                    if await openURL(url) {
+                        await send(.delegate(.contactOpened))
+                    } else {
                         Log.trace("관장 사범 인증 문의 메일을 열지 못함(메일 앱 없음 등)", category: .view, level: .error)
                         await send(.delegate(.mailUnavailable(email: email)))
                     }

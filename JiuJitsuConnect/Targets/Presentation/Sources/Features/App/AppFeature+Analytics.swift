@@ -64,6 +64,10 @@ extension AppFeature {
         var pendingProfileSave: PendingProfileSave?
         /// MY 사진 · 인증 사진을 고른 방법(#429). 사진을 고르면 화면 상태에서 지워져 반영 응답까지 여기 둔다.
         var pendingPhoto: PendingPhoto?
+        /// 알림 설정 저장을 시작할 때 서버에 있던 값(#430). 응답 때는 화면의 마지막 저장값이 이미 새 값이라 미리 잡아 둔다.
+        var pendingNotificationBaseline: NoticeSetting?
+        /// 알림 화면을 나가며 MY에 넘긴 저장의 기준값. 그 응답을 기다리는 사이 알림 화면을 다시 열어 저장해도 섞이지 않게 따로 둔다.
+        var handedOffNotificationBaseline: NoticeSetting?
 
         struct LinkReceipt: Equatable, Sendable {
             let url: URL
@@ -107,6 +111,7 @@ extension AppFeature {
             reduceSafetyEvent(action: action)
             reduceProfileEvent(into: &state, action: action)
             reduceUIClickEvent(state: state, action: action)
+            reduceSettingsEvent(into: &state, action: action)
             return .merge(effect, screenEffect, updateVisibleScreen(&state))
         }
 
