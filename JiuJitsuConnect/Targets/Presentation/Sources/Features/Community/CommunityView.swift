@@ -107,11 +107,11 @@ public struct CommunityView: View {
                     .frame(height: 1)
                     .opacity(headerTint == nil && !webDrawsTopGlass ? 1 : 0)
             }
-            // 바탕이 비어도 머리줄을 누르면 뒤로 지나가는 글이 눌리지 않게 막는다.
+            // 바탕이 비어도 머리줄을 누르면 뒤로 지나가는 글이 눌리지 않게 막는다(비운 바탕도 거의 투명한 면으로 두어 손가락을 받는다).
             .contentShape(Rectangle())
             // 바탕을 상단 safe area(상태바)까지 끌어올려 회색(background.default)이 상태바에 번지지 않게 한다.
             .background {
-                (headerTint ?? (webDrawsTopGlass ? Color.clear : Color.component.header.background))
+                (headerTint ?? (webDrawsTopGlass ? Color.component.header.background.opacity(0.001) : Color.component.header.background))
                     .ignoresSafeArea(edges: .top)
             }
             // 띠가 들고 날 때 한 번에 바뀐다(기본 모션 0.5초).

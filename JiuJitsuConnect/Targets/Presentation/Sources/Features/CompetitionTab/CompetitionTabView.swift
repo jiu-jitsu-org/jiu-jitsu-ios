@@ -74,12 +74,12 @@ public struct CompetitionTabView: View {
         .padding(.leading, 16)
         .padding(.trailing, 8)
         .frame(height: 44)
-        // 바탕이 비어도 머리줄을 누르면 뒤로 지나가는 카드가 눌리지 않게 막는다.
+        // 바탕이 비어도 머리줄을 누르면 뒤로 지나가는 카드가 눌리지 않게 막는다(비운 바탕도 거의 투명한 면으로 두어 손가락을 받는다).
         .contentShape(Rectangle())
         // 홈 머리줄과 같은 흰 바탕(웹이 색을 알리면 그 색)을 상태바까지 끌어올린다.
         // 웹이 스크롤하며 조금씩 다른 색을 연달아 보내므로 애니메이션 없이 바로 바꾼다.
         .background {
-            (headerTint ?? (webDrawsTopGlass ? Color.clear : Color.component.header.background))
+            (headerTint ?? (webDrawsTopGlass ? Color.component.header.background.opacity(0.001) : Color.component.header.background))
                 .ignoresSafeArea(edges: .top)
         }
     }
