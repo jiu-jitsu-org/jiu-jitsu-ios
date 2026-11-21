@@ -29,15 +29,17 @@ enum WebRefreshPhase: Equatable {
 
 /// 화면마다 다른 새로고침 꾸밈. 대회 탭은 머리줄이 내 띠 색으로 칠해져 있어 당길 때 보이는 손까지
 /// 파랑이면 블루띠를 뜻하는 것처럼 읽히므로(#287) 그 손 하나만 흰 손으로, 문구는 대회 문구로 둔다.
-/// 놓을 때 터지는 손들(ShakaBurstView)은 두 화면 모두 여러 색 그대로.
+/// 홈 피드도 맨 위 진한 띠가 보이는 동안은 밴드가 띠 색이라, 문구는 피드 그대로 두고 손만 흰 손으로 바꾼다(feedOnDark).
+/// 놓을 때 터지는 손들(ShakaBurstView)은 모든 화면에서 여러 색 그대로.
 enum WebPullToRefreshStyle: Equatable {
     case feed
+    case feedOnDark
     case competition
 
     // 당길 때마다 하나를 골라 보여 준다.
     var pullingLines: [String] {
         switch self {
-        case .feed:
+        case .feed, .feedOnDark:
             return [
                 "OSS! 새 글 스윕 중",
                 "샤카~ 오늘도 매트 위로",
@@ -62,7 +64,7 @@ enum WebPullToRefreshStyle: Equatable {
 
     var success: String {
         switch self {
-        case .feed: return "오쓰! 최신 소식을 가져왔어요"
+        case .feed, .feedOnDark: return "오쓰! 최신 소식을 가져왔어요"
         case .competition: return "OSS! 대회 소식을 새로 가져왔어요"
         }
     }
@@ -71,7 +73,7 @@ enum WebPullToRefreshStyle: Equatable {
     var icon: UIImage {
         switch self {
         case .feed: return Assets.Common.Shaka.icon.image
-        case .competition: return Assets.Common.Shaka.burstWhite.image
+        case .feedOnDark, .competition: return Assets.Common.Shaka.burstWhite.image
         }
     }
 }
@@ -91,7 +93,10 @@ final class WebPullToRefreshBand: UIView {
     private let iconView = UIImageView()
     private let label = UILabel()
     private var isWaving = false
-    private let style: WebPullToRefreshStyle
+    // 홈은 머리줄 색에 따라 그리는 중에 바뀐다. 문구는 다음 당김부터 새 꾸밈에서 고른다.
+    var style: WebPullToRefreshStyle {
+        didSet { iconView.image = style.icon }
+    }
     private var pullingLine: String
     // 문구 투명도 계산용. 컨트롤러가 밴드를 늘릴 때와 같은 기준이다.
     private let triggerThreshold: CGFloat
@@ -506,6 +511,12 @@ final class WebPullToRefreshController {
             y: scrollView.frame.minY + systemTop + Metrics.refreshingHeight / 2
         )
         burstView.burst(at: origin)
+    }
+
+    /// 꾸밈(손 색·문구)을 바꾼다. 홈은 맨 위 진한 띠가 보이는 동안만 흰 손을 쓴다.
+    func setStyle(_ style: WebPullToRefreshStyle) {
+        guard band.style != style else { return }
+        band.style = style
     }
 
     /// 밴드 바탕색을 바꾼다. nil이면 기본 연파랑. 화면 머리줄이 다른 색일 때 당겨도 이음새가 없게 한다.
