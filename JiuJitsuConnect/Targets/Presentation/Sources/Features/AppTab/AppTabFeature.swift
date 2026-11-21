@@ -409,14 +409,14 @@ public struct AppTabFeature: Sendable {
                 return .send(.home(.unreadNotificationRefreshRequested))
 
             // 웹의 '피드로 가기'(OPEN_HOME_FEED) — 연 탭마다 무엇을 닫는지는 AppTabFeature+HomeFeed.
-            case let .competition(.delegate(.homeFeedRequested(competitionId))):
-                return Self.showHomeFeed(from: .competition, competitionId: competitionId, into: &state)
+            case let .competition(.delegate(.homeFeedRequested(filter))):
+                return Self.showHomeFeed(from: .competition, filter: filter, into: &state)
 
-            case let .home(.delegate(.homeFeedRequested(competitionId))):
-                return Self.showHomeFeed(from: .home, competitionId: competitionId, into: &state)
+            case let .home(.delegate(.homeFeedRequested(filter))):
+                return Self.showHomeFeed(from: .home, filter: filter, into: &state)
 
-            case let .myPage(.delegate(.webSubview(.homeFeedRequested(competitionId)))):
-                return Self.showHomeFeed(from: .myPage, competitionId: competitionId, into: &state)
+            case let .myPage(.delegate(.webSubview(.homeFeedRequested(filter)))):
+                return Self.showHomeFeed(from: .myPage, filter: filter, into: &state)
 
             // 끝난 대회의 '내 기록에 남기기'(#250). 웹은 비로그인이면 로그인 안내를 대신 보내지만, 웹과 앱의 로그인 상태가
             // 어긋났을 때를 대비해 앱도 막는다 — 로그인 모달을 띄우고, 로그인하면 이 대회로 이어서 연다.
