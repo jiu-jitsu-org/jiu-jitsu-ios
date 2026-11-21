@@ -159,6 +159,8 @@ private extension WebBridgeInboundMessage {
             return "HOME_HEADER_TINT  color=\(hex ?? "null")"
         case let .setSheetOpen(open):
             return "SET_SHEET_OPEN  open=\(open)"
+        case let .setTopGlass(active):
+            return "SET_TOP_GLASS  active=\(active)"
         case let .contentCreated(kind):
             return "CONTENT_CREATED  kind=\(kind.rawValue)"
         case let .analyticsEvent(event):
@@ -278,6 +280,10 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 가린 높이를 0으로 돌려, 시트가 탭 바 자리까지 내려오게 한다(안 그러면 그 자리를 WebKit이 시트 가장자리 색으로 채운다).
     /// 화면 표시만 바꾸는 신호라 BridgeWebView가 받아 처리하고 Feature로는 넘기지 않는다.
     case setSheetOpen(Bool)
+    /// 웹이 앱 머리줄 뒤까지 비치는 유리 면을 그리는지(홈 · 대회 탭 목록). 그리는 동안 앱은 머리줄 바탕을 비워 두고
+    /// (글자 · 아이콘만) 웹 유리 면 한 장이 머리줄과 칩 · 필터 줄을 끊김 없이 덮게 한다. 옛 웹은 보내지 않아 흰 머리줄 그대로다.
+    /// 화면 표시만 바꾸는 신호라 BridgeWebView가 받아 처리하고 Feature로는 넘기지 않는다.
+    case setTopGlass(Bool)
     /// 글 · 댓글(답글 · 밸런스 게임 댓글 포함) 등록 성공(#333 · jiu-jitsu-frontend#495). 웹은 매번 보내고(capability 확인 없음),
     /// 알림 권한 안내를 띄울지는 앱(AppTab)이 정한다.
     case contentCreated(ContentCreatedKind)
@@ -309,6 +315,7 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case competitionHeaderTint = "COMPETITION_HEADER_TINT"
         case homeHeaderTint = "HOME_HEADER_TINT"
         case setSheetOpen = "SET_SHEET_OPEN"
+        case setTopGlass = "SET_TOP_GLASS"
         case contentCreated = "CONTENT_CREATED"
         case analyticsEvent = "ANALYTICS_EVENT"
     }
@@ -472,6 +479,9 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case .setSheetOpen:
             // 값이 어긋나면 닫힘으로 본다 — 탭 바가 숨은 채 갇히지 않게.
             return .setSheetOpen((payload?["open"] as? Bool) ?? false)
+        case .setTopGlass:
+            // 값이 어긋나면 꺼짐으로 본다 — 머리줄이 빈 채로 글이 비쳐 보이지 않게.
+            return .setTopGlass((payload?["active"] as? Bool) ?? false)
         case .contentCreated:
             return decodeContentCreated(payload)
         case .analyticsEvent:
@@ -767,6 +777,9 @@ enum WebBridgeCapability: String, Equatable, Sendable {
     case homeHeaderTint = "HOME_HEADER_TINT"
     /// 탭 첫 화면 웹(떠 있는 탭 바 밑까지 그리는 웹뷰)만 알린다(#314). 목록이 없으면 웹은 시트 열림을 보내지 않는다.
     case setSheetOpen = "SET_SHEET_OPEN"
+    /// 머리줄 뒤까지 그리는 탭 첫 화면 웹(홈 · 대회 목록)만 알린다. 웹뷰 위쪽이 머리줄에 가린 높이는
+    /// `--app-header-obscured-top`으로 넘긴다. 목록이 없으면 웹은 유리 면을 그리지 않고 신호도 보내지 않는다.
+    case setTopGlass = "SET_TOP_GLASS"
     /// 모든 웹뷰가 알린다(#424, BridgeWebView가 붙임). 목록이 없으면 웹은 기록을 버린다. 있으면 서브뷰 주소에 `?from=`을 싣는다.
     case analyticsEvent = "ANALYTICS_EVENT"
     /// 모든 웹뷰가 알린다(#395, BridgeWebView가 붙임). 있으면 웹은 requestId를 실어 보내고 COMPETITION_ALERTS_RESULT를 기다린다.

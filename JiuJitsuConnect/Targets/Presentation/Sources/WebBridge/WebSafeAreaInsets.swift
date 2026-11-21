@@ -18,28 +18,44 @@ import WebKit
 struct WebSafeAreaInsets: Equatable {
     var top: CGFloat
     var bottom: CGFloat
+    /// 웹뷰 위쪽이 앱 머리줄(상태바 포함)에 덮인 높이. 머리줄 뒤까지 그리는 탭 첫 화면 웹(홈·대회)만 값이 있다.
+    /// 웹은 유리 면을 그릴 때 맨 위를 이만큼 비우고 붙는 줄을 이 아래에 붙인다(앱이 가린 영역으로 알리지 않는 동안).
+    var headerObscuredTop: CGFloat = 0
 
     static let topVariable = "--app-safe-area-inset-top"
     static let bottomVariable = "--app-safe-area-inset-bottom"
+    static let headerObscuredTopVariable = "--app-header-obscured-top"
+    /// 탭 첫 화면(홈·대회) 앱 머리줄 높이. 상태바 아래에 놓인다.
+    static let tabHeaderHeight: CGFloat = 44
 
     /// 웹뷰를 화면에 붙이기 전, 놓일 자리로 짐작한 값. 문서 시작 스크립트에 넣어 첫 그림부터 맞게 한다.
     /// 세로 고정 앱이라 창의 안전 영역은 기기마다 정해져 있다. 창을 못 찾으면 0 — 웹은 `env()`와 같은 처지가 된다.
+    /// 머리줄 뒤까지 그리는 웹은 웹이 유리 면을 그린다고 보고 시작하므로(KeyboardAvoidingWebContainer) 머리줄 높이가 곧 위쪽 안전 영역이다.
     @MainActor
-    static func expected(coversStatusBar: Bool) -> WebSafeAreaInsets {
+    static func expected(coversStatusBar: Bool, underTabHeader: Bool = false) -> WebSafeAreaInsets {
         let windowInsets = keyWindow?.safeAreaInsets ?? .zero
-        return WebSafeAreaInsets(top: coversStatusBar ? windowInsets.top : 0, bottom: windowInsets.bottom)
+        let headerTop = underTabHeader ? windowInsets.top + tabHeaderHeight : 0
+        return WebSafeAreaInsets(
+            top: underTabHeader ? headerTop : coversStatusBar ? windowInsets.top : 0,
+            bottom: windowInsets.bottom,
+            headerObscuredTop: headerTop
+        )
     }
 
     /// 화면에 붙은 웹뷰가 지금 겹치는 값. 창에 없으면(닫히는 중 · 아직 안 붙음) nil.
+    /// 위쪽은 가린 곳(obscuredContentInsets) 아래부터 잰다 — 웹이 실제로 배치되는 자리와 겹치는 만큼만.
+    /// 머리줄 뒤까지 그리는 웹이 맨 위를 스스로 비우는 동안은 머리줄에 덮인 높이까지 위쪽 안전 영역으로 본다.
     @MainActor
-    static func measured(for view: UIView) -> WebSafeAreaInsets? {
-        guard let window = view.window else { return nil }
-        let frame = view.convert(view.bounds, to: window)
+    static func measured(for webView: ChromelessWebView) -> WebSafeAreaInsets? {
+        guard let window = webView.window else { return nil }
+        let frame = webView.convert(webView.bounds, to: window)
         let insets = window.safeAreaInsets
+        let obscuredTop = webView.obscuredContentInsets.top
         // 탭 바 움직임 등으로 생기는 소수점 흔들림에 매번 웹을 다시 그리지 않게 정수 pt로 맞춘다.
-        let top = min(max(insets.top - frame.minY, 0), insets.top).rounded()
+        let deviceTop = min(max(insets.top - frame.minY - obscuredTop, 0), insets.top)
+        let top = max(deviceTop, webView.tabHeaderCoveredTop).rounded()
         let bottom = min(max(frame.maxY - (window.bounds.maxY - insets.bottom), 0), insets.bottom).rounded()
-        return WebSafeAreaInsets(top: top, bottom: bottom)
+        return WebSafeAreaInsets(top: top, bottom: bottom, headerObscuredTop: webView.tabHeaderHeight.rounded())
     }
 
     /// 문서가 만들어지자마자(다른 내용을 읽기 전) 값을 넣는 스크립트. 웹뷰를 만들 때 한 번 붙인다.
@@ -51,7 +67,8 @@ struct WebSafeAreaInsets: Equatable {
     var applyScript: String {
         "(function(){var s=document.documentElement&&document.documentElement.style;if(!s)return;"
             + "s.setProperty('\(Self.topVariable)','\(Self.cssPixels(top))');"
-            + "s.setProperty('\(Self.bottomVariable)','\(Self.cssPixels(bottom))');})();"
+            + "s.setProperty('\(Self.bottomVariable)','\(Self.cssPixels(bottom))');"
+            + "s.setProperty('\(Self.headerObscuredTopVariable)','\(Self.cssPixels(headerObscuredTop))');})();"
     }
 
     private static func cssPixels(_ value: CGFloat) -> String {

@@ -54,6 +54,11 @@ struct BridgeWebView: UIViewRepresentable {
     // 웹뷰를 상태바 밑까지 그리는지(상세처럼 웹이 자기 헤더로 상태바 자리를 칠하는 화면). 웹에 처음 알리는 위쪽
     // 안전 영역을 정한다 — 머리줄 아래 놓이는 탭 첫 화면 웹은 0. 화면에 붙은 뒤에는 실제 자리로 다시 잰다.
     var coversStatusBar: Bool = false
+    // 웹뷰를 탭 첫 화면 머리줄(상태바 + 44) 뒤까지 그리는지(홈 피드 · 대회 목록). 머리줄에 가린 높이를 웹에 가려진 영역으로
+    // 알려 웹은 그 아래부터 배치되고, 스크롤하면 글이 머리줄 뒤로 지나간다. 웹이 유리 면을 그리는지는 onTopGlassChanged로 받는다.
+    var extendsUnderTabHeader: Bool = false
+    // 웹이 머리줄 뒤 유리 면을 그리기 시작 · 멈출 때(SET_TOP_GLASS). 새 문서 · 웹 프로세스 종료 때는 false로 돌린다.
+    var onTopGlassChanged: ((Bool) -> Void)?
     // 이 웹뷰를 소유한 Feature가 실제로 처리하는 '사전 확인형' 메시지. 처리하지 않는 웹뷰가 지원한다고
     // 알리면 웹이 요청을 보내 놓고 응답 없이 기다리므로, 처리하는 화면만 넘긴다.
     var capabilities: [WebBridgeCapability] = []
@@ -61,6 +66,7 @@ struct BridgeWebView: UIViewRepresentable {
     // 탭 바 밑까지 그리는 웹은 시트 열림을 이 웹뷰가 직접 처리하므로 덧붙인다(#314).
     private var injectedCapabilities: [WebBridgeCapability] {
         capabilities + [.analyticsEvent, .competitionAlertsEnabled, .contentAlertsEnabled] + (extendsUnderTabBar ? [.setSheetOpen] : [])
+            + (extendsUnderTabHeader ? [.setTopGlass] : [])
     }
     // 진입 시간 측정의 시작 시각·경로(#298). 위에 쌓이는 상세만 넘기고, nil이면 재지 않는다.
     var entryOrigin: WebEntryTrace.Origin?
@@ -152,7 +158,7 @@ struct BridgeWebView: UIViewRepresentable {
         } else {
             nil
         }
-        let expectedSafeArea = WebSafeAreaInsets.expected(coversStatusBar: coversStatusBar)
+        let expectedSafeArea = WebSafeAreaInsets.expected(coversStatusBar: coversStatusBar, underTabHeader: extendsUnderTabHeader)
         let webView = preload?.webView ?? Self.makeWebView(
             capabilities: injectedCapabilities,
             safeArea: expectedSafeArea,
@@ -204,6 +210,11 @@ struct BridgeWebView: UIViewRepresentable {
         // 불안정해 레이아웃 뷰포트가 안 줄어들므로, 네이티브 프레임 리사이즈로 키보드를 처리한다.
         let container = KeyboardAvoidingWebContainer()
         container.reportsTabBarAsObscured = extendsUnderTabBar
+        // 머리줄 뒤 위쪽 자리(콘텐츠 여백 · 새로고침 띠)를 맞춘다. 붙기 전(첫 레이아웃 전)에 넣어야 첫 값부터 받는다.
+        container.onTabHeaderInsetsChanged = { [weak coordinator = context.coordinator] insets in
+            coordinator?.setTabHeaderInsets(insets)
+        }
+        container.extendsUnderTabHeader = extendsUnderTabHeader
         container.tabBarObscuredBottom = context.environment.tabBarReservedHeight
         // 화면에 붙은 뒤 실제로 겹치는 안전 영역이 처음 짐작과 다르면(키보드로 줄어듦 등) 웹에 다시 알린다.
         (webView as? ChromelessWebView)?.onSafeAreaMeasured = { [weak coordinator = context.coordinator] insets in
@@ -263,6 +274,7 @@ struct BridgeWebView: UIViewRepresentable {
         keyboardAvoidingContainer?.onScroll = tabRootScroll?.report
         keyboardAvoidingContainer?.onKeyboardVisibilityChanged = onKeyboardVisibilityChanged
         // 웹 시트가 열린 동안 가린 높이를 0으로 돌리고 탭 바를 숨긴다(#314).
+        context.coordinator.onTopGlassChanged = onTopGlassChanged
         context.coordinator.onSheetOpenChanged = extendsUnderTabBar
             ? { [weak keyboardAvoidingContainer] isOpen in
                 keyboardAvoidingContainer?.isSheetOpen = isOpen
@@ -334,6 +346,13 @@ struct BridgeWebView: UIViewRepresentable {
         private var isDeactivated = false
         // 웹 시트 열림·닫힘을 받는 곳(#314). 탭 바 밑까지 그리는 웹뷰만 updateUIView가 넣는다.
         var onSheetOpenChanged: (@MainActor (Bool) -> Void)?
+        // 웹 유리 면 시작 · 멈춤을 받는 곳. 머리줄 뒤까지 그리는 웹뷰만 updateUIView가 넣는다.
+        var onTopGlassChanged: ((Bool) -> Void)?
+        // 웹이 마지막으로 알린 유리 면. 문서가 바뀌면(새로고침 · 이동) 멈춤 신호를 못 받으니 직접 푼다.
+        private var isTopGlassActive = false
+        // 지금 문서가 유리 면을 그린다고 알렸는지. 다 뜨도록 알리지 않으면(옛 웹) 웹뷰 위쪽을 머리줄 아래로 되돌린다.
+        private var didDocumentConfirmTopGlass = false
+        private var topGlassFallbackTask: Task<Void, Never>?
         // 웹에 마지막으로 알린 안전 영역(WebSafeAreaInsets).
         private var appliedSafeArea: WebSafeAreaInsets?
         // 웹이 마지막으로 알린 시트 열림. 시트를 연 채 문서가 바뀌면(새로고침·이동) 닫힘을 못 받으니 직접 푼다.
@@ -577,6 +596,10 @@ struct BridgeWebView: UIViewRepresentable {
                 setWebSheetOpen(isOpen)
                 return
             }
+            if case let .setTopGlass(isActive) = inbound {
+                receiveTopGlass(isActive)
+                return
+            }
             if case .pageReady = inbound { reportScreenLoad(.succeeded) }
             if let entryTraceToken {
                 switch inbound {
@@ -599,11 +622,56 @@ struct BridgeWebView: UIViewRepresentable {
             onSheetOpenChanged(isOpen)
         }
 
+        /// 웹이 알린 유리 면을 웹뷰 위쪽 자리(컨테이너)와 머리줄 바탕(화면)에 반영한다.
+        private func receiveTopGlass(_ isActive: Bool) {
+            if isActive { didDocumentConfirmTopGlass = true }
+            topGlassContainer?.isTopGlassActive = isActive
+            setTopGlassActive(isActive)
+        }
+
+        private func setTopGlassActive(_ isActive: Bool) {
+            // 받을 곳이 아직 없으면 기록하지 않는다 — 넘겨받는 중(미리 불러 둔 홈) 받은 시작을 같은 값이라며 버리지 않게.
+            guard let onTopGlassChanged, isTopGlassActive != isActive else { return }
+            isTopGlassActive = isActive
+            onTopGlassChanged(isActive)
+        }
+
+        private var topGlassContainer: KeyboardAvoidingWebContainer? {
+            guard let container = webView?.superview as? KeyboardAvoidingWebContainer, container.extendsUnderTabHeader else { return nil }
+            return container
+        }
+
+        /// 문서가 다 떴는데 유리 면 알림이 없으면 옛 웹이다 — 웹뷰 위쪽을 머리줄 아래로 되돌린다(웹이 맨 위를 비우지 않으므로).
+        /// 웹은 화면을 그린 직후(하이드레이션) 알리므로 느린 기기에서도 넉넉히 기다린다 — 새 웹을 옛 웹으로 잘못 보면 화면이 들썩인다.
+        private func scheduleTopGlassFallback() {
+            topGlassFallbackTask?.cancel()
+            guard topGlassContainer != nil, !didDocumentConfirmTopGlass else { return }
+            topGlassFallbackTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(4))
+                guard let self, !Task.isCancelled, !self.didDocumentConfirmTopGlass else { return }
+                self.topGlassContainer?.isTopGlassActive = false
+            }
+        }
+
+        /// 머리줄 뒤 위쪽 자리를 맞춘다. 당겨서 새로고침이 있으면 그쪽이 위쪽 여백을 맡는다(새로고침 중 더하고 되돌림).
+        func setTabHeaderInsets(_ insets: TabHeaderInsets) {
+            if let pullToRefresh {
+                pullToRefresh.bandTopOffset = insets.bandTop
+                pullToRefresh.restingTopInset = insets.contentTop
+                return
+            }
+            guard let scrollView = webView?.scrollView, scrollView.contentInset.top != insets.contentTop else { return }
+            let wasAtTop = scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 0.5
+            scrollView.contentInset.top = insets.contentTop
+            if wasAtTop { scrollView.contentOffset.y = -scrollView.adjustedContentInset.top }
+        }
+
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
             // 뜨기 전에 죽었으면 그 로드는 실패다. 오류 화면으로 받는 화면(상세)만 — 아니면 보인 오류 없이 실패만 남는다.
             if onWebProcessTerminated != nil { reportScreenLoad(.fail) }
             // 웹 프로세스가 죽으면 닫힘 신호도 새 문서(didCommit)도 오지 않을 수 있다 — 시트가 열린 채였으면 탭 바를 돌려놓는다.
             setWebSheetOpen(false)
+            setTopGlassActive(false)
             onWebProcessTerminated?()
         }
 
@@ -619,6 +687,11 @@ struct BridgeWebView: UIViewRepresentable {
             if let entryTraceToken { WebEntryTrace.mark(.commit, token: entryTraceToken) }
             // 새 문서에는 시트가 없다 — 시트를 연 채 문서가 바뀌었으면 탭 바를 돌려놓는다.
             setWebSheetOpen(false)
+            // 새 문서는 아직 유리 면을 그리지 않았다 — 다시 알릴 때까지 앱 흰 머리줄로 가린다. 웹뷰 위쪽 자리는 그대로 둔다 —
+            // 새 웹은 첫 그림부터 맨 위를 비우므로(앱이 문서 시작 때 머리줄 높이를 넣음) 되돌리면 새로고침마다 화면이 들썩인다.
+            didDocumentConfirmTopGlass = false
+            topGlassFallbackTask?.cancel()
+            setTopGlassActive(false)
             // 새 문서는 웹뷰를 만들 때의 값으로 시작한다(문서 시작 스크립트). 그 뒤 바뀐 값이 있으면 다시 넣는다.
             if let appliedSafeArea { webView.evaluateJavaScript(appliedSafeArea.applyScript) }
             // 여기부터는 웹(스켈레톤)이 로딩 모습을 그린다. 새로고침은 시작도 알리지 않았으니 끝도 알리지 않는다.
@@ -630,6 +703,7 @@ struct BridgeWebView: UIViewRepresentable {
             markScreenLoadDocumentFinished()
             endRefreshing(success: true, navigation: navigation)
             onLoadingFinished()
+            scheduleTopGlassFallback()
             // 웹이 로드되며 overscroll-behavior로 바운스를 끌 수 있어 풀다운 여지를 재확보한다.
             pullToRefresh?.enforceVerticalBounce()
         }

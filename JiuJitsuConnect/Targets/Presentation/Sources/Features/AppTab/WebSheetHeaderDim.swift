@@ -12,6 +12,9 @@ import DesignSystem
 
 struct WebSheetHeaderDim: ViewModifier {
     let isDimmed: Bool
+    // 머리줄 바탕이 비어 웹이 그 뒤까지 깔려 있는지(웹 유리 면). 그러면 웹 딤이 머리줄 · 상태바 자리까지 이미 덮으므로
+    // 막을 머리줄 글자 · 아이콘 모양으로만 깐다 — 통째로 깔면 그 자리만 두 번 어두워진다.
+    var webDimsBehind = false
 
     func body(content: Content) -> some View {
         content
@@ -19,18 +22,26 @@ struct WebSheetHeaderDim: ViewModifier {
             .accessibilityHidden(isDimmed)
             .overlay {
                 // 웹 딤과 같은 색(overlay/scrim · 검정 40%)·같은 0.2초 페이드. 머리줄 버튼은 막만 받고 눌리지 않는다.
-                Color.component.bottomSheet.selected.container.scrim
-                    .ignoresSafeArea(edges: .top)
-                    .opacity(isDimmed ? 1 : 0)
-                    .allowsHitTesting(isDimmed)
-                    .animation(.easeInOut(duration: 0.2), value: isDimmed)
-                    .accessibilityHidden(true)
+                Group {
+                    if webDimsBehind {
+                        scrim.mask { content }
+                    } else {
+                        scrim.ignoresSafeArea(edges: .top)
+                    }
+                }
+                .opacity(isDimmed ? 1 : 0)
+                .contentShape(Rectangle())
+                .allowsHitTesting(isDimmed)
+                .animation(.easeInOut(duration: 0.2), value: isDimmed)
+                .accessibilityHidden(true)
             }
     }
+
+    private var scrim: Color { Color.component.bottomSheet.selected.container.scrim }
 }
 
 extension View {
-    func webSheetHeaderDim(_ isDimmed: Bool) -> some View {
-        modifier(WebSheetHeaderDim(isDimmed: isDimmed))
+    func webSheetHeaderDim(_ isDimmed: Bool, webDimsBehind: Bool = false) -> some View {
+        modifier(WebSheetHeaderDim(isDimmed: isDimmed, webDimsBehind: webDimsBehind))
     }
 }

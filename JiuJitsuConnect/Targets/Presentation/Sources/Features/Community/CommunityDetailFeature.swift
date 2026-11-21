@@ -460,8 +460,8 @@ public struct CommunityDetailFeature: Sendable {
                     WebAnalytics.logPendingScreenLoad(after: event, pendingLoad: &state.pendingScreenLoad, client: analyticsClient)
                     return .none
 
-                case .setSheetOpen:
-                    // BridgeWebView가 받아 탭 바만 숨긴다(#314). 여기까지 오지 않는다.
+                case .setSheetOpen, .setTopGlass:
+                    // BridgeWebView가 받아 탭 바 · 머리줄 바탕만 바꾼다(#314). 여기까지 오지 않는다.
                     return .none
 
                 case .homeHeaderTint:

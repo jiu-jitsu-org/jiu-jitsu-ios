@@ -15,6 +15,11 @@ final class ChromelessWebView: WKWebView {
     // 크기·창이 바뀔 때마다 실제로 겹치는 안전 영역을 넘긴다(WebSafeAreaInsets). 같은 값은 받는 쪽이 거른다.
     // 웹뷰의 자리·크기는 웹뷰 자신의 레이아웃에서 가장 확실히 잡히므로 여기서 잰다.
     var onSafeAreaMeasured: (@MainActor (WebSafeAreaInsets) -> Void)?
+    // 머리줄 뒤까지 그리는 웹뷰(홈 · 대회 목록)의 머리줄 높이(상태바 포함). 웹에 `--app-header-obscured-top`으로 알린다.
+    var tabHeaderHeight: CGFloat = 0
+    // 그중 웹이 스스로 비워야 하는 높이 — 가린 영역으로 알리지 않을 때(웹이 유리 면을 그림)만 머리줄 높이다.
+    // 위쪽 안전 영역으로 알려 웹 시트 · 고정 요소가 머리줄 밑으로 들어가지 않게 한다.
+    var tabHeaderCoveredTop: CGFloat = 0
 
     override func layoutSubviews() {
         super.layoutSubviews()
