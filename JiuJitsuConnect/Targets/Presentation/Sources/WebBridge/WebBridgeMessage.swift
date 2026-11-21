@@ -153,14 +153,14 @@ private extension WebBridgeInboundMessage {
             return "COMPETITION_ALERTS_ENABLED  competitionId=\(competitionId.map(String.init) ?? "-") reqId=\(requestId ?? "-")"
         case let .competitionHeaderTint(hex):
             return "COMPETITION_HEADER_TINT  color=\(hex ?? "null")"
+        case let .homeHeaderTint(hex):
+            return "HOME_HEADER_TINT  color=\(hex ?? "null")"
         case let .setSheetOpen(open):
             return "SET_SHEET_OPEN  open=\(open)"
         case let .contentCreated(kind):
             return "CONTENT_CREATED  kind=\(kind.rawValue)"
         case let .analyticsEvent(event):
             return "ANALYTICS_EVENT  name=\(event.name.rawValue) params=\(event.parameters.count)"
-        case let .homeCategoryTabs(payload):
-            return "HOME_CATEGORY_TABS  tabs=\(payload.tabs.count) selectedId=\(payload.selectedId.map(String.init) ?? "null")"
         case let .unknown(type):
             return "\(type)  (unsupported)"
         }
@@ -199,8 +199,6 @@ private extension WebBridgeOutboundMessage {
             return "USER_BLOCK_CHANGED  userId=\(userId) blocked=\(blocked)"
         case let .competitionAlertsResult(requestId, deviceEnabled):
             return "COMPETITION_ALERTS_RESULT  reqId=\(requestId) deviceEnabled=\(deviceEnabled)"
-        case let .homeCategorySelect(categoryId):
-            return "HOME_CATEGORY_SELECT  categoryId=\(categoryId.map(String.init) ?? "null")"
         }
     }
 }
@@ -265,6 +263,9 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 대회 목록 맨 위 띠 색 그라데이션에 맞춰 앱 대회 탭 머리줄(상태바 포함)을 칠해 달라는 요청.
     /// hex는 `#RRGGBB`, nil이면 앱 기본 머리줄 색으로 돌린다. 스크롤하며 조금씩 옅어진 색을 여러 번 보낸다.
     case competitionHeaderTint(hex: String?)
+    /// 홈 피드 맨 위 진한 띠(밸런스 게임)가 보이는 동안 앱 홈 머리줄(상태바 포함)을 그 색으로 칠해 달라는 요청.
+    /// hex는 `#RRGGBB`, nil이면 흰 머리줄로 돌린다. 흰 시트가 맨 위에 닿으면 null을 보낸다.
+    case homeHeaderTint(hex: String?)
     /// 웹 바텀 시트가 떠 있는지(#314 · jiu-jitsu-frontend#465). 탭 첫 화면 웹만 알린다 — 열린 동안 떠 있는 탭 바를 숨기고
     /// 가린 높이를 0으로 돌려, 시트가 탭 바 자리까지 내려오게 한다(안 그러면 그 자리를 WebKit이 시트 가장자리 색으로 채운다).
     /// 화면 표시만 바꾸는 신호라 BridgeWebView가 받아 처리하고 Feature로는 넘기지 않는다.
@@ -276,9 +277,6 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// 사전에 있는 이름 · 문자열 또는 정수 값만 받고, `surface`는 webview로 붙인다. 회신 없음.
     /// OSS 도메인에서 온 것만 받는 검사는 메시지를 받은 프레임을 아는 BridgeWebView가 한다.
     case analyticsEvent(AnalyticsEvent)
-    /// 홈 피드의 카테고리 칩 목록과 고른 칩(jiu-jitsu-frontend 홈 칩 → 앱 머리줄). capability가 있는 리스트 웹만 보낸다.
-    /// 피드가 뜰 때와 고른 칩이 바뀔 때마다 오고, 같은 내용이 거푸 올 수 있다. 회신 없음.
-    case homeCategoryTabs(HomeCategoryTabsPayload)
     /// 계약에 없는 타입(상위 버전/오타 등) — 무시 대상.
     case unknown(type: String)
 
@@ -300,10 +298,10 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case openCompetitionRecord = "OPEN_COMPETITION_RECORD"
         case competitionAlertsEnabled = "COMPETITION_ALERTS_ENABLED"
         case competitionHeaderTint = "COMPETITION_HEADER_TINT"
+        case homeHeaderTint = "HOME_HEADER_TINT"
         case setSheetOpen = "SET_SHEET_OPEN"
         case contentCreated = "CONTENT_CREATED"
         case analyticsEvent = "ANALYTICS_EVENT"
-        case homeCategoryTabs = "HOME_CATEGORY_TABS"
     }
 
     /// `WKScriptMessage.body`를 파싱한다.
@@ -451,10 +449,9 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             return .competitionAlertsEnabled(competitionId: competitionId, requestId: requestId)
         case .competitionHeaderTint:
             // `#RRGGBB`만 받는다. 형식이 어긋나면 null과 같이 기본색으로 돌린다(엉뚱한 색이 남지 않게).
-            let hex = (payload?["color"] as? String).flatMap {
-                $0.range(of: "^#[0-9A-Fa-f]{6}$", options: .regularExpression) != nil ? $0 : nil
-            }
-            return .competitionHeaderTint(hex: hex)
+            return .competitionHeaderTint(hex: headerTintHex(payload))
+        case .homeHeaderTint:
+            return .homeHeaderTint(hex: headerTintHex(payload))
         case .setSheetOpen:
             // 값이 어긋나면 닫힘으로 본다 — 탭 바가 숨은 채 갇히지 않게.
             return .setSheetOpen((payload?["open"] as? Bool) ?? false)
@@ -462,10 +459,15 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             return decodeContentCreated(payload)
         case .analyticsEvent:
             return decodeAnalyticsEvent(payload)
-        case .homeCategoryTabs:
-            return decodeHomeCategoryTabs(payload)
         case .none:
             return .unknown(type: rawType)
+        }
+    }
+
+    /// 머리줄 색 신호의 `color`. `#RRGGBB`가 아니면 nil(기본색)로 본다.
+    private static func headerTintHex(_ payload: [String: Any]?) -> String? {
+        (payload?["color"] as? String).flatMap {
+            $0.range(of: "^#[0-9A-Fa-f]{6}$", options: .regularExpression) != nil ? $0 : nil
         }
     }
 
@@ -492,34 +494,6 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             return nil
         }
         return .contentCreated(kind)
-    }
-
-    /// 이름이 없는 칩은 그릴 수 없어 건너뛴다. id가 없는('전체') 칩은 맨 앞 하나만 받고, 나머지는 id가 정수여야 한다.
-    /// 같은 id가 거푸 오면 앞의 것만 둔다(칩 줄이 id로 칩을 구분한다). selectedId가 정수가 아니면 '전체'로 본다.
-    private static func decodeHomeCategoryTabs(_ payload: [String: Any]?) -> WebBridgeInboundMessage? {
-        guard let rawTabs = payload?["tabs"] as? [[String: Any]] else {
-            Log.trace("HOME_CATEGORY_TABS payload tabs 누락", category: .network, level: .error)
-            return nil
-        }
-        var tabs: [HomeCategoryTab] = []
-        var seenIds: Set<Int?> = []
-        for (index, raw) in rawTabs.enumerated() {
-            guard let name = raw["name"] as? String, !name.isEmpty else { continue }
-            let id = jsonInteger(raw["id"])
-            let isAll = index == 0 && (raw["id"] == nil || raw["id"] is NSNull)
-            guard id != nil || isAll, seenIds.insert(id).inserted else { continue }
-            tabs.append(HomeCategoryTab(id: id, name: name))
-        }
-        let selectedId = jsonInteger(payload?["selectedId"])
-        return .homeCategoryTabs(HomeCategoryTabsPayload(tabs: tabs, selectedId: selectedId))
-    }
-
-    /// JSON 정수만 Int로 읽는다. 참거짓도 NSNumber로 오므로 거르고, 소수·null·문자열은 nil.
-    private static func jsonInteger(_ raw: Any?) -> Int? {
-        guard let number = raw as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
-        let double = number.doubleValue
-        guard double.isFinite, double == double.rounded(), abs(double) <= 9_007_199_254_740_991 else { return nil }
-        return number.intValue
     }
 
     /// 사전에 없는 이름, 문자열 · 정수가 아닌 값(참거짓 · 소수 · 객체)이 하나라도 있으면 기록 전체를 버린다.
@@ -585,30 +559,6 @@ public struct OpenUserProfilePayload: Equatable, Sendable {
     public init(userId: Int, isMe: Bool) {
         self.userId = userId
         self.isMe = isMe
-    }
-}
-
-// MARK: - HOME_CATEGORY_TABS Payload
-
-/// 홈 피드 카테고리 칩 하나. `id`가 nil이면 '전체'다.
-public struct HomeCategoryTab: Equatable, Sendable {
-    public let id: Int?
-    public let name: String
-
-    public init(id: Int?, name: String) {
-        self.id = id
-        self.name = name
-    }
-}
-
-/// `HOME_CATEGORY_TABS` 페이로드. `selectedId`가 nil이면 '전체'를 고른 상태다.
-public struct HomeCategoryTabsPayload: Equatable, Sendable {
-    public let tabs: [HomeCategoryTab]
-    public let selectedId: Int?
-
-    public init(tabs: [HomeCategoryTab], selectedId: Int?) {
-        self.tabs = tabs
-        self.selectedId = selectedId
     }
 }
 
@@ -796,6 +746,8 @@ enum WebBridgeCapability: String, Equatable, Sendable {
     case openCompetitionRecord = "OPEN_COMPETITION_RECORD"
     /// 대회 탭 목록 웹만 알린다. 목록이 없으면 웹은 머리줄 색을 보내지 않는다(앱 기본색 그대로).
     case competitionHeaderTint = "COMPETITION_HEADER_TINT"
+    /// 홈 리스트 웹만 알린다. 목록이 없으면 웹은 머리줄 색을 보내지 않는다(앱 흰 머리줄 그대로).
+    case homeHeaderTint = "HOME_HEADER_TINT"
     /// 탭 첫 화면 웹(떠 있는 탭 바 밑까지 그리는 웹뷰)만 알린다(#314). 목록이 없으면 웹은 시트 열림을 보내지 않는다.
     case setSheetOpen = "SET_SHEET_OPEN"
     /// 모든 웹뷰가 알린다(#424, BridgeWebView가 붙임). 목록이 없으면 웹은 기록을 버린다. 있으면 서브뷰 주소에 `?from=`을 싣는다.
@@ -803,8 +755,6 @@ enum WebBridgeCapability: String, Equatable, Sendable {
     /// 모든 웹뷰가 알린다(#395, BridgeWebView가 붙임). 있으면 웹은 requestId를 실어 보내고 COMPETITION_ALERTS_RESULT를 기다린다.
     /// 없으면(옛 앱) 지금처럼 바로 성공 토스트를 띄운다.
     case competitionAlertsEnabled = "COMPETITION_ALERTS_ENABLED"
-    /// 홈 리스트 웹만 알린다. 있으면 웹은 자기 카테고리 칩 줄을 숨기고 HOME_CATEGORY_TABS로 앱 머리줄에 칩을 맡긴다.
-    case homeCategoryTabs = "HOME_CATEGORY_TABS"
 
     /// `window.AppBridgeCapabilities = [...]`를 정의하는 스크립트 소스. 직렬화 실패 시 nil.
     static func injectionScriptSource(for capabilities: [WebBridgeCapability]) -> String? {
@@ -883,8 +833,6 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
     case userBlockChanged(userId: Int, blocked: Bool)
     /// COMPETITION_ALERTS_ENABLED의 결과(#395). 기기 알림이 켜져 있을 때(방금 허용 포함)만 true — 웹은 true일 때만 성공 토스트를 띄운다.
     case competitionAlertsResult(requestId: String, deviceEnabled: Bool)
-    /// 앱 머리줄에서 카테고리 칩을 누름 → 웹이 피드를 그 카테고리로 바꾸고 HOME_CATEGORY_TABS로 다시 알린다. nil이면 '전체'.
-    case homeCategorySelect(categoryId: Int?)
 
     private var type: String {
         switch self {
@@ -899,7 +847,6 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         case .profileUpdated: return "PROFILE_UPDATED"
         case .userBlockChanged: return "USER_BLOCK_CHANGED"
         case .competitionAlertsResult: return "COMPETITION_ALERTS_RESULT"
-        case .homeCategorySelect: return "HOME_CATEGORY_SELECT"
         }
     }
 
@@ -913,9 +860,6 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
             return ["userId": userId, "blocked": blocked]
         case let .competitionAlertsResult(requestId, deviceEnabled):
             return ["requestId": requestId, "deviceEnabled": deviceEnabled]
-        case let .homeCategorySelect(categoryId):
-            // '전체'도 키를 빼지 않고 JSON null로 싣는다(계약).
-            return ["categoryId": categoryId.map { $0 as Any } ?? NSNull()]
         case let .confirmDialogResult(requestId, outcome):
             return ["requestId": requestId, "result": outcome.rawValue]
         case let .selectSheetResult(requestId, outcome):

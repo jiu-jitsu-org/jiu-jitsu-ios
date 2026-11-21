@@ -243,10 +243,25 @@ public struct AppTabView: View {
             onSelectSubmit: { store.send(.competition(.web(.view(.selectSheetSubmitted(value: $0, customText: $1))))) },
             onSelectDismiss: { store.send(.competition(.web(.view(.selectSheetDismissed)))) }
         )
+        // 홈 머리줄이 진한 띠 색일 때만 상태바 글자를 흰색으로. 창 전체의 색 모드를 바꾸는 방식이라
+        // 홈 첫 화면이 맨 앞에 보일 때로 좁힌다 — 다른 탭 · 쌓인 화면 · 모달 · 시트가 뜨면 원래대로 돌아간다.
+        // 알럿 · 선택 시트 · 토스트는 이 뷰 위에 겹쳐 그리는 것이라(띠는 딤 아래 그대로) 그대로 둔다.
+        .lightStatusBar(isHomeHeaderTintInFront)
         .onAppear { store.send(.view(.onAppear)) }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { store.send(.view(.sceneBecameActive)) }
         }
+    }
+
+    /// 진한 띠 색으로 칠한 홈 머리줄이 맨 앞에 보이는지. 띄워 올리는 화면(로그인 · 상세 모달 · 알림 권한 시트 · 시스템 알럿)은
+    /// 이 뷰의 색 모드 고정 밖이라 창 색 모드를 따르므로, 하나라도 뜨면 거둔다.
+    private var isHomeHeaderTintInFront: Bool {
+        store.selectedTab == .home
+            && store.home.headerTint != nil
+            && isTabRootInFront
+            && store.loginCover == nil
+            && !store.isNotificationPromptPresented
+            && !store.home.isDebugURLAlertPresented
     }
 
     // 게스트가 인증 필요 동작(커뮤니티 글쓰기·대회 관심 등)을 시도할 때 노출되는 공통 로그인 유도 알럿.

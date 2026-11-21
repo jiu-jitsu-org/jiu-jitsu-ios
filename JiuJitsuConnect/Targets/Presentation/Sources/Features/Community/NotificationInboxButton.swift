@@ -10,6 +10,10 @@ import DesignSystem
 
 struct NotificationInboxButton: View {
     let hasUnread: Bool
+    // 머리줄이 진한 색으로 칠해지면(홈 맨 위 띠) 종을 흰색으로 바꾼다.
+    var iconColor: Color = Color.component.header.iconButton
+    // 점 테두리는 머리줄 바탕과 같은 색이어야 점이 종에서 떨어져 보인다.
+    var dotRingColor: Color = Color.primitive.bw.white
     let action: () -> Void
 
     private enum Metrics {
@@ -28,7 +32,7 @@ struct NotificationInboxButton: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: Metrics.iconSize, height: Metrics.iconSize)
-                .foregroundStyle(Color.component.header.iconButton)
+                .foregroundStyle(iconColor)
                 .overlay(alignment: .topTrailing) {
                     if hasUnread {
                         dot
@@ -50,7 +54,7 @@ struct NotificationInboxButton: View {
             .frame(width: Metrics.dotSize, height: Metrics.dotSize)
             .background {
                 Circle()
-                    .fill(Color.primitive.bw.white)
+                    .fill(dotRingColor)
                     .padding(-Metrics.dotStrokeWidth)
             }
             .padding(.trailing, Metrics.dotTrailingInset)

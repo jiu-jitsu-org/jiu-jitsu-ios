@@ -44,9 +44,9 @@ struct BridgeWebView: UIViewRepresentable {
     // 오버스크롤(바운스) 영역에 드러나는 색. 웹 콘텐츠 배경과 어긋나면 바운스할 때 이음새가
     // 보이므로 화면별로 주입한다. 리스트 피드는 B&W/White, 상세 서브뷰는 True-White.
     var overscrollBackground: Color = Color.primitive.bw.trueWhite
-    // 맨 위에서 당길 때 드러나는 풀다운 밴드의 바탕색. nil이면 기본 연파랑. 대회 목록만 머리줄 색과 맞추려고 넘긴다.
+    // 맨 위에서 당길 때 드러나는 풀다운 밴드의 바탕색. nil이면 기본 연파랑. 머리줄이 칠해진 화면(대회 목록 · 홈)이 그 색과 맞추려고 넘긴다.
     var pullToRefreshBackground: Color?
-    // 당겨서 새로고침 꾸밈(손 색·문구). 대회 목록만 .competition.
+    // 당겨서 새로고침 꾸밈(손 색·문구). 대회 목록은 .competition, 홈은 맨 위 진한 띠가 보이는 동안 .feedOnDark.
     var pullToRefreshStyle: WebPullToRefreshStyle = .feed
     // 탭 첫 화면 웹(홈 피드·대회 목록)만 켠다(#267). 웹뷰를 떠 있는 탭 바 밑까지 그리고, 탭 바가 가린 만큼을
     // 웹에 알려 맨 아래 글·고정 버튼이 탭 바 위에서 멈추게 한다. 키보드가 뜨면 가린 영역이 없으므로 0으로 돌린다.
@@ -76,7 +76,7 @@ struct BridgeWebView: UIViewRepresentable {
     // 첫 응답이 와서 문서를 그리기 시작함(didCommit). 그 전까지는 웹이 아무것도 그릴 수 없어, 그 사이만 네이티브가
     // 로딩을 알리는 화면(상세)이 받는다. 당겨서 새로고침 중엔 띠가 로딩을 알리므로 보내지 않는다.
     var onLoadingCommitted: (() -> Void)?
-    // 당겨서 새로고침을 시작함. 이때는 로딩 시작(onLoadingStarted)을 보내지 않아, 웹을 다시 불러오는 걸 알아야 하는 화면(홈)만 넘긴다.
+    // 당겨서 새로고침을 시작함. 이때는 로딩 시작(onLoadingStarted)을 보내지 않아, 당김을 세야 하는 화면(홈·대회 목록 분석 기록)만 넘긴다.
     var onRefreshStarted: (() -> Void)?
     // 웹 프로세스가 죽음(#352). 화면은 흰 채로 남고 웹 헤더 · BACK_PRESSED 응답도 없어, 받는 화면(상세)이 오류로 돌린다.
     var onWebProcessTerminated: (() -> Void)?
@@ -136,7 +136,10 @@ struct BridgeWebView: UIViewRepresentable {
 
         // 시스템 기본 입력 액세서리 바(위/아래/완료 회색 바)를 제거한다. 웹이 자체 하단 툴바
         // (사진/태그)를 키보드 위에 띄우므로 시스템 바는 불필요하고, 없는 편이 깔끔하다.
-        return ChromelessWebView(frame: .zero, configuration: config)
+        let webView = ChromelessWebView(frame: .zero, configuration: config)
+        // 상태바를 희게 하려고 창을 어두운 모드로 요청해도(lightStatusBar) 웹은 밝은 모드(prefers-color-scheme) 그대로 둔다.
+        webView.overrideUserInterfaceStyle = .light
+        return webView
     }
 
     // 웹뷰를 컨테이너 UIView로 감싼다. 직접 WKWebView를 반환하지 않는 이유는
@@ -251,7 +254,9 @@ struct BridgeWebView: UIViewRepresentable {
         context.coordinator.onWebProcessTerminated = onWebProcessTerminated
         context.coordinator.onScreenLoadMeasured = onScreenLoadMeasured
         context.coordinator.scrollToTop(token: scrollToTopToken)
-        context.coordinator.setPullToRefreshBackground(pullToRefreshBackground.map { UIColor($0) })
+        context.coordinator.setPullToRefreshBackground(pullToRefreshBackground.map { UIColor($0) }, style: pullToRefreshStyle)
+        // 홈은 맨 위 진한 띠가 보이는 동안 바운스 바탕도 띠 색으로 바꾼다 — 밴드가 다 못 덮게 길게 당겨도 흰 틈이 없게.
+        context.coordinator.webView?.scrollView.backgroundColor = UIColor(overscrollBackground)
         // 탭 첫 화면 웹만 스크롤을 AppTabView에 알린다 — 탭 바 숨김·맨 위로 버튼(#267).
         let tabRootScroll: TabRootScrollAction? = extendsUnderTabBar ? context.environment.tabRootScroll : nil
         let keyboardAvoidingContainer = container as? KeyboardAvoidingWebContainer
@@ -462,8 +467,9 @@ struct BridgeWebView: UIViewRepresentable {
             }
         }
 
-        func setPullToRefreshBackground(_ color: UIColor?) {
+        func setPullToRefreshBackground(_ color: UIColor?, style: WebPullToRefreshStyle) {
             pullToRefresh?.setBandBackground(color)
+            pullToRefresh?.setStyle(style)
         }
 
         private func beginRefresh() {

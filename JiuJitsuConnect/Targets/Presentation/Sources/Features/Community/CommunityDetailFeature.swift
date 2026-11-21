@@ -458,9 +458,8 @@ public struct CommunityDetailFeature: Sendable {
                     // BridgeWebView가 받아 탭 바만 숨긴다(#314). 여기까지 오지 않는다.
                     return .none
 
-                case .homeCategoryTabs:
-                    // 홈 리스트 웹만 알리는 신호라 상세 웹에서는 오지 않아야 한다. 그릴 칩 줄이 없어 무시한다.
-                    Log.trace("상세 웹뷰 HOME_CATEGORY_TABS 수신 — 무시", category: .network, level: .info)
+                case .homeHeaderTint:
+                    // 홈 리스트 웹만 알리는 신호라 쌓인 웹에서는 오지 않아야 한다. 칠할 머리줄이 없어 무시한다.
                     return .none
 
                 case let .unknown(type):
