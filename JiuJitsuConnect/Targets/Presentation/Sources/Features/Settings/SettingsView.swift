@@ -64,6 +64,14 @@ public struct SettingsView: View {
                         )
                     }
 
+                    // MARK: - 공지사항 (#369) — 로그인 여부와 상관없이 보인다. 약관과 같은 웹뷰로 웹 공지 화면을 연다
+                    // TODO: 디자인 확정 아이콘으로 교체 (시안 없음, 있는 아이콘 중 documents)
+                    SettingsSection {
+                        SettingsInteractiveRow(asset: Assets.Common.Icon.documents, text: "공지사항") {
+                            store.send(.view(.noticesButtonTapped))
+                        }
+                    }
+
                     // MARK: - 약관 및 정책 섹션
                     SettingsSection {
                         SettingsInteractiveRow(asset: Assets.Common.Icon.documents, text: "서비스 이용 약관") {

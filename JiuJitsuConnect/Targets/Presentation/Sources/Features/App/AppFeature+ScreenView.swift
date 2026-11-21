@@ -179,6 +179,8 @@ extension AppFeature {
             case "terms-of-service": "terms"
             case "privacy-policy": "privacy"
             case "marketing-consent": "marketing"
+            // 공지사항(#369)도 같은 약관 웹뷰로 연다. 웹 안에서 상세로 넘어가도 앱은 처음 주소로 남긴다.
+            case "notices": "notices"
             default: nil
             }
             return VisibleScreen(id: id, event: .screenView(.policy, section: section, screenClass: "webview"))
