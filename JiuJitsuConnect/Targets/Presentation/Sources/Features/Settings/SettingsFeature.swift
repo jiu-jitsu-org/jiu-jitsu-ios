@@ -22,6 +22,8 @@ public struct SettingsFeature: Sendable {
         static let serviceTerms = makeURL(path: "/policies/terms-of-service")
         static let privacyPolicy = makeURL(path: "/policies/privacy-policy")
         static let marketingConsent = makeURL(path: "/policies/marketing-consent")
+        // 공지사항(#369) — 웹 공지 화면(jiu-jitsu-frontend#509)을 약관과 같은 웹뷰로 연다.
+        static let notices = makeURL(path: "/notices")
 
         private static func makeURL(path: String) -> URL? {
             guard
@@ -93,6 +95,7 @@ public struct SettingsFeature: Sendable {
             case notificationButtonTapped
             case analyticsToggled(Bool)
             case blockedUsersButtonTapped
+            case noticesButtonTapped
             case termsButtonTapped
             case privacyPolicyButtonTapped
             case marketingConsentButtonTapped
@@ -179,6 +182,11 @@ public struct SettingsFeature: Sendable {
                 // 끄면 바로 수집을 멈추고, 다시 켤 때까지 다음 실행에도 꺼 둔다.
                 state.isAnalyticsEnabled = isEnabled
                 analyticsClient.setCollectionEnabled(isEnabled)
+                return .none
+
+            case .view(.noticesButtonTapped):
+                guard let url = TermsURL.notices else { return .none }
+                state.termsWebCover = TermsWebViewFeature.State(url: url)
                 return .none
 
             case .view(.termsButtonTapped):

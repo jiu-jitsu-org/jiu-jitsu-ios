@@ -7,6 +7,7 @@
 
 import SwiftUI
 import WebKit
+import SafariServices
 import ComposableArchitecture
 import DesignSystem
 import CoreKit
@@ -219,6 +220,8 @@ private struct TermsWKWebView: UIViewRepresentable {
         WebEnvironment.appendAppName(to: configuration)
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
+        // 공지 본문의 새 창 링크(target="_blank")를 열기 위해(#369). 없으면 WebKit이 새 창 요청을 조용히 버린다.
+        webView.uiDelegate = context.coordinator
         // 시스템 자동 인셋을 끄고, SwiftUI에서 계산한 값을 직접 주입한다.
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.allowsBackForwardNavigationGestures = false
@@ -281,7 +284,7 @@ private struct TermsWKWebView: UIViewRepresentable {
         Coordinator(onScroll: onScroll, onLoadFinish: onLoadFinish, onLoadFail: onLoadFail)
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         var onScroll: (CGFloat) -> Void
         var onLoadFinish: () -> Void
         var onLoadFail: () -> Void
@@ -331,6 +334,46 @@ private struct TermsWKWebView: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
             Log.trace("didFailProvisionalNavigation — error=\(error.localizedDescription)", category: .view, level: .error)
             handleFailure(webView, error: error)
+        }
+
+        // MARK: WKUIDelegate
+
+        // 새 창 요청(공지 본문 링크, #369). 커뮤니티 웹뷰(#316)처럼 바깥 주소는 앱 위 브라우저로 띄워,
+        // 닫으면 보던 공지로 돌아온다. 새 WKWebView를 만들지 않으므로 nil을 반환한다.
+        func webView(
+            _ webView: WKWebView,
+            createWebViewWith configuration: WKWebViewConfiguration,
+            for navigationAction: WKNavigationAction,
+            windowFeatures: WKWindowFeatures
+        ) -> WKWebView? {
+            guard let url = navigationAction.request.url, url.scheme == "http" || url.scheme == "https" else {
+                Log.trace("Terms webview 새 창 요청 무시: \(navigationAction.request.url?.absoluteString ?? "nil")", category: .view, level: .info)
+                return nil
+            }
+            openInAppBrowser(url, from: webView)
+            return nil
+        }
+
+        /// 다른 앱이 맡는 유니버설 링크는 그 앱으로, 아니면 앱 위 브라우저(SFSafariViewController) 시트로 연다.
+        private func openInAppBrowser(_ url: URL, from webView: WKWebView) {
+            UIApplication.shared.open(url, options: [.universalLinksOnly: true]) { [weak webView] openedInApp in
+                Task { @MainActor [weak webView] in
+                    guard !openedInApp, let webView, webView.window != nil else { return }
+                    var presenter = webView.window?.rootViewController
+                    while let presented = presenter?.presentedViewController, !presented.isBeingDismissed {
+                        presenter = presented
+                    }
+                    // 빠른 연타로 이미 떠 있으면 겹쳐 띄우지 않는다.
+                    guard !(presenter is SFSafariViewController) else { return }
+                    guard let presenter else {
+                        UIApplication.shared.open(url)
+                        return
+                    }
+                    let safari = SFSafariViewController(url: url)
+                    safari.modalPresentationStyle = .pageSheet
+                    presenter.present(safari, animated: true)
+                }
+            }
         }
 
         private func handleFailure(_ webView: WKWebView, error: Error) {
