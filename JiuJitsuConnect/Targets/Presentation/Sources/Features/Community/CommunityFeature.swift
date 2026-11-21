@@ -74,20 +74,11 @@ public struct CommunityFeature: Sendable {
         var pendingConfirmDialog: ConfirmDialogPayload?
         var pendingSelectSheet: SelectSheetPayload?
 
-        // 머리줄 카테고리 칩. 홈 웹이 HOME_CATEGORY_TABS로 알려 주며, 아직 안 왔으면 비어 있어 '홈' 글자를 보인다.
-        // 웹뷰를 다시 불러도 지우지 않고, 웹이 다시 보내는 값으로 맞춘다.
-        var homeCategoryTabs: [HomeCategoryTab] = []
-        // 고른 칩의 id. nil이면 '전체'.
-        var selectedHomeCategoryId: Int?
-        // 지금 떠 있는 웹이 칩 누름을 받을 수 있는지. 웹을 다시 불러오기 시작하면 false, 웹이 HOME_CATEGORY_TABS를 보내면 true.
-        // false인 동안 누름은 받을 웹이 없어(새 문서가 버림) 무시한다. 칩 모양은 그대로 둔다.
-        var homeCategoryTabsReady = false
-        // 칩을 눌러 웹에 보낸 값. 바깥 Optional이 nil이 아니면 웹이 같은 값을 돌려줄 때까지 기다리는 중이다.
-        // 그동안 웹이 먼저 보낸 다른 선택은 눌러 둔 칩을 되돌리지 않게 덮지 않는다.
-        var pendingHomeCategoryId: Int??
-
         // GNB 종 아이콘의 새 알림 점. 안 읽은 알림이 하나라도 있으면 true.
         var hasUnreadNotification = false
+
+        // 홈 웹이 알린 머리줄 색(HOME_HEADER_TINT, `#RRGGBB`). 맨 위 진한 띠가 보이는 동안만 값이 있고, nil이면 흰 머리줄.
+        var headerTint: String?
 
         // 테스트용 웹뷰 도메인 변경 입력 다이얼로그 상태. (DEBUG/BETA 빌드에서만 노출)
         var isDebugURLAlertPresented = false
@@ -145,8 +136,6 @@ public struct CommunityFeature: Sendable {
             case retryTapped
             case notificationTapped
             case searchTapped
-            // 머리줄 카테고리 칩 누름. nil이면 '전체'.
-            case homeCategoryTapped(Int?)
 
             // MARK: 브릿지 다이얼로그 결과 (AppTabView가 그린 알럿/시트 → Feature로 회신)
             // 확인 알럿의 [확인]/[취소] 버튼 탭.
@@ -174,7 +163,7 @@ public struct CommunityFeature: Sendable {
             case loadingFinished
             case loadingFailed(WebLoadFailure)
             case screenLoadMeasured(WebScreenLoad)
-            // 당겨서 새로고침 시작(이때는 loadingStarted가 오지 않는다).
+            // 당겨서 새로고침 시작(이때는 loadingStarted가 오지 않는다). 분석 기록(homePullRefresh)이 센다.
             case refreshStarted
             // 웹뷰가 AppBridge로 보내온 인바운드 메시지(WKScriptMessageHandler 경유).
             case bridgeMessageReceived(WebBridgeInboundMessage)
@@ -240,8 +229,8 @@ public struct CommunityFeature: Sendable {
         case competitionInfo(CompetitionInfoFeature)
     }
 
-    /// 홈 리스트 웹뷰가 알리는 기능. 카테고리 칩은 앱 머리줄이 그린다.
-    static let listCapabilities: [WebBridgeCapability] = [.homeCategoryTabs]
+    /// 홈 리스트 웹뷰가 알리는 기능. 맨 위 진한 띠가 보이는 동안 머리줄 색을 앱이 맞춘다.
+    static let listCapabilities: [WebBridgeCapability] = [.homeHeaderTint]
 
     /// 홈에 쌓이는 웹이 알리는 기능. 피드·글 상세·알림함에서 연 대회 상세도 대회 탭과 같이
     /// '커뮤니티에서 더 보기'·'내 기록에 남기기'를 네이티브가 받는다(#304).
@@ -302,15 +291,6 @@ public struct CommunityFeature: Sendable {
                 state.path.append(.detail(Self.subview(url: url, accessToken: state.accessToken)))
                 return .none
 
-            // 칩은 바로 고른 모양으로 바꾸고(웹 응답을 기다리지 않게) 웹에 피드를 바꾸라고 알린다.
-            // 웹을 다시 불러오는 중이면 보낸 값이 새 문서에 닿지 않아 누름을 무시한다.
-            case let .view(.homeCategoryTapped(categoryId)):
-                guard state.homeCategoryTabsReady, categoryId != state.selectedHomeCategoryId else { return .none }
-                state.selectedHomeCategoryId = categoryId
-                state.pendingHomeCategoryId = .some(categoryId)
-                Self.enqueue(.homeCategorySelect(categoryId: categoryId), into: &state)
-                return .none
-
             // 글 검색은 웹 화면이다(jiu-jitsu-frontend#591, #435). 알림함처럼 서브뷰로 열어, 결과 글은 그 위에 쌓이고
             // 뒤로가기는 검색 결과 → 홈 순서로 돌아온다. 비로그인도 쓸 수 있어 로그인을 묻지 않는다.
             case .view(.searchTapped):
@@ -336,7 +316,6 @@ public struct CommunityFeature: Sendable {
                 state.hasError = false
                 state.isLoading = true
                 state.loadToken = UUID()
-                Self.resetHomeCategorySync(&state)
                 return .none
 
             // MARK: - 테스트용 웹뷰 도메인 변경
@@ -416,15 +395,16 @@ public struct CommunityFeature: Sendable {
                 Self.enqueue(.selectSheetResult(requestId: pending.requestId, outcome: .dismiss), into: &state)
                 return .none
 
+            // 새 문서는 띠 색을 다시 알린다. 지난 색이 덮개·새 화면 위에 남지 않게 흰 머리줄로 돌린다.
+            // 당겨서 새로고침은 로딩 시작을 알리지 않아 지우지 않는다 — 띠가 보이는 채라 흰색으로 깜빡이지 않게(대회 탭과 같음).
             case .internal(.loadingStarted):
                 state.isLoading = true
                 state.hasError = false
-                Self.resetHomeCategorySync(&state)
+                state.headerTint = nil
                 return .none
 
-            // 당겨서 새로고침은 로딩 시작을 알리지 않지만 웹 문서는 새로 뜬다.
+            // 당겨서 새로고침 — 상태는 그대로. 분석 기록만 이 액션을 센다(AppFeature+UIClickAnalytics).
             case .internal(.refreshStarted):
-                Self.resetHomeCategorySync(&state)
                 return .none
 
             case .internal(.loadingFinished):
@@ -435,7 +415,8 @@ public struct CommunityFeature: Sendable {
             case let .internal(.loadingFailed(failure)):
                 state.isLoading = false
                 state.hasError = true
-                Self.resetHomeCategorySync(&state)
+                // 오류 화면 위에 지난 진한 머리줄이 남지 않게 한다.
+                state.headerTint = nil
                 WebAnalytics.loadFailed(failure, client: analyticsClient)
                 return .none
 
@@ -518,19 +499,8 @@ public struct CommunityFeature: Sendable {
                     WebAnalytics.logPendingScreenLoad(after: event, pendingLoad: &state.pendingScreenLoad, client: analyticsClient)
                     return .none
 
-                case let .homeCategoryTabs(payload):
-                    // 칩 목록은 늘 웹 값으로 맞추고, 이제 누름을 받을 수 있다.
-                    state.homeCategoryTabs = payload.tabs
-                    state.homeCategoryTabsReady = true
-                    // 누른 값이 아직 돌아오지 않았으면 고른 칩은 덮지 않는다 — 웹이 그 전에 보낸 선택이 늦게 와 깜빡이지 않게.
-                    // 누른 칩이 목록에서 사라졌으면 웹이 고를 수 없으니 기다리지 않는다.
-                    if let pending = state.pendingHomeCategoryId,
-                       pending != payload.selectedId,
-                       payload.tabs.contains(where: { $0.id == pending }) {
-                        return .none
-                    }
-                    state.pendingHomeCategoryId = nil
-                    state.selectedHomeCategoryId = payload.selectedId
+                case let .homeHeaderTint(hex):
+                    state.headerTint = hex
                     return .none
 
                 case .openHomeFeed, .openCompetitionRecord, .competitionHeaderTint, .setSheetOpen:
@@ -1048,13 +1018,6 @@ public struct CommunityFeature: Sendable {
     }
 
     /// 아웃바운드 메시지를 식별자와 함께 대기열에 추가한다.
-    /// 웹을 다시 불러오기 시작함 — 새 문서가 HOME_CATEGORY_TABS를 보낼 때까지 칩 누름을 받지 않고, 기다리던 값도 버린다.
-    /// 칩 모양은 지우지 않는다('홈'으로 깜빡이지 않게).
-    private static func resetHomeCategorySync(_ state: inout State) {
-        state.homeCategoryTabsReady = false
-        state.pendingHomeCategoryId = nil
-    }
-
     private static func enqueue(_ message: WebBridgeOutboundMessage, into state: inout State) {
         state.outbox.append(WebBridgeOutboundEnvelope(id: UUID(), message: message))
     }
@@ -1120,7 +1083,6 @@ public struct CommunityFeature: Sendable {
         state.url = url
         // URL이 동일해도 View가 reload를 인지하도록 토큰을 갱신한다.
         state.loadToken = UUID()
-        resetHomeCategorySync(&state)
         // 도메인이 바뀌면 이전 웹 컨텍스트의 전달 대기 메시지는 의미가 없다.
         state.outbox.removeAll()
         if url == nil {

@@ -22,14 +22,9 @@ public struct CommunityView: View {
         // 검색 버튼에서 사용(알림함 종은 NotificationInboxButton이 같은 값으로 그린다)
         static let trailingIconSize: CGFloat = 24
         static let trailingIconButtonSize: CGFloat = 40
-        // 머리줄 카테고리 칩(웹 홈 칩과 같은 규격)
         static let leadingInset: CGFloat = 16
-        // 큰 글씨에서 잘리지 않게 최소 높이로 둔다.
-        static let chipMinHeight: CGFloat = 32
-        static let chipHorizontalPadding: CGFloat = 12
-        static let chipSpacing: CGFloat = 8
-        // 칩 줄 오른쪽 끝이 종·검색 앞에서 흐려지는 폭
-        static let chipFadeWidth: CGFloat = 24
+        static let rowHeight: CGFloat = 44
+        static let logoHeight: CGFloat = 20
     }
 
     public var body: some View {
@@ -45,15 +40,18 @@ public struct CommunityView: View {
                         accessToken: store.accessToken,
                         outbox: store.outbox,
                         // 리스트 피드 웹 배경과 맞춰, 바운스 때 다른 색이 드러나지 않게 한다.
-                        overscrollBackground: Color.primitive.bw.white,
+                        // 맨 위 진한 띠가 보이는 동안은 띠 색 — 당겨 내려도 띠 위가 희게 비지 않게.
+                        overscrollBackground: headerTint ?? Color.primitive.bw.white,
+                        // 머리줄이 칠해져 있으면 당길 때 드러나는 밴드도 같은 색으로 잇고 손을 흰 손으로 바꾼다(대회 탭과 같음).
+                        pullToRefreshBackground: headerTint,
+                        pullToRefreshStyle: headerTint == nil ? .feed : .feedOnDark,
                         extendsUnderTabBar: true,
-                        // 카테고리 칩은 머리줄(gnb)이 그린다 — 웹은 이걸 보고 자기 칩 줄을 숨긴다.
+                        // 맨 위 띠 색을 받으려고 알린다(HOME_HEADER_TINT).
                         capabilities: CommunityFeature.listCapabilities,
                         onLoadingStarted: { store.send(.internal(.loadingStarted)) },
                         onLoadingFinished: { store.send(.internal(.loadingFinished)) },
                         onLoadingFailed: { store.send(.internal(.loadingFailed($0))) },
                         onScreenLoadMeasured: { store.send(.internal(.screenLoadMeasured($0))) },
-                        // 새로고침 중 누른 칩이 새 웹에 닿지 않고 사라지지 않게, 다시 불러오는 동안은 누름을 막는다.
                         onRefreshStarted: { store.send(.internal(.refreshStarted)) },
                         onBridgeMessage: { store.send(.internal(.bridgeMessageReceived($0))) },
                         onOutboundDelivered: { store.send(.internal(.outboundDelivered(id: $0))) }
@@ -83,125 +81,86 @@ public struct CommunityView: View {
         .modifier(DebugDomainAlert(store: store))
     }
 
+    // 웹이 알린 맨 위 띠 색. nil이면 흰 머리줄.
+    private var headerTint: Color? { store.headerTint.map { Color(hex: $0) } }
+
     private var gnb: some View {
-        // 대회 탭 머리줄과 같이 왼쪽에 탭 이름, 오른쪽에 아이콘을 둔다(#435).
-        // 홈 웹이 카테고리 칩을 알려 오면 탭 이름 자리에 칩 줄을 그린다(웹은 자기 칩 줄을 숨긴다).
-        ZStack(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.component.navibar.container.divider)
-                .frame(height: 1)
+        // 왼쪽에 OSS 로고, 오른쪽에 종 · 검색. 카테고리 칩은 웹 피드가 그린다.
+        // 웹 맨 위 진한 띠가 보이는 동안은 머리줄도 그 색으로 칠해 띠와 한 면으로 잇고, 구분선을 뺀다.
+        logoRow
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(Color.component.navibar.container.divider)
+                    .frame(height: 1)
+                    .opacity(headerTint == nil ? 1 : 0)
+            }
+            // 바탕을 상단 safe area(상태바)까지 끌어올려 회색(background.default)이
+            // 상태바에 번지지 않게 한다. gnb가 VStack 최상단이라 top safe area 무시가 곧 상태바 채움.
+            .background {
+                (headerTint ?? Color.component.header.background)
+                    .ignoresSafeArea(edges: .top)
+            }
+            // 띠가 들고 날 때 한 번에 바뀐다(기본 모션 0.5초).
+            .animation(.easeInOut(duration: 0.5), value: store.headerTint)
+    }
 
+    private var logoRow: some View {
+        HStack(spacing: 0) {
+            Assets.Splash.logo.swiftUIImage
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(height: Metrics.logoHeight)
+                .foregroundStyle(headerTint == nil ? Color.component.header.text : Color.primitive.bw.white)
+                .padding(.leading, Metrics.leadingInset)
+                .accessibilityLabel("홈")
+                .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 0)
             HStack(spacing: 0) {
-                if store.homeCategoryTabs.isEmpty {
-                    Text("홈")
-                        .font(Font.pretendard.title3)
-                        .foregroundStyle(Color.component.header.text)
-                        .padding(.leading, Metrics.leadingInset)
-                    Spacer(minLength: 0)
-                } else {
-                    categoryChips
+                #if DEBUG || BETA
+                Button {
+                    store.send(.view(.debugChangeDomainTapped))
+                } label: {
+                    Image(systemName: "network")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(.red)
+                        .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
+                        .contentShape(Rectangle())
                 }
-                HStack(spacing: 0) {
-                    #if DEBUG || BETA
-                    Button {
-                        store.send(.view(.debugChangeDomainTapped))
-                    } label: {
-                        Image(systemName: "network")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(.red)
-                            .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    #endif
+                .buttonStyle(.plain)
+                #endif
 
-                    if store.isNotificationButtonVisible {
-                        NotificationInboxButton(hasUnread: store.hasUnreadNotification) {
-                            store.send(.view(.notificationTapped))
-                        }
+                if store.isNotificationButtonVisible {
+                    NotificationInboxButton(
+                        hasUnread: store.hasUnreadNotification,
+                        iconColor: iconColor,
+                        dotRingColor: headerTint ?? Color.primitive.bw.white
+                    ) {
+                        store.send(.view(.notificationTapped))
                     }
-
-                    Button {
-                        store.send(.view(.searchTapped))
-                    } label: {
-                        Assets.Common.Icon.search.swiftUIImage
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: Metrics.trailingIconSize, height: Metrics.trailingIconSize)
-                            .foregroundStyle(Color.component.header.iconButton)
-                            .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
                 }
+
+                Button {
+                    store.send(.view(.searchTapped))
+                } label: {
+                    Assets.Common.Icon.search.swiftUIImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: Metrics.trailingIconSize, height: Metrics.trailingIconSize)
+                        .foregroundStyle(iconColor)
+                        .frame(width: Metrics.trailingIconButtonSize, height: Metrics.trailingIconButtonSize)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
-            .padding(.trailing, 8)
         }
-        .frame(height: 44)
-        // 헤더 흰색을 상단 safe area(상태바)까지 끌어올려 회색(background.default)이
-        // 상태바에 번지지 않게 한다. gnb가 VStack 최상단이라 top safe area 무시가 곧 상태바 채움.
-        .background {
-            Color.component.header.background
-                .ignoresSafeArea(edges: .top)
-        }
+        .padding(.trailing, 8)
+        .frame(height: Metrics.rowHeight)
     }
 
-    /// 밀어서 보는 카테고리 칩 줄. 밀면 칩이 화면 왼쪽 끝까지 가도록 앞 여백은 스크롤 내용 안쪽에 둔다.
-    private var categoryChips: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: Metrics.chipSpacing) {
-                    ForEach(store.homeCategoryTabs, id: \.id) { tab in
-                        categoryChip(tab)
-                            .id(tab.id)
-                    }
-                }
-                // 끝까지 밀어도 마지막 칩이 흐림에 묻히지 않게 뒤에도 여백을 둔다.
-                .padding(.horizontal, Metrics.leadingInset)
-            }
-            .mask {
-                HStack(spacing: 0) {
-                    Rectangle()
-                    LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
-                        .frame(width: Metrics.chipFadeWidth)
-                }
-            }
-            .onAppear {
-                proxy.scrollTo(store.selectedHomeCategoryId, anchor: .center)
-            }
-            .onChange(of: store.selectedHomeCategoryId) { _, selectedId in
-                withAnimation {
-                    proxy.scrollTo(selectedId, anchor: .center)
-                }
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("카테고리")
-    }
-
-    private func categoryChip(_ tab: HomeCategoryTab) -> some View {
-        let isSelected = tab.id == store.selectedHomeCategoryId
-        return Button {
-            store.send(.view(.homeCategoryTapped(tab.id)))
-        } label: {
-            Text(tab.name)
-                .font(Font.pretendard.buttonS)
-                .foregroundStyle(isSelected ? Color.semantic.primary.primary : Color.semantic.text.primary)
-                .lineLimit(1)
-                .fixedSize()
-                .padding(.horizontal, Metrics.chipHorizontalPadding)
-                .frame(minHeight: Metrics.chipMinHeight)
-                .background(Capsule().fill(isSelected ? Color.semantic.surface.primarySubtle : Color.clear))
-                .overlay(
-                    Capsule().strokeBorder(
-                        isSelected ? Color.semantic.primary.primary : Color.semantic.border.disabled,
-                        lineWidth: 1
-                    )
-                )
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    // 종 · 검색 색. 진한 띠 위에서는 흰색.
+    private var iconColor: Color {
+        headerTint == nil ? Color.component.header.iconButton : Color.primitive.bw.white
     }
 
     private var errorOverlay: some View {

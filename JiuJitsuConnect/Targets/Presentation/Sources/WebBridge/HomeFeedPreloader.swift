@@ -58,9 +58,9 @@ enum HomeFeedPreloader {
     }
 
     /// 홈 피드 웹뷰의 브릿지 기능 목록 — 홈 웹뷰(BridgeWebView)가 알리는 목록과 같아야 이어받는다.
-    /// 카테고리 칩(HOME_CATEGORY_TABS)은 홈 웹뷰가 직접 넘기고,
+    /// 머리줄 색(HOME_HEADER_TINT)은 홈 웹뷰가 직접 넘기고(`CommunityFeature.listCapabilities`),
     /// 분석 기록(#424) · 관심 대회 알림 결과(#395)는 모든 웹뷰, 시트 열림은 탭 바 밑까지 그리는 웹(#314)에 BridgeWebView가 붙인다.
-    static let capabilities: [WebBridgeCapability] = [.homeCategoryTabs, .analyticsEvent, .competitionAlertsEnabled, .setSheetOpen]
+    static let capabilities: [WebBridgeCapability] = [.homeHeaderTint, .analyticsEvent, .competitionAlertsEnabled, .setSheetOpen]
 
     /// 홈 웹뷰가 미리 불러 둔 화면을 이어받는다. 주소·설정이 다르면 이어받지 않고 새로 만들게 둔다.
     static func take(url: URL, capabilities: [WebBridgeCapability]) -> HomeFeedPreload? {
@@ -118,7 +118,7 @@ final class HomeFeedPreload {
         self.url = url
         let recorder = HomeFeedPreloadRecorder()
         self.recorder = recorder
-        // 홈 웹뷰와 같은 설정으로 만든다(지원 목록은 `HomeFeedPreloader.capabilities` — 분석 기록 #424 · 관심 대회 알림 결과 #395 · 시트 열림 #314)
+        // 홈 웹뷰와 같은 설정으로 만든다(지원 목록은 `HomeFeedPreloader.capabilities` — 머리줄 색 · 분석 기록 #424 · 관심 대회 알림 결과 #395 · 시트 열림 #314)
         // 홈 웹은 머리줄 아래 놓여 상태바를 덮지 않는다 — 홈 웹뷰(BridgeWebView)가 짐작하는 값과 같아야 한다.
         webView = BridgeWebView.makeWebView(
             capabilities: HomeFeedPreloader.capabilities,
