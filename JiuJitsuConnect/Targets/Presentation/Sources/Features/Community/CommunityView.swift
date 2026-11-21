@@ -12,10 +12,13 @@ import CoreKit
 
 public struct CommunityView: View {
     let store: StoreOf<CommunityFeature>
+    // 웹 아래 시트가 열려 있는지(SET_SHEET_OPEN) — 머리줄도 웹 딤과 같이 어둡게 덮는다.
+    let isWebSheetOpen: Bool
     @Environment(\.scenePhase) private var scenePhase
 
-    public init(store: StoreOf<CommunityFeature>) {
+    public init(store: StoreOf<CommunityFeature>, isWebSheetOpen: Bool = false) {
         self.store = store
+        self.isWebSheetOpen = isWebSheetOpen
     }
 
     private enum Metrics {
@@ -30,6 +33,7 @@ public struct CommunityView: View {
     public var body: some View {
         VStack(spacing: 0) {
             gnb
+                .webSheetHeaderDim(isWebSheetOpen)
             ZStack {
                 if let url = store.url {
                     BridgeWebView(
