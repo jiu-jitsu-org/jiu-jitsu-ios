@@ -295,7 +295,7 @@ public struct SettingsFeature: Sendable {
                 if case .signInCancelled? = error as? DomainError {
                     return .send(.internal(.showToast(.init(message: "Apple 확인을 취소해 탈퇴하지 않았어요.", status: .info))))
                 }
-                // 실패 이유나 오류 코드를 알리고, 문의 메일에 남긴다(#379).
+                // 실패를 알리고, 오류 코드는 문의 메일에 남긴다(#379).
                 guard let domainError = error as? DomainError,
                       let notice = DomainErrorMapper.authFailure(from: domainError)
                 else { return handleError(error) }

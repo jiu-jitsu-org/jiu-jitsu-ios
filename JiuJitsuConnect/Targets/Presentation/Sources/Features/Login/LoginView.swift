@@ -13,7 +13,6 @@ public struct LoginView: View {
         NavigationStack(path: $store.scope(state: \.path, action: \.path)) {
             LoginSceneView {
                 loginButtons
-                    .serverLoginProgress(isLoading: store.isLoading)
             }
             // 빈 내비게이션 바가 안전 영역을 차지하지 않도록 첫 화면에서만 숨긴다
             .toolbar(.hidden, for: .navigationBar)
@@ -79,31 +78,37 @@ public struct LoginView: View {
             Button(action: { store.send(.view(.kakaoButtonTapped)) }) {
                 SocialLoginButton(
                     asset: Assets.Login.Logo.kakao,
+                    isLoading: store.loadingProvider == .kakao,
                     text: "카카오로 계속하기",
                     backgroundColor: Color.primitive.kakao.bg,
                     foregroundColor: Color.primitive.kakao.text
                 )
             }
+            .loginButtonDimmed(store.isLoading && store.loadingProvider != .kakao)
 
             // 흰 시트 위의 흰 버튼이라 테두리로 경계를 잡는다
             Button(action: { store.send(.view(.googleButtonTapped)) }) {
                 SocialLoginButton(
                     asset: Assets.Login.Logo.google,
+                    isLoading: store.loadingProvider == .google,
                     text: "Google로 계속하기",
                     backgroundColor: Color.primitive.google.bg,
                     foregroundColor: Color.primitive.google.text,
                     borderColor: Color.primitive.coolGray.cg75
                 )
             }
+            .loginButtonDimmed(store.isLoading && store.loadingProvider != .google)
 
             Button(action: { store.send(.view(.appleButtonTapped)) }) {
                 SocialLoginButton(
                     asset: Assets.Login.Logo.apple,
+                    isLoading: store.loadingProvider == .apple,
                     text: "Apple로 계속하기",
                     backgroundColor: Color.primitive.apple.bg,
                     foregroundColor: Color.primitive.apple.text
                 )
             }
+            .loginButtonDimmed(store.isLoading && store.loadingProvider != .apple)
 
             Button(action: { store.send(.view(.aroundButtonTapped)) }) {
                 Text("로그인 없이 둘러보기")
@@ -115,7 +120,11 @@ public struct LoginView: View {
                     .contentShape(Rectangle())
             }
             .padding(.top, 2)
+            .loginButtonDimmed(store.isLoading)
         }
+        // 누른 버튼은 스피너를 돌리며 그대로 두되 다시 눌리지는 않게 막는다
+        .disabled(store.isLoading)
+        .animation(.easeInOut(duration: 0.15), value: store.loadingProvider)
     }
 
     private func calculateSheetHeight(itemCount: Int) -> CGFloat {
@@ -134,38 +143,18 @@ public struct LoginView: View {
 // MARK: - 서버 로그인 진행 표시 (#384)
 
 private extension View {
-    /// SNS 창에서 돌아와 서버 확인을 기다리는 동안 버튼을 흐리게 막고 그 위에 진행 중임을 알린다.
+    /// 서버 확인을 기다리는 동안 누르지 않은 버튼을 흐리게 해, 지금 어느 계정으로 로그인 중인지 보이게 한다.
     /// 표시가 없으면 사람들은 멈춘 줄 알고 버튼을 다시 누르는데, 진행 중엔 리듀서가 그 탭을 버려 아무 반응이 없다.
-    /// SNS 창이 떠 있는 단계는 넣지 않는다 — `isLoading`이 서버 확인 때만 켜진다(카카오톡에서 그냥 돌아오면 SDK가 응답하지 않음).
-    func serverLoginProgress(isLoading: Bool) -> some View {
-        self
-            // 버튼은 자리만 남기고 감춘다. 흐리게만 두면 검은 Apple 버튼이 회색 띠로 남아 가운데 문구와 겹친다.
-            // 자리를 남겨 덮개가 걷힐 때 시트 높이가 들썩이지 않는다.
-            .opacity(isLoading ? 0 : 1)
-            .disabled(isLoading)
-            .accessibilityHidden(isLoading)
-            .overlay {
-                if isLoading {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                            .controlSize(.large)
-                            .tint(Color.semantic.text.secondary)
-                        Text("로그인하는 중이에요")
-                            .font(Font.pretendard.custom(weight: .medium, size: 16))
-                            .foregroundStyle(Color.semantic.text.primary)
-                    }
-                    .accessibilityElement(children: .combine)
-                    .transition(.opacity)
-                }
-            }
-            .animation(.easeInOut(duration: 0.15), value: isLoading)
+    func loginButtonDimmed(_ isDimmed: Bool) -> some View {
+        opacity(isDimmed ? 0.35 : 1)
     }
 }
 
 // MARK: - 재사용 가능한 소셜 로그인 버튼 View
 struct SocialLoginButton: View {
     let asset: ImageAsset
+    /// 서버 로그인 중 — 로고 자리에 스피너를 돌린다. 문구는 그대로 둬 버튼 폭이 들썩이지 않는다.
+    var isLoading = false
     let text: String
     let backgroundColor: Color
     let foregroundColor: Color
@@ -173,16 +162,26 @@ struct SocialLoginButton: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            asset.swiftUIImage
-                .resizable()
-                .scaledToFit()
-                .frame(width: 22, height: 22)
+            Group {
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .tint(foregroundColor)
+                } else {
+                    asset.swiftUIImage
+                        .resizable()
+                        .scaledToFit()
+                }
+            }
+            .frame(width: 22, height: 22)
 
             Text(text)
                 .font(Font.pretendard.custom(weight: .medium, size: 16))
         }
         .frame(maxWidth: .infinity)
         .frame(height: 52)
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(isLoading ? "로그인하는 중" : "")
         .background(backgroundColor)
         .foregroundStyle(foregroundColor)
         .clipShape(RoundedRectangle(cornerRadius: 12))
