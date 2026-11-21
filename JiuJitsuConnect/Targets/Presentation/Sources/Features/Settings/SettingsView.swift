@@ -50,20 +50,6 @@ public struct SettingsView: View {
                         }
                     }
 
-                    // MARK: - 이용 통계 (#423) — 로그인 여부와 상관없이 보인다
-                    // TODO: 디자인 확정 아이콘으로 교체 (시안 없음, 있는 아이콘 중 version)
-                    SettingsSection {
-                        SettingsToggleRow(
-                            asset: Assets.Common.Icon.version,
-                            text: "이용 통계",
-                            subtitle: "앱을 고치는 데 쓰는 이용 기록을 보내요",
-                            isOn: Binding(
-                                get: { store.isAnalyticsEnabled },
-                                set: { store.send(.view(.analyticsToggled($0))) }
-                            )
-                        )
-                    }
-
                     // MARK: - 공지사항 (#369) — 로그인 여부와 상관없이 보인다. 약관과 같은 웹뷰로 웹 공지 화면을 연다
                     // TODO: 디자인 확정 아이콘으로 교체 (시안 없음, 있는 아이콘 중 documents)
                     SettingsSection {
@@ -82,6 +68,11 @@ public struct SettingsView: View {
                         }
                         SettingsInteractiveRow(asset: Assets.Common.Icon.documents, text: "마케팅 정보 수신 동의") {
                             store.send(.view(.marketingConsentButtonTapped))
+                        }
+                        // 이용 통계(#476) — 로그인 여부와 상관없이 보인다. 목록에서 바로 꺼지지 않게 한 단계 아래 화면에서 끈다.
+                        // TODO: 디자인 확정 아이콘으로 교체 (시안 없음, 같은 묶음의 documents)
+                        SettingsInteractiveRow(asset: Assets.Common.Icon.documents, text: "이용 통계") {
+                            store.send(.view(.analyticsButtonTapped))
                         }
                     }
 
@@ -150,6 +141,14 @@ public struct SettingsView: View {
             )
         ) { notificationStore in
             NotificationSettingView(store: notificationStore)
+        }
+        .navigationDestination(
+            item: $store.scope(
+                state: \.destination?.analyticsSetting,
+                action: \.destination.analyticsSetting
+            )
+        ) { analyticsStore in
+            AnalyticsSettingView(store: analyticsStore)
         }
         .fullScreenCover(
             item: $store.scope(state: \.termsWebCover, action: \.termsWebCover)

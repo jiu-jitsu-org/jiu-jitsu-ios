@@ -158,6 +158,11 @@ extension AppFeature {
             if case .notificationSetting? = settings.destination {
                 return native(.notificationSettings, id: "\(id)/notification")
             }
+            // 이용 통계 화면(#476)은 사전에 따로 이름이 없다 — 설정과 같은 id로 두어 들어갈 때 settings가 한 번 더 남지 않게 하고,
+            // 거기서 연 처리방침만 policy로 남긴다.
+            if case let .analyticsSetting(analytics)? = settings.destination, let policy = analytics.termsWebCover {
+                return policyScreen(policy.url, id: "\(id)/analytics/policy")
+            }
             return native(.settings, id: id)
         }
 
