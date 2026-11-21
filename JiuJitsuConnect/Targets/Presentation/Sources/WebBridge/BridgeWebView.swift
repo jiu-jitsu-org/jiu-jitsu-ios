@@ -268,6 +268,9 @@ struct BridgeWebView: UIViewRepresentable {
         context.coordinator.onRefreshStarted = onRefreshStarted
         context.coordinator.onWebProcessTerminated = onWebProcessTerminated
         context.coordinator.onScreenLoadMeasured = onScreenLoadMeasured
+        // 앱이 백그라운드에 있어도 웹뷰는 창에 붙어 있다 — 앱이 다시 올라올 때 미뤄 둔 복구를 한다(#479).
+        context.coordinator.isSceneActive = context.environment.scenePhase == .active
+        context.coordinator.reloadIfTerminatedWhileHidden()
         context.coordinator.scrollToTop(token: scrollToTopToken)
         context.coordinator.setPullToRefreshBackground(pullToRefreshBackground.map { UIColor($0) }, style: pullToRefreshStyle)
         // 홈은 맨 위 진한 띠가 보이는 동안 바운스 바탕도 띠 색으로 바꾼다 — 밴드가 다 못 덮게 길게 당겨도 흰 틈이 없게.
@@ -329,6 +332,8 @@ struct BridgeWebView: UIViewRepresentable {
         private var lastLoadToken: UUID?
         // 웹 프로세스가 창에서 떨어진 동안 죽어, 다시 보일 때 다시 불러와야 함(#479).
         private var needsReloadAfterTermination = false
+        // 앱이 화면에 올라와 있는지(scenePhase). 백그라운드에서 다시 부르면 새 웹 프로세스도 곧 멈추거나 정리된다.
+        var isSceneActive = true
         // 웹 프로세스 종료 뒤 다시 불러오는 중. 끝나기 전에 또 죽으면 되풀이하지 않고 오류 화면으로 보낸다.
         private var isRecoveringFromTermination = false
         private var lastScrollToTopToken: UUID?
@@ -696,7 +701,11 @@ struct BridgeWebView: UIViewRepresentable {
         /// 서브페이지에 가려져 창에서 떨어진 동안 죽었으면, 다시 보일 때까지 미룬다 — 안 보이는 웹을 부르면 또 정리되기 쉽다.
         private func recoverFromTermination(_ webView: WKWebView) {
             guard !isDeactivated else { return }
-            Log.trace("Bridge webview process terminated (window: \(webView.window != nil))", category: .network, level: .error)
+            Log.trace(
+                "Bridge webview process terminated (window: \(webView.window != nil), active: \(isSceneActive))",
+                category: .network,
+                level: .error
+            )
             // 죽은 문서의 새로고침 결과는 오지 않는다 — 띠를 닫아 둔다.
             if isRefreshing {
                 isRefreshing = false
@@ -709,16 +718,20 @@ struct BridgeWebView: UIViewRepresentable {
                 fail(.processTerminated)
                 return
             }
-            guard webView.window != nil else {
+            guard isShowing(webView) else {
                 needsReloadAfterTermination = true
                 return
             }
             reloadAfterTermination(webView)
         }
 
-        /// 창에 다시 붙을 때(서브페이지 닫힘 · 탭 복귀) 미뤄 둔 다시 불러오기를 한다.
+        private func isShowing(_ webView: WKWebView) -> Bool {
+            webView.window != nil && isSceneActive
+        }
+
+        /// 창에 다시 붙거나(서브페이지 닫힘) 앱이 다시 올라올 때 미뤄 둔 다시 불러오기를 한다.
         func reloadIfTerminatedWhileHidden() {
-            guard needsReloadAfterTermination, !isDeactivated, let webView else { return }
+            guard needsReloadAfterTermination, !isDeactivated, let webView, isShowing(webView) else { return }
             reloadAfterTermination(webView)
         }
 
