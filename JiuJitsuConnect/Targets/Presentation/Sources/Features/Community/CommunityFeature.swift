@@ -503,7 +503,7 @@ public struct CommunityFeature: Sendable {
                     state.headerTint = hex
                     return .none
 
-                case .openHomeFeed, .openCompetitionRecord, .competitionHeaderTint, .setSheetOpen:
+                case .openHomeFeed, .openCompetitionRecord, .competitionHeaderTint, .setSheetOpen, .setTopGlass:
                     // 대회 화면만 알리는 신호(#250)라 홈 피드 웹에서는 오지 않아야 한다. 받을 곳이 없어 무시한다.
                     Log.trace("리스트 웹뷰 \(message) 수신 — 무시", category: .network, level: .info)
                     return .none

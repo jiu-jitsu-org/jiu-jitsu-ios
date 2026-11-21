@@ -386,6 +386,17 @@ final class WebPullToRefreshController {
     private var collapseTask: Task<Void, Never>?
     // 인셋/프레임을 코드로 애니메이션하는 동안에는 스크롤 콜백이 밴드 높이를 덮어쓰지 않게 한다.
     private var isAdjustingInset = false
+    // 쉬는 동안의 위쪽 여백. 머리줄 뒤까지 그리는 웹(홈·대회 탭)은 머리줄에 가린 높이만큼 콘텐츠를 내려 둔다 —
+    // 새로고침 중에는 그 위에 로딩 높이를 더하고, 끝나면 이 값으로 돌아온다.
+    var restingTopInset: CGFloat = 0 {
+        didSet {
+            guard oldValue != restingTopInset, let scrollView else { return }
+            // 맨 위에 쉬고 있었으면 새 여백에서도 맨 위에 둔다 — 콘텐츠가 머리줄 밑으로 들어간 채 시작하지 않게.
+            let wasAtTop = scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 0.5
+            if phase == .idle, !isAdjustingInset { scrollView.contentInset.top = restingTopInset }
+            if wasAtTop { scrollView.contentOffset.y = -scrollView.adjustedContentInset.top }
+        }
+    }
 
     init(scrollView: UIScrollView, style: WebPullToRefreshStyle = .feed, onRefresh: @escaping () -> Void) {
         self.scrollView = scrollView
@@ -455,7 +466,7 @@ final class WebPullToRefreshController {
         // 로딩 높이로 안착시켜 reload 동안 밴드를 노출한다(콘텐츠를 그만큼 아래로 민다).
         isAdjustingInset = true
         UIView.animate(withDuration: Timing.insetAnimation) {
-            scrollView.contentInset.top = Metrics.refreshingHeight
+            scrollView.contentInset.top = self.restingTopInset + Metrics.refreshingHeight
             self.layoutBand(height: Metrics.refreshingHeight)
         } completion: { [weak self] _ in
             self?.isAdjustingInset = false
@@ -485,7 +496,7 @@ final class WebPullToRefreshController {
         // 접히는 동안 현재 문구(완료/새로고침)를 유지하다가, 끝난 뒤 idle로 되돌린다.
         isAdjustingInset = true
         UIView.animate(withDuration: Timing.insetAnimation) {
-            scrollView.contentInset.top = 0
+            scrollView.contentInset.top = self.restingTopInset
             self.layoutBand(height: 0)
         } completion: { [weak self] _ in
             guard let self else { return }
@@ -504,11 +515,11 @@ final class WebPullToRefreshController {
             host.addSubview(burstView)
         }
         host.bringSubviewToFront(burstView)
-        // 안전 영역 등 우리가 넣지 않은 위쪽 여백 아래부터 밴드가 시작된다.
+        // 안전 영역 등 시스템이 넣은 위쪽 여백과 머리줄에 가린 높이 아래부터 밴드가 시작된다.
         let systemTop = scrollView.adjustedContentInset.top - scrollView.contentInset.top
         let origin = CGPoint(
             x: scrollView.frame.midX,
-            y: scrollView.frame.minY + systemTop + Metrics.refreshingHeight / 2
+            y: scrollView.frame.minY + systemTop + restingTopInset + Metrics.refreshingHeight / 2
         )
         burstView.burst(at: origin)
     }
