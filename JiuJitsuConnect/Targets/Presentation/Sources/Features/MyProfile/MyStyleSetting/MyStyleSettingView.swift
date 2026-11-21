@@ -196,9 +196,12 @@ public struct MyStyleSettingView: View {
         Button {
             store.send(.view(.resetButtonTapped))
         } label: {
+            // 툴바가 정해 주는 폭이 글자보다 좁아 '나중에 ...'로 잘렸다(#471). 글자 폭만큼은 차지하게 한다
             Text("나중에 하기")
                 .font(Font.pretendard.buttonS)
                 .foregroundStyle(Color.component.button.text.defaultText)
+                .lineLimit(1)
+                .fixedSize()
                 .padding(.horizontal, 4)
                 .padding(.vertical, 9)
                 .frame(height: 32)
