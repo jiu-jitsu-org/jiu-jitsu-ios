@@ -20,7 +20,7 @@
 | Swift / Xcode | **6.0** / upToNextMajor("26.0") |
 | 기술 스택 | SwiftUI + TCA(ComposableArchitecture) 1.22.2+ |
 | 패키지 관리 | SPM (Tuist `Tuist/Package.swift`) |
-| 빌드 시스템 | **Tuist** — `mise.toml` 핀은 4.46.1이나 실제 빌드는 homebrew 최신(4.203.3) 필요 (§10.5) |
+| 빌드 시스템 | **Tuist** 4.203.3 — `mise.toml` 핀. 로컬 · Xcode Cloud 모두 이 버전 (§10.5) |
 | 경고 정책 | Warnings as Errors (Swift / GCC 모두 ON) |
 
 **주요 외부 의존성:** `swift-composable-architecture` 1.22.2+, `firebase-ios-sdk` 12.12.1+,
@@ -517,14 +517,14 @@ private enum Metrics {
 |---|---|---|
 | Xcode | 26.x | Mac App Store / Apple Developer |
 | mise | 최신 | `brew install mise` |
-| Tuist | 4.46.1 (핀) / 4.203.3 (실빌드) | `mise install` + `brew install tuist` — **§10.5 참고** |
+| Tuist | 4.203.3 (`mise.toml` 핀) | `mise install` — **§10.5 참고** |
 | SwiftLint | 최신 | `brew install swiftlint` |
 
 ### 10.2 최초 세팅 순서
 
 ```sh
 # 1) 도구 설치
-mise install                                      # → tuist 4.46.1
+mise install                                      # → tuist 4.203.3
 
 # 2) 시크릿 배치 (별도 채널로 받은 파일)
 #    템플릿: JiuJitsuConnect/Configs/Secrets.xcconfig.example.md
@@ -535,7 +535,7 @@ cp <받은 파일> JiuJitsuConnect/Secrets/GoogleService-Info-Dev.plist   # dev 
 #    빌드 단계 `Copy GoogleService-Info.plist`가 구성에 맞는 파일을 앱에 `GoogleService-Info.plist`로 넣는다(#423).
 
 # 3) 의존성 + 프로젝트 생성
-#    ⚠️ 핀 버전(mise 4.46.1)이 아니라 homebrew tuist로 실행한다 — §10.5
+#    mise가 mise.toml 핀(4.203.3)을 쓴다. `tuist version`으로 확인 — §10.5
 cd JiuJitsuConnect
 tuist install
 tuist generate
@@ -559,31 +559,32 @@ open JiuJitsuConnect.xcworkspace
 | Firebase / Kakao / Google 관련 빌드 에러 | `Configs/Secrets.xcconfig` 및 `Secrets/GoogleService-Info.plist` 배치 확인 |
 | `Copy GoogleService-Info.plist` 단계에서 빌드 실패 | 그 구성의 Firebase plist가 없음. Debug · Beta는 `Secrets/GoogleService-Info-Dev.plist`(§10.2), Release는 `Secrets/GoogleService-Info.plist` |
 | Pulse 콘솔이 뜨지 않음 | Debug/Beta 빌드인지 확인(Release는 의도적으로 비활성), 시뮬레이터 흔들기 제스처 |
-| `module map file ... not found` 로 빌드 실패 | homebrew `tuist`로 `tuist install && tuist generate` 재실행 — §10.5 |
+| `module map file ... not found` 로 빌드 실패 | 구버전 tuist로 generate됨. `tuist version`이 4.203.3인지 보고 `tuist install && tuist generate` 재실행 — §10.5 |
 
-### 10.5 Tuist 핀 버전과 빌드 실패 (2026-08-31 확인)
+### 10.5 Tuist 버전 (2026-11-21 핀 변경)
 
-`mise.toml`은 tuist를 **4.46.1로 핀**하고 있지만, **이 버전으로 generate한 프로젝트는 빌드되지 않는다.**
+`mise.toml`은 tuist를 **4.203.3으로 핀**한다. Xcode Cloud(`ci_post_clone.sh`)도 같은 핀을 읽는다.
+
+예전 핀 4.46.1로 generate하면 빌드가 이렇게 깨진다.
 
 ```
 error: module map file '.../Tuist/.build/checkouts/GoogleUtilities/../../tuist-derived/
 GoogleUtilities_Environment/GoogleUtilities_Environment.modulemap' not found
 ```
 
-원인은 `Tuist/.build/checkouts/<pkg>`가 `~/.cache/swifterpm/sources/...`로 가는 **심볼릭 링크**라는 점이다.
-생성된 모듈맵 경로의 `../..`가 물리적으로는 프로젝트가 아닌 **SPM 공유 캐시 폴더 안**을 가리켜 파일을 찾지 못한다.
+`Tuist/.build/checkouts/<pkg>`가 `~/.cache/swifterpm/sources/...`로 가는 심볼릭 링크라서,
+구버전이 만든 모듈맵 경로의 `../..`가 SPM 공유 캐시 폴더 안을 가리키기 때문이다.
 
-**조치 — homebrew의 최신 `tuist`(4.203.3 이상)로 generate한다.**
+이 오류가 나면 다른 tuist(전역 mise 설정, 예전 설치본)가 잡힌 것이다.
 
 ```sh
-brew install tuist
 cd JiuJitsuConnect
-tuist install && tuist generate     # mise exec 아님
+tuist version                       # 4.203.3이어야 한다
+mise install                        # 아니면 핀 버전 설치
+tuist install && tuist generate
 ```
 
-- `Tuist.swift`가 구형 `Config(...)` API를 쓰고 있지만 4.203.3에서도 정상 파싱된다.
-- 이 조합으로 Debug 시뮬레이터 빌드 성공을 확인했다(이슈 #25).
-- `mise.toml`의 핀을 올릴지는 다른 팀원 환경에서도 재현되는지 확인한 뒤 결정한다. 재현되면 핀을 올리고 이 절을 지운다.
+- 핀을 바꿀 때는 `mise.toml`만 고친다. CI도 그 값을 따른다.
 
 ---
 
@@ -593,7 +594,7 @@ tuist install && tuist generate     # mise exec 아님
 빌드/테스트 자동화 job은 현재 미구성.
 
 **TestFlight 배포 (Xcode Cloud):** `main`에 PR이 머지되면 Xcode Cloud가 `App-Beta` 스킴(Beta 구성, dev 서버)을 Archive해 TestFlight 내부 테스트로 올린다. `main`은 develop → main 릴리스 PR 전용.
-- `ci_scripts/ci_post_clone.sh`: 시크릿 파일 복원 → tuist(§10.5 버전) 설치 → `tuist install && tuist generate`
+- `ci_scripts/ci_post_clone.sh`: 시크릿 파일 복원 → tuist(`mise.toml` 핀) 설치 → `tuist install && tuist generate`
 - 시크릿은 Xcode Cloud 워크플로 환경 변수 `SECRETS_XCCONFIG_BASE64`, `GOOGLE_SERVICE_INFO_PLIST_BASE64`(운영 Firebase), `GOOGLE_SERVICE_INFO_DEV_PLIST_BASE64`(dev Firebase, Beta 아카이브가 씀)(모두 Secret)에 base64로 넣는다. 하나라도 없으면 `ci_post_clone.sh`가 멈춘다. 시크릿 파일이 바뀌면 이 값도 갱신한다.
 - 빌드 번호는 Xcode Cloud가 매긴다. 다음 번호는 App Store Connect > Xcode Cloud 설정에서 바꾼다.
 - `Tuist/Package.resolved`는 커밋한다. 의존성을 올릴 때만 `tuist install --update` 후 함께 커밋한다.
