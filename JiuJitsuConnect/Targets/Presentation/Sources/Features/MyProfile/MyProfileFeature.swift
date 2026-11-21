@@ -901,10 +901,13 @@ public struct MyProfileFeature: Sendable {
                     case let .communityDetail(source)? = state.path[id: id],
                     let url = URL(string: payload.url)
                 else { return .none }
+                // 활동에서 연 글 상세도 카테고리 이름 · 피드로 가기가 홈 탭으로 보낸다(OPEN_HOME_FEED, #480).
                 state.path.append(.communityDetail(.init(
                     url: url,
                     title: payload.title,
-                    accessToken: source.accessToken
+                    accessToken: source.accessToken,
+                    isTabRoot: false,
+                    capabilities: [.pickPhotos, .openHomeFeed]
                 )))
                 return .none
 
