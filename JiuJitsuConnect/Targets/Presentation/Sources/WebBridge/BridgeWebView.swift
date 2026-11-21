@@ -85,6 +85,7 @@ struct BridgeWebView: UIViewRepresentable {
     // 당겨서 새로고침을 시작함. 이때는 로딩 시작(onLoadingStarted)을 보내지 않아, 당김을 세야 하는 화면(홈·대회 목록 분석 기록)만 넘긴다.
     var onRefreshStarted: (() -> Void)?
     // 웹 프로세스가 죽음(#352). 화면은 흰 채로 남고 웹 헤더 · BACK_PRESSED 응답도 없어, 받는 화면(상세)이 오류로 돌린다.
+    // 넘기지 않는 웹뷰(홈 · 대회 목록)는 보던 주소를 스스로 다시 불러온다(#479).
     var onWebProcessTerminated: (() -> Void)?
     // 키보드가 뜨고 내림. 받는 화면(상세)만 넘긴다(#383).
     var onKeyboardVisibilityChanged: ((Bool) -> Void)?
@@ -220,6 +221,9 @@ struct BridgeWebView: UIViewRepresentable {
         (webView as? ChromelessWebView)?.onSafeAreaMeasured = { [weak coordinator = context.coordinator] insets in
             coordinator?.applySafeArea(insets)
         }
+        (webView as? ChromelessWebView)?.onMovedToWindow = { [weak coordinator = context.coordinator] in
+            coordinator?.reloadIfTerminatedWhileHidden()
+        }
         webView.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(webView)
         container.pinWebView(webView)
@@ -264,6 +268,9 @@ struct BridgeWebView: UIViewRepresentable {
         context.coordinator.onRefreshStarted = onRefreshStarted
         context.coordinator.onWebProcessTerminated = onWebProcessTerminated
         context.coordinator.onScreenLoadMeasured = onScreenLoadMeasured
+        // 앱이 백그라운드에 있어도 웹뷰는 창에 붙어 있다 — 앱이 다시 올라올 때 미뤄 둔 복구를 한다(#479).
+        context.coordinator.isSceneActive = context.environment.scenePhase == .active
+        context.coordinator.reloadIfTerminatedWhileHidden()
         context.coordinator.scrollToTop(token: scrollToTopToken)
         context.coordinator.setPullToRefreshBackground(pullToRefreshBackground.map { UIColor($0) }, style: pullToRefreshStyle)
         // 홈은 맨 위 진한 띠가 보이는 동안 바운스 바탕도 띠 색으로 바꾼다 — 밴드가 다 못 덮게 길게 당겨도 흰 틈이 없게.
@@ -323,6 +330,12 @@ struct BridgeWebView: UIViewRepresentable {
 
         private var lastLoadedURL: URL?
         private var lastLoadToken: UUID?
+        // 웹 프로세스가 창에서 떨어진 동안 죽어, 다시 보일 때 다시 불러와야 함(#479).
+        private var needsReloadAfterTermination = false
+        // 앱이 화면에 올라와 있는지(scenePhase). 백그라운드에서 다시 부르면 새 웹 프로세스도 곧 멈추거나 정리된다.
+        var isSceneActive = true
+        // 웹 프로세스 종료 뒤 다시 불러오는 중. 끝나기 전에 또 죽으면 되풀이하지 않고 오류 화면으로 보낸다.
+        private var isRecoveringFromTermination = false
         private var lastScrollToTopToken: UUID?
         // 이미 evaluateJavaScript로 전달한 아웃바운드 id. updateUIView가 여러 번
         // 호출돼도 같은 메시지를 중복 주입하지 않도록 가드한다.
@@ -427,6 +440,9 @@ struct BridgeWebView: UIViewRepresentable {
             if lastLoadToken != nil { screenLoadStartedAt = .now }
             lastLoadedURL = url
             lastLoadToken = token
+            // 새로 여는 로드가 미뤄 둔 복구를 대신한다.
+            needsReloadAfterTermination = false
+            isRecoveringFromTermination = false
             // 재로드(재시도) 시 웹 컨텍스트가 초기화되므로 전달 기록도 비운다.
             // 재로드 후 다시 WEBVIEW_READY가 오면 초기 동기화가 새로 일어난다.
             deliveredOutboundIDs.removeAll()
@@ -518,6 +534,8 @@ struct BridgeWebView: UIViewRepresentable {
             // 새로고침은 화면을 여는 시간이 아니라 재지 않는다. 첫 로드 중에 당겼으면 그 측정도 버린다.
             screenLoadStartedAt = nil
             refreshNavigation = webView.reload()
+                // 문서가 사라진 웹뷰(웹 프로세스 종료 등)는 reload할 항목이 없다 — 마지막으로 연 주소를 다시 연다(#479).
+                ?? lastLoadedURL.flatMap { webView.load(URLRequest(url: $0, timeoutInterval: BridgeWebView.documentRequestTimeout)) }
             // 다시 불러올 페이지가 없으면 기다릴 결과도 없으니 띠를 바로 닫는다.
             guard refreshNavigation == nil else { return }
             isRefreshing = false
@@ -672,7 +690,60 @@ struct BridgeWebView: UIViewRepresentable {
             // 웹 프로세스가 죽으면 닫힘 신호도 새 문서(didCommit)도 오지 않을 수 있다 — 시트가 열린 채였으면 탭 바를 돌려놓는다.
             setWebSheetOpen(false)
             setTopGlassActive(false)
-            onWebProcessTerminated?()
+            if let onWebProcessTerminated {
+                onWebProcessTerminated()
+            } else {
+                recoverFromTermination(webView)
+            }
+        }
+
+        /// 종료를 받을 화면이 없는 웹뷰(홈 · 대회 목록)는 흰 화면으로 남지 않게 보던 주소를 다시 불러온다(#479).
+        /// 서브페이지에 가려져 창에서 떨어진 동안 죽었으면, 다시 보일 때까지 미룬다 — 안 보이는 웹을 부르면 또 정리되기 쉽다.
+        private func recoverFromTermination(_ webView: WKWebView) {
+            guard !isDeactivated else { return }
+            Log.trace(
+                "Bridge webview process terminated (window: \(webView.window != nil), active: \(isSceneActive))",
+                category: .network,
+                level: .error
+            )
+            // 죽은 문서의 새로고침 결과는 오지 않는다 — 띠를 닫아 둔다.
+            if isRefreshing {
+                isRefreshing = false
+                refreshNavigation = nil
+                pullToRefresh?.finishRefreshing(success: false)
+            }
+            // 다시 불러온 문서가 뜨기 전에 또 죽으면 같은 일을 되풀이하지 않고 오류 화면(다시 시도)으로 보낸다.
+            guard !isRecoveringFromTermination else {
+                isRecoveringFromTermination = false
+                fail(.processTerminated)
+                return
+            }
+            guard isShowing(webView) else {
+                needsReloadAfterTermination = true
+                return
+            }
+            reloadAfterTermination(webView)
+        }
+
+        private func isShowing(_ webView: WKWebView) -> Bool {
+            webView.window != nil && isSceneActive
+        }
+
+        /// 창에 다시 붙거나(서브페이지 닫힘) 앱이 다시 올라올 때 미뤄 둔 다시 불러오기를 한다.
+        func reloadIfTerminatedWhileHidden() {
+            guard needsReloadAfterTermination, !isDeactivated, let webView, isShowing(webView) else { return }
+            reloadAfterTermination(webView)
+        }
+
+        private func reloadAfterTermination(_ webView: WKWebView) {
+            needsReloadAfterTermination = false
+            // 웹 안에서 옮긴 주소(카테고리 등)가 남아 있으면 그 주소, 없으면 마지막으로 연 주소.
+            guard let url = webView.url ?? lastLoadedURL else { return }
+            isRecoveringFromTermination = true
+            // 새 문서는 WEBVIEW_READY부터 다시 맞춘다. 화면을 여는 시간이 아니라 재지 않는다.
+            deliveredOutboundIDs.removeAll()
+            screenLoadStartedAt = nil
+            webView.load(URLRequest(url: url, timeoutInterval: BridgeWebView.documentRequestTimeout))
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
@@ -701,6 +772,7 @@ struct BridgeWebView: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             if let entryTraceToken { WebEntryTrace.mark(.finish, token: entryTraceToken) }
             markScreenLoadDocumentFinished()
+            isRecoveringFromTermination = false
             endRefreshing(success: true, navigation: navigation)
             onLoadingFinished()
             scheduleTopGlassFallback()
@@ -738,6 +810,7 @@ struct BridgeWebView: UIViewRepresentable {
         /// 로드 실패를 올린다. 재던 로드면 그때까지 걸린 시간도 실패(시간 초과)로 남긴다.
         /// 새 로드에 밀려 취소된 로드는 재던 것이 새 로드라 측정을 건드리지 않는다.
         private func fail(_ failure: WebLoadFailure) {
+            if !failure.isCancelled { isRecoveringFromTermination = false }
             if !failure.isCancelled { reportScreenLoad(failure.isTimeout ? .timeout : .fail) }
             onLoadingFailed(failure)
         }
