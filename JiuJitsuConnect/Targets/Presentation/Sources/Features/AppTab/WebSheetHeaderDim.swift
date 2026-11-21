@@ -14,15 +14,18 @@ struct WebSheetHeaderDim: ViewModifier {
     let isDimmed: Bool
 
     func body(content: Content) -> some View {
-        content.overlay {
-            // 웹 딤과 같은 색(overlay/scrim · 검정 40%)·같은 0.2초 페이드. 머리줄 버튼은 막만 받고 눌리지 않는다.
-            Color.component.bottomSheet.selected.container.scrim
-                .ignoresSafeArea(edges: .top)
-                .opacity(isDimmed ? 1 : 0)
-                .allowsHitTesting(isDimmed)
-                .animation(.easeInOut(duration: 0.2), value: isDimmed)
-                .accessibilityHidden(true)
-        }
+        content
+            // 손가락만 막으면 VoiceOver는 막 아래 버튼(종·검색)을 그대로 누른다 — 시트가 열린 동안은 읽지도 않게.
+            .accessibilityHidden(isDimmed)
+            .overlay {
+                // 웹 딤과 같은 색(overlay/scrim · 검정 40%)·같은 0.2초 페이드. 머리줄 버튼은 막만 받고 눌리지 않는다.
+                Color.component.bottomSheet.selected.container.scrim
+                    .ignoresSafeArea(edges: .top)
+                    .opacity(isDimmed ? 1 : 0)
+                    .allowsHitTesting(isDimmed)
+                    .animation(.easeInOut(duration: 0.2), value: isDimmed)
+                    .accessibilityHidden(true)
+            }
     }
 }
 
