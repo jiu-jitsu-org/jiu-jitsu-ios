@@ -361,7 +361,7 @@ public struct NicknameSettingFeature: Sendable {
         }
     }
 
-    /// 가입 실패를 이유 또는 오류 코드와 함께 알린다(#379).
+    /// 가입 실패를 알리고, 오류 코드는 문의 메일용으로 남긴다(#379).
     private func signupFailed(_ error: DomainError) -> Effect<Action> {
         analyticsClient.logErrorShown(error)
         guard let notice = DomainErrorMapper.authFailure(from: error) else { return .none }

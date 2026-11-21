@@ -13,7 +13,9 @@ public struct LoginFeature: Sendable {
     public struct State: Equatable {
         /// 서버 로그인 진행 중. 이 동안 들어온 다른 로그인·'둘러보기'는 무시한다(진행 중인 로그인이 토큰을 저장하므로).
         /// SNS 화면이 떠 있는 단계는 포함하지 않는다 — 카카오톡에서 로그인 없이 돌아오면 SDK가 응답하지 않아 풀리지 않는다.
-        public var isLoading = false
+        /// 서버 로그인 중인 SNS. 누른 버튼에만 스피너를 띄우는 데 쓴다.
+        public var loadingProvider: SNSProvider?
+        public var isLoading: Bool { loadingProvider != nil }
         public var toast: ToastState?
         
         var tempToken: String?
@@ -127,7 +129,7 @@ public struct LoginFeature: Sendable {
 
                 // MARK: - 로그인 결과 처리
             case let .internal(.socialLoginResponse(.success(user))):
-                state.isLoading = true
+                state.loadingProvider = user.snsProvider
                 return .run { send in
                     await send(.internal(.serverLoginResponse(
                         await TaskResult { try await authClient.serverLogin(user) }
@@ -138,7 +140,7 @@ public struct LoginFeature: Sendable {
                 return handleError(state: &state, error: error)
                 
             case let .internal(.serverLoginResponse(.success(authInfo))):
-                state.isLoading = false
+                state.loadingProvider = nil
                 Log.trace("서버 로그인 성공: isNewUser=\(authInfo.isNewUser ?? false)", category: .network, level: .info)
                 // 1. 신규 유저일 경우
                 if authInfo.isNewUser == true {
@@ -239,7 +241,7 @@ public struct LoginFeature: Sendable {
     }
     
     private func handleError(state: inout State, error: Error) -> Effect<Action> {
-        state.isLoading = false
+        state.loadingProvider = nil
         analyticsClient.logErrorShown(error)
 
         guard let domainError = error as? DomainError else {
@@ -247,7 +249,7 @@ public struct LoginFeature: Sendable {
             return .send(.internal(.showToast(.init(message: APIErrorCode.unknown.displayMessage, status: .error))))
         }
 
-        // 실패 이유(탈퇴 처리 · 영구 삭제)나 오류 코드를 알린다(#379). 취소는 안내하지 않는다.
+        // 실패 이유(탈퇴 처리 · 영구 삭제)를 알리고 오류 코드는 문의 메일용으로 남긴다(#379). 취소는 안내하지 않는다.
         guard let notice = DomainErrorMapper.authFailure(from: domainError) else { return .none }
         if let code = notice.code {
             recentErrorClient.record(RecentError(code: code, occurredAt: date.now))
