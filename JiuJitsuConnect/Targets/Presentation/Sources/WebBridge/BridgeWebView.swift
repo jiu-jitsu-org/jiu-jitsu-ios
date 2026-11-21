@@ -57,10 +57,10 @@ struct BridgeWebView: UIViewRepresentable {
     // 이 웹뷰를 소유한 Feature가 실제로 처리하는 '사전 확인형' 메시지. 처리하지 않는 웹뷰가 지원한다고
     // 알리면 웹이 요청을 보내 놓고 응답 없이 기다리므로, 처리하는 화면만 넘긴다.
     var capabilities: [WebBridgeCapability] = []
-    // 웹에 실제로 알리는 목록. 분석 기록(#424) · 관심 대회 알림 결과(#395)는 브리지를 받는 모든 Feature(목록 · 상세)가 처리하므로 모든 웹뷰에 붙인다.
+    // 웹에 실제로 알리는 목록. 분석 기록(#424) · 관심 대회 · 글 알림 결과(#395 · #466)는 브리지를 받는 모든 Feature(목록 · 상세)가 처리하므로 모든 웹뷰에 붙인다.
     // 탭 바 밑까지 그리는 웹은 시트 열림을 이 웹뷰가 직접 처리하므로 덧붙인다(#314).
     private var injectedCapabilities: [WebBridgeCapability] {
-        capabilities + [.analyticsEvent, .competitionAlertsEnabled] + (extendsUnderTabBar ? [.setSheetOpen] : [])
+        capabilities + [.analyticsEvent, .competitionAlertsEnabled, .contentAlertsEnabled] + (extendsUnderTabBar ? [.setSheetOpen] : [])
     }
     // 진입 시간 측정의 시작 시각·경로(#298). 위에 쌓이는 상세만 넘기고, nil이면 재지 않는다.
     var entryOrigin: WebEntryTrace.Origin?

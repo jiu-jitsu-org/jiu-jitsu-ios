@@ -151,6 +151,8 @@ private extension WebBridgeInboundMessage {
             return "OPEN_COMPETITION_RECORD  competitionId=\(payload.competitionId.map(String.init) ?? "-") year=\(payload.year)"
         case let .competitionAlertsEnabled(competitionId, requestId):
             return "COMPETITION_ALERTS_ENABLED  competitionId=\(competitionId.map(String.init) ?? "-") reqId=\(requestId ?? "-")"
+        case let .contentAlertsEnabled(contentId, requestId):
+            return "CONTENT_ALERTS_ENABLED  contentId=\(contentId.map(String.init) ?? "-") reqId=\(requestId)"
         case let .competitionHeaderTint(hex):
             return "COMPETITION_HEADER_TINT  color=\(hex ?? "null")"
         case let .homeHeaderTint(hex):
@@ -199,6 +201,8 @@ private extension WebBridgeOutboundMessage {
             return "USER_BLOCK_CHANGED  userId=\(userId) blocked=\(blocked)"
         case let .competitionAlertsResult(requestId, deviceEnabled):
             return "COMPETITION_ALERTS_RESULT  reqId=\(requestId) deviceEnabled=\(deviceEnabled)"
+        case let .contentAlertsResult(requestId, deviceEnabled):
+            return "CONTENT_ALERTS_RESULT  reqId=\(requestId) deviceEnabled=\(deviceEnabled)"
         }
     }
 }
@@ -260,6 +264,10 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     /// capability가 있는 웹은 requestId를 실어 COMPETITION_ALERTS_RESULT를 기다렸다가 성공 토스트를 정한다(#395). 없으면 답하지 않는다.
     /// competitionId는 서버 대회 id(숫자)로 로그에만 남긴다 — 없어도 안내는 한다.
     case competitionAlertsEnabled(competitionId: Int?, requestId: String?)
+    /// 글 · 밸런스 게임 상세의 알림 종을 켬(#466 · jiu-jitsu-frontend#633). 웹은 capability가 있을 때만, requestId를 늘 실어 보낸다.
+    /// 대회 쪽과 같이 기기 알림을 보고(미정이면 권한 창의 답까지) CONTENT_ALERTS_RESULT로 답하며, 꺼짐 안내 · FCM 등록도 대회 쪽과 같다.
+    /// contentId는 글 id(숫자)로 로그에만 남긴다.
+    case contentAlertsEnabled(contentId: Int?, requestId: String)
     /// 대회 목록 맨 위 띠 색 그라데이션에 맞춰 앱 대회 탭 머리줄(상태바 포함)을 칠해 달라는 요청.
     /// hex는 `#RRGGBB`, nil이면 앱 기본 머리줄 색으로 돌린다. 스크롤하며 조금씩 옅어진 색을 여러 번 보낸다.
     case competitionHeaderTint(hex: String?)
@@ -297,6 +305,7 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
         case openHomeFeed = "OPEN_HOME_FEED"
         case openCompetitionRecord = "OPEN_COMPETITION_RECORD"
         case competitionAlertsEnabled = "COMPETITION_ALERTS_ENABLED"
+        case contentAlertsEnabled = "CONTENT_ALERTS_ENABLED"
         case competitionHeaderTint = "COMPETITION_HEADER_TINT"
         case homeHeaderTint = "HOME_HEADER_TINT"
         case setSheetOpen = "SET_SHEET_OPEN"
@@ -447,6 +456,14 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             let competitionId = OpenCompetitionRecordPayload.parseCompetitionId(payload?["competitionId"])
             let requestId = (payload?["requestId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             return .competitionAlertsEnabled(competitionId: competitionId, requestId: requestId)
+        case .contentAlertsEnabled:
+            // 답을 기다리는 웹만 보내는 메시지라 requestId가 없으면 받을 곳이 없다 — 무시한다.
+            guard let requestId = (payload?["requestId"] as? String).flatMap({ $0.isEmpty ? nil : $0 }) else {
+                Log.trace("CONTENT_ALERTS_ENABLED requestId 누락", category: .network, level: .error)
+                return nil
+            }
+            let contentId = OpenCompetitionRecordPayload.parseCompetitionId(payload?["contentId"])
+            return .contentAlertsEnabled(contentId: contentId, requestId: requestId)
         case .competitionHeaderTint:
             // `#RRGGBB`만 받는다. 형식이 어긋나면 null과 같이 기본색으로 돌린다(엉뚱한 색이 남지 않게).
             return .competitionHeaderTint(hex: headerTintHex(payload))
@@ -755,6 +772,9 @@ enum WebBridgeCapability: String, Equatable, Sendable {
     /// 모든 웹뷰가 알린다(#395, BridgeWebView가 붙임). 있으면 웹은 requestId를 실어 보내고 COMPETITION_ALERTS_RESULT를 기다린다.
     /// 없으면(옛 앱) 지금처럼 바로 성공 토스트를 띄운다.
     case competitionAlertsEnabled = "COMPETITION_ALERTS_ENABLED"
+    /// 모든 웹뷰가 알린다(#466, BridgeWebView가 붙임). 있을 때만 웹은 글 · 밸런스 게임 종을 켤 때 이 메시지를 보내고 CONTENT_ALERTS_RESULT를 기다린다.
+    /// 없으면(옛 앱) 보내지 않고 바로 토스트를 띄운다.
+    case contentAlertsEnabled = "CONTENT_ALERTS_ENABLED"
 
     /// `window.AppBridgeCapabilities = [...]`를 정의하는 스크립트 소스. 직렬화 실패 시 nil.
     static func injectionScriptSource(for capabilities: [WebBridgeCapability]) -> String? {
@@ -833,6 +853,8 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
     case userBlockChanged(userId: Int, blocked: Bool)
     /// COMPETITION_ALERTS_ENABLED의 결과(#395). 기기 알림이 켜져 있을 때(방금 허용 포함)만 true — 웹은 true일 때만 성공 토스트를 띄운다.
     case competitionAlertsResult(requestId: String, deviceEnabled: Bool)
+    /// CONTENT_ALERTS_ENABLED의 결과(#466). 모양 · 뜻은 COMPETITION_ALERTS_RESULT와 같다 — 웹은 false면 꺼짐 안내를 띄운다.
+    case contentAlertsResult(requestId: String, deviceEnabled: Bool)
 
     private var type: String {
         switch self {
@@ -847,6 +869,7 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         case .profileUpdated: return "PROFILE_UPDATED"
         case .userBlockChanged: return "USER_BLOCK_CHANGED"
         case .competitionAlertsResult: return "COMPETITION_ALERTS_RESULT"
+        case .contentAlertsResult: return "CONTENT_ALERTS_RESULT"
         }
     }
 
@@ -858,7 +881,8 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
             return nil
         case let .userBlockChanged(userId, blocked):
             return ["userId": userId, "blocked": blocked]
-        case let .competitionAlertsResult(requestId, deviceEnabled):
+        case let .competitionAlertsResult(requestId, deviceEnabled),
+             let .contentAlertsResult(requestId, deviceEnabled):
             return ["requestId": requestId, "deviceEnabled": deviceEnabled]
         case let .confirmDialogResult(requestId, outcome):
             return ["requestId": requestId, "result": outcome.rawValue]

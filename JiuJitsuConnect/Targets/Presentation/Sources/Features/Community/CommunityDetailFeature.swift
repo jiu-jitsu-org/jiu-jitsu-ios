@@ -159,6 +159,8 @@ public struct CommunityDetailFeature: Sendable {
             case outboundDelivered(id: UUID)
             // COMPETITION_ALERTS_ENABLED를 받고 기기 알림 상태를 봄(#395). requestId가 있으면 이 웹에 답한다.
             case competitionAlertsChecked(requestId: String?, DeviceNotificationCheck)
+            // CONTENT_ALERTS_ENABLED(글 · 밸런스 게임 종)를 받고 기기 알림 상태를 봄(#466). 이 웹에 늘 답한다.
+            case contentAlertsChecked(requestId: String, DeviceNotificationCheck)
         }
 
         public enum DelegateAction: Sendable {
@@ -441,6 +443,10 @@ public struct CommunityDetailFeature: Sendable {
                     // 기기 알림은 이 화면이 보고, 안내 · 토큰 등록은 어느 탭이든 부모가 AppTab까지 올린다(#395).
                     return checkCompetitionAlerts(competitionId: competitionId, requestId: requestId)
 
+                case let .contentAlertsEnabled(contentId, requestId):
+                    // 글 · 밸런스 게임 상세의 알림 종(#466 · jiu-jitsu-frontend#633). 대회 쪽과 같이 이 웹에 답하고 부모가 안내한다.
+                    return checkContentAlerts(contentId: contentId, requestId: requestId)
+
                 case .contentCreated:
                     return .send(.delegate(.contentCreated))
 
@@ -475,6 +481,11 @@ public struct CommunityDetailFeature: Sendable {
                 if let requestId {
                     Self.enqueue(.competitionAlertsResult(requestId: requestId, deviceEnabled: check.isEnabled), into: &state)
                 }
+                return .send(.delegate(.competitionAlertsChecked(check)))
+
+            case let .internal(.contentAlertsChecked(requestId, check)):
+                Self.enqueue(.contentAlertsResult(requestId: requestId, deviceEnabled: check.isEnabled), into: &state)
+                // 꺼짐 안내(로그인 동안 한 번, 대회와 같이 센다) · 토큰 등록은 대회 알림과 같은 경로로 AppTab이 맡는다(#466).
                 return .send(.delegate(.competitionAlertsChecked(check)))
 
             case .delegate:
@@ -568,6 +579,15 @@ public struct CommunityDetailFeature: Sendable {
         return .run { send in
             let check = await DeviceNotificationCheck.current(permission: notificationPermissionClient, firebase: firebaseClient)
             await send(.internal(.competitionAlertsChecked(requestId: requestId, check)))
+        }
+    }
+
+    /// 글 · 밸런스 게임 종을 켰을 때 기기 알림 상태를 본다 — 대회 쪽과 같다(#466).
+    private func checkContentAlerts(contentId: Int?, requestId: String) -> Effect<Action> {
+        Log.trace("글 알림 켬: contentId=\(contentId.map(String.init) ?? "-")", category: .view, level: .info)
+        return .run { send in
+            let check = await DeviceNotificationCheck.current(permission: notificationPermissionClient, firebase: firebaseClient)
+            await send(.internal(.contentAlertsChecked(requestId: requestId, check)))
         }
     }
 
