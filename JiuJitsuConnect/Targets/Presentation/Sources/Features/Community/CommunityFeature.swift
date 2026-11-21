@@ -197,8 +197,8 @@ public struct CommunityFeature: Sendable {
             // 이 스택에 쌓인 남의 프로필에서 회원을 차단·해제함(#328) → 부모가 열린 웹뷰 모두에 USER_BLOCK_CHANGED를 보낸다.
             case userBlockChanged(userId: Int, blocked: Bool)
             // 홈에 쌓인 대회 상세의 '커뮤니티에서 더 보기'(#304) → 부모가 홈에 쌓인 화면을 닫아 피드를 보인다.
-            // 대회 번호가 있으면 그 대회 글만 보이게 피드를 다시 연다(#437).
-            case homeFeedRequested(competitionId: Int?)
+            // 대회 번호가 있으면 그 대회 글만(#437), 카테고리 번호가 있으면 그 카테고리 탭으로(#480) 피드를 다시 연다.
+            case homeFeedRequested(HomeFeedFilter?)
             // 홈에 쌓인 끝난 대회 상세의 '내 기록에 남기기'(#304) → 부모가 프로필을 보고 기록 추가를 그 상세 위에 쌓는다.
             case competitionRecordRequested(OpenCompetitionRecordPayload)
             // 홈 웹에서 글 · 댓글을 올림(#333) → 부모(AppTab)가 알림 권한 안내를 띄울지 정한다.
@@ -766,8 +766,8 @@ public struct CommunityFeature: Sendable {
             return .send(.openUserProfile(userId: userId))
         case let .competitionAlertsChecked(check):
             return .send(.delegate(.competitionAlertsChecked(check)))
-        case let .homeFeedRequested(competitionId):
-            return .send(.delegate(.homeFeedRequested(competitionId: competitionId)))
+        case let .homeFeedRequested(filter):
+            return .send(.delegate(.homeFeedRequested(filter)))
         case let .competitionRecordRequested(payload):
             return .send(.delegate(.competitionRecordRequested(payload)))
         case .competitionHeaderTintChanged:
@@ -826,13 +826,19 @@ public struct CommunityFeature: Sendable {
     }
 
     /// 대회 이야기 '모두 보기'(#437): 홈 피드를 `/?competitionId=<번호>`로 다시 불러온다. 웹이 '대회' 탭을 고르고
-    /// 그 대회 글만 보여 준다(jiu-jitsu-frontend#598). 다른 카테고리를 보고 있었거나 같은 주소여도 다시 불러와 그 대회로 맞춘다.
-    /// 대회 번호 없이 홈으로 오면(오늘의 게임·커뮤니티에서 더 보기 등) 앞서 건 대회 필터만 풀고, 필터가 없으면 보던 피드를 그대로 둔다.
-    public static func reloadFeed(competitionId: Int?, into state: inout State) {
+    /// 그 대회 글만 보여 준다(jiu-jitsu-frontend#598). 글 상세의 카테고리 이름(#480)은 `/?categoryId=<번호>`로 그 카테고리 탭을 연다.
+    /// 다른 탭을 보고 있었거나 같은 주소여도 다시 불러와 맞춘다 — 웹 안에서 탭을 바꾸면 앱의 `state.url`은 그대로라
+    /// 지금 보는 탭을 앱이 알 수 없다.
+    /// 필터 없이 홈으로 오면(오늘의 게임·커뮤니티에서 더 보기 등) 앞서 건 대회 필터만 풀고, 필터가 없으면 보던 피드를 그대로 둔다.
+    public static func reloadFeed(filter: HomeFeedFilter?, into state: inout State) {
         guard let base = makeCommunityURL() else { return }
         let target: URL?
-        if let competitionId {
-            target = URL(string: "/?\(competitionIdQueryName)=\(competitionId)", relativeTo: base)?.absoluteURL
+        if let filter {
+            let query = switch filter {
+            case let .competition(id): "\(competitionIdQueryName)=\(id)"
+            case let .category(id): "categoryId=\(id)"
+            }
+            target = URL(string: "/?\(query)", relativeTo: base)?.absoluteURL
         } else if let current = state.url, hasCompetitionFilter(current) {
             target = base
         } else {
