@@ -389,7 +389,7 @@ public struct AppTabFeature: Sendable {
                  .myPage(.delegate(.webSubview(.contentCreated))):
                 return promptNotificationPermissionIfNeeded(state)
 
-            // 관심 대회 '알림 받기' · 상세 종(#257 · #395). 웹은 홈 피드(글 속 대회 카드)·글 상세·알림함·대회 화면 어디서든 보내므로
+            // 관심 대회 '알림 받기' · 상세 종(#257 · #395), 글 · 밸런스 게임 종(#466). 웹은 홈 피드(글 속 대회 카드)·글 상세·알림함·대회 화면 어디서든 보내므로
             // 모든 탭의 웹을 한곳에서 받는다. 기기 알림은 메시지를 받은 웹 화면이 보고 답했다.
             // 설정 값은 웹이 서버에 저장했으니(#281) 열려 있는 설정 › 알림만 다시 읽힌다.
             case let .competition(.delegate(.competitionAlertsChecked(check))),
