@@ -31,6 +31,26 @@ final class KeyboardAvoidingWebContainer: UIView {
     var isSheetOpen = false {
         didSet { if reportsTabBarAsObscured, oldValue != isSheetOpen { setNeedsLayout() } }
     }
+    // 켜면 웹뷰를 탭 첫 화면 머리줄(상태바 + 44) 뒤까지 그린다(홈 피드 · 대회 목록). 머리줄 높이는 웹에
+    // `--app-header-obscured-top`으로 알린다(ChromelessWebView). 위쪽을 어떻게 비울지는 isTopGlassActive가 정한다.
+    var extendsUnderTabHeader = false {
+        didSet {
+            guard oldValue != extendsUnderTabHeader else { return }
+            webView?.scrollView.topEdgeEffect.isHidden = extendsUnderTabHeader
+            setNeedsLayout()
+        }
+    }
+    // 웹이 머리줄 뒤까지 유리 면을 그리는지(SET_TOP_GLASS).
+    // - 그린다: 웹이 맨 위를 머리줄 높이만큼 스스로 비우고 붙는 줄도 그 아래에 붙인다. 앱은 가린 영역을 알리지 않는다 —
+    //   알리면 WebKit이 가린 곳 근처의 sticky 줄을 따로 그려(가린 곳을 줄 색으로 덮음) 머리줄 뒤로 글이 비치지 않는다.
+    // - 안 그린다(옛 웹 · 홈이 아닌 화면): 머리줄에 가린 높이를 가린 영역 · 콘텐츠 여백으로 알려 지금처럼 머리줄 아래부터 배치한다.
+    // 새 웹이 대부분이라 그린다고 보고 시작하고, 문서가 다 뜨도록 알림이 없으면 코디네이터가 끈다.
+    var isTopGlassActive = true {
+        didSet { if extendsUnderTabHeader, oldValue != isTopGlassActive { setNeedsLayout() } }
+    }
+    // 콘텐츠 위쪽 여백 · 당겨서 새로고침 띠 자리가 바뀌면 부른다. 여백은 새로고침과 함께 다뤄야 해서 코디네이터가 맡는다.
+    var onTabHeaderInsetsChanged: ((TabHeaderInsets) -> Void)?
+    private var appliedTabHeaderInsets = TabHeaderInsets()
     // 스크롤할 때마다 부른다(탭 첫 화면 웹만, #267).
     var onScroll: (@MainActor (CGFloat, CGFloat, Bool) -> Void)?
     // 키보드가 떠 있는지. 고정 셸(상세)이 댓글을 쓰는 중에 당겨서 새로고침되지 않게 본다(#432).
@@ -41,6 +61,7 @@ final class KeyboardAvoidingWebContainer: UIView {
 
     func pinWebView(_ webView: WKWebView) {
         self.webView = webView
+        webView.scrollView.topEdgeEffect.isHidden = extendsUnderTabHeader
         offsetObservation = webView.scrollView.observe(\.contentOffset) { [weak self] scrollView, _ in
             MainActor.assumeIsolated { self?.reportScroll(of: scrollView) }
         }
@@ -91,16 +112,43 @@ final class KeyboardAvoidingWebContainer: UIView {
             DispatchQueue.main.async { [weak self] in self?.onKeyboardVisibilityChanged?(keyboardVisible) }
         }
         isKeyboardVisible = keyboardVisible
-        if reportsTabBarAsObscured, let webView {
-            let obscuredBottom = keyboardVisible || isSheetOpen ? 0 : tabBarObscuredBottom
-            if webView.obscuredContentInsets.bottom != obscuredBottom {
-                webView.obscuredContentInsets = UIEdgeInsets(top: 0, left: 0, bottom: obscuredBottom, right: 0)
+        // 가린 영역을 알리는 웹뷰만 건드린다 — 상세 웹뷰는 WebKit 기본값(스크롤 뷰 여백)을 그대로 쓴다.
+        if reportsTabBarAsObscured || extendsUnderTabHeader, let webView {
+            let headerTop = headerCoveredTop
+            let drawsGlass = isTopGlassActive
+            let obscuredTop = drawsGlass ? 0 : headerTop
+            let obscuredBottom = reportsTabBarAsObscured && !keyboardVisible && !isSheetOpen ? tabBarObscuredBottom : 0
+            if webView.obscuredContentInsets.top != obscuredTop || webView.obscuredContentInsets.bottom != obscuredBottom {
+                webView.obscuredContentInsets = UIEdgeInsets(top: obscuredTop, left: 0, bottom: obscuredBottom, right: 0)
+                webView.scrollView.verticalScrollIndicatorInsets.top = obscuredTop
                 webView.scrollView.verticalScrollIndicatorInsets.bottom = obscuredBottom
+                // 웹에 알리는 안전 영역(ChromelessWebView)은 가린 곳 아래부터 다시 잰다.
+                webView.setNeedsLayout()
+            }
+            if let chromeless = webView as? ChromelessWebView {
+                let covered = drawsGlass ? headerTop : 0
+                if chromeless.tabHeaderHeight != headerTop || chromeless.tabHeaderCoveredTop != covered {
+                    chromeless.tabHeaderHeight = headerTop
+                    chromeless.tabHeaderCoveredTop = covered
+                    chromeless.setNeedsLayout()
+                }
+            }
+            let insets = TabHeaderInsets(contentTop: drawsGlass ? 0 : headerTop, bandTop: drawsGlass ? headerTop : 0)
+            if appliedTabHeaderInsets != insets {
+                appliedTabHeaderInsets = insets
+                onTabHeaderInsetsChanged?(insets)
             }
         }
         let shouldPinBottom = !keyboardVisible
         guard bottomToBottomEdge?.isActive != shouldPinBottom else { return }
         bottomToBottomEdge?.isActive = shouldPinBottom
+    }
+
+    // 화면 맨 위에서 머리줄 아래 끝까지 중 이 뷰와 겹치는 높이. 세로 고정 앱이라 상태바 높이는 기기마다 정해져 있다.
+    private var headerCoveredTop: CGFloat {
+        guard extendsUnderTabHeader, let window else { return 0 }
+        let headerBottom = window.safeAreaInsets.top + WebSafeAreaInsets.tabHeaderHeight
+        return max(headerBottom - convert(bounds, to: window).minY, 0).rounded()
     }
 
     private func reportScroll(of scrollView: UIScrollView) {
@@ -111,4 +159,12 @@ final class KeyboardAvoidingWebContainer: UIView {
         let isUserScrolling = scrollView.isTracking || scrollView.isDecelerating
         onScroll(offsetY, maxOffsetY, isUserScrolling)
     }
+}
+
+/// 머리줄 뒤까지 그리는 웹뷰의 위쪽 자리.
+struct TabHeaderInsets: Equatable {
+    /// 콘텐츠 위쪽 여백 — 쉬는 동안 콘텐츠를 머리줄 아래로 내려 두는 만큼(웹이 비우지 않을 때).
+    var contentTop: CGFloat = 0
+    /// 당겨서 새로고침 띠를 콘텐츠 원점에서 내려 다는 만큼 — 웹이 맨 위를 스스로 비울 때 머리줄 아래에서 띠가 나오게.
+    var bandTop: CGFloat = 0
 }
