@@ -1085,6 +1085,8 @@ public struct CommunityFeature: Sendable {
         state.loadToken = UUID()
         // 도메인이 바뀌면 이전 웹 컨텍스트의 전달 대기 메시지는 의미가 없다.
         state.outbox.removeAll()
+        // 새 웹이 다시 알려 줄 때까지 흰 머리줄 — 주소가 없어 오류 화면만 남을 때 지난 진한 색이 남지 않게.
+        state.headerTint = nil
         if url == nil {
             state.isLoading = false
             state.hasError = true
