@@ -118,9 +118,10 @@ final class KeyboardAvoidingWebContainer: UIView {
             let drawsGlass = isTopGlassActive
             let obscuredTop = drawsGlass ? 0 : headerTop
             let obscuredBottom = reportsTabBarAsObscured && !keyboardVisible && !isSheetOpen ? tabBarObscuredBottom : 0
+            // 스크롤 막대는 웹이 맨 위를 스스로 비울 때도 머리줄 아래에서 시작한다.
+            webView.scrollView.verticalScrollIndicatorInsets.top = headerTop
             if webView.obscuredContentInsets.top != obscuredTop || webView.obscuredContentInsets.bottom != obscuredBottom {
                 webView.obscuredContentInsets = UIEdgeInsets(top: obscuredTop, left: 0, bottom: obscuredBottom, right: 0)
-                webView.scrollView.verticalScrollIndicatorInsets.top = obscuredTop
                 webView.scrollView.verticalScrollIndicatorInsets.bottom = obscuredBottom
                 // 웹에 알리는 안전 영역(ChromelessWebView)은 가린 곳 아래부터 다시 잰다.
                 webView.setNeedsLayout()
