@@ -189,30 +189,19 @@ public struct SettingsView: View {
     }
 
     // MARK: - 버전 정보 (#326)
-    /// 최신이면 '버전 · 최신 버전', 새 버전이 있으면 버전과 '업데이트', 확인 못 했으면 지금처럼 버전만.
+    /// 새 버전이 있을 때만 버전 옆에 '업데이트'를 둔다. 최신이거나 확인 못 했으면 버전만 — 최신이라는 문구는 따로 알릴 필요가 없다.
     @ViewBuilder
     private var versionValue: some View {
-        let versionText = Text(store.appVersion)
+        Text(store.appVersion)
             .font(Font.pretendard.captionM)
             .foregroundStyle(Color.component.list.setting.valueText)
-        switch store.isLatestVersion {
-        case true?:
-            HStack(spacing: 0) {
-                versionText
-                Text(" · 최신 버전")
-                    .font(Font.pretendard.captionM)
-                    .foregroundStyle(Color.component.list.setting.valueText)
-            }
-        case false?:
-            versionText
+        if store.isLatestVersion == false {
             Button {
                 store.send(.view(.updateButtonTapped))
             } label: {
                 AppButtonConfiguration(title: "업데이트", size: .small)
             }
             .appButtonStyle(.primary, size: .small, height: 32)
-        case nil:
-            versionText
         }
     }
 
