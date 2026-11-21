@@ -30,6 +30,7 @@ public struct CommunityView: View {
         static let leadingInset: CGFloat = 16
         static let rowHeight: CGFloat = 44
         static let logoHeight: CGFloat = 20
+        static let headerTintAnimation: Animation = .easeOut(duration: 0.2)
     }
 
     public var body: some View {
@@ -114,8 +115,9 @@ public struct CommunityView: View {
                 (headerTint ?? (webDrawsTopGlass ? Color.component.header.background.opacity(0.001) : Color.component.header.background))
                     .ignoresSafeArea(edges: .top)
             }
-            // 띠가 들고 날 때 한 번에 바뀐다(기본 모션 0.5초).
-            .animation(.easeInOut(duration: 0.5), value: store.headerTint)
+            // 띠가 들고 날 때 한 번에 바뀐다. 상태바 글자는 같은 순간 바로 바뀌므로, 바탕이 늦게 따라와
+            // 먹색 위 검은 글자처럼 어긋나 보이지 않게 짧게 · 처음부터 빠르게 바꾼다(0.5초 easeInOut은 절반까지 0.27초 걸렸음).
+            .animation(Metrics.headerTintAnimation, value: store.headerTint)
     }
 
     private var logoRow: some View {
