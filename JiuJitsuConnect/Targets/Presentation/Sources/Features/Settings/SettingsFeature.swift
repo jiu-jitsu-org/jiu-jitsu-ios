@@ -61,8 +61,6 @@ public struct SettingsFeature: Sendable {
         var isAppleWithdrawal = false
         // 문의 메일을 여는 중(#331). 빠르게 두 번 눌러도 메일 화면·토스트가 한 번만 뜨게 한다.
         var isOpeningInquiry = false
-        // 이용 통계 수집(#423). 기기에 저장된 값을 화면이 열릴 때 읽는다.
-        var isAnalyticsEnabled = true
 
         public init(authInfo: AuthInfo) {
             self.authInfo = authInfo
@@ -77,6 +75,8 @@ public struct SettingsFeature: Sendable {
     @Reducer
     public enum Destination {
         case notificationSetting(NotificationSettingFeature)
+        // 이용 통계(#476) — 수집 끄기 스위치는 한 단계 아래 화면에 둔다
+        case analyticsSetting(AnalyticsSettingFeature)
     }
 
     public enum Action: Sendable {
@@ -93,7 +93,7 @@ public struct SettingsFeature: Sendable {
             // 버전 정보의 '업데이트'(#326)
             case updateButtonTapped
             case notificationButtonTapped
-            case analyticsToggled(Bool)
+            case analyticsButtonTapped
             case blockedUsersButtonTapped
             case noticesButtonTapped
             case termsButtonTapped
@@ -150,7 +150,6 @@ public struct SettingsFeature: Sendable {
             switch action {
             // MARK: UI Actions
             case .view(.onAppear):
-                state.isAnalyticsEnabled = analyticsClient.isCollectionEnabled()
                 // 스플래시에서 받은 결과를 쓰고, 확인이 실패했거나 오래됐으면 한 번 더 받는다(#326).
                 if let checked = appVersionClient.lastChecked() {
                     state.isLatestVersion = Self.isLatest(state.appVersion, policy: checked.policy)
@@ -178,10 +177,11 @@ public struct SettingsFeature: Sendable {
                 state.destination = .notificationSetting(NotificationSettingFeature.State())
                 return .none
 
-            case let .view(.analyticsToggled(isEnabled)):
-                // 끄면 바로 수집을 멈추고, 다시 켤 때까지 다음 실행에도 꺼 둔다.
-                state.isAnalyticsEnabled = isEnabled
-                analyticsClient.setCollectionEnabled(isEnabled)
+            case .view(.analyticsButtonTapped):
+                state.destination = .analyticsSetting(AnalyticsSettingFeature.State(
+                    isEnabled: analyticsClient.isCollectionEnabled(),
+                    privacyPolicyURL: TermsURL.privacyPolicy
+                ))
                 return .none
 
             case .view(.noticesButtonTapped):
