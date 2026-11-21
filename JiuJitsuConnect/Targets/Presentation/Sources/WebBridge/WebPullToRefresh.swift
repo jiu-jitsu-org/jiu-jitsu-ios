@@ -509,6 +509,8 @@ final class WebPullToRefreshController {
         } completion: { [weak self] _ in
             guard let self else { return }
             self.isAdjustingInset = false
+            // 접히는 동안 쉬는 여백이 바뀌었으면(웹 유리 면 시작 · 멈춤) 새 값으로 맞춘다.
+            scrollView.contentInset.top = self.restingTopInset
             self.phase = .idle
             self.band.update(phase: .idle, progress: 0)
         }
