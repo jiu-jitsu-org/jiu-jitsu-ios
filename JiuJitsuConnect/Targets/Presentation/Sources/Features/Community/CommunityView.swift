@@ -15,6 +15,8 @@ public struct CommunityView: View {
     // 웹 아래 시트가 열려 있는지(SET_SHEET_OPEN) — 머리줄도 웹 딤과 같이 어둡게 덮는다.
     let isWebSheetOpen: Bool
     @Environment(\.scenePhase) private var scenePhase
+    // 웹이 머리줄 뒤까지 유리 면을 그리는 중인지(SET_TOP_GLASS). 그리는 동안 머리줄 바탕을 비워 웹 유리 면 한 장이 비치게 한다.
+    @State private var webDrawsTopGlass = false
 
     public init(store: StoreOf<CommunityFeature>, isWebSheetOpen: Bool = false) {
         self.store = store
@@ -31,9 +33,8 @@ public struct CommunityView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
-            gnb
-                .webSheetHeaderDim(isWebSheetOpen)
+        // 웹을 머리줄 · 상태바 뒤까지 깔고 머리줄을 위에 얹는다 — 글을 내리면 머리줄 뒤로 지나가며 비친다.
+        ZStack(alignment: .top) {
             ZStack {
                 if let url = store.url {
                     BridgeWebView(
@@ -50,6 +51,8 @@ public struct CommunityView: View {
                         pullToRefreshBackground: headerTint,
                         pullToRefreshStyle: headerTint == nil ? .feed : .feedOnDark,
                         extendsUnderTabBar: true,
+                        extendsUnderTabHeader: true,
+                        onTopGlassChanged: { webDrawsTopGlass = $0 },
                         // 맨 위 띠 색을 받으려고 알린다(HOME_HEADER_TINT).
                         capabilities: CommunityFeature.listCapabilities,
                         onLoadingStarted: { store.send(.internal(.loadingStarted)) },
@@ -60,22 +63,27 @@ public struct CommunityView: View {
                         onBridgeMessage: { store.send(.internal(.bridgeMessageReceived($0))) },
                         onOutboundDelivered: { store.send(.internal(.outboundDelivered(id: $0))) }
                     )
-                    // 피드가 떠 있는 탭 바 뒤로 비쳐 흐르게 바닥까지 그린다(#267).
-                    .ignoresSafeArea(.container, edges: .bottom)
+                    // 피드가 떠 있는 탭 바 · 머리줄 뒤로 비쳐 흐르게 위아래 끝까지 그린다(#267).
+                    .ignoresSafeArea(.container, edges: [.top, .bottom])
                 }
 
                 WebLoadingOverlay(isLoading: store.isLoading)
-                    // 웹이 탭 바 밑까지 그려지므로 덮개도 그 밑까지 덮어, 탭 바 자리에 웹 바탕(흰색)이 따로 비치지 않게 한다.
-                    .ignoresSafeArea(.container, edges: .bottom)
+                    // 웹이 탭 바 · 머리줄 밑까지 그려지므로 덮개도 그만큼 덮어, 그 자리에 웹 바탕(흰색)이 따로 비치지 않게 한다.
+                    .ignoresSafeArea(.container, edges: [.top, .bottom])
 
                 if store.hasError {
                     errorOverlay
+                        .padding(.top, Metrics.rowHeight)
                 }
             }
             // SwiftUI 자동 키보드 회피를 끄고, 키보드 대응은 BridgeWebView의 keyboardLayoutGuide
             // 한 곳에서만 처리한다. 글쓰기 화면이 웹 내부 라우트로 열릴 때도 웹뷰 높이만 줄어
             // 웹의 sticky 하단 툴바가 키보드 위에 붙는다. (이중 보정·애니메이션 충돌 방지)
             .ignoresSafeArea(.keyboard, edges: .bottom)
+
+            gnb
+                // 머리줄 바탕이 비어 있으면 그 뒤를 웹 딤이 이미 덮으므로 글자 · 아이콘만 어둡게 한다(두 번 어두워지지 않게).
+                .webSheetHeaderDim(isWebSheetOpen, webDimsBehind: webDrawsTopGlass && headerTint == nil)
         }
         .background(Color.component.background.default)
         .onAppear { store.send(.view(.onAppear)) }
@@ -91,17 +99,19 @@ public struct CommunityView: View {
     private var gnb: some View {
         // 왼쪽에 OSS 로고, 오른쪽에 종 · 검색. 카테고리 칩은 웹 피드가 그린다.
         // 웹 맨 위 진한 띠가 보이는 동안은 머리줄도 그 색으로 칠해 띠와 한 면으로 잇고, 구분선을 뺀다.
+        // 웹이 유리 면을 그리는 동안은 바탕을 비워 두어 웹 유리 면이 머리줄과 칩 줄을 한 장으로 덮게 한다(구분선도 뺀다).
         logoRow
             .overlay(alignment: .bottom) {
                 Rectangle()
                     .fill(Color.component.navibar.container.divider)
                     .frame(height: 1)
-                    .opacity(headerTint == nil ? 1 : 0)
+                    .opacity(headerTint == nil && !webDrawsTopGlass ? 1 : 0)
             }
-            // 바탕을 상단 safe area(상태바)까지 끌어올려 회색(background.default)이
-            // 상태바에 번지지 않게 한다. gnb가 VStack 최상단이라 top safe area 무시가 곧 상태바 채움.
+            // 바탕이 비어도 머리줄을 누르면 뒤로 지나가는 글이 눌리지 않게 막는다.
+            .contentShape(Rectangle())
+            // 바탕을 상단 safe area(상태바)까지 끌어올려 회색(background.default)이 상태바에 번지지 않게 한다.
             .background {
-                (headerTint ?? Color.component.header.background)
+                (headerTint ?? (webDrawsTopGlass ? Color.clear : Color.component.header.background))
                     .ignoresSafeArea(edges: .top)
             }
             // 띠가 들고 날 때 한 번에 바뀐다(기본 모션 0.5초).
