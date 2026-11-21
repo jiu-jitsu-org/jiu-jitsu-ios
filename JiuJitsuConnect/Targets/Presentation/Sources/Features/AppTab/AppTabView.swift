@@ -66,7 +66,10 @@ public struct AppTabView: View {
                 NavigationStack(
                     path: $store.scope(state: \.home.path, action: \.home.path)
                 ) {
-                    CommunityView(store: store.scope(state: \.home, action: \.home))
+                    CommunityView(
+                        store: store.scope(state: \.home, action: \.home),
+                        isWebSheetOpen: webSheetOpenTab == .home
+                    )
                         .modifier(tabRootModifier(for: .home))
                 } destination: { destinationStore in
                     switch destinationStore.case {
@@ -88,7 +91,8 @@ public struct AppTabView: View {
                     // 대회 탭 종의 새 알림 점은 홈이 조회한 값 하나를 함께 쓴다(#258).
                     CompetitionTabView(
                         store: store.scope(state: \.competition, action: \.competition),
-                        hasUnreadNotification: store.home.hasUnreadNotification
+                        hasUnreadNotification: store.home.hasUnreadNotification,
+                        isWebSheetOpen: webSheetOpenTab == .competition
                     )
                         .modifier(tabRootModifier(for: .competition))
                 } destination: { destinationStore in

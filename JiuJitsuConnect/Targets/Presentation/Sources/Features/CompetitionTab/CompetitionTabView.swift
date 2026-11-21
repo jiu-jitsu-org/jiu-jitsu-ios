@@ -15,15 +15,19 @@ public struct CompetitionTabView: View {
     let store: StoreOf<CompetitionTabFeature>
     // 알림함 종의 새 알림 점(#258). 홈이 조회해 둔 값 하나만 따라 그려, 두 탭의 점이 어긋나지 않게 한다.
     let hasUnreadNotification: Bool
+    // 웹 아래 시트가 열려 있는지(SET_SHEET_OPEN) — 머리줄도 웹 딤과 같이 어둡게 덮는다.
+    let isWebSheetOpen: Bool
 
-    public init(store: StoreOf<CompetitionTabFeature>, hasUnreadNotification: Bool) {
+    public init(store: StoreOf<CompetitionTabFeature>, hasUnreadNotification: Bool, isWebSheetOpen: Bool = false) {
         self.store = store
         self.hasUnreadNotification = hasUnreadNotification
+        self.isWebSheetOpen = isWebSheetOpen
     }
 
     public var body: some View {
         VStack(spacing: 0) {
             header
+                .webSheetHeaderDim(isWebSheetOpen)
             ZStack {
                 if let webStore = store.scope(state: \.web, action: \.web) {
                     CompetitionListWebView(store: webStore, scrollToTopToken: store.scrollToTopToken, headerTint: headerTint)
