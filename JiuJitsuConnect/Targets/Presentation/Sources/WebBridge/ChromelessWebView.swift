@@ -20,6 +20,8 @@ final class ChromelessWebView: WKWebView {
     // 그중 웹이 스스로 비워야 하는 높이 — 가린 영역으로 알리지 않을 때(웹이 유리 면을 그림)만 머리줄 높이다.
     // 위쪽 안전 영역으로 알려 웹 시트 · 고정 요소가 머리줄 밑으로 들어가지 않게 한다.
     var tabHeaderCoveredTop: CGFloat = 0
+    // 창에 다시 붙음. 가려진 채 웹 프로세스가 죽은 웹뷰가 다시 보일 때 다시 불러오려고 받는다(#479).
+    var onMovedToWindow: (@MainActor () -> Void)?
 
     override func layoutSubviews() {
         super.layoutSubviews()
@@ -29,6 +31,7 @@ final class ChromelessWebView: WKWebView {
     override func didMoveToWindow() {
         super.didMoveToWindow()
         reportSafeArea()
+        if window != nil { onMovedToWindow?() }
     }
 
     private func reportSafeArea() {
