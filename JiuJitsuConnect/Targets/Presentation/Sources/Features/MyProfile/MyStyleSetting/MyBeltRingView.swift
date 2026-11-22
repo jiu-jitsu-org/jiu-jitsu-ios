@@ -23,6 +23,8 @@ struct MyBeltRingView<Content: View>: View {
     var entranceTrigger: Int = 0
     /// 오를 때마다 다시 보기 움직임을 한 번 한다(#338) — 사진을 눌렀을 때. 움직이는 중이면 처음부터 다시 하지 않고 무시한다.
     var replayTrigger: Int = 0
+    /// MY 헤더 크기(1) 대비 배율. 승급 축하 장면은 같은 링을 크게 그린다.
+    var scale: CGFloat = 1
     @ViewBuilder let content: Content
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -36,16 +38,17 @@ struct MyBeltRingView<Content: View>: View {
     @State private var spinTime = Motion.total
 
     var body: some View {
+        let ring = MyBeltRingGeometry(scale: scale)
         ZStack {
             content
-                .frame(width: Ring.photo, height: Ring.photo)
+                .frame(width: ring.photo, height: ring.photo)
                 .clipShape(Circle())
 
-            ring
+            MyBeltRingStroke(geometry: ring, beltRank: beltRank, stripeCount: beltStripe?.count ?? 0)
                 .modifier(SpinRotation(time: spinTime, kind: spinKind))
                 .allowsHitTesting(false)
         }
-        .frame(width: Ring.box, height: Ring.box)
+        .frame(width: ring.box, height: ring.box)
         .modifier(SpinScale(time: spinTime, kind: spinKind))
         .onChange(of: entranceTrigger) { _, _ in
             guard !reduceMotion else { return }
@@ -73,47 +76,103 @@ struct MyBeltRingView<Content: View>: View {
             }
         }
     }
+}
 
-    // MARK: - Ring
+// MARK: - Ring Stroke
 
-    @ViewBuilder
-    private var ring: some View {
+/// 사진 둘레의 링만 — 흰 테(halo) · 띠 색 링 · 띠 끝 검은 칸 · 흰 그랄 줄. 띠가 없으면 점선 링만.
+///
+/// MY 헤더는 그대로 그리고, 승급 축하 장면(BeltPromotionView)은 아래 값으로 바뀌는 순간을 그린다.
+/// - `drawingBelt`/`drawProgress`: 새 띠 색이 12시부터 시계 방향으로 덮인다(0이면 없음, 1이면 한 바퀴).
+/// - `newStripes`/`newStripeProgress`: 뒤쪽 그랄 N줄이 링 바깥에서 안쪽으로 그려진다.
+/// - `stripeOpacity`: 그랄 줄 전체를 흐리게(띠가 바뀔 때 옛 그랄을 지운다).
+struct MyBeltRingStroke: View {
+    let geometry: MyBeltRingGeometry
+    let beltRank: BeltRank?
+    let stripeCount: Int
+    var drawingBelt: BeltRank?
+    var drawProgress: CGFloat = 0
+    var newStripes: Int = 0
+    var newStripeProgress: CGFloat = 1
+    var stripeOpacity: Double = 1
+
+    var body: some View {
+        let ring = geometry
         if let beltRank {
             ZStack {
-                Circle()
-                    .inset(by: Ring.box / 2 - (Ring.radius - 0.5))
-                    .stroke(haloColor(beltRank), lineWidth: Ring.width + Ring.gap + 3)
-                Circle()
-                    .inset(by: Ring.box / 2 - Ring.radius)
-                    .stroke(beltRank.beltSurfaceColor, lineWidth: Ring.width)
-                RingArc(from: Ring.barCenter - Ring.barWidth / 2, to: Ring.barCenter + Ring.barWidth / 2)
-                    .stroke(
-                        beltRank == .black ? Color.component.myBelt.blackRankBar : Color.component.myBelt.ringRankBar,
-                        lineWidth: Ring.width
-                    )
-                ForEach(0..<(beltStripe?.count ?? 0), id: \.self) { index in
-                    let count = Double(beltStripe?.count ?? 0)
-                    let center = Ring.barCenter + (Double(index) - (count - 1) / 2) * Ring.markPitchDegrees
-                    RingArc(from: center - Ring.markDegrees / 2, to: center + Ring.markDegrees / 2)
-                        .stroke(Color.component.myBelt.stripe, lineWidth: Ring.width)
+                halo(beltRank)
+                    .opacity(drawingBelt == nil ? 1 : 1 - drawProgress)
+                if let drawingBelt {
+                    halo(drawingBelt)
+                        .opacity(drawProgress)
                 }
+                Circle()
+                    .inset(by: ring.box / 2 - ring.radius)
+                    .stroke(beltRank.beltSurfaceColor, lineWidth: ring.width)
+                if let drawingBelt {
+                    Circle()
+                        .inset(by: ring.box / 2 - ring.radius)
+                        .trim(from: 0, to: drawProgress)
+                        .stroke(drawingBelt.beltSurfaceColor, lineWidth: ring.width)
+                        // trim은 3시에서 출발한다 — 12시부터 덮이게 돌려 둔다.
+                        .rotationEffect(.degrees(-90))
+                }
+                RingArc(from: ring.barCenter - ring.barWidth / 2, to: ring.barCenter + ring.barWidth / 2, radius: ring.radius)
+                    .stroke(rankBarColor(beltRank), lineWidth: ring.width)
+                // 단 색이 바뀌는 승급(검은띠)은 새 띠 색이 덮고 지나간 자리만 새 단 색으로 칠한다.
+                if let drawingBelt, (drawingBelt == .black) != (beltRank == .black) {
+                    Circle()
+                        .inset(by: ring.box / 2 - ring.radius)
+                        .trim(from: 0, to: drawProgress)
+                        .stroke(rankBarColor(drawingBelt), lineWidth: ring.width)
+                        .rotationEffect(.degrees(-90))
+                        .mask(
+                            RingArc(from: ring.barCenter - ring.barWidth / 2, to: ring.barCenter + ring.barWidth / 2, radius: ring.radius)
+                                .stroke(lineWidth: ring.width)
+                        )
+                }
+                ForEach(0..<stripeCount, id: \.self) { index in
+                    let count = Double(stripeCount)
+                    let center = ring.barCenter + (Double(index) - (count - 1) / 2) * ring.markPitchDegrees
+                    // 그랄은 띠 끝 쪽부터 감으므로 새 그랄은 단의 안쪽(뒤쪽 순서)에 생긴다 — BeltIllustration과 같은 규칙.
+                    let isNew = index >= stripeCount - newStripes
+                    RingStripe(
+                        from: center - ring.markDegrees / 2,
+                        to: center + ring.markDegrees / 2,
+                        radius: ring.radius,
+                        width: ring.width,
+                        progress: isNew ? newStripeProgress : 1
+                    )
+                    .fill(Color.component.myBelt.stripe)
+                }
+                .opacity(stripeOpacity)
             }
-            .frame(width: Ring.box, height: Ring.box)
+            .frame(width: ring.box, height: ring.box)
         } else {
             Circle()
-                .inset(by: Ring.box / 2 - Ring.radius)
+                .inset(by: ring.box / 2 - ring.radius)
                 .stroke(
                     Color.component.myBelt.noBeltRing,
-                    style: StrokeStyle(lineWidth: Ring.width, dash: [Ring.noBeltDash / 2, Ring.noBeltDash / 2])
+                    style: StrokeStyle(lineWidth: ring.width, dash: [ring.noBeltDash / 2, ring.noBeltDash / 2])
                 )
-                .frame(width: Ring.box, height: Ring.box)
+                .frame(width: ring.box, height: ring.box)
         }
+    }
+
+    private func rankBarColor(_ beltRank: BeltRank) -> Color {
+        beltRank == .black ? Color.component.myBelt.blackRankBar : Color.component.myBelt.ringRankBar
+    }
+
+    private func halo(_ beltRank: BeltRank) -> some View {
+        Circle()
+            .inset(by: geometry.box / 2 - (geometry.radius - 0.5 * geometry.scale))
+            .stroke(haloColor(beltRank), lineWidth: geometry.width + geometry.gap + 3 * geometry.scale)
     }
 
     private func haloColor(_ beltRank: BeltRank) -> Color {
         beltRank.isLightBelt
-            ? Color.component.myBelt.lightInk.opacity(Ring.haloOpacity * 0.24)
-            : Color.primitive.bw.trueWhite.opacity(Ring.haloOpacity)
+            ? Color.component.myBelt.lightInk.opacity(MyBeltRingGeometry.haloOpacity * 0.24)
+            : Color.primitive.bw.trueWhite.opacity(MyBeltRingGeometry.haloOpacity)
     }
 }
 
@@ -121,44 +180,70 @@ struct MyBeltRingView<Content: View>: View {
 
 enum MyBeltRing {
     /// 사진 + 틈 + 링 바깥 지름. 헤더 레이아웃은 이 크기를 차지한다(흰 테는 3pt씩 바깥으로 번진다).
-    static let box: CGFloat = Ring.box
+    static let box: CGFloat = MyBeltRingGeometry(scale: 1).box
 }
 
-private enum Ring {
-    static let photo: CGFloat = 90
-    static let gap: CGFloat = 4
-    static let width: CGFloat = 7
-    static let mark: CGFloat = 3.5
+/// 링 치수. MY 헤더(배율 1)를 기준으로 정하고, 크게 그릴 때는 같은 비율로 키운다.
+struct MyBeltRingGeometry {
     static let haloOpacity: Double = 0.7
-    static let box: CGFloat = photo + 2 * (gap + width)
+
+    let scale: CGFloat
+    var photo: CGFloat { 90 * scale }
+    var gap: CGFloat { 4 * scale }
+    var width: CGFloat { 7 * scale }
+    var mark: CGFloat { 3.5 * scale }
+    var box: CGFloat { photo + 2 * (gap + width) }
     /// 링 중심선 반지름
-    static let radius: CGFloat = photo / 2 + gap + width / 2
-    static let barCenter: Double = 135
-    static let barWidth: Double = 44
-    static let markDegrees = Double(mark / (2 * .pi * radius)) * 360
-    static let markPitchDegrees = Double(mark * 2.4 / (2 * .pi * radius)) * 360
+    var radius: CGFloat { photo / 2 + gap + width / 2 }
+    var barCenter: Double { 135 }
+    var barWidth: Double { 44 }
+    var markDegrees: Double { Double(mark / (2 * .pi * radius)) * 360 }
+    var markPitchDegrees: Double { Double(mark * 2.4 / (2 * .pi * radius)) * 360 }
     /// 띠 없음 점선 한 칸(선+틈) — 둘레에 딱 나눠떨어지게
-    static let noBeltDash: CGFloat = {
+    var noBeltDash: CGFloat {
         let circumference = 2 * .pi * radius
         return circumference / (circumference / 12).rounded()
-    }()
+    }
 }
 
 /// 12시 = 0°, 시계 방향 각도로 그린 원호. 굵기는 stroke로 준다.
 private struct RingArc: Shape {
     let from: Double
     let to: Double
+    let radius: CGFloat
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
         path.addArc(
             center: CGPoint(x: rect.midX, y: rect.midY),
-            radius: Ring.radius,
+            radius: radius,
             startAngle: .degrees(from - 90),
             endAngle: .degrees(to - 90),
             clockwise: false
         )
         return path
+    }
+}
+
+/// 그랄 한 줄. progress가 0 → 1로 가며 링 바깥 끝에서 안쪽으로 차오른다(1이면 링 굵기 전체).
+private struct RingStripe: Shape {
+    let from: Double
+    let to: Double
+    let radius: CGFloat
+    let width: CGFloat
+    var progress: CGFloat
+
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let filled = width * min(max(progress, 0), 1)
+        guard filled > 0 else { return Path() }
+        return RingArc(from: from, to: to, radius: radius + (width - filled) / 2)
+            .path(in: rect)
+            .strokedPath(StrokeStyle(lineWidth: filled))
     }
 }
 
@@ -232,6 +317,26 @@ private enum Motion {
 
     private static func sine(_ fraction: Double) -> Double {
         -(cos(.pi * fraction) - 1) / 2
+    }
+}
+
+// MARK: - Entrance Motion (shared)
+
+/// 등장 움직임(웅크렸다 두 바퀴 돌고 통통 멈춤)을 다른 장면에서 같은 곡선으로 쓴다 — 승급 축하 장면.
+/// time(ms)을 0 → `MyBeltRingEntrance.total`로 선형 애니메이션하면 된다.
+enum MyBeltRingEntrance {
+    static let total = Motion.total
+}
+
+extension View {
+    /// 링만 돌린다.
+    func myBeltRingEntranceRotation(time: Double) -> some View {
+        modifier(SpinRotation(time: time, kind: .entrance))
+    }
+
+    /// 사진과 링을 함께 웅크렸다 편다.
+    func myBeltRingEntranceScale(time: Double) -> some View {
+        modifier(SpinScale(time: time, kind: .entrance))
     }
 }
 

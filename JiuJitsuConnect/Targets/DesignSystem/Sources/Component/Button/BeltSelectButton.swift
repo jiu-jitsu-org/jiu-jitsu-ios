@@ -124,15 +124,28 @@ public struct BeltSelectButton: View {
 /// 띠 칩의 띠 그림만 따로 — 휠 같은 다른 부품의 아이콘 자리에서 칩과 같은 띠 모양을 쓴다.
 public struct BeltIcon: View {
     private let color: BeltSelectButton.BeltColor
-    private let size: BeltSelectButton.Size
+    private let stripes: Int
+    private let metrics: BeltMetrics
 
     public init(color: BeltSelectButton.BeltColor, size: BeltSelectButton.Size = .regular) {
+        self.init(color: color, stripes: 0, metrics: BeltMetrics(size))
+    }
+
+    private init(color: BeltSelectButton.BeltColor, stripes: Int, metrics: BeltMetrics) {
         self.color = color
-        self.size = size
+        self.stripes = stripes
+        self.metrics = metrics
+    }
+
+    /// MY 벨트 카드의 40 칸에 그리는 36×12 띠 — 그랄까지 그린다.
+    /// 4그랄만 단을 넓혀(20) 띠 끝 쪽으로 붙이고, 0~3그랄은 단 13 안 가운데에 모은다.
+    public static func card(color: BeltSelectButton.BeltColor, stripes: Int) -> BeltIcon {
+        let stripes = min(max(stripes, 0), 4)
+        return BeltIcon(color: color, stripes: stripes, metrics: .card(stripes: stripes))
     }
 
     public var body: some View {
-        BeltShape(color: color, stripes: 0, size: size)
+        BeltShape(color: color, stripes: stripes, metrics: metrics)
     }
 }
 
@@ -267,6 +280,35 @@ private struct BeltMetrics {
         rankBarInset = size.rankBarInset
         stripeWidth = size.stripeWidth
         stripeSpacing = size.stripeSpacing
+    }
+
+    private init(
+        beltSize: CGSize,
+        beltCornerRadius: CGFloat,
+        rankBarWidth: CGFloat,
+        rankBarInset: CGFloat,
+        stripeWidth: CGFloat,
+        stripeSpacing: CGFloat
+    ) {
+        self.beltSize = beltSize
+        self.beltCornerRadius = beltCornerRadius
+        self.rankBarWidth = rankBarWidth
+        self.rankBarInset = rankBarInset
+        self.stripeWidth = stripeWidth
+        self.stripeSpacing = stripeSpacing
+    }
+
+    /// MY 벨트 카드(`BeltIcon.card`) 치수. 그랄 4줄은 13 단에 들어가지 않아 단을 넓히고 끝으로 붙인다(양옆 3씩 남음).
+    static func card(stripes: Int) -> BeltMetrics {
+        let isFull = stripes >= 4
+        return BeltMetrics(
+            beltSize: CGSize(width: 36, height: 12),
+            beltCornerRadius: 2.5,
+            rankBarWidth: isFull ? 20 : 13,
+            rankBarInset: isFull ? 2 : 4,
+            stripeWidth: isFull ? 2 : 1.75,
+            stripeSpacing: isFull ? 2 : 1.25
+        )
     }
 
     func scaled(by factor: CGFloat) -> BeltMetrics {

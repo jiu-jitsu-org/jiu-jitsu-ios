@@ -150,8 +150,8 @@ private struct BeltSection: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // 띠 그림은 띠 고르기 칩·휠과 같은 부품(DesignSystem BeltIcon)을 쓴다(#320).
-            BeltIcon(color: beltRank.selectButtonColor)
+            // 띠 그림은 띠 고르기 칩·휠과 같은 부품(DesignSystem BeltIcon)을 쓰고, 카드에선 그랄까지 그린다(#320).
+            BeltIcon.card(color: beltRank.selectButtonColor, stripes: beltStripe?.count ?? 0)
                 .frame(width: 40, height: 40)
                 .background(Color.semantic.surface.secondary)
                 .clipShape(RoundedRectangle(cornerRadius: 10))

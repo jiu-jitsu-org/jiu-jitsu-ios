@@ -495,7 +495,7 @@ private extension View {
                 set: { if $0 == nil { store.send(.view(.beltPromotionDismissed)) } }
             )
         ) { promotion in
-            BeltPromotionView(promotion: promotion) {
+            BeltPromotionView(promotion: promotion, profileImageUrl: store.userProfile?.profileImageUrl) {
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
                 store.send(.view(.beltPromotionDismissed), transaction: transaction)
