@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import UniformTypeIdentifiers
 import DesignSystem
 import Domain
 
@@ -318,7 +317,8 @@ private struct CompetitionMedalSummaryView: View {
 
 /// 대회 정보 리스트 (정보가 있을 때)
 ///
-/// › 줄을 눌러 뜨는 시트의 '순서 바꾸기'를 고르면 머리줄에 취소·완료가 나오고, 그동안 줄을 길게 눌러 끌어 순서를 바꾼다(#204). 완료를 눌러야 저장한다.
+/// › 줄을 눌러 뜨는 시트의 '순서 바꾸기'를 고르면 머리줄에 취소·완료가 나오고, 그동안 줄 끝 ≡ 를 잡고 끌어 순서를 바꾼다(#204). 완료를 눌러야 저장한다.
+/// 끌기를 순서 바꾸기 중의 ≡ 에만 두는 건 — 예전처럼 줄마다 길게 눌러 끌기를 붙여 두면 그 인식이 짧은 탭을 가끔 가로채 한 번 눌러서는 반응하지 않았다.
 /// 고정한 줄은 고정한 줄끼리, 고정 안 한 줄은 고정 안 한 줄끼리만 자리를 바꾼다
 /// — 고정 안 한 줄을 고정 자리로 올리려면 같은 시트의 '맨 위에 고정'을 쓴다.
 private struct CompetitionListView: View {
@@ -331,11 +331,21 @@ private struct CompetitionListView: View {
     // 끄는 동안의 줄 순서(손가락을 따라 바로 바뀜)와 끄는 줄. 놓으면 pendingGroups로 넘기고 비운다.
     @State private var liveGroups: [CompetitionGroup]?
     @State private var draggingID: String?
+    /// 끄는 손가락의 세로 위치와, 잡은 곳이 줄 위끝에서 얼마나 아래인지 — 끄는 줄이 손가락을 따라오게 한다.
+    @State private var dragY: CGFloat = 0
+    @State private var grabOffset: CGFloat = 0
     @State private var rowHeights: [String: CGFloat] = [:]
+    /// 손가락이 닿아 있는 동안만 참 — 끌기가 끝나지 않고 끊겨도(앱이 뒤로 감 · 시스템 방해) 거짓으로 돌아와 정리할 수 있게 한다.
+    @GestureState private var isDragActive = false
 
     private enum Metrics {
         static let rowSpacing: CGFloat = 0
+        /// 줄 오른쪽 끝에서 ≡ 를 잡는 폭 — 12pt 손잡이 둘레를 손가락에 걸리게 넓힌다.
+        static let handleHitWidth: CGFloat = 56
+        static let rowCornerRadius: CGFloat = 14
     }
+
+    private static let coordinateSpace = "competitionList"
 
     private var isReordering: Bool { pendingGroups != nil }
 
@@ -352,11 +362,22 @@ private struct CompetitionListView: View {
         withAnimation(.easeInOut(duration: 0.2)) { pendingGroups = order }
     }
 
+    /// 주어진 순서에서 줄의 위끝 — 목록 맨 위(첫 줄 위끝)가 0이다.
+    private func top(of id: String, in groups: [CompetitionGroup]) -> CGFloat {
+        var top: CGFloat = 0
+        for group in groups {
+            if group.id == id { return top }
+            top += (rowHeights[group.id] ?? 0) + Metrics.rowSpacing
+        }
+        return top
+    }
+
     var body: some View {
         VStack(spacing: Metrics.rowSpacing) {
             let groups = liveGroups ?? baseGroups
             ForEach(groups, id: \.id) { group in
                 let index = groups.firstIndex { $0.id == group.id } ?? 0
+                let isDragging = draggingID == group.id
                 // 순서를 옮기는 중에는 수정 화면·시트로 들어가지 않는다(저장 안 한 순서를 잃지 않게).
                 CompetitionRowView(
                     group: group,
@@ -369,125 +390,104 @@ private struct CompetitionListView: View {
                 )
                 // 줄 높이를 내용만큼 고정한다 — 없으면 부문이 여러 줄인 대회가 다른 줄과 같은 높이로 눌려 위아래 줄과 겹친다(#140).
                 .fixedSize(horizontal: false, vertical: true)
-                // 끄는 동안 원래 자리는 옅게 남겨 어디로 들어갈지 보이게 한다.
-                .opacity(liveGroups != nil && draggingID == group.id ? 0.3 : 1)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { rowHeights[group.id] = $0 }
+                // 끄는 줄은 카드 면을 깔고 살짝 띄워 손가락을 따라오게 한다. 다른 줄이 자리를 바꿔도 끄는 줄은 애니메이션 없이 손가락에 붙어 있는다.
+                .background {
+                    if isDragging {
+                        RoundedRectangle(cornerRadius: Metrics.rowCornerRadius)
+                            .fill(Color.component.skillCard.default.bg)
+                            .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
+                    }
+                }
+                .offset(y: isDragging ? dragY - grabOffset - top(of: group.id, in: groups) : 0)
+                .zIndex(isDragging ? 1 : 0)
+                .transaction { if isDragging { $0.animation = nil } }
+                // 순서 바꾸기 중에는 줄 끝 ≡ 를 잡자마자 끈다 — 길게 누를 필요가 없다. 줄의 나머지는 화면 스크롤에 남긴다.
+                .overlay(alignment: .trailing) {
+                    if isReordering {
+                        Color.clear
+                            .frame(width: Metrics.handleHitWidth)
+                            .contentShape(Rectangle())
+                            .gesture(reorderGesture(for: group))
+                            .accessibilityHidden(true)
+                    }
+                }
                 // 끌 수 없는 VoiceOver 사용자도 같은 묶음 안에서 한 칸씩 옮길 수 있게 한다.
                 .accessibilityAction(named: "위로 이동") { moveByOne(group, offset: -1) }
                 .accessibilityAction(named: "아래로 이동") { moveByOne(group, offset: 1) }
-                // 끌기는 순서 바꾸기 중에만 붙인다 — 평소에도 붙어 있으면 끌기를 알아보는 길게 누르기가 짧은 탭을 가끔 가로채
-                // 한 번 눌러서는 반응하지 않았다.
-                .modifier(ReorderDragModifier(isEnabled: isReordering) {
-                    draggingID = group.id
-                    return CompetitionDropDelegate.itemProvider(for: group)
-                })
             }
         }
-        .contentShape(Rectangle())
-        .onDrop(of: [CompetitionDropDelegate.rowType], delegate: CompetitionDropDelegate(
-            groups: baseGroups,
-            isSaving: isSaving,
-            rowHeights: rowHeights,
-            rowSpacing: Metrics.rowSpacing,
-            liveGroups: $liveGroups,
-            draggingID: $draggingID,
-            pendingGroups: $pendingGroups
-        ))
+        .coordinateSpace(.named(Self.coordinateSpace))
+        // 끌기가 끝나든 끊기든 손가락이 떨어지면 정리한다(끊길 때는 onEnded가 오지 않는다).
+        .onChange(of: isDragActive) { _, active in
+            if !active { finishDrag() }
+        }
+        // 취소·완료로 순서 바꾸기가 끝나면 끌던 상태도 버린다.
+        .onChange(of: isReordering) { _, reordering in
+            if !reordering {
+                liveGroups = nil
+                draggingID = nil
+            }
+        }
         .padding(.vertical, 8)
         .background(Color.component.skillCard.default.bg)
         .clipShape(RoundedRectangle(cornerRadius: 18))
         // 끌기를 시작·끝낼 때가 아니라 줄이 실제로 자리를 바꿀 때만 울린다.
         .sensoryFeedback(.selection, trigger: liveGroups?.map(\.id)) { old, new in old != nil && new != nil }
     }
-}
 
-/// 순서 바꾸기 중에만 줄을 끌 수 있게 한다.
-/// 켜고 끌 때 줄이 새로 그려져 펼친 줄이 접히는데, 옮기는 동안에는 접힌 줄끼리 높이가 고르게 맞아 오히려 낫다.
-private struct ReorderDragModifier: ViewModifier {
-    let isEnabled: Bool
-    let itemProvider: () -> NSItemProvider
+    private func reorderGesture(for group: CompetitionGroup) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.coordinateSpace))
+            .updating($isDragActive) { _, active, _ in active = true }
+            .onChanged { value in
+                // 다른 손가락이 다른 줄의 ≡ 를 잡아도 끄던 줄만 따라간다.
+                guard !isSaving, draggingID == nil || draggingID == group.id else { return }
+                if draggingID == nil {
+                    draggingID = group.id
+                    liveGroups = baseGroups
+                    grabOffset = value.startLocation.y - top(of: group.id, in: baseGroups)
+                }
+                dragY = value.location.y
+                moveDraggedRow()
+            }
+            .onEnded { _ in finishDrag() }
+    }
 
-    func body(content: Content) -> some View {
-        if isEnabled {
-            content
-                .contentShape(.dragPreview, RoundedRectangle(cornerRadius: 14))
-                .onDrag(itemProvider)
-        } else {
-            content
+    /// 놓은 순서를 '저장 전 순서'로 남기고 끌던 상태를 비운다. 끝남·끊김 양쪽에서 불리므로 두 번 와도 한 번만 한다.
+    private func finishDrag() {
+        guard draggingID != nil else { return }
+        if let live = liveGroups {
+            // 끄는 사이 목록이 바뀌었으면(다시 불러오기 등) 줄 내용은 최신 값으로, 자리만 끈 순서를 따른다 — 섹션의 병합과 같은 규칙.
+            let latest = baseGroups
+            let kept = live.compactMap { group in latest.first { $0.id == group.id } }
+            let added = latest.filter { group in !kept.contains { $0.id == group.id } }
+            let merged = kept + added
+            let order = merged.filter(\.isPinned) + merged.filter { !$0.isPinned }
+            if order.map(\.id) != latest.map(\.id) {
+                pendingGroups = order
+            }
         }
-    }
-}
-
-/// 끄는 줄이 다른 줄의 가운데를 넘으면 그 자리로 옮기고, 놓으면 그 순서를 '저장 전 순서'로 남긴다.
-/// 고정한 줄과 고정 안 한 줄은 서로의 자리로 넘어가지 않는다.
-private struct CompetitionDropDelegate: DropDelegate {
-    /// 이 앱 안에서만 쓰는 끌기 형식(Project.swift UTExportedTypeDeclarations에 등록)
-    /// — 다른 앱의 글을 끌어와도 순서가 바뀌지 않고, 줄을 다른 앱에 놓아도 내부 값이 붙여지지 않는다.
-    static let rowType = UTType(exportedAs: "com.jiujitsulab.connect.competition-row")
-
-    static func itemProvider(for group: CompetitionGroup) -> NSItemProvider {
-        let provider = NSItemProvider()
-        provider.registerDataRepresentation(forTypeIdentifier: rowType.identifier, visibility: .ownProcess) { completion in
-            completion(Data(group.id.utf8), nil)
-            return nil
-        }
-        return provider
-    }
-
-    let groups: [CompetitionGroup]
-    /// 프로필 저장 중 — 저장 전 목록으로 순서를 바꾸면 앞의 저장을 덮으므로 놓기를 받지 않는다.
-    let isSaving: Bool
-    let rowHeights: [String: CGFloat]
-    let rowSpacing: CGFloat
-    @Binding var liveGroups: [CompetitionGroup]?
-    @Binding var draggingID: String?
-    @Binding var pendingGroups: [CompetitionGroup]?
-
-    func validateDrop(info: DropInfo) -> Bool {
-        draggingID != nil && !isSaving && info.hasItemsConforming(to: [Self.rowType])
-    }
-
-    func dropEntered(info: DropInfo) {
-        guard validateDrop(info: info) else { return }
-        if liveGroups == nil { liveGroups = groups }
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        moveDraggedRow(toward: info.location.y)
-        return DropProposal(operation: .move)
-    }
-
-    /// 카드 밖으로 끌고 나가면 바꾸던 순서를 되돌린다(밖에 놓으면 취소).
-    func dropExited(info: DropInfo) {
-        withAnimation(.easeInOut(duration: 0.2)) { liveGroups = nil }
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        defer {
+        withAnimation(.easeInOut(duration: 0.2)) {
             liveGroups = nil
             draggingID = nil
         }
-        guard let live = liveGroups else { return false }
-        if live.map(\.id) != groups.map(\.id) {
-            pendingGroups = live
-        }
-        return true
     }
 
-    private func moveDraggedRow(toward y: CGFloat) {
-        guard var live = liveGroups,
+    /// 끄는 줄의 가운데가 옆 줄의 가운데를 넘으면 그 자리로 옮긴다.
+    /// 고정한 줄과 고정 안 한 줄은 서로의 자리로 넘어가지 않는다.
+    private func moveDraggedRow() {
+        guard var live = liveGroups, let draggingID,
               let from = live.firstIndex(where: { $0.id == draggingID }) else { return }
-        // 놓기 영역은 카드 위아래 여백 안쪽(줄들만)이라 0부터 센다.
+        let center = dragY - grabOffset + (rowHeights[draggingID] ?? 0) / 2
         var top: CGFloat = 0
         for (index, group) in live.enumerated() {
             let height = rowHeights[group.id] ?? 0
-            defer { top += height + rowSpacing }
-            guard y >= top, y < top + height + rowSpacing, index != from else { continue }
-            // 고정한 줄과 고정 안 한 줄은 서로의 자리로 옮기지 않는다.
+            defer { top += height + Metrics.rowSpacing }
+            guard center >= top, center < top + height + Metrics.rowSpacing, index != from else { continue }
             guard group.isPinned == live[from].isPinned else { return }
             // 옆 줄의 가운데를 넘어야 옮긴다 — 키가 다른 줄끼리 바뀐 직후 되돌아 바뀌며 떨리지 않게.
             let middle = top + height / 2
-            guard index > from ? y > middle : y < middle else { return }
+            guard index > from ? center > middle : center < middle else { return }
             let moving = live.remove(at: from)
             live.insert(moving, at: index)
             withAnimation(.easeInOut(duration: 0.2)) { liveGroups = live }
@@ -620,7 +620,11 @@ struct CompetitionRowView: View {
             }
         }
         .padding(.top, startsPlainBlock ? 12 : 0)
-        // 줄의 빈 곳도 끌기 영역에 넣는다 — 빠지면 끄는 손가락이 줄 사이를 지날 때 놓기가 끊겨 옮기던 순서가 되돌아간다.
+        // 옮기는 동안에는 펼친 부문을 접어 줄 높이를 고르게 한다.
+        .onChange(of: isReordering) { _, reordering in
+            if reordering { isExpanded = false }
+        }
+        // 줄의 빈 곳까지 눌리는 영역에 넣는다 — 이름과 메달 사이 빈 곳을 눌러도 반응하게.
         .contentShape(Rectangle())
         // 펼치는 동안 부문 줄이 아래 대회 줄과 겹쳐 보이지 않게 줄 높이만큼만 보여 준다.
         .clipped()

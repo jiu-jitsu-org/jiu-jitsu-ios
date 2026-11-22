@@ -125,14 +125,6 @@ let appInfoPlist: [String: Plist.Value] = {
             "Pretendard-SemiBold.otf",
             "CookieRun Black.otf"
         ],
-        // MY 대회 줄을 끌어 순서를 바꿀 때 쓰는 앱 안 전용 끌기 형식(#204). 다른 앱과 주고받지 않는다.
-        "UTExportedTypeDeclarations": [
-            [
-                "UTTypeIdentifier": "com.jiujitsulab.connect.competition-row",
-                "UTTypeDescription": "Competition Row",
-                "UTTypeConformsTo": ["public.data"]
-            ]
-        ],
         "CFBundleURLTypes": [
             [
                 "CFBundleURLSchemes": ["com.googleusercontent.apps.$(GOOGLE_CLIENT_ID)"]
