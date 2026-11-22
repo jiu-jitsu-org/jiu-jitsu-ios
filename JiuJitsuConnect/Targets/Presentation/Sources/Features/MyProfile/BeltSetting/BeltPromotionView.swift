@@ -163,7 +163,7 @@ struct BeltPromotionView: View {
         return RadialGradient(
             stops: [
                 .init(color: Color.primitive.bw.trueWhite, location: 0),
-                .init(color: Color.primitive.coolGray.cg25, location: 0.7),
+                .init(color: Color.primitive.coolGray.cg25, location: 0.7)
             ],
             center: center,
             startRadius: 0,
