@@ -42,45 +42,41 @@ public struct SettingsView: View {
                         }
 
                         // MARK: - 차단한 회원 (#56) — 웹 화면을 서브뷰로 연다. 비로그인은 미노출
-                        // TODO: 디자인 확정 아이콘으로 교체 (시안에 아이콘 미지정)
                         SettingsSection {
-                            SettingsInteractiveRow(asset: Assets.Common.Icon.profile, text: "차단한 회원") {
+                            SettingsInteractiveRow(asset: Assets.Common.Icon.userX, text: "차단한 회원") {
                                 store.send(.view(.blockedUsersButtonTapped))
                             }
                         }
                     }
 
                     // MARK: - 공지사항 (#369) — 로그인 여부와 상관없이 보인다. 약관과 같은 웹뷰로 웹 공지 화면을 연다
-                    // TODO: 디자인 확정 아이콘으로 교체 (시안 없음, 있는 아이콘 중 documents)
                     SettingsSection {
-                        SettingsInteractiveRow(asset: Assets.Common.Icon.documents, text: "공지사항") {
+                        SettingsInteractiveRow(asset: Assets.Common.Icon.megaphone, text: "공지사항") {
                             store.send(.view(.noticesButtonTapped))
                         }
                     }
 
                     // MARK: - 약관 및 정책 섹션
                     SettingsSection {
-                        SettingsInteractiveRow(asset: Assets.Common.Icon.documents, text: "서비스 이용 약관") {
+                        SettingsInteractiveRow(asset: Assets.Common.Icon.fileText, text: "서비스 이용 약관") {
                             store.send(.view(.termsButtonTapped))
                         }
-                        SettingsInteractiveRow(asset: Assets.Common.Icon.documents, text: "개인정보 처리 방침") {
+                        SettingsInteractiveRow(asset: Assets.Common.Icon.shieldCheck, text: "개인정보 처리 방침") {
                             store.send(.view(.privacyPolicyButtonTapped))
                         }
-                        SettingsInteractiveRow(asset: Assets.Common.Icon.documents, text: "마케팅 정보 수신 동의") {
+                        SettingsInteractiveRow(asset: Assets.Common.Icon.mailCheck, text: "마케팅 정보 수신 동의") {
                             store.send(.view(.marketingConsentButtonTapped))
                         }
                         // 이용 통계(#476) — 로그인 여부와 상관없이 보인다. 목록에서 바로 꺼지지 않게 한 단계 아래 화면에서 끈다.
-                        // TODO: 디자인 확정 아이콘으로 교체 (시안 없음, 같은 묶음의 documents)
-                        SettingsInteractiveRow(asset: Assets.Common.Icon.documents, text: "이용 통계") {
+                        SettingsInteractiveRow(asset: Assets.Common.Icon.chartPie, text: "이용 통계") {
                             store.send(.view(.analyticsButtonTapped))
                         }
                     }
 
                     // MARK: - 문의하기 (#331) — 로그인 여부와 상관없이 보인다
-                    // TODO: 디자인 확정 아이콘으로 교체 (시안 확인 전, 있는 아이콘 중 inbox)
                     if SupportContact.email != nil {
                         SettingsSection {
-                            SettingsInteractiveRow(asset: Assets.Common.Icon.inbox, text: "문의하기") {
+                            SettingsInteractiveRow(asset: Assets.Common.Icon.headset, text: "문의하기") {
                                 store.send(.view(.inquiryButtonTapped))
                             }
                         }
