@@ -19,7 +19,7 @@ struct CompetitionActionSheetView: View {
     let onEditTapped: () -> Void
     let onPinToggled: () -> Void
     let onAddDivisionTapped: () -> Void
-    /// 대회가 둘 이상일 때만 — 하나면 옮길 곳이 없어 행을 숨긴다.
+    /// 옮길 줄이 있을 때만 — 없으면 행을 숨긴다.
     var onReorderTapped: (() -> Void)?
     let onDeleteTapped: () -> Void
     let onCancelTapped: () -> Void
@@ -48,8 +48,12 @@ struct CompetitionActionSheetView: View {
         VStack(spacing: 0) {
             handleBar
             titleSection
-            optionsSection
-                .padding(.top, 16)
+            // 큰 글자 설정에서 행이 시트 높이를 넘으면 행 목록만 스크롤한다(취소 버튼은 늘 보인다).
+            ScrollView {
+                optionsSection
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .padding(.top, 16)
             cancelButton
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

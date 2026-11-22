@@ -360,11 +360,11 @@ public struct MyProfileView: View {
         )
     }
 
-    /// 대회가 둘 이상일 때만 시트에 '순서 바꾸기'를 둔다.
+    /// 옮길 줄이 있을 때만 시트에 '순서 바꾸기'를 둔다(고정한 줄끼리 또는 고정 안 한 줄끼리 둘 이상).
     /// 프로필 저장 중에는 옮기기가 앞의 저장을 덮으므로 숨긴다(눌러도 시작되지 않는 줄을 두지 않게).
     private var canReorderCompetitions: Bool {
         !store.isLoadingProfile
-            && CompetitionGroup.grouped(store.communityProfile?.competitions ?? []).count > 1
+            && CompetitionGroup.canReorder(CompetitionGroup.grouped(store.communityProfile?.competitions ?? []))
     }
 
     private func closeCompetitionSheet(then action: @escaping () -> Void) {

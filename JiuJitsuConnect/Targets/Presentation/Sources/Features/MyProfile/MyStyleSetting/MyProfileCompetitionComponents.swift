@@ -89,7 +89,7 @@ public struct MyProfileCompetitionSection: View {
         }
         .onChange(of: reorderRequest) {
             let groups = CompetitionGroup.grouped(competitions ?? [])
-            guard groups.count > 1, !isSaving else { return }
+            guard CompetitionGroup.canReorder(groups), !isSaving else { return }
             withAnimation(.easeInOut(duration: 0.5)) { pendingGroups = groups }
         }
         // 옮기는 중에 목록이 바뀌면(다시 불러오기 등) 옮겨 둔 순서는 지키고, 사라진 줄은 빼고 새 줄은 그 묶음 끝에 둔다.
@@ -132,6 +132,11 @@ public struct MyProfileCompetitionSection: View {
 /// 앱의 `Competition`은 한 건 = 한 부문이라 같은 이름·연도의 기록을 표시할 때 묶는다.
 /// 서버와는 대회 → 부문 중첩으로 주고받고, 그 변환은 Data 레이어 DTO가 맡는다.
 struct CompetitionGroup {
+    /// 옮길 줄이 있는지 — 고정한 줄끼리, 고정 안 한 줄끼리만 자리를 바꾸므로 어느 한쪽이라도 둘 이상이어야 한다.
+    static func canReorder(_ groups: [CompetitionGroup]) -> Bool {
+        groups.filter(\.isPinned).count > 1 || groups.filter { !$0.isPinned }.count > 1
+    }
+
     /// 맨 위에 고정할 수 있는 줄 수(#124). 많이 고정하면 고정의 의미(대표 기록)가 흐려진다.
     static let maxPinnedCount = 3
 
@@ -409,6 +414,8 @@ private struct CompetitionListView: View {
                             .frame(width: Metrics.handleHitWidth)
                             .contentShape(Rectangle())
                             .gesture(reorderGesture(for: group))
+                            // 한 줄을 끄는 동안 다른 줄의 ≡ 는 잡히지 않게 한다 — 두 손가락이 한 줄을 번갈아 움직이거나 먼저 뗀 손가락이 끌기를 끝내지 않게.
+                            .allowsHitTesting(draggingID == nil || draggingID == group.id)
                             .accessibilityHidden(true)
                     }
                 }
@@ -450,12 +457,21 @@ private struct CompetitionListView: View {
                 dragY = value.location.y
                 moveDraggedRow()
             }
-            .onEnded { _ in finishDrag() }
+            .onEnded { _ in
+                guard draggingID == group.id else { return }
+                finishDrag()
+            }
     }
 
     /// 놓은 순서를 '저장 전 순서'로 남기고 끌던 상태를 비운다. 끝남·끊김 양쪽에서 불리므로 두 번 와도 한 번만 한다.
     private func finishDrag() {
         guard draggingID != nil else { return }
+        // 취소·완료로 순서 바꾸기가 이미 끝났으면 끌던 순서를 남기지 않는다(다시 순서 바꾸기로 들어가지 않게).
+        guard isReordering else {
+            liveGroups = nil
+            draggingID = nil
+            return
+        }
         if let live = liveGroups {
             // 끄는 사이 목록이 바뀌었으면(다시 불러오기 등) 줄 내용은 최신 값으로, 자리만 끈 순서를 따른다 — 섹션의 병합과 같은 규칙.
             let latest = baseGroups
