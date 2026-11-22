@@ -17,8 +17,10 @@ public struct MyProfileCompetitionSection: View {
     let competitions: [Competition]?
     var medalCount: MedalCount = .zero
     let onAddCompetitionTapped: () -> Void
-    /// 대회 한 줄을 누름 — 그 대회의 부문별 기록을 넘긴다(고칠 부문 / 부문 추가를 고르는 시트를 띄움).
-    let onCompetitionTapped: ([Competition]) -> Void
+    /// › 줄(부문 하나)을 누름 — 누른 부문과 그 대회의 부문들을 넘긴다(부문 수정 · 고정 · 부문 추가 · 순서 바꾸기 · 삭제 시트를 띄움).
+    let onDivisionTapped: (_ entry: Competition, _ entries: [Competition]) -> Void
+    /// 값이 바뀌면 순서 바꾸기를 시작한다(시트의 '순서 바꾸기'). 옮기는 순서는 이 섹션이 가지므로 신호만 받는다.
+    var reorderRequest = 0
     /// 순서를 바꾸고 '완료' — 순서가 바뀐 묶음(고정한 줄들 / 고정 안 한 줄들)의 줄별 부문들, 위에서부터. 저장은 부모가 한다.
     var onCompetitionsReordered: ([[Competition]]) -> Void = { _ in }
     /// 프로필 저장 중 — 저장 전 목록으로 순서를 바꾸면 앞의 저장을 덮으므로 끌기와 '완료'를 막는다.
@@ -78,13 +80,18 @@ public struct MyProfileCompetitionSection: View {
             if let competitions = competitions, !competitions.isEmpty {
                 CompetitionListView(
                     competitions: competitions,
-                    onCompetitionTapped: onCompetitionTapped,
+                    onDivisionTapped: onDivisionTapped,
                     isSaving: isSaving,
                     pendingGroups: $pendingGroups
                 )
             } else {
                 EmptyCompetitionView(onAddCompetitionTapped: onAddCompetitionTapped)
             }
+        }
+        .onChange(of: reorderRequest) {
+            let groups = CompetitionGroup.grouped(competitions ?? [])
+            guard groups.count > 1, !isSaving else { return }
+            withAnimation(.easeInOut(duration: 0.5)) { pendingGroups = groups }
         }
         // 옮기는 중에 목록이 바뀌면(다시 불러오기 등) 옮겨 둔 순서는 지키고, 사라진 줄은 빼고 새 줄은 그 묶음 끝에 둔다.
         // 목록이 비면 옮길 것이 없으므로 취소·완료도 거둔다.
@@ -311,12 +318,12 @@ private struct CompetitionMedalSummaryView: View {
 
 /// 대회 정보 리스트 (정보가 있을 때)
 ///
-/// 줄을 길게 눌러 끌면 순서를 바꾼다(#204). 처음 하나를 옮기면 머리줄에 취소·완료가 나오고, 완료를 눌러야 저장한다.
+/// › 줄을 눌러 뜨는 시트의 '순서 바꾸기'를 고르면 머리줄에 취소·완료가 나오고, 그동안 줄을 길게 눌러 끌어 순서를 바꾼다(#204). 완료를 눌러야 저장한다.
 /// 고정한 줄은 고정한 줄끼리, 고정 안 한 줄은 고정 안 한 줄끼리만 자리를 바꾼다
-/// — 고정 안 한 줄을 고정 자리로 올리려면 줄을 눌러 뜨는 시트의 '맨 위에 고정'을 쓴다.
+/// — 고정 안 한 줄을 고정 자리로 올리려면 같은 시트의 '맨 위에 고정'을 쓴다.
 private struct CompetitionListView: View {
     let competitions: [Competition]
-    let onCompetitionTapped: ([Competition]) -> Void
+    let onDivisionTapped: (_ entry: Competition, _ entries: [Competition]) -> Void
     var isSaving: Bool = false
     /// 끌어 놓았지만 아직 저장하지 않은 순서(섹션이 갖고 취소·완료를 받는다)
     @Binding var pendingGroups: [CompetitionGroup]?
@@ -329,6 +336,8 @@ private struct CompetitionListView: View {
     private enum Metrics {
         static let rowSpacing: CGFloat = 0
     }
+
+    private var isReordering: Bool { pendingGroups != nil }
 
     /// 끌기를 시작할 때의 순서 — 앞서 옮겨 둔 순서가 있으면 그것부터
     private var baseGroups: [CompetitionGroup] { pendingGroups ?? CompetitionGroup.grouped(competitions) }
@@ -348,14 +357,15 @@ private struct CompetitionListView: View {
             let groups = liveGroups ?? baseGroups
             ForEach(groups, id: \.id) { group in
                 let index = groups.firstIndex { $0.id == group.id } ?? 0
+                // 순서를 옮기는 중에는 수정 화면·시트로 들어가지 않는다(저장 안 한 순서를 잃지 않게).
                 CompetitionRowView(
                     group: group,
                     startsPlainBlock: index > 0 && groups[index - 1].isPinned && !group.isPinned,
-                    // 순서를 옮기는 중에는 수정·고정 시트로 들어가지 않는다(저장 안 한 순서를 잃지 않게).
-                    onTapped: {
+                    onEntryTapped: { entry in
                         guard pendingGroups == nil else { return }
-                        onCompetitionTapped(group.entries)
-                    }
+                        onDivisionTapped(entry, group.entries)
+                    },
+                    isReordering: isReordering
                 )
                 // 줄 높이를 내용만큼 고정한다 — 없으면 부문이 여러 줄인 대회가 다른 줄과 같은 높이로 눌려 위아래 줄과 겹친다(#140).
                 .fixedSize(horizontal: false, vertical: true)
@@ -365,11 +375,12 @@ private struct CompetitionListView: View {
                 // 끌 수 없는 VoiceOver 사용자도 같은 묶음 안에서 한 칸씩 옮길 수 있게 한다.
                 .accessibilityAction(named: "위로 이동") { moveByOne(group, offset: -1) }
                 .accessibilityAction(named: "아래로 이동") { moveByOne(group, offset: 1) }
-                .contentShape(.dragPreview, RoundedRectangle(cornerRadius: 14))
-                .onDrag {
+                // 끌기는 순서 바꾸기 중에만 붙인다 — 평소에도 붙어 있으면 끌기를 알아보는 길게 누르기가 짧은 탭을 가끔 가로채
+                // 한 번 눌러서는 반응하지 않았다.
+                .modifier(ReorderDragModifier(isEnabled: isReordering) {
                     draggingID = group.id
                     return CompetitionDropDelegate.itemProvider(for: group)
-                }
+                })
             }
         }
         .contentShape(Rectangle())
@@ -387,6 +398,23 @@ private struct CompetitionListView: View {
         .clipShape(RoundedRectangle(cornerRadius: 18))
         // 끌기를 시작·끝낼 때가 아니라 줄이 실제로 자리를 바꿀 때만 울린다.
         .sensoryFeedback(.selection, trigger: liveGroups?.map(\.id)) { old, new in old != nil && new != nil }
+    }
+}
+
+/// 순서 바꾸기 중에만 줄을 끌 수 있게 한다.
+/// 켜고 끌 때 줄이 새로 그려져 펼친 줄이 접히는데, 옮기는 동안에는 접힌 줄끼리 높이가 고르게 맞아 오히려 낫다.
+private struct ReorderDragModifier: ViewModifier {
+    let isEnabled: Bool
+    let itemProvider: () -> NSItemProvider
+
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content
+                .contentShape(.dragPreview, RoundedRectangle(cornerRadius: 14))
+                .onDrag(itemProvider)
+        } else {
+            content
+        }
     }
 }
 
@@ -536,14 +564,20 @@ private struct CompetitionBeltMark: View {
 
 /// 대회 한 줄 — 왼쪽에 띠, 가운데에 대회 이름과 그 아래 약한 부가 정보 한 줄(종목·체급 · 연도), 오른쪽에 메달.
 /// 고정한 줄은 맨 위에 두고 이름을 굵게 해서 알린다.
-/// 부문이 하나면 줄을 눌러 수정·부문 추가·고정·삭제 시트를 띄운다.
-/// 부문이 여럿이면 줄을 눌러 펼치고, 펼친 부문 줄을 누르면 같은 시트를 띄운다. 길게 눌러 끌면 순서를 바꾼다(CompetitionListView).
-/// 남의 프로필처럼 읽기만 하는 곳은 onTapped를 비워 둔다 — 부문이 여럿인 줄의 펼치기만 남는다.
+///
+/// 내 프로필에서는 › 가 붙은 줄이 부문 하나다 — 누르면 그 부문 수정이 맨 위에 있는 시트(고정 · 부문 추가 · 순서 바꾸기 · 삭제)를 띄운다.
+/// 부문이 하나면 대회 줄이 곧 부문 줄이고, 여럿이면 대회 줄을 눌러 펼친 뒤 부문 줄을 누른다.
+/// 줄 끝 표시는 › 하나만 둔다 — ›와 ···를 함께 두면 어느 쪽을 누를지 헷갈린다.
+/// 예전에는 부문 하나인 줄은 시트를, 여럿인 줄은 펼치기만 해서 부문을 어디서 고치는지 찾기 어려웠다.
+/// 남의 프로필처럼 읽기만 하는 곳은 두 동작을 비워 둔다 — 부문이 여럿인 줄의 펼치기만 남는다.
 struct CompetitionRowView: View {
     let group: CompetitionGroup
     /// 고정 묶음 다음 첫 줄 — 위에 여백을 둬 두 묶음을 가른다.
     var startsPlainBlock = false
-    var onTapped: (() -> Void)?
+    /// › 줄(부문 하나)을 누름
+    var onEntryTapped: ((Competition) -> Void)?
+    /// 순서 바꾸기 중 — › 대신 끄는 손잡이(≡)를 보여 준다. 누르는 동작은 받지 않는다.
+    var isReordering = false
 
     // 펼침은 화면 표시용 일시 상태라 저장하지 않는다.
     @State private var isExpanded = false
@@ -553,9 +587,14 @@ struct CompetitionRowView: View {
         static let medalSize: CGFloat = 22
         /// 부문 줄의 글자를 대회 이름과 같은 세로줄에 맞추는 들여쓰기(띠 8 + 띠 뒤 여백 4 + 간격 8)
         static let divisionIndent: CGFloat = 20
+        static let horizontalPadding: CGFloat = 16
+        /// 줄 끝 ›·≡ 크기 — 모든 줄이 같은 세로줄에 둔다.
+        static let indicatorSize: CGFloat = 12
     }
 
     private var hasDivisions: Bool { group.entries.count > 1 }
+    /// 고칠 수 있는 줄(내 프로필) — 줄 끝 › 자리를 둔다.
+    private var isEditable: Bool { onEntryTapped != nil || isReordering }
 
     /// 펼쳤을 때의 부문 — 접은 줄의 메달과 같은 금·은·동 순서
     private var sortedEntries: [Competition] {
@@ -577,8 +616,6 @@ struct CompetitionRowView: View {
                         divisionRow(entry, index: index)
                     }
                 }
-                .padding(.leading, Metrics.divisionIndent)
-                .padding(.horizontal, 16)
                 .padding(.bottom, 6)
             }
         }
@@ -591,23 +628,47 @@ struct CompetitionRowView: View {
 
     @ViewBuilder
     private var header: some View {
-        if hasDivisions || onTapped != nil {
-            Button {
-                if hasDivisions {
-                    withAnimation(.easeInOut(duration: 0.5)) { isExpanded.toggle() }
-                } else {
-                    onTapped?()
-                }
-            } label: {
+        if hasDivisions && !isReordering {
+            Button(action: toggleExpanded) {
                 headerContent
             }
             .buttonStyle(.plain)
-            .accessibilityValue(hasDivisions ? (isExpanded ? "펼침" : "접힘") : "")
+            .accessibilityValue(isExpanded ? "펼침" : "접힘")
+        } else if let entry = group.entries.first, let onEntryTapped, !isReordering {
+            Button { onEntryTapped(entry) } label: {
+                headerContent
+            }
+            .buttonStyle(.plain)
         } else {
             // 버튼이 없으면 이름·부가 정보·메달이 따로 읽히므로 한 덩어리로 묶는다.
             headerContent
                 .accessibilityElement(children: .combine)
         }
+    }
+
+    private func toggleExpanded() {
+        withAnimation(.easeInOut(duration: 0.5)) { isExpanded.toggle() }
+    }
+
+    /// 줄 끝 표시 — 고칠 수 있는 부문 줄은 ›, 순서 바꾸기 중에는 ≡, 펼치는 줄은 자리만 비운다.
+    @ViewBuilder
+    private func trailingIndicator(isEntry: Bool) -> some View {
+        Group {
+            if isReordering {
+                Image(systemName: "line.3.horizontal")
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                Assets.Common.Icon.chevronRight.swiftUIImage
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .opacity(isEntry ? 1 : 0)
+            }
+        }
+        .frame(width: Metrics.indicatorSize, height: Metrics.indicatorSize)
+        .foregroundStyle(Color.component.competitionCard.cardTextSecondary)
+        .accessibilityHidden(true)
     }
 
     private var headerContent: some View {
@@ -652,17 +713,21 @@ struct CompetitionRowView: View {
             if !isExpanded {
                 CompetitionMedalCluster(medals: group.displayedMedals, namespace: medalNamespace)
             }
+
+            if isEditable {
+                trailingIndicator(isEntry: !hasDivisions || isReordering)
+            }
         }
         // 줄 안 간격(2)보다 줄 사이 간격(8 + 8)을 크게 둬, 이름과 부가 정보가 한 덩어리로 읽히게 한다.
         .padding(.vertical, 8)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Metrics.horizontalPadding)
         .contentShape(Rectangle())
     }
 
     @ViewBuilder
     private func divisionRow(_ entry: Competition, index: Int) -> some View {
-        if let onTapped {
-            Button(action: onTapped) {
+        if let onEntryTapped, !isReordering {
+            Button { onEntryTapped(entry) } label: {
                 divisionContent(entry, index: index)
             }
             .buttonStyle(.plain)
@@ -686,8 +751,16 @@ struct CompetitionRowView: View {
                 .frame(width: Metrics.medalSize, height: Metrics.medalSize)
                 .accessibilityLabel(entry.competitionRank.displayName)
                 .matchedGeometryEffect(id: index, in: medalNamespace)
+
+            if isEditable {
+                trailingIndicator(isEntry: !isReordering)
+                    .opacity(isReordering ? 0 : 1)
+            }
         }
-        .padding(.vertical, 2)
+        // 누르는 줄이면 손가락에 걸리게 위아래를 넓힌다(읽기만 하는 곳은 예전처럼 촘촘히).
+        .padding(.vertical, isEditable ? 6 : 2)
+        .padding(.leading, Metrics.horizontalPadding + Metrics.divisionIndent)
+        .padding(.trailing, Metrics.horizontalPadding)
         .contentShape(Rectangle())
     }
 }
@@ -782,7 +855,7 @@ private struct EmptyCompetitionView: View {
         ],
         medalCount: MedalCount(gold: 1, silver: 2, bronze: 1),
         onAddCompetitionTapped: { },
-        onCompetitionTapped: { _ in }
+        onDivisionTapped: { _, _ in }
     )
     .padding()
     .background(Color.component.background.default)
@@ -798,7 +871,7 @@ private struct EmptyCompetitionView: View {
         ],
         medalCount: MedalCount(gold: 1, silver: 1, bronze: 1),
         onAddCompetitionTapped: { },
-        onCompetitionTapped: { _ in }
+        onDivisionTapped: { _, _ in }
     )
     .padding()
     .background(Color.component.background.default)
@@ -808,7 +881,7 @@ private struct EmptyCompetitionView: View {
     MyProfileCompetitionSection(
         competitions: nil,
         onAddCompetitionTapped: { },
-        onCompetitionTapped: { _ in }
+        onDivisionTapped: { _, _ in }
     )
     .padding()
     .background(Color.component.background.default)
@@ -818,7 +891,7 @@ private struct EmptyCompetitionView: View {
     MyProfileCompetitionSection(
         competitions: [],
         onAddCompetitionTapped: { },
-        onCompetitionTapped: { _ in }
+        onDivisionTapped: { _, _ in }
     )
     .padding()
     .background(Color.component.background.default)
@@ -852,7 +925,7 @@ private struct EmptyCompetitionView: View {
                 competitionRank: .participation
             )
         ],
-        onCompetitionTapped: { _ in },
+        onDivisionTapped: { _, _ in },
         pendingGroups: .constant(nil)
     )
     .padding()

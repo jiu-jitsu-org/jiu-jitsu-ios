@@ -32,6 +32,8 @@ public struct MyProfileView: View {
     @Environment(\.tabRootScroll) private var tabRootScroll
     @State private var isUserScrolling = false
     @State private var pendingCompetitionAction: (() -> Void)?
+    /// 시트의 '순서 바꾸기' — 값이 바뀌면 대회 기록 칸이 순서 바꾸기를 시작한다.
+    @State private var competitionReorderRequest = 0
     // 헤더 바탕 무늬(#320) — 서버 없이 이 기기에만 저장한다.
     @AppStorage(MyHeaderPattern.storageKey) private var headerPattern: MyHeaderPattern = .oss
     @State private var isPatternSheetPresented = false
@@ -183,16 +185,20 @@ public struct MyProfileView: View {
             .sheetPresentation(store: $store)
             .sheet(item: $competitionSheet, onDismiss: sendPendingCompetitionAction) { target in
                 CompetitionActionSheetView(
+                    entry: target.entry,
                     entries: target.entries,
+                    onEditTapped: {
+                        closeCompetitionSheet { store.send(.view(.competitionDetailTapped(target.entry))) }
+                    },
                     onPinToggled: {
                         closeCompetitionSheet { store.send(.view(.competitionPinToggled(target.entries))) }
-                    },
-                    onDivisionTapped: { entry in
-                        closeCompetitionSheet { store.send(.view(.competitionDetailTapped(entry))) }
                     },
                     onAddDivisionTapped: {
                         closeCompetitionSheet { store.send(.view(.addDivisionTapped(target.entries))) }
                     },
+                    onReorderTapped: canReorderCompetitions ? {
+                        closeCompetitionSheet { competitionReorderRequest += 1 }
+                    } : nil,
                     onDeleteTapped: {
                         closeCompetitionSheet { competitionPendingDelete = target.entries }
                     },
@@ -200,7 +206,7 @@ public struct MyProfileView: View {
                 )
                 .presentationDragIndicator(.hidden)
                 .presentationDetents([
-                    .height(CompetitionActionSheetView.contentHeight(divisionCount: target.entries.count))
+                    .height(CompetitionActionSheetView.contentHeight(showsReorder: canReorderCompetitions))
                 ])
                 .presentationBackground(Color.component.bottomSheet.selected.container.background)
             }
@@ -343,14 +349,22 @@ public struct MyProfileView: View {
             competitions: store.communityProfile?.competitions,
             medalCount: store.communityProfile?.medalCount ?? .zero,
             onAddCompetitionTapped: { store.send(.view(.addCompetitionButtonTapped)) },
-            onCompetitionTapped: { entries in
+            onDivisionTapped: { entry, entries in
                 // 이전 시트가 닫힘 신호 없이 사라졌을 때 남은 동작이 이번 시트를 닫을 때 실행되지 않게 비운다.
                 pendingCompetitionAction = nil
-                competitionSheet = CompetitionSheetTarget(entries: entries)
+                competitionSheet = CompetitionSheetTarget(entry: entry, entries: entries)
             },
+            reorderRequest: competitionReorderRequest,
             onCompetitionsReordered: { store.send(.view(.competitionsReordered($0))) },
             isSaving: store.isLoadingProfile
         )
+    }
+
+    /// 대회가 둘 이상일 때만 시트에 '순서 바꾸기'를 둔다.
+    /// 프로필 저장 중에는 옮기기가 앞의 저장을 덮으므로 숨긴다(눌러도 시작되지 않는 줄을 두지 않게).
+    private var canReorderCompetitions: Bool {
+        !store.isLoadingProfile
+            && CompetitionGroup.grouped(store.communityProfile?.competitions ?? []).count > 1
     }
 
     private func closeCompetitionSheet(then action: @escaping () -> Void) {
@@ -783,5 +797,8 @@ private extension View {
 /// 대회 시트에 띄울 대회(부문별 기록) — sheet(item:)용 식별자를 붙인다.
 private struct CompetitionSheetTarget: Identifiable {
     let id = UUID()
+    /// 누른 부문 — 시트 맨 위 '수정'이 고친다.
+    let entry: Competition
+    /// 그 대회의 부문들 — 고정 · 부문 추가 · 삭제는 대회 단위로 한다.
     let entries: [Competition]
 }
