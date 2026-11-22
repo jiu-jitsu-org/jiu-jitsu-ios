@@ -33,7 +33,7 @@ public struct AnalyticsSettingView: View {
                 VStack(alignment: .leading, spacing: Style.sectionSpacing) {
                     SettingsSection {
                         SettingsToggleRow(
-                            asset: Assets.Common.Icon.documents,
+                            asset: Assets.Common.Icon.chartPie,
                             text: "이용 통계 보내기",
                             subtitle: nil,
                             isOn: Binding(
