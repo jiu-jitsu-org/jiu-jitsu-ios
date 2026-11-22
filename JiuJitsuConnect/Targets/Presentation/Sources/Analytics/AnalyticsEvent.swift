@@ -100,6 +100,10 @@ public struct AnalyticsEvent: Equatable, Sendable {
         case int(Int)
     }
 
+    /// GA에 숫자로 보내는 꼬리표(측정항목 · 측정값). 나머지 `.int`는 보낼 때 문자열로 바꾼다 —
+    /// GA는 앱 이벤트의 정수 값을 이벤트 범위 맞춤 측정기준에 넣지 않아 `page` 같은 꼬리표가 `(not set)`이 된다(#487).
+    public static let numericParameterKeys: Set<String> = ["load_ms", "metric_value"]
+
     public let name: Name
     public let parameters: [String: Value]
     public let surface: Surface

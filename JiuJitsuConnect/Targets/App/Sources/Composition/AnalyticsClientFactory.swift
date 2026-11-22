@@ -41,7 +41,8 @@ enum AnalyticsClientFactory {
                 for (key, value) in event.parameters {
                     switch value {
                     case let .string(text): parameters[key] = text
-                    case let .int(number): parameters[key] = number
+                    case let .int(number):
+                        parameters[key] = AnalyticsEvent.numericParameterKeys.contains(key) ? number : String(number)
                     }
                 }
                 Log.trace("[Analytics] \(event.name.rawValue) \(parameters)", category: .debug, level: .info)
