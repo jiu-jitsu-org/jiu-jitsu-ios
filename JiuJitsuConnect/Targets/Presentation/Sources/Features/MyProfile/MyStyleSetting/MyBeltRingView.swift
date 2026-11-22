@@ -99,7 +99,6 @@ struct MyBeltRingStroke: View {
     var body: some View {
         let ring = geometry
         if let beltRank {
-            let topBelt = drawingBelt ?? beltRank
             ZStack {
                 halo(beltRank)
                     .opacity(drawingBelt == nil ? 1 : 1 - drawProgress)
@@ -119,10 +118,19 @@ struct MyBeltRingStroke: View {
                         .rotationEffect(.degrees(-90))
                 }
                 RingArc(from: ring.barCenter - ring.barWidth / 2, to: ring.barCenter + ring.barWidth / 2, radius: ring.radius)
-                    .stroke(
-                        topBelt == .black ? Color.component.myBelt.blackRankBar : Color.component.myBelt.ringRankBar,
-                        lineWidth: ring.width
-                    )
+                    .stroke(rankBarColor(beltRank), lineWidth: ring.width)
+                // 단 색이 바뀌는 승급(검은띠)은 새 띠 색이 덮고 지나간 자리만 새 단 색으로 칠한다.
+                if let drawingBelt, (drawingBelt == .black) != (beltRank == .black) {
+                    Circle()
+                        .inset(by: ring.box / 2 - ring.radius)
+                        .trim(from: 0, to: drawProgress)
+                        .stroke(rankBarColor(drawingBelt), lineWidth: ring.width)
+                        .rotationEffect(.degrees(-90))
+                        .mask(
+                            RingArc(from: ring.barCenter - ring.barWidth / 2, to: ring.barCenter + ring.barWidth / 2, radius: ring.radius)
+                                .stroke(lineWidth: ring.width)
+                        )
+                }
                 ForEach(0..<stripeCount, id: \.self) { index in
                     let count = Double(stripeCount)
                     let center = ring.barCenter + (Double(index) - (count - 1) / 2) * ring.markPitchDegrees
@@ -149,6 +157,10 @@ struct MyBeltRingStroke: View {
                 )
                 .frame(width: ring.box, height: ring.box)
         }
+    }
+
+    private func rankBarColor(_ beltRank: BeltRank) -> Color {
+        beltRank == .black ? Color.component.myBelt.blackRankBar : Color.component.myBelt.ringRankBar
     }
 
     private func halo(_ beltRank: BeltRank) -> some View {

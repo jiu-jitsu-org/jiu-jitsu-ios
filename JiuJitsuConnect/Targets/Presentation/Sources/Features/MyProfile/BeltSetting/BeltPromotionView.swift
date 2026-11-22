@@ -4,14 +4,14 @@ import DesignSystem
 
 /// MY에서 띠나 그랄을 올려 저장했을 때 축하할 일(#278, #286).
 public enum BeltPromotion: Equatable, Identifiable, Sendable {
-    /// 더 높은 띠로 바꿈. 장면이 옛 띠·그랄에서 새 띠로 바뀌는 순간을 그려서 옛 값을 함께 둔다.
-    case belt(BeltRank, from: BeltRank, fromStripe: BeltStripe)
+    /// 더 높은 띠로 바꿈. 장면이 옛 띠·그랄에서 새 띠·그랄로 바뀌는 순간을 그려서 옛 값을 함께 둔다.
+    case belt(BeltRank, from: BeltRank, fromStripe: BeltStripe, toStripe: BeltStripe)
     /// 같은 띠에서 그랄만 늘림
     case stripe(BeltRank, from: BeltStripe, to: BeltStripe)
 
     public var id: String {
         switch self {
-        case let .belt(rank, from, _): return "\(from.id)-\(rank.id)"
+        case let .belt(rank, from, _, toStripe): return "\(from.id)-\(rank.id)-\(toStripe.id)"
         case let .stripe(rank, from, to): return "\(rank.id)-\(from.id)-\(to.id)"
         }
     }
@@ -26,7 +26,7 @@ public enum BeltPromotion: Equatable, Identifiable, Sendable {
 
         let oldStripe = old?.beltStripe ?? BeltStripe.none
         if newIndex > oldIndex {
-            self = .belt(newRank, from: oldRank, fromStripe: oldStripe)
+            self = .belt(newRank, from: oldRank, fromStripe: oldStripe, toStripe: new.beltStripe ?? BeltStripe.none)
             return
         }
         guard newIndex == oldIndex,
@@ -65,6 +65,8 @@ struct BeltPromotionView: View {
     @State private var beltDrawProgress: CGFloat = 0
     /// 옛 띠의 그랄 — 띠가 바뀌면 지운다
     @State private var oldStripeOpacity: Double = 1
+    /// 새 띠 색이 링을 다 덮었는지 — 이때부터 새 띠의 그랄을 그린다
+    @State private var isBeltSwept = false
     /// 다 바뀐 순간의 통 튐
     @State private var pulseScale: CGFloat = 1
     /// 다 바뀐 순간 퍼지는 띠 색 테(0 → 1)
@@ -101,6 +103,10 @@ struct BeltPromotionView: View {
         static let oldStripeFade = Animation.easeInOut(duration: 0.3).delay(0.3)
         static let beltDraw = Animation.easeInOut(duration: 1.0).delay(0.25)
         static let beltCelebrateAt: Duration = .milliseconds(1300)
+        /// 띠와 그랄을 함께 올렸으면 덮기가 끝난 뒤(1.25초) 새 그랄을 그리고 다 그려지면 축하
+        static let beltSweptAt: Duration = .milliseconds(1250)
+        static let beltStripeDraw = Animation.easeInOut(duration: 0.45)
+        static let beltWithStripeCelebrateAt: Duration = .milliseconds(1700)
         // 축하: 링이 1.05배로 통 튀었다 돌아오고, 띠 색 테가 0.8초 동안 퍼지며 사라진다.
         static let pulseUp = Animation.spring(duration: 0.18, bounce: 0)
         static let pulseDown = Animation.spring(duration: 0.4, bounce: 0.45)
@@ -194,7 +200,7 @@ struct BeltPromotionView: View {
 
     private var titleText: String {
         switch promotion {
-        case let .belt(belt, _, _): return "\(belt.displayName)띠 승급을 축하해요!"
+        case let .belt(belt, _, _, _): return "\(belt.displayName)띠 승급을 축하해요!"
         case let .stripe(belt, _, to): return "\(belt.displayName)띠 \(to.displayName)을 축하해요!"
         }
     }
@@ -226,14 +232,17 @@ struct BeltPromotionView: View {
     @ViewBuilder
     private func ringStroke(geometry: MyBeltRingGeometry) -> some View {
         switch promotion {
-        case let .belt(belt, from, fromStripe):
+        case let .belt(belt, from, fromStripe, toStripe):
+            // 새 띠 색이 다 덮인 뒤에 새 띠의 그랄을 그린다(띠와 그랄을 함께 올린 경우).
             MyBeltRingStroke(
                 geometry: geometry,
                 beltRank: from,
-                stripeCount: fromStripe.count,
+                stripeCount: isBeltSwept ? toStripe.count : fromStripe.count,
                 drawingBelt: belt,
                 drawProgress: beltDrawProgress,
-                stripeOpacity: oldStripeOpacity
+                newStripes: isBeltSwept ? toStripe.count : 0,
+                newStripeProgress: newStripeProgress,
+                stripeOpacity: isBeltSwept ? 1 : oldStripeOpacity
             )
         case let .stripe(belt, from, to):
             MyBeltRingStroke(
@@ -279,7 +288,7 @@ struct BeltPromotionView: View {
 
     private var newBelt: BeltRank {
         switch promotion {
-        case let .belt(belt, _, _): return belt
+        case let .belt(belt, _, _, _): return belt
         case let .stripe(belt, _, _): return belt
         }
     }
@@ -299,6 +308,7 @@ struct BeltPromotionView: View {
             newStripeProgress = 1
             beltDrawProgress = 1
             oldStripeOpacity = 0
+            isBeltSwept = true
             withAnimation(Motion.reduced) { isShown = true } completion: { isCloseEnabled = true }
             return
         }
@@ -313,10 +323,18 @@ struct BeltPromotionView: View {
         case .stripe:
             withAnimation(Motion.stripeDraw) { newStripeProgress = 1 }
             celebrateAt = Motion.stripeCelebrateAt
-        case .belt:
+        case let .belt(_, _, _, toStripe):
             withAnimation(Motion.oldStripeFade) { oldStripeOpacity = 0 }
             withAnimation(Motion.beltDraw) { beltDrawProgress = 1 }
-            celebrateAt = Motion.beltCelebrateAt
+            if toStripe.count > 0 {
+                try? await Task.sleep(for: Motion.beltSweptAt - .milliseconds(16))
+                guard !Task.isCancelled else { return }
+                isBeltSwept = true
+                withAnimation(Motion.beltStripeDraw) { newStripeProgress = 1 }
+                celebrateAt = Motion.beltWithStripeCelebrateAt - Motion.beltSweptAt + .milliseconds(16)
+            } else {
+                celebrateAt = Motion.beltCelebrateAt
+            }
         }
 
         try? await Task.sleep(for: celebrateAt - .milliseconds(16))
@@ -360,7 +378,7 @@ private struct BurstRing: ViewModifier, Animatable {
 // MARK: - Preview
 
 #Preview("띠") {
-    BeltPromotionView(promotion: .belt(.purple, from: .blue, fromStripe: .two), onDismiss: {})
+    BeltPromotionView(promotion: .belt(.purple, from: .blue, fromStripe: .two, toStripe: .none), onDismiss: {})
 }
 
 #Preview("그랄") {
