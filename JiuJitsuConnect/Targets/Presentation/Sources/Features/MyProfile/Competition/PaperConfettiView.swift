@@ -4,14 +4,23 @@ import DesignSystem
 /// 완료 화면 뒤에서 퍼진 뒤 계속 내리는 종이 꽃가루(#220).
 ///
 /// 정해진 경로로 그리면 도형이 미끄러지는 것처럼 보여서, 조각마다 무게·공기 저항·팔랑임·뒤집힘을 계산한다.
+/// `isOneShot`이면 한 번만 터지고, 화면 밖으로 나간 조각은 다시 내려오지 않아 다 나가면 멈춘다(승급 축하).
 struct PaperConfettiView: View {
     let startDelay: TimeInterval
+    /// 조각 색. 비우면 다섯 띠 색.
+    var colors: [Color]?
+    /// 터지는 자리(이 뷰 좌표). 비우면 가운데 가슴께(높이 42%).
+    var burstOrigin: CGPoint?
+    var isOneShot = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @State private var simulation = PaperConfettiSimulation()
+    /// 한 번 터진 조각이 모두 화면 밖으로 나감 — 더 그리지 않는다.
+    @State private var isFinished = false
 
     private var pieceColors: [Color] {
+        if let colors, !colors.isEmpty { return colors }
         let belt = Color.component.beltSelectButton.belt
         return [belt.white, belt.blue, belt.purple, belt.brown, belt.black]
     }
@@ -22,13 +31,15 @@ struct PaperConfettiView: View {
             let colors = pieceColors
 
             // 계속 내리므로 화면에 오래 머물러도 배터리를 덜 쓰게 120Hz 기기에서도 60번까지만 그린다.
-            TimelineView(.animation(minimumInterval: 1.0 / 60, paused: reduceMotion || scenePhase != .active)) { context in
+            TimelineView(.animation(minimumInterval: 1.0 / 60, paused: reduceMotion || isFinished || scenePhase != .active)) { context in
                 let pieces = simulation.pieces(
                     at: context.date,
                     size: size,
                     startDelay: startDelay,
                     colorCount: colors.count,
-                    settlesImmediately: reduceMotion
+                    settlesImmediately: reduceMotion,
+                    origin: burstOrigin,
+                    isOneShot: isOneShot
                 )
 
                 Canvas { graphics, _ in
@@ -40,6 +51,14 @@ struct PaperConfettiView: View {
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+        .task {
+            guard isOneShot else { return }
+            // 조각이 다 나갔는지 가끔만 살핀다. 다 나가면 타임라인을 멈춘다.
+            while !Task.isCancelled, !simulation.isFinished {
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+            isFinished = simulation.isFinished
+        }
     }
 
     private static func draw(_ piece: PaperConfettiSimulation.Piece, color: Color, in graphics: GraphicsContext) {
@@ -97,19 +116,29 @@ final class PaperConfettiSimulation {
     private var createdAt: Date?
     private var lastDate: Date?
     private var unsimulated: TimeInterval = 0
+    private var origin: CGPoint?
+    private var isOneShot = false
+    private var hasBurst = false
+
+    /// 한 번만 터지는 꽃가루가 터진 뒤 모두 화면 밖으로 나감.
+    var isFinished: Bool { isOneShot && hasBurst && pieces.isEmpty }
 
     func pieces(
         at date: Date,
         size: CGSize,
         startDelay: TimeInterval,
         colorCount: Int,
-        settlesImmediately: Bool
+        settlesImmediately: Bool,
+        origin: CGPoint? = nil,
+        isOneShot: Bool = false
     ) -> [Piece] {
         guard size.width > 0, size.height > 0 else { return [] }
         self.size = size
+        self.origin = origin
+        self.isOneShot = isOneShot
 
         if settlesImmediately {
-            if pieces.isEmpty {
+            if pieces.isEmpty, !hasBurst {
                 burst(colorCount: colorCount)
                 for _ in 0..<Int(1.5 / Physics.stepInterval) { step(Physics.stepInterval) }
             }
@@ -121,6 +150,8 @@ final class PaperConfettiSimulation {
         guard date.timeIntervalSince(createdAt) >= startDelay else { return [] }
 
         if pieces.isEmpty {
+            // 한 번만 터지는 꽃가루는 다 나간 뒤 다시 터지지 않는다.
+            if isOneShot, hasBurst { return [] }
             burst(colorCount: colorCount)
             lastDate = date
         }
@@ -138,14 +169,16 @@ final class PaperConfettiSimulation {
     private func burst(colorCount: Int) {
         // 공기 저항이 같아 터지는 시간은 그대로이고 거리만 늘어난다.
         let scale = max(1, size.height / Physics.referenceHeight)
+        let center = origin ?? CGPoint(x: size.width / 2, y: size.height * 0.42)
+        hasBurst = true
         pieces = (0..<Int((CGFloat(Physics.pieceCount) * scale).rounded())).map { index in
             let angle = CGFloat.random(in: 0..<(2 * .pi))
             let speed = CGFloat.random(in: 260...1000) * scale
             let baseFlipSpeed = CGFloat.random(in: 4...8)
             let direction: CGFloat = Bool.random() ? 1 : -1
             return Piece(
-                x: size.width / 2 + .random(in: -16...16),
-                y: size.height * 0.42 + .random(in: -30...30),
+                x: center.x + .random(in: -16...16),
+                y: center.y + .random(in: -30...30),
                 velocityX: cos(angle) * speed,
                 velocityY: sin(angle) * speed - 190 * scale,
                 mass: .random(in: 0.75...1.3),
@@ -185,8 +218,8 @@ final class PaperConfettiSimulation {
 
             if piece.x < -20 { piece.x = size.width + 20 }
             if piece.x > size.width + 20 { piece.x = -20 }
-            // 아래로 나간 조각은 위에서 다시 내려와 꽃가루가 끊이지 않는다.
-            if piece.y > size.height + 16 {
+            // 아래로 나간 조각은 위에서 다시 내려와 꽃가루가 끊이지 않는다. 한 번만 터지는 꽃가루는 다 돈 뒤 걷어낸다.
+            if !isOneShot, piece.y > size.height + 16 {
                 piece.x = .random(in: 0...size.width)
                 piece.y = -.random(in: 12...90)
                 piece.velocityX = .random(in: -8...8)
@@ -195,6 +228,9 @@ final class PaperConfettiSimulation {
                 piece.flipSpeed = piece.baseFlipSpeed
             }
             pieces[index] = piece
+        }
+        if isOneShot {
+            pieces.removeAll { $0.y > size.height + 16 }
         }
     }
 }
