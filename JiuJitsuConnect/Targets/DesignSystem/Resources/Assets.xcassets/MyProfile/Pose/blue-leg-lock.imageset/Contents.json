@@ -1,0 +1,18 @@
+{
+  "images" : [
+    {
+      "filename" : "blue-leg-lock@2x.heic",
+      "idiom" : "universal",
+      "scale" : "2x"
+    },
+    {
+      "filename" : "blue-leg-lock@3x.heic",
+      "idiom" : "universal",
+      "scale" : "3x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "images" : [
+    {
+      "filename" : "blue-guard-pass@2x.heic",
+      "idiom" : "universal",
+      "scale" : "2x"
+    },
+    {
+      "filename" : "blue-guard-pass@3x.heic",
+      "idiom" : "universal",
+      "scale" : "3x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

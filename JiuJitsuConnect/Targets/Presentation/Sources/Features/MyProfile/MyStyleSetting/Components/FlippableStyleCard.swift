@@ -89,7 +89,7 @@ struct FlippableStyleCard: View {
                 .opacity(showBack ? 1 : 0)
             
             // 앞면
-            StyleCard(style: style, isSelected: true)
+            StyleCard(style: style, isSelected: true, beltRank: beltRank)
                 .opacity(showBack ? 0 : 1)
         }
         .rotation3DEffect(

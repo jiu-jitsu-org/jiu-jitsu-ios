@@ -1,0 +1,18 @@
+{
+  "images" : [
+    {
+      "filename" : "brown-top@2x.heic",
+      "idiom" : "universal",
+      "scale" : "2x"
+    },
+    {
+      "filename" : "brown-top@3x.heic",
+      "idiom" : "universal",
+      "scale" : "3x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
