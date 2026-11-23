@@ -45,6 +45,8 @@ public struct AppTabView: View {
         static let itemWidth: CGFloat = 88
         // 맨 위로 칸은 좁게 — 탭 칸 자리를 고정한 채 오른쪽으로 늘어나도 화면 안에 들어오게 한다.
         static let topItemWidth: CGFloat = 48
+        // 맨 위로까지 늘어난 탭 바와 화면 오른쪽 끝 사이 최소 여백
+        static let minEdgeInset: CGFloat = 12
         static let itemHeight: CGFloat = 54
         static let barPadding: CGFloat = 4
         // 홈 막대가 있는 기기에서 탭 바 아래 여백(홈 막대 34 - 17)
@@ -462,8 +464,12 @@ public struct AppTabView: View {
         // 홈·대회·MY 자리는 3칸일 때 가운데 정렬 기준으로 고정하고, 맨 위로 칸은 오른쪽으로만 늘린다.
         // (4칸을 통째로 가운데에 두면 칸이 반 칸 밀려 홈을 두 번 누를 때 대회가 눌린다.)
         let baseWidth = 3 * DockMetrics.itemWidth + DockMetrics.barPadding * 2
+        // 좁은 화면(375pt)에서는 맨 위로까지 늘어난 끝이 화면 끝에 붙지 않게 왼쪽으로 당긴다.
+        // 맨 위로 유무와 상관없이 같은 값이라 칸 자리는 그대로다.
+        let fullWidth = baseWidth + DockMetrics.topItemWidth
+        let x = min((size.width - baseWidth) / 2, size.width - fullWidth - DockMetrics.minEdgeInset)
         return CGRect(
-            x: (size.width - baseWidth) / 2,
+            x: x,
             y: size.height - dockBottomGap - DockMetrics.barHeight,
             width: width,
             height: DockMetrics.barHeight
