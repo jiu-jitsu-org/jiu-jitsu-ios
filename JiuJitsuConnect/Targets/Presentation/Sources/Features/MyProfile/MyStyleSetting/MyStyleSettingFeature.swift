@@ -336,6 +336,9 @@ public struct MyStyleSettingFeature: Sendable {
         // 설정 타입 (포지션/서브미션/기술)
         var settingType: MyStyleSettingType
 
+        // 내 띠 — 큰 카드 앞면 캐릭터의 띠와 뒷면 바탕 색. 없으면 nil.
+        var beltRank: BeltRank?
+
         // 부모(MY)가 저장 중. 끝날 때까지 '완료' · 뒤로가기 · 나중에 하기 버튼을 막는다(#155). 스와이프 백은 허용.
         var isSaving = false
 
@@ -360,6 +363,7 @@ public struct MyStyleSettingFeature: Sendable {
         public init(
             settingType: MyStyleSettingType,
             mode: Mode = .register,
+            beltRank: BeltRank? = nil,
             bestPosition: PositionType? = nil,
             favoritePosition: PositionType? = nil,
             bestSubmission: SubmissionType? = nil,
@@ -369,6 +373,7 @@ public struct MyStyleSettingFeature: Sendable {
         ) {
             self.mode = mode
             self.settingType = settingType
+            self.beltRank = beltRank
             self.selectedBestPosition = bestPosition
             self.selectedFavoritePosition = favoritePosition
             self.selectedBestSubmission = bestSubmission

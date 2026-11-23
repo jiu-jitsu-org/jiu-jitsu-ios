@@ -140,7 +140,7 @@ public struct MyStyleSettingView: View {
             
             if let style = currentStyle {
                 // 선택된 스타일 카드 (플립 가능)
-                FlippableStyleCard(style: style, settingType: store.settingType)
+                FlippableStyleCard(style: style, beltRank: store.beltRank)
             } else {
                 // "없음"이 선택된 상태 - EmptySelectionCard 표시
                 EmptySelectionCard(

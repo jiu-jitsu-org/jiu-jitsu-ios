@@ -470,6 +470,7 @@ public struct MyProfileFeature: Sendable {
                     MyStyleSettingFeature.State(
                         settingType: .position,
                         mode: .register,
+                        beltRank: state.communityProfile?.beltRank,
                         bestPosition: state.communityProfile?.bestPosition,
                         favoritePosition: state.communityProfile?.favoritePosition,
                         bestSubmission: state.communityProfile?.bestSubmission,
@@ -489,6 +490,7 @@ public struct MyProfileFeature: Sendable {
                     MyStyleSettingFeature.State(
                         settingType: type,
                         mode: .edit,
+                        beltRank: state.communityProfile?.beltRank,
                         bestPosition: state.communityProfile?.bestPosition,
                         favoritePosition: state.communityProfile?.favoritePosition,
                         bestSubmission: state.communityProfile?.bestSubmission,
@@ -712,6 +714,7 @@ public struct MyProfileFeature: Sendable {
                     MyStyleSettingFeature.State(
                         settingType: .technique,
                         mode: .register,
+                        beltRank: profile.beltRank,
                         bestTechnique: profile.bestTechnique,
                         favoriteTechnique: profile.favoriteTechnique
                     )
@@ -732,6 +735,7 @@ public struct MyProfileFeature: Sendable {
                     MyStyleSettingFeature.State(
                         settingType: .submission,
                         mode: .register,
+                        beltRank: profile.beltRank,
                         bestSubmission: profile.bestSubmission,
                         favoriteSubmission: profile.favoriteSubmission
                     )
