@@ -169,7 +169,7 @@ extension SubmissionType: StyleSelectable {
         case .chokes:
             return "내 몸은 아나콘다, 넌 그냥 먹잇감.\n탭이 늦으면, 네 뼈가 먼저 비명을 지를 거다."
         case .legLocks:
-            return "네가 아무리 발버둥 쳐도 소용없어. 네 하체는 이제 완벽하게\n내 통제하에 들어왔으니까."
+            return "네가 아무리 발버둥 쳐도 소용없어.\n네 하체는 이제 완벽하게\n내 통제하에 들어왔으니까."
         }
     }
     
@@ -259,7 +259,7 @@ extension TechniqueType: StyleSelectable {
     public var cardDescription: String {
         switch self {
         case .takedowns:
-            return "이 매트 위에서 '선다'는 건 없어.\n'아직 넘어지지 않았다'만 있을 뿐.\n그리고 그 시간은, 이제 끝났어."
+            return "서 있을 수 있을 때 실컷 즐겨 둬.\n네 발이 바닥에서 떨어지는 순간,\n다음에 닿는 건 네 등이니까."
         case .sweeps:
             return "지금 네가 보는 천장, 곧 네 등이 마주할 매트가 될 거다. 세상이 뒤집히는 기분을 즐겨보라고."
         case .escapes:

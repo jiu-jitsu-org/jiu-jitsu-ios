@@ -48,10 +48,14 @@ struct StyleCard: View {
                     .frame(width: Metrics.poseSize, height: Metrics.poseSize)
 
                 // 풀 타이틀
-                Text(style.fullTitle)
+                // 한 줄에 다 들어가게 — 긴 이름(이스케이프 디펜스)만 글자를 줄이고 나머지는 40 그대로
+                Text(style.fullTitle.replacingOccurrences(of: "\n", with: " "))
                     .font(.cookieRun.custom(weight: .black, size: 40))
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .padding(.horizontal, 16)
                     .frame(height: 54)
                     .padding(.bottom, 20)
 
@@ -61,6 +65,8 @@ struct StyleCard: View {
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
+                    // 세 줄 안에 다 들어가게 — 한 줄이 넘치는 설명(하체 관절기)만 글자를 조금 줄인다
+                    .minimumScaleFactor(0.9)
                     .frame(height: 72)
                     .padding(.horizontal, 25)
                     .padding(.bottom, 32)
