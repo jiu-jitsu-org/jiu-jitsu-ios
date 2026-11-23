@@ -111,54 +111,74 @@ private extension StyleSelectable {
 
     /// 그 띠를 맨 캐릭터가 이 기술을 거는 그림(상대는 회색). 모르는 스타일이면 아이콘.
     func poseImage(belt: BeltRank) -> ImageAsset {
+        stylePose?.beltImages.image(for: belt) ?? iconImage
+    }
+}
+
+/// 띠마다 칠해 둔 같은 장면 그림 한 벌
+private struct BeltPoseImages {
+    let white, blue, purple, brown, black: ImageAsset
+
+    func image(for belt: BeltRank) -> ImageAsset {
+        switch belt {
+        case .white: return white
+        case .blue: return blue
+        case .purple: return purple
+        case .brown: return brown
+        case .black: return black
+        }
+    }
+}
+
+private extension StylePose {
+    var beltImages: BeltPoseImages {
         typealias Pose = Assets.MyProfile.Pose
-        guard let pose = stylePose else { return iconImage }
-        switch (belt, pose) {
-        case (.white, .top): return Pose.whiteTop
-        case (.white, .guardPosition): return Pose.whiteGuard
-        case (.white, .escape): return Pose.whiteEscape
-        case (.white, .armLock): return Pose.whiteArmLock
-        case (.white, .legLock): return Pose.whiteLegLock
-        case (.white, .guardPass): return Pose.whiteGuardPass
-        case (.white, .choke): return Pose.whiteChoke
-        case (.white, .sweep): return Pose.whiteSweep
-        case (.white, .takedown): return Pose.whiteTakedown
-        case (.blue, .top): return Pose.blueTop
-        case (.blue, .guardPosition): return Pose.blueGuard
-        case (.blue, .escape): return Pose.blueEscape
-        case (.blue, .armLock): return Pose.blueArmLock
-        case (.blue, .legLock): return Pose.blueLegLock
-        case (.blue, .guardPass): return Pose.blueGuardPass
-        case (.blue, .choke): return Pose.blueChoke
-        case (.blue, .sweep): return Pose.blueSweep
-        case (.blue, .takedown): return Pose.blueTakedown
-        case (.purple, .top): return Pose.purpleTop
-        case (.purple, .guardPosition): return Pose.purpleGuard
-        case (.purple, .escape): return Pose.purpleEscape
-        case (.purple, .armLock): return Pose.purpleArmLock
-        case (.purple, .legLock): return Pose.purpleLegLock
-        case (.purple, .guardPass): return Pose.purpleGuardPass
-        case (.purple, .choke): return Pose.purpleChoke
-        case (.purple, .sweep): return Pose.purpleSweep
-        case (.purple, .takedown): return Pose.purpleTakedown
-        case (.brown, .top): return Pose.brownTop
-        case (.brown, .guardPosition): return Pose.brownGuard
-        case (.brown, .escape): return Pose.brownEscape
-        case (.brown, .armLock): return Pose.brownArmLock
-        case (.brown, .legLock): return Pose.brownLegLock
-        case (.brown, .guardPass): return Pose.brownGuardPass
-        case (.brown, .choke): return Pose.brownChoke
-        case (.brown, .sweep): return Pose.brownSweep
-        case (.brown, .takedown): return Pose.brownTakedown
-        case (.black, .top): return Pose.blackTop
-        case (.black, .guardPosition): return Pose.blackGuard
-        case (.black, .escape): return Pose.blackEscape
-        case (.black, .armLock): return Pose.blackArmLock
-        case (.black, .legLock): return Pose.blackLegLock
-        case (.black, .guardPass): return Pose.blackGuardPass
-        case (.black, .choke): return Pose.blackChoke
-        case (.black, .sweep): return Pose.blackSweep
-        case (.black, .takedown): return Pose.blackTakedown
+        switch self {
+        case .top:
+            return BeltPoseImages(
+                white: Pose.whiteTop, blue: Pose.blueTop, purple: Pose.purpleTop,
+                brown: Pose.brownTop, black: Pose.blackTop
+            )
+        case .guardPosition:
+            return BeltPoseImages(
+                white: Pose.whiteGuard, blue: Pose.blueGuard, purple: Pose.purpleGuard,
+                brown: Pose.brownGuard, black: Pose.blackGuard
+            )
+        case .escape:
+            return BeltPoseImages(
+                white: Pose.whiteEscape, blue: Pose.blueEscape, purple: Pose.purpleEscape,
+                brown: Pose.brownEscape, black: Pose.blackEscape
+            )
+        case .armLock:
+            return BeltPoseImages(
+                white: Pose.whiteArmLock, blue: Pose.blueArmLock, purple: Pose.purpleArmLock,
+                brown: Pose.brownArmLock, black: Pose.blackArmLock
+            )
+        case .legLock:
+            return BeltPoseImages(
+                white: Pose.whiteLegLock, blue: Pose.blueLegLock, purple: Pose.purpleLegLock,
+                brown: Pose.brownLegLock, black: Pose.blackLegLock
+            )
+        case .guardPass:
+            return BeltPoseImages(
+                white: Pose.whiteGuardPass, blue: Pose.blueGuardPass, purple: Pose.purpleGuardPass,
+                brown: Pose.brownGuardPass, black: Pose.blackGuardPass
+            )
+        case .choke:
+            return BeltPoseImages(
+                white: Pose.whiteChoke, blue: Pose.blueChoke, purple: Pose.purpleChoke,
+                brown: Pose.brownChoke, black: Pose.blackChoke
+            )
+        case .sweep:
+            return BeltPoseImages(
+                white: Pose.whiteSweep, blue: Pose.blueSweep, purple: Pose.purpleSweep,
+                brown: Pose.brownSweep, black: Pose.blackSweep
+            )
+        case .takedown:
+            return BeltPoseImages(
+                white: Pose.whiteTakedown, blue: Pose.blueTakedown, purple: Pose.purpleTakedown,
+                brown: Pose.brownTakedown, black: Pose.blackTakedown
+            )
         }
     }
 }
