@@ -22,6 +22,13 @@ public struct MyStyleSettingView: View {
 
     private var isRevealed: Bool { revealedType == store.settingType }
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// 동작 줄이기를 켰으면 조명이 바로 켜진다
+    private var lightAnimation: Animation? {
+        reduceMotion ? nil : .easeInOut(duration: StageMetrics.lightDuration)
+    }
+
     public init(store: StoreOf<MyStyleSettingFeature>) {
         self.store = store
     }
@@ -176,7 +183,7 @@ public struct MyStyleSettingView: View {
                     isLit: isRevealed,
                     playsIntro: !isRevealed,
                     onRevealed: {
-                        withAnimation(.easeOut(duration: StageMetrics.lightDuration)) { revealedType = store.settingType }
+                        withAnimation(lightAnimation) { revealedType = store.settingType }
                     }
                 )
                 .brightness(isRevealed ? 0 : StageMetrics.unlitBrightness)
@@ -197,7 +204,7 @@ public struct MyStyleSettingView: View {
         .background {
             StageLight(cardSize: StageMetrics.cardSize, cornerRadius: 40)
                 .opacity(isRevealed && currentStyle != nil ? 1 : 0)
-                .animation(.easeInOut(duration: StageMetrics.lightDuration), value: currentStyle == nil)
+                .animation(lightAnimation, value: currentStyle == nil)
         }
     }
     

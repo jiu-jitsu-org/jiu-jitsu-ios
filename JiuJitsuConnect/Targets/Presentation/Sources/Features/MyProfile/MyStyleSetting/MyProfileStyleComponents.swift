@@ -102,7 +102,8 @@ public struct MyProfileStyleSectionView: View {
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .frame(height: stageHeight, alignment: .topLeading)
-            .animation(spreadAnimation(at: 0), value: showsOpen)
+            // 누를 때만 움직인다. 프로필이 늦게 불러와져 빈 칸에서 채워질 때는 그 자리에서 바로 덮인다.
+            .animation(spreadAnimation(at: 0), value: isOpen)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         }
     }
@@ -125,14 +126,15 @@ public struct MyProfileStyleSectionView: View {
                 FavoriteStyleCardBack(category: item.type.title)
                     .frame(width: cardWidth, height: cardHeight)
             }
-            .animation(flipAnimation(at: index), value: showsOpen)
+            .animation(flipAnimation(at: index), value: isOpen)
             .contentShape(RoundedRectangle(cornerRadius: FavoriteStyleCardMetrics.cornerRadius))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel(for: item))
+        .accessibilityHint(accessibilityHint)
         .rotationEffect(.degrees(showsOpen ? 0 : Metrics.pileAngle[index]))
         .position(center(at: index))
-        .animation(spreadAnimation(at: index), value: showsOpen)
+        .animation(spreadAnimation(at: index), value: isOpen)
     }
 
     private func center(at index: Int) -> CGPoint {
@@ -162,8 +164,13 @@ public struct MyProfileStyleSectionView: View {
         }
     }
 
+    private var accessibilityHint: String {
+        guard showsOpen else { return "세 장을 펼쳐요" }
+        return onStyleCardTapped == nil ? "다시 덮어요" : "고르는 화면으로 가요"
+    }
+
     private func accessibilityLabel(for item: Item) -> String {
-        guard showsOpen else { return "최애 \(item.type.title) 카드, 펼쳐 보기" }
+        guard showsOpen else { return "최애 \(item.type.title) 카드, 뒤집혀 있음" }
         return "최애 \(item.type.title), \(item.style?.tabTitle ?? "없음")"
     }
 
