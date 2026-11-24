@@ -283,9 +283,9 @@ struct BridgeWebView: UIViewRepresentable {
         // 웹 시트가 열린 동안 가린 높이를 0으로 돌리고 탭 바를 숨긴다(#314).
         context.coordinator.onTopGlassChanged = onTopGlassChanged
         context.coordinator.onSheetOpenChanged = extendsUnderTabBar
-            ? { [weak keyboardAvoidingContainer] isOpen in
+            ? { [weak keyboardAvoidingContainer] isOpen, isDimmed in
                 keyboardAvoidingContainer?.isSheetOpen = isOpen
-                tabRootScroll?.reportSheetOpen(isOpen)
+                tabRootScroll?.reportSheetOpen(isOpen, isDimmed)
             }
             : nil
         // 토큰 변동(갱신) 시에도 세션 쿠키를 최신으로 유지한 뒤 (재)로드/플러시한다.
@@ -358,7 +358,7 @@ struct BridgeWebView: UIViewRepresentable {
         // deactivate() 이후에는 웹뷰가 아직 살아 있어도 store로 아무것도 보내지 않는다.
         private var isDeactivated = false
         // 웹 시트 열림·닫힘을 받는 곳(#314). 탭 바 밑까지 그리는 웹뷰만 updateUIView가 넣는다.
-        var onSheetOpenChanged: (@MainActor (Bool) -> Void)?
+        var onSheetOpenChanged: (@MainActor (_ isOpen: Bool, _ isDimmed: Bool) -> Void)?
         // 웹 유리 면 시작 · 멈춤을 받는 곳. 머리줄 뒤까지 그리는 웹뷰만 updateUIView가 넣는다.
         var onTopGlassChanged: ((Bool) -> Void)?
         // 웹이 마지막으로 알린 유리 면. 문서가 바뀌면(새로고침 · 이동) 멈춤 신호를 못 받으니 직접 푼다.
@@ -370,6 +370,7 @@ struct BridgeWebView: UIViewRepresentable {
         private var appliedSafeArea: WebSafeAreaInsets?
         // 웹이 마지막으로 알린 시트 열림. 시트를 연 채 문서가 바뀌면(새로고침·이동) 닫힘을 못 받으니 직접 푼다.
         private var isWebSheetOpen = false
+        private var isWebSheetDimmed = false
         // 진입 시간 측정의 키(#298). 웹뷰를 만들 때의 loadToken — 다시 시도로 토큰이 바뀌어도 첫 진입 기록을 끝맺는다.
         var entryTraceToken: UUID?
         // 마지막 메인 프레임 이동을 이동 정책이 막았는지. 리다이렉트를 막으면 실패 알림이 따로 와 오류와 구분한다.
@@ -610,8 +611,8 @@ struct BridgeWebView: UIViewRepresentable {
             WebBridge.logInboundRaw(body, source: source)
             guard let inbound = WebBridgeInboundMessage.decode(from: body) else { return }
             WebBridge.logInbound(inbound, source: source)
-            if case let .setSheetOpen(isOpen) = inbound {
-                setWebSheetOpen(isOpen)
+            if case let .setSheetOpen(isOpen, isDimmed) = inbound {
+                setWebSheetOpen(isOpen, isDimmed: isDimmed)
                 return
             }
             if case let .setTopGlass(isActive) = inbound {
@@ -632,12 +633,13 @@ struct BridgeWebView: UIViewRepresentable {
             onBridgeMessage(inbound)
         }
 
-        private func setWebSheetOpen(_ isOpen: Bool) {
+        private func setWebSheetOpen(_ isOpen: Bool, isDimmed: Bool = false) {
             // 받을 곳이 아직 없으면(미리 불러 둔 홈 피드를 넘겨받는 중 등) 기록하지 않는다 — 적용 안 된 열림이 남아
             // 다음 열림을 같은 값이라며 버리지 않게.
-            guard let onSheetOpenChanged, isWebSheetOpen != isOpen else { return }
+            guard let onSheetOpenChanged, isWebSheetOpen != isOpen || isWebSheetDimmed != isDimmed else { return }
             isWebSheetOpen = isOpen
-            onSheetOpenChanged(isOpen)
+            isWebSheetDimmed = isDimmed
+            onSheetOpenChanged(isOpen, isDimmed)
         }
 
         /// 웹이 알린 유리 면을 웹뷰 위쪽 자리(컨테이너)와 머리줄 바탕(화면)에 반영한다.
