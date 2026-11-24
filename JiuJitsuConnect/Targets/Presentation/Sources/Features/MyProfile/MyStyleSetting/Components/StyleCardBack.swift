@@ -12,31 +12,46 @@ import Domain
 /// 스타일 카드 뒷면 컴포넌트
 ///
 /// 메인 화면에 표시되는 큰 스타일 카드의 뒷면입니다.
-/// 설정 타입과 스타일 이름을 간단하게 표시합니다.
+/// 내 띠 색 바탕(띠가 없으면 회색)에 앱 로고와 스타일 이름을 표시합니다.
 struct StyleCardBack: View {
     let style: any StyleSelectable
-    let settingType: MyStyleSettingType
-    
+    /// 바탕을 칠할 띠. 없으면 회색.
+    var beltRank: BeltRank? = nil
+
+    // MARK: - Colors
+
+    /// 띠 색 바탕. 흰띠는 페이지 바탕 위에서 뜨게 순백.
+    private var backgroundColor: Color {
+        beltRank?.beltSurfaceColor ?? Color.primitive.coolGray.cg75
+    }
+
+    /// 로고·이름 색 — 밝은 띠는 어둡게, 띠가 없으면 회색 글자, 그 외 흰색
+    private var foregroundColor: Color {
+        guard let beltRank else { return Color.primitive.coolGray.cg600 }
+        return beltRank.isLightBelt ? Color.component.myBelt.onLight : .white
+    }
+
     // MARK: - Body
 
     var body: some View {
         ZStack {
-            // 배경 색상 - 고정된 회색
             RoundedRectangle(cornerRadius: 40)
-                .fill(Color.primitive.coolGray.cg75)
+                .fill(backgroundColor)
 
-            VStack(alignment: .center, spacing: 7) {
-                // 타이틀 - 화면 타입 표시 (포지션/서브미션/기술)
-                Text(settingType.navigationTitle)
-                    .font(.pretendard.bodyM)
-                    .foregroundColor(.primitive.coolGray.cg400)
-                
-                // 캡션 - 스타일 타이틀
+            VStack(alignment: .center, spacing: 24) {
+                // 앱 로고 (흰 글자 로고를 바탕에 맞는 색으로 칠한다)
+                Assets.Splash.logo.swiftUIImage
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 136)
+
+                // 스타일 이름
                 Text(style.fullTitle)
                     .font(.pretendard.display1)
                     .lineSpacing(5)
-                    .foregroundColor(.primitive.coolGray.cg600)
             }
+            .foregroundStyle(foregroundColor)
         }
         .frame(width: 262, height: 394)
     }
@@ -46,8 +61,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Position Top") {
     StyleCardBack(
-        style: PositionType.top,
-        settingType: .position
+        style: PositionType.top
     )
     .padding()
     .background(Color.component.background.default)
@@ -55,8 +69,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Position Guard") {
     StyleCardBack(
-        style: PositionType.guard,
-        settingType: .position
+        style: PositionType.guard
     )
     .padding()
     .background(Color.component.background.default)
@@ -64,8 +77,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Submission ArmLocks") {
     StyleCardBack(
-        style: SubmissionType.armLocks,
-        settingType: .submission
+        style: SubmissionType.armLocks
     )
     .padding()
     .background(Color.component.background.default)
@@ -73,8 +85,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Submission Chokes") {
     StyleCardBack(
-        style: SubmissionType.chokes,
-        settingType: .submission
+        style: SubmissionType.chokes
     )
     .padding()
     .background(Color.component.background.default)
@@ -82,8 +93,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Submission LegLocks") {
     StyleCardBack(
-        style: SubmissionType.legLocks,
-        settingType: .submission
+        style: SubmissionType.legLocks
     )
     .padding()
     .background(Color.component.background.default)
@@ -91,8 +101,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Technique Takedowns") {
     StyleCardBack(
-        style: TechniqueType.takedowns,
-        settingType: .technique
+        style: TechniqueType.takedowns
     )
     .padding()
     .background(Color.component.background.default)
@@ -100,8 +109,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Technique Sweeps") {
     StyleCardBack(
-        style: TechniqueType.sweeps,
-        settingType: .technique
+        style: TechniqueType.sweeps
     )
     .padding()
     .background(Color.component.background.default)
@@ -109,8 +117,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Technique Escapes") {
     StyleCardBack(
-        style: TechniqueType.escapes,
-        settingType: .technique
+        style: TechniqueType.escapes
     )
     .padding()
     .background(Color.component.background.default)
@@ -118,8 +125,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Technique GuardPasses") {
     StyleCardBack(
-        style: TechniqueType.guardPasses,
-        settingType: .technique
+        style: TechniqueType.guardPasses
     )
     .padding()
     .background(Color.component.background.default)
@@ -131,8 +137,8 @@ struct StyleCardBack: View {
             .font(.pretendard.display1)
         
         HStack(spacing: 20) {
-            StyleCardBack(style: PositionType.top, settingType: .position)
-            StyleCardBack(style: PositionType.guard, settingType: .position)
+            StyleCardBack(style: PositionType.top)
+            StyleCardBack(style: PositionType.guard)
         }
         
         Text("서브미션 설정")
@@ -140,8 +146,8 @@ struct StyleCardBack: View {
             .padding(.top, 20)
         
         HStack(spacing: 20) {
-            StyleCardBack(style: SubmissionType.armLocks, settingType: .submission)
-            StyleCardBack(style: SubmissionType.chokes, settingType: .submission)
+            StyleCardBack(style: SubmissionType.armLocks)
+            StyleCardBack(style: SubmissionType.chokes)
         }
         
         Text("기술 설정")
@@ -149,8 +155,8 @@ struct StyleCardBack: View {
             .padding(.top, 20)
         
         HStack(spacing: 20) {
-            StyleCardBack(style: TechniqueType.takedowns, settingType: .technique)
-            StyleCardBack(style: TechniqueType.sweeps, settingType: .technique)
+            StyleCardBack(style: TechniqueType.takedowns)
+            StyleCardBack(style: TechniqueType.sweeps)
         }
     }
     .padding()

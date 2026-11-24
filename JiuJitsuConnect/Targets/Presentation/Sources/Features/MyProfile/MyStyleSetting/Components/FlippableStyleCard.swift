@@ -13,12 +13,13 @@ import Domain
 ///
 /// 좌우 드래그로 앞면/뒷면을 전환할 수 있는 인터랙티브 카드입니다.
 /// - 앞면: `StyleCard` (배경 이미지, 아이콘, 설명)
-/// - 뒷면: `StyleCardBack` (간단한 텍스트)
+/// - 뒷면: `StyleCardBack` (띠 색 바탕 + 로고 + 이름)
 /// - 제스처: 좌우 드래그로 180도 회전
 /// - 애니메이션: 3D 회전, 동적 섀도우
 struct FlippableStyleCard: View {
     let style: any StyleSelectable
-    let settingType: MyStyleSettingType
+    /// 앞면 캐릭터 띠·뒷면 바탕 색
+    var beltRank: BeltRank? = nil
     
     @State private var dragAngle: Double = 0
     @State private var cumulativeRotation: Double = 0  // 누적 회전각
@@ -80,7 +81,7 @@ struct FlippableStyleCard: View {
     var body: some View {
         ZStack {
             // 뒷면 (처음부터 180도 뒤집어 대기)
-            StyleCardBack(style: style, settingType: settingType)
+            StyleCardBack(style: style, beltRank: beltRank)
                 .rotation3DEffect(
                     .degrees(Metrics.flipAngle),
                     axis: (x: 0, y: 1, z: 0)
@@ -88,7 +89,7 @@ struct FlippableStyleCard: View {
                 .opacity(showBack ? 1 : 0)
             
             // 앞면
-            StyleCard(style: style, isSelected: true)
+            StyleCard(style: style, isSelected: true, beltRank: beltRank)
                 .opacity(showBack ? 0 : 1)
         }
         .rotation3DEffect(
@@ -158,7 +159,7 @@ struct FlippableStyleCard: View {
 #Preview("FlippableStyleCard - Position Top") {
     FlippableStyleCard(
         style: PositionType.top,
-        settingType: .position
+        beltRank: .blue
     )
     .padding()
     .background(Color.component.background.default)
@@ -167,7 +168,7 @@ struct FlippableStyleCard: View {
 #Preview("FlippableStyleCard - Position Guard") {
     FlippableStyleCard(
         style: PositionType.guard,
-        settingType: .position
+        beltRank: .blue
     )
     .padding()
     .background(Color.component.background.default)
@@ -176,7 +177,7 @@ struct FlippableStyleCard: View {
 #Preview("FlippableStyleCard - Submission ArmLocks") {
     FlippableStyleCard(
         style: SubmissionType.armLocks,
-        settingType: .submission
+        beltRank: .blue
     )
     .padding()
     .background(Color.component.background.default)
@@ -185,7 +186,7 @@ struct FlippableStyleCard: View {
 #Preview("FlippableStyleCard - Submission Chokes") {
     FlippableStyleCard(
         style: SubmissionType.chokes,
-        settingType: .submission
+        beltRank: .blue
     )
     .padding()
     .background(Color.component.background.default)
@@ -194,7 +195,7 @@ struct FlippableStyleCard: View {
 #Preview("FlippableStyleCard - Technique Takedowns") {
     FlippableStyleCard(
         style: TechniqueType.takedowns,
-        settingType: .technique
+        beltRank: .blue
     )
     .padding()
     .background(Color.component.background.default)
@@ -230,7 +231,7 @@ struct FlippableStyleCard: View {
                 // 플립 가능한 카드
                 FlippableStyleCard(
                     style: currentStyle,
-                    settingType: selectedType
+                    beltRank: .blue
                 )
             }
             .padding()
@@ -248,8 +249,8 @@ struct FlippableStyleCard: View {
                 .font(.pretendard.display1)
             
             VStack(spacing: 20) {
-                FlippableStyleCard(style: PositionType.top, settingType: .position)
-                FlippableStyleCard(style: PositionType.guard, settingType: .position)
+                FlippableStyleCard(style: PositionType.top, beltRank: .blue)
+                FlippableStyleCard(style: PositionType.guard, beltRank: .blue)
             }
             
             Text("서브미션 스타일")
@@ -257,9 +258,9 @@ struct FlippableStyleCard: View {
                 .padding(.top, 20)
             
             VStack(spacing: 20) {
-                FlippableStyleCard(style: SubmissionType.armLocks, settingType: .submission)
-                FlippableStyleCard(style: SubmissionType.chokes, settingType: .submission)
-                FlippableStyleCard(style: SubmissionType.legLocks, settingType: .submission)
+                FlippableStyleCard(style: SubmissionType.armLocks, beltRank: .blue)
+                FlippableStyleCard(style: SubmissionType.chokes, beltRank: .blue)
+                FlippableStyleCard(style: SubmissionType.legLocks, beltRank: .blue)
             }
             
             Text("기술 스타일")
@@ -267,8 +268,8 @@ struct FlippableStyleCard: View {
                 .padding(.top, 20)
             
             VStack(spacing: 20) {
-                FlippableStyleCard(style: TechniqueType.takedowns, settingType: .technique)
-                FlippableStyleCard(style: TechniqueType.sweeps, settingType: .technique)
+                FlippableStyleCard(style: TechniqueType.takedowns, beltRank: .blue)
+                FlippableStyleCard(style: TechniqueType.sweeps, beltRank: .blue)
             }
         }
         .padding()
