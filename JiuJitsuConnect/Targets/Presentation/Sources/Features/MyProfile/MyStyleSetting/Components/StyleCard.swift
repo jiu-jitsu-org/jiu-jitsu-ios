@@ -18,6 +18,8 @@ struct StyleCard: View {
     let isSelected: Bool
     /// 캐릭터가 맬 띠. 띠가 없으면 흰띠로 그린다.
     var beltRank: BeltRank? = nil
+    /// 조명이 켜졌는지 — 켜지면 카드 윗부분이 빛을 받아 밝아진다. 캐릭터와 글자는 그대로.
+    var isLit = false
     
     // MARK: - Metrics
 
@@ -37,7 +39,17 @@ struct StyleCard: View {
             style.backgroundImage.swiftUIImage
                 .resizable()
                 .frame(width: Metrics.cardWidth, height: Metrics.cardHeight)
-            
+
+            LinearGradient(
+                stops: [
+                    .init(color: .white.opacity(0.14), location: 0),
+                    .init(color: .white.opacity(0), location: 0.5)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .opacity(isLit ? 1 : 0)
+
             VStack(alignment: .center, spacing: 0) {
                 Spacer()
                 
