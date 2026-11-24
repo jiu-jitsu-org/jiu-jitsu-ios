@@ -83,8 +83,8 @@ private enum StylePose {
     case top, guardPosition, escape, armLock, legLock, guardPass, choke, sweep, takedown
 }
 
-private extension StyleSelectable {
-    var stylePose: StylePose? {
+extension StyleSelectable {
+    private var stylePose: StylePose? {
         switch self {
         case let position as PositionType:
             switch position {

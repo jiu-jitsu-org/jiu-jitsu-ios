@@ -11,35 +11,57 @@ import Domain
 
 // MARK: - MyProfileStyleSectionView
 
-/// 최애 기술 섹션 (포지션 · 기술 · 서브미션 최애 한 칸씩)
+/// 최애 기술 섹션 (포지션 · 기술 · 서브미션 최애 한 장씩)
 ///
 /// 제목은 '최애 기술'이다(#199). '최애 스타일'은 무엇을 말하는지 애매하다는 피드백이 있어,
 /// 포지션·서브미션까지 넓게 '기술'로 묶어 부른다.
 ///
+/// 처음에는 무엇을 골랐는지 안 보이게 뒤집힌 채 포개져 있고, 누르면 펼쳐지며 앞면이 나온다.
 /// 특기는 자기 평가라 입력 부담이 커서 최애만 보여 준다(#118). 남이 보는 프로필도 같은 모양을 쓴다.
 public struct MyProfileStyleSectionView: View {
     let favoritePosition: (any StyleSelectable)?
     let favoriteTechnique: (any StyleSelectable)?
     let favoriteSubmission: (any StyleSelectable)?
+    /// 앞면 캐릭터가 맬 띠
+    let beltRank: BeltRank?
 
-    /// 카드를 눌러 수정한다. `nil`이면 읽기 전용(남이 보는 프로필)이라 빈 칸에 고르라는 말 대신 안 골랐다고 적는다.
+    /// 펼친 카드를 눌러 수정한다. `nil`이면 읽기 전용(남이 보는 프로필)이라 다시 누르면 덮인다.
     let onStyleCardTapped: ((MyStyleSettingType) -> Void)?
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isOpen = false
+    @State private var width: CGFloat = 0
 
     public init(
         favoritePosition: (any StyleSelectable)?,
         favoriteTechnique: (any StyleSelectable)?,
         favoriteSubmission: (any StyleSelectable)?,
+        beltRank: BeltRank?,
         onStyleCardTapped: ((MyStyleSettingType) -> Void)?
     ) {
         self.favoritePosition = favoritePosition
         self.favoriteTechnique = favoriteTechnique
         self.favoriteSubmission = favoriteSubmission
+        self.beltRank = beltRank
         self.onStyleCardTapped = onStyleCardTapped
     }
 
     private struct Item {
         let type: MyStyleSettingType
         let style: (any StyleSelectable)?
+    }
+
+    private enum Metrics {
+        static let spacing: CGFloat = 8
+        /// 시안 카드 비율 (가로 ÷ 세로)
+        static let cardRatio: CGFloat = 827.0 / 972.0
+        /// 포갰을 때 — 카드 폭에 견준 가운데 자리, 아래로 내린 길이, 기울기
+        static let pileCenterX: [CGFloat] = [0.58, 1.21, 1.84]
+        static let pileOffsetY: [CGFloat] = [0, 0.085, 0]
+        static let pileAngle: [Double] = [-21, 7.5, -21]
+        /// 포갠 카드는 기울어 위아래로 더 나온다
+        static let pileHeightRatio: CGFloat = 1.22
+        static let flipAngle: Double = 180
     }
 
     private var items: [Item] {
@@ -50,9 +72,21 @@ public struct MyProfileStyleSectionView: View {
         ]
     }
 
-    private func tapAction(for type: MyStyleSettingType) -> (() -> Void)? {
-        guard let onStyleCardTapped else { return nil }
-        return { onStyleCardTapped(type) }
+    /// 하나도 안 골랐으면 숨길 것이 없어 펼친 채로 둔다.
+    private var showsOpen: Bool {
+        isOpen || items.allSatisfy { $0.style == nil }
+    }
+
+    private var cardWidth: CGFloat {
+        max(0, (width - Metrics.spacing * 2) / 3)
+    }
+
+    private var cardHeight: CGFloat {
+        cardWidth / Metrics.cardRatio
+    }
+
+    private var stageHeight: CGFloat {
+        showsOpen ? cardHeight : cardHeight * Metrics.pileHeightRatio
     }
 
     public var body: some View {
@@ -61,76 +95,189 @@ public struct MyProfileStyleSectionView: View {
                 .font(.pretendard.title3)
                 .foregroundStyle(Color.component.sectionHeader.title)
 
-            HStack(alignment: .top, spacing: 8) {
-                ForEach(items, id: \.type.title) { item in
-                    FavoriteStyleCardItem(
-                        category: item.type.title,
-                        style: item.style,
-                        // 좁은 기기(375pt)에서는 한 줄에 다 들어가지 않아 '지정해주세/요'로 끊긴다.
-                        // 보이지 않는 줄바꿈 자리(U+200B)를 두어 넘어갈 때는 '지정해/주세요'로 넘어가게 한다.
-                        emptyText: onStyleCardTapped == nil ? "아직 안 골랐어요" : "지정해\u{200B}주세요",
-                        onTapped: tapAction(for: item.type)
-                    )
+            ZStack(alignment: .topLeading) {
+                ForEach(Array(items.enumerated()), id: \.element.type) { index, item in
+                    card(item, at: index)
                 }
             }
-            // 이름이 두 줄로 넘어가는 칸이 있어도 세 칸 높이를 맞춘다
-            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .frame(height: stageHeight, alignment: .topLeading)
+            .animation(spreadAnimation(at: 0), value: showsOpen)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         }
+    }
+
+    private func card(_ item: Item, at index: Int) -> some View {
+        Button {
+            cardTapped(item.type)
+        } label: {
+            FlipCard(angle: showsOpen ? 0 : Metrics.flipAngle) {
+                FavoriteStyleCardFront(
+                    category: item.type.title,
+                    style: item.style,
+                    beltRank: beltRank,
+                    // 좁은 기기(375pt)에서는 한 줄에 다 들어가지 않아 '지정해주세/요'로 끊긴다.
+                    // 보이지 않는 줄바꿈 자리(U+200B)를 두어 넘어갈 때는 '지정해/주세요'로 넘어가게 한다.
+                    emptyText: onStyleCardTapped == nil ? "아직 안 골랐어요" : "지정해\u{200B}주세요"
+                )
+                .frame(width: cardWidth, height: cardHeight)
+            } back: {
+                FavoriteStyleCardBack(category: item.type.title)
+                    .frame(width: cardWidth, height: cardHeight)
+            }
+            .animation(flipAnimation(at: index), value: showsOpen)
+            .contentShape(RoundedRectangle(cornerRadius: FavoriteStyleCardMetrics.cornerRadius))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel(for: item))
+        .rotationEffect(.degrees(showsOpen ? 0 : Metrics.pileAngle[index]))
+        .position(center(at: index))
+        .animation(spreadAnimation(at: index), value: showsOpen)
+    }
+
+    private func center(at index: Int) -> CGPoint {
+        if showsOpen {
+            return CGPoint(
+                x: cardWidth / 2 + CGFloat(index) * (cardWidth + Metrics.spacing),
+                y: cardHeight / 2
+            )
+        }
+        return CGPoint(
+            x: cardWidth * Metrics.pileCenterX[index],
+            y: cardHeight * (Metrics.pileHeightRatio / 2 + Metrics.pileOffsetY[index] - 0.04)
+        )
+    }
+
+    private func cardTapped(_ type: MyStyleSettingType) {
+        guard showsOpen else {
+            isOpen = true
+            return
+        }
+        if let onStyleCardTapped {
+            // 다 빈 채로 펼쳐져 있다가 하나를 고르고 돌아와도 다시 덮이지 않게 한다.
+            isOpen = true
+            onStyleCardTapped(type)
+        } else {
+            isOpen = false
+        }
+    }
+
+    private func accessibilityLabel(for item: Item) -> String {
+        guard showsOpen else { return "최애 \(item.type.title) 카드, 펼쳐 보기" }
+        return "최애 \(item.type.title), \(item.style?.tabTitle ?? "없음")"
+    }
+
+    // MARK: - Animation
+
+    /// 맨 위(오른쪽) 카드부터 미끄러지듯 자리를 잡는다.
+    private func spreadAnimation(at index: Int) -> Animation? {
+        guard !reduceMotion else { return nil }
+        return .spring(response: 0.5, dampingFraction: 0.78).delay(Double(2 - index) * 0.05)
+    }
+
+    /// 펼쳐지는 동안 왼쪽부터 차례로 뒤집힌다.
+    private func flipAnimation(at index: Int) -> Animation? {
+        guard !reduceMotion else { return nil }
+        return .spring(response: 0.55, dampingFraction: 0.75).delay(0.1 + Double(index) * 0.1)
     }
 }
 
-// MARK: - FavoriteStyleCardItem
+// MARK: - FavoriteStyleCard
 
-/// 최애 한 칸 — 아이콘 · 분류(포지션/기술/서브미션) · 이름
-private struct FavoriteStyleCardItem: View {
+private enum FavoriteStyleCardMetrics {
+    static let cornerRadius: CGFloat = 16
+}
+
+/// 뒷면 — 로고와 분류만. 무엇을 골랐는지는 적지 않는다.
+private struct FavoriteStyleCardBack: View {
     let category: String
-    let style: (any StyleSelectable)?
-    let emptyText: String
-    let onTapped: (() -> Void)?
 
     var body: some View {
-        if let onTapped {
-            Button(action: onTapped) { content }
-                .buttonStyle(.plain)
-        } else {
-            content
+        StyleCardBackSurface(cornerRadius: FavoriteStyleCardMetrics.cornerRadius)
+            .overlay {
+                VStack(spacing: 10) {
+                    Assets.Splash.logo.swiftUIImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 54)
+
+                    Text(category)
+                        .font(.pretendard.custom(weight: .medium, size: 13))
+                        .foregroundStyle(Color.white.opacity(0.8))
+                }
+            }
+    }
+}
+
+/// 앞면 — 설정 화면 큰 카드와 같은 바탕 무늬에 내 띠 캐릭터 · 분류 · 이름
+private struct FavoriteStyleCardFront: View {
+    let category: String
+    let style: (any StyleSelectable)?
+    let beltRank: BeltRank?
+    let emptyText: String
+
+    var body: some View {
+        Group {
+            if let style {
+                filled(style)
+            } else {
+                empty
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: FavoriteStyleCardMetrics.cornerRadius))
+    }
+
+    private func filled(_ style: any StyleSelectable) -> some View {
+        VStack(spacing: 0) {
+            style.poseImage(belt: beltRank ?? .white).swiftUIImage
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            Text(category)
+                .font(.pretendard.custom(weight: .medium, size: 11))
+                .foregroundStyle(Color.white.opacity(0.8))
+
+            Text(style.fullTitle)
+                .font(.cookieRun.custom(weight: .black, size: 15))
+                .foregroundStyle(Color.white)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.7)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 6)
+        .padding(.top, 6)
+        .padding(.bottom, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            style.backgroundImage.swiftUIImage
+                .resizable()
+                .scaledToFill()
         }
     }
 
-    private var content: some View {
+    private var empty: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if let style {
-                style.iconImage.swiftUIImage
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 36, height: 36)
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.primitive.coolGray.cg50)
-                    .frame(width: 36, height: 36)
-            }
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.primitive.coolGray.cg50)
+                .frame(width: 36, height: 36)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(category)
                     .font(Font.pretendard.bodyS)
                     .foregroundStyle(Color.component.skillCard.default.labelText)
 
-                Text(style?.tabTitle ?? emptyText)
+                Text(emptyText)
                     .font(.pretendard.custom(weight: .semiBold, size: 16))
-                    .foregroundStyle(
-                        style == nil
-                            ? Color.component.skillCard.default.titleTextEmpty
-                            : Color.component.skillCard.default.titleTextFilled
-                    )
+                    .foregroundStyle(Color.component.skillCard.default.titleTextEmpty)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        // 세 칸이라 폭이 좁아, 글자를 키운 만큼 안쪽 여백을 줄여 긴 이름(「이스케이프 디펜스」)이 두 줄 안에 들게 한다.
         .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color.component.skillCard.default.bg)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 }
 
@@ -261,6 +408,7 @@ private struct DecorativeCardConfig {
         favoritePosition: PositionType.guard,
         favoriteTechnique: TechniqueType.escapes,
         favoriteSubmission: SubmissionType.armLocks,
+        beltRank: .blue,
         onStyleCardTapped: { _ in }
     )
     .padding()
@@ -272,6 +420,7 @@ private struct DecorativeCardConfig {
         favoritePosition: nil,
         favoriteTechnique: TechniqueType.escapes,
         favoriteSubmission: nil,
+        beltRank: nil,
         onStyleCardTapped: { _ in }
     )
     .padding()

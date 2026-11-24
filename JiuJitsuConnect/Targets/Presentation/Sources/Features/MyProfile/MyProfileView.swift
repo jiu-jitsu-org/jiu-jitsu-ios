@@ -339,6 +339,7 @@ public struct MyProfileView: View {
             favoritePosition: store.communityProfile?.favoritePosition,
             favoriteTechnique: store.communityProfile?.favoriteTechnique,
             favoriteSubmission: store.communityProfile?.favoriteSubmission,
+            beltRank: store.communityProfile?.beltRank,
             onStyleCardTapped: { store.send(.view(.styleCardEditTapped($0))) }
         )
     }
