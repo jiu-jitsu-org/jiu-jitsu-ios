@@ -125,6 +125,7 @@ public struct UserProfileView: View {
                             favoritePosition: profile.favoritePosition,
                             favoriteTechnique: profile.favoriteTechnique,
                             favoriteSubmission: profile.favoriteSubmission,
+                            beltRank: profile.beltRank,
                             onStyleCardTapped: nil
                         )
                     }

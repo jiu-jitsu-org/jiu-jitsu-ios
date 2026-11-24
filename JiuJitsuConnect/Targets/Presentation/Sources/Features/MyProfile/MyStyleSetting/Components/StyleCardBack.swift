@@ -11,47 +11,40 @@ import Domain
 
 /// 스타일 카드 뒷면 컴포넌트
 ///
-/// 메인 화면에 표시되는 큰 스타일 카드의 뒷면입니다.
-/// 내 띠 색 바탕(띠가 없으면 회색)에 앱 로고와 스타일 이름을 표시합니다.
+/// 설정 화면에 표시되는 큰 스타일 카드의 뒷면입니다.
+/// 로고 무늬 회색 바탕에 앱 로고 · 분류(포지션/기술/서브미션) · 스타일 이름을 표시합니다.
 struct StyleCardBack: View {
+    let category: String
     let style: any StyleSelectable
-    /// 바탕을 칠할 띠. 없으면 회색.
-    var beltRank: BeltRank? = nil
-
-    // MARK: - Colors
-
-    /// 띠 색 바탕. 흰띠는 페이지 바탕 위에서 뜨게 순백.
-    private var backgroundColor: Color {
-        beltRank?.beltSurfaceColor ?? Color.primitive.coolGray.cg75
-    }
-
-    /// 로고·이름 색 — 밝은 띠는 어둡게, 띠가 없으면 회색 글자, 그 외 흰색
-    private var foregroundColor: Color {
-        guard let beltRank else { return Color.primitive.coolGray.cg600 }
-        return beltRank.isLightBelt ? Color.component.myBelt.onLight : .white
-    }
 
     // MARK: - Body
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 40)
-                .fill(backgroundColor)
+            StyleCardBackSurface(cornerRadius: 40, borderWidth: 2)
 
-            VStack(alignment: .center, spacing: 24) {
-                // 앱 로고 (흰 글자 로고를 바탕에 맞는 색으로 칠한다)
+            VStack(spacing: 0) {
+                // 앱 로고 (흰 글자)
                 Assets.Splash.logo.swiftUIImage
-                    .renderingMode(.template)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 136)
+                    .frame(width: 122)
 
-                // 스타일 이름
+                Text(category)
+                    .font(.pretendard.custom(weight: .medium, size: 24))
+                    .foregroundStyle(Color.white.opacity(0.8))
+                    .padding(.top, 44)
+
+                // 시안 글자 크기 그대로 두되 긴 이름(스윕 · 뒤집기)만 폭에 맞춰 줄인다
                 Text(style.fullTitle)
-                    .font(.pretendard.display1)
-                    .lineSpacing(5)
+                    .font(.pretendard.custom(weight: .semiBold, size: 38))
+                    .foregroundStyle(Color.white)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+                    .padding(.top, 4)
+                    .padding(.horizontal, 24)
             }
-            .foregroundStyle(foregroundColor)
         }
         .frame(width: 262, height: 394)
     }
@@ -61,6 +54,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Position Top") {
     StyleCardBack(
+        category: "포지션",
         style: PositionType.top
     )
     .padding()
@@ -69,6 +63,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Position Guard") {
     StyleCardBack(
+        category: "포지션",
         style: PositionType.guard
     )
     .padding()
@@ -77,6 +72,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Submission ArmLocks") {
     StyleCardBack(
+        category: "서브미션",
         style: SubmissionType.armLocks
     )
     .padding()
@@ -85,6 +81,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Submission Chokes") {
     StyleCardBack(
+        category: "서브미션",
         style: SubmissionType.chokes
     )
     .padding()
@@ -93,6 +90,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Submission LegLocks") {
     StyleCardBack(
+        category: "서브미션",
         style: SubmissionType.legLocks
     )
     .padding()
@@ -101,6 +99,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Technique Takedowns") {
     StyleCardBack(
+        category: "기술",
         style: TechniqueType.takedowns
     )
     .padding()
@@ -109,6 +108,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Technique Sweeps") {
     StyleCardBack(
+        category: "기술",
         style: TechniqueType.sweeps
     )
     .padding()
@@ -117,6 +117,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Technique Escapes") {
     StyleCardBack(
+        category: "기술",
         style: TechniqueType.escapes
     )
     .padding()
@@ -125,6 +126,7 @@ struct StyleCardBack: View {
 
 #Preview("StyleCardBack - Technique GuardPasses") {
     StyleCardBack(
+        category: "기술",
         style: TechniqueType.guardPasses
     )
     .padding()
@@ -137,8 +139,8 @@ struct StyleCardBack: View {
             .font(.pretendard.display1)
         
         HStack(spacing: 20) {
-            StyleCardBack(style: PositionType.top)
-            StyleCardBack(style: PositionType.guard)
+            StyleCardBack(category: "포지션", style: PositionType.top)
+            StyleCardBack(category: "포지션", style: PositionType.guard)
         }
         
         Text("서브미션 설정")
@@ -146,8 +148,8 @@ struct StyleCardBack: View {
             .padding(.top, 20)
         
         HStack(spacing: 20) {
-            StyleCardBack(style: SubmissionType.armLocks)
-            StyleCardBack(style: SubmissionType.chokes)
+            StyleCardBack(category: "서브미션", style: SubmissionType.armLocks)
+            StyleCardBack(category: "서브미션", style: SubmissionType.chokes)
         }
         
         Text("기술 설정")
@@ -155,8 +157,8 @@ struct StyleCardBack: View {
             .padding(.top, 20)
         
         HStack(spacing: 20) {
-            StyleCardBack(style: TechniqueType.takedowns)
-            StyleCardBack(style: TechniqueType.sweeps)
+            StyleCardBack(category: "기술", style: TechniqueType.takedowns)
+            StyleCardBack(category: "기술", style: TechniqueType.sweeps)
         }
     }
     .padding()

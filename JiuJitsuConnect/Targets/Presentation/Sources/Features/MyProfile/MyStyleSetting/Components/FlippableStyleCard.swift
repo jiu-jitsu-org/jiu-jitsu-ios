@@ -13,16 +13,45 @@ import Domain
 ///
 /// 좌우 드래그로 앞면/뒷면을 전환할 수 있는 인터랙티브 카드입니다.
 /// - 앞면: `StyleCard` (배경 이미지, 아이콘, 설명)
-/// - 뒷면: `StyleCardBack` (띠 색 바탕 + 로고 + 이름)
+/// - 뒷면: `StyleCardBack` (로고 무늬 회색 바탕 + 로고 + 분류 + 이름)
 /// - 제스처: 좌우 드래그로 180도 회전
+/// - 첫 등장: 뒷면으로 서 있다가 앞면으로 한 번 돌아, 돌려 볼 수 있는 카드임을 알린다
 /// - 애니메이션: 3D 회전, 동적 섀도우
 struct FlippableStyleCard: View {
+    let category: String
     let style: any StyleSelectable
-    /// 앞면 캐릭터 띠·뒷면 바탕 색
-    var beltRank: BeltRank? = nil
-    
-    @State private var dragAngle: Double = 0
-    @State private var cumulativeRotation: Double = 0  // 누적 회전각
+    /// 앞면 캐릭터가 맬 띠
+    var beltRank: BeltRank?
+    /// 조명이 켜졌는지
+    var isLit: Bool
+    /// 앞면이 보이기 시작할 때(첫 회전 시작) 한 번 부른다
+    var onRevealed: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @State private var dragAngle: Double
+    @State private var cumulativeRotation: Double  // 누적 회전각
+    @State private var isIntroPending: Bool
+
+    /// - Parameter playsIntro: 뒷면에서 앞면으로 한 번 도는 등장 동작을 할지
+    init(
+        category: String,
+        style: any StyleSelectable,
+        beltRank: BeltRank? = nil,
+        isLit: Bool = false,
+        playsIntro: Bool = false,
+        onRevealed: @escaping () -> Void = {}
+    ) {
+        self.category = category
+        self.style = style
+        self.beltRank = beltRank
+        self.isLit = isLit
+        self.onRevealed = onRevealed
+        let initialAngle: Double = playsIntro ? Metrics.flipAngle : 0
+        _dragAngle = State(initialValue: initialAngle)
+        _cumulativeRotation = State(initialValue: initialAngle)
+        _isIntroPending = State(initialValue: playsIntro)
+    }
     
     // MARK: - Metrics
     
@@ -40,6 +69,11 @@ struct FlippableStyleCard: View {
         // 애니메이션
         static let springResponse: Double = 0.45
         static let springDamping: Double = 0.72
+
+        // 등장 회전 — 화면이 다 밀려 들어온 뒤, 끝에서 살짝 흔들리며 멈춘다
+        static let introDelay: Duration = .milliseconds(450)
+        static let introResponse: Double = 0.8
+        static let introDamping: Double = 0.6
         
         // 3D 효과
         static let perspective: Double = 0.4
@@ -54,13 +88,6 @@ struct FlippableStyleCard: View {
     }
     
     // MARK: - Computed Properties
-    
-    /// 현재 총 회전각 기준으로 앞/뒷면 판단
-    private var showBack: Bool {
-        let normalized = dragAngle.truncatingRemainder(dividingBy: 360)
-        let positive = normalized < 0 ? normalized + 360 : normalized
-        return (positive > 90 && positive < 270)
-    }
     
     /// 회전 각도 기반으로 섀도우 강도 계산 (0.0 ~ 1.0)
     /// - 정면/뒷면: 1.0 (최대 강도)
@@ -79,24 +106,11 @@ struct FlippableStyleCard: View {
     // MARK: - Body
     
     var body: some View {
-        ZStack {
-            // 뒷면 (처음부터 180도 뒤집어 대기)
-            StyleCardBack(style: style, beltRank: beltRank)
-                .rotation3DEffect(
-                    .degrees(Metrics.flipAngle),
-                    axis: (x: 0, y: 1, z: 0)
-                )
-                .opacity(showBack ? 1 : 0)
-            
-            // 앞면
-            StyleCard(style: style, isSelected: true, beltRank: beltRank)
-                .opacity(showBack ? 0 : 1)
+        FlipCard(angle: dragAngle, perspective: Metrics.perspective) {
+            StyleCard(style: style, isSelected: true, beltRank: beltRank, isLit: isLit)
+        } back: {
+            StyleCardBack(category: category, style: style)
         }
-        .rotation3DEffect(
-            .degrees(dragAngle),
-            axis: (x: 0, y: 1, z: 0),
-            perspective: Metrics.perspective
-        )
         // Shadow 1 - 기본 섀도우 (Blur: 12, Color: #000000 20%)
         .shadow(
             color: Color.black.opacity(Metrics.shadowOpacity1 * shadowIntensity),
@@ -120,12 +134,51 @@ struct FlippableStyleCard: View {
                     handleDragEnded(value)
                 }
         )
+        .accessibilityAction(named: "카드 뒤집기") { flip(by: Metrics.flipAngle) }
+        .task { await playIntro() }
+    }
+
+    // MARK: - Intro
+
+    private func playIntro() async {
+        guard isIntroPending else {
+            onRevealed()
+            return
+        }
+        if reduceMotion {
+            reveal(animation: nil)
+            return
+        }
+        try? await Task.sleep(for: Metrics.introDelay)
+        // 기다리는 동안 손으로 돌리기 시작했으면 그 동작을 따른다.
+        guard !Task.isCancelled, isIntroPending else { return }
+        reveal(animation: .spring(response: Metrics.introResponse, dampingFraction: Metrics.introDamping))
+    }
+
+    private func reveal(animation: Animation?) {
+        isIntroPending = false
+        onRevealed()
+        withAnimation(animation) {
+            cumulativeRotation += Metrics.flipAngle
+            dragAngle = cumulativeRotation
+        }
     }
     
     // MARK: - Gesture Handlers
+
+    private func flip(by angle: Double) {
+        withAnimation(.spring(response: Metrics.springResponse, dampingFraction: Metrics.springDamping)) {
+            cumulativeRotation += angle
+            dragAngle = cumulativeRotation
+        }
+    }
     
     /// 드래그 진행 중 처리
     private func handleDragChanged(_ value: DragGesture.Value) {
+        if isIntroPending {
+            isIntroPending = false
+            onRevealed()
+        }
         // 누적 회전각에 드래그 이동량을 더함 (양방향 지원)
         dragAngle = cumulativeRotation + value.translation.width * Metrics.dragSensitivity
     }
@@ -158,6 +211,7 @@ struct FlippableStyleCard: View {
 
 #Preview("FlippableStyleCard - Position Top") {
     FlippableStyleCard(
+        category: "포지션",
         style: PositionType.top,
         beltRank: .blue
     )
@@ -167,6 +221,7 @@ struct FlippableStyleCard: View {
 
 #Preview("FlippableStyleCard - Position Guard") {
     FlippableStyleCard(
+        category: "포지션",
         style: PositionType.guard,
         beltRank: .blue
     )
@@ -176,6 +231,7 @@ struct FlippableStyleCard: View {
 
 #Preview("FlippableStyleCard - Submission ArmLocks") {
     FlippableStyleCard(
+        category: "서브미션",
         style: SubmissionType.armLocks,
         beltRank: .blue
     )
@@ -185,6 +241,7 @@ struct FlippableStyleCard: View {
 
 #Preview("FlippableStyleCard - Submission Chokes") {
     FlippableStyleCard(
+        category: "서브미션",
         style: SubmissionType.chokes,
         beltRank: .blue
     )
@@ -194,6 +251,7 @@ struct FlippableStyleCard: View {
 
 #Preview("FlippableStyleCard - Technique Takedowns") {
     FlippableStyleCard(
+        category: "기술",
         style: TechniqueType.takedowns,
         beltRank: .blue
     )
@@ -230,6 +288,7 @@ struct FlippableStyleCard: View {
                 
                 // 플립 가능한 카드
                 FlippableStyleCard(
+                    category: selectedType.title,
                     style: currentStyle,
                     beltRank: .blue
                 )
@@ -249,8 +308,8 @@ struct FlippableStyleCard: View {
                 .font(.pretendard.display1)
             
             VStack(spacing: 20) {
-                FlippableStyleCard(style: PositionType.top, beltRank: .blue)
-                FlippableStyleCard(style: PositionType.guard, beltRank: .blue)
+                FlippableStyleCard(category: "포지션", style: PositionType.top, beltRank: .blue)
+                FlippableStyleCard(category: "포지션", style: PositionType.guard, beltRank: .blue)
             }
             
             Text("서브미션 스타일")
@@ -258,9 +317,9 @@ struct FlippableStyleCard: View {
                 .padding(.top, 20)
             
             VStack(spacing: 20) {
-                FlippableStyleCard(style: SubmissionType.armLocks, beltRank: .blue)
-                FlippableStyleCard(style: SubmissionType.chokes, beltRank: .blue)
-                FlippableStyleCard(style: SubmissionType.legLocks, beltRank: .blue)
+                FlippableStyleCard(category: "서브미션", style: SubmissionType.armLocks, beltRank: .blue)
+                FlippableStyleCard(category: "서브미션", style: SubmissionType.chokes, beltRank: .blue)
+                FlippableStyleCard(category: "서브미션", style: SubmissionType.legLocks, beltRank: .blue)
             }
             
             Text("기술 스타일")
@@ -268,8 +327,8 @@ struct FlippableStyleCard: View {
                 .padding(.top, 20)
             
             VStack(spacing: 20) {
-                FlippableStyleCard(style: TechniqueType.takedowns, beltRank: .blue)
-                FlippableStyleCard(style: TechniqueType.sweeps, beltRank: .blue)
+                FlippableStyleCard(category: "기술", style: TechniqueType.takedowns, beltRank: .blue)
+                FlippableStyleCard(category: "기술", style: TechniqueType.sweeps, beltRank: .blue)
             }
         }
         .padding()

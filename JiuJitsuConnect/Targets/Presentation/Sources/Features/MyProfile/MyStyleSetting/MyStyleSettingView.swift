@@ -13,7 +13,22 @@ import Domain
 
 public struct MyStyleSettingView: View {
     @Bindable var store: StoreOf<MyStyleSettingFeature>
-    
+
+    /// 카드가 앞면으로 돌아 조명이 켜진 단계. 단계(포지션 · 기술 · 서브미션)마다 처음 한 번만 돈다.
+    ///
+    /// 가입 흐름은 화면을 그대로 둔 채 단계만 바꾼다. 켜짐 여부(Bool)를 단계가 바뀐 뒤 끄면
+    /// 새 카드가 아직 켜진 값으로 만들어져 돌지 않으므로, 어느 단계에서 켜졌는지를 기억한다.
+    @State private var revealedType: MyStyleSettingType?
+
+    private var isRevealed: Bool { revealedType == store.settingType }
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// 동작 줄이기를 켰으면 조명이 바로 켜진다
+    private var lightAnimation: Animation? {
+        reduceMotion ? nil : .easeInOut(duration: StageMetrics.lightDuration)
+    }
+
     public init(store: StoreOf<MyStyleSettingFeature>) {
         self.store = store
     }
@@ -46,8 +61,20 @@ public struct MyStyleSettingView: View {
             static let selectedTop: CGFloat = 20
             static let unselectedTop: CGFloat = 14.7
         }
+
+        /// 고른 카드만 조명을 받게 나머지 카드는 어둡게 가라앉힌다
+        static let dimmedOpacity: Double = 0.3
     }
-    
+
+    private enum StageMetrics {
+        static let background = Color(hex: "#1E1E1E")
+        static let dimmedText = Color.white.opacity(0.6)
+        static let cardSize = CGSize(width: 262, height: 394)
+        static let lightDuration: Double = 0.7
+        /// 조명이 켜지기 전 카드는 어둠 속에 있다
+        static let unlitBrightness: Double = -0.35
+    }
+
     public var body: some View {
         ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
@@ -63,8 +90,8 @@ public struct MyStyleSettingView: View {
                 Spacer()
                 LinearGradient(
                     stops: [
-                        Gradient.Stop(color: Color(hex: "#EDEFF0").opacity(0), location: 0.0),
-                        Gradient.Stop(color: Color(hex: "#EDEFF0").opacity(1.0), location: 1.0)
+                        Gradient.Stop(color: StageMetrics.background.opacity(0), location: 0.0),
+                        Gradient.Stop(color: StageMetrics.background, location: 1.0)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -80,7 +107,7 @@ public struct MyStyleSettingView: View {
             // 완료 버튼
             completeButton
         }
-        .background(Color.component.background.default)
+        .background(StageMetrics.background)
         // 아래 '완료' 버튼을 가리지 않도록 버튼 위에 띄운다.
         .toast(
             store.toast,
@@ -93,7 +120,15 @@ public struct MyStyleSettingView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .tabBar)
+        // 어두운 바탕이라 상태 바 글자를 밝게 한다
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("최애 \(store.settingType.title)")
+                    .font(.pretendard.custom(weight: .semiBold, size: 17))
+                    .foregroundStyle(StageMetrics.dimmedText)
+            }
+
             ToolbarItem(placement: .topBarLeading) {
                 backButton
             }
@@ -127,7 +162,8 @@ public struct MyStyleSettingView: View {
                 .frame(minHeight: proxy.size.height)
             }
         }
-        .background(Color.component.background.default)
+        // 조명 윗부분이 스크롤 경계에서 잘리지 않게 한다
+        .scrollClipDisabled()
         .scrollEdgeEffectStyle(.soft, for: .top)    // 상단 부드러운 페이드
         .scrollEdgeEffectStyle(.soft, for: .bottom) // 하단 부드러운 페이드
     }
@@ -140,7 +176,19 @@ public struct MyStyleSettingView: View {
             
             if let style = currentStyle {
                 // 선택된 스타일 카드 (플립 가능)
-                FlippableStyleCard(style: style, beltRank: store.beltRank)
+                FlippableStyleCard(
+                    category: store.settingType.title,
+                    style: style,
+                    beltRank: store.beltRank,
+                    isLit: isRevealed,
+                    playsIntro: !isRevealed,
+                    onRevealed: {
+                        withAnimation(lightAnimation) { revealedType = store.settingType }
+                    }
+                )
+                .brightness(isRevealed ? 0 : StageMetrics.unlitBrightness)
+                // 다음 단계(기술 · 서브미션)로 넘어가면 새 카드로 다시 돈다
+                .id(store.settingType.title)
             } else {
                 // "없음"이 선택된 상태 - EmptySelectionCard 표시
                 EmptySelectionCard(
@@ -152,7 +200,12 @@ public struct MyStyleSettingView: View {
             
             Spacer()
         }
-        .frame(height: 394)
+        .frame(height: StageMetrics.cardSize.height)
+        .background {
+            StageLight(cardSize: StageMetrics.cardSize, cornerRadius: 40)
+                .opacity(isRevealed && currentStyle != nil ? 1 : 0)
+                .animation(lightAnimation, value: currentStyle == nil)
+        }
     }
     
     private var completeButton: some View {
@@ -199,7 +252,7 @@ public struct MyStyleSettingView: View {
             // 툴바가 정해 주는 폭이 글자보다 좁아 '나중에 ...'로 잘렸다(#471). 글자 폭만큼은 차지하게 한다
             Text("나중에 하기")
                 .font(Font.pretendard.buttonS)
-                .foregroundStyle(Color.component.button.text.defaultText)
+                .foregroundStyle(StageMetrics.dimmedText)
                 .lineLimit(1)
                 .fixedSize()
                 .padding(.horizontal, 4)
@@ -223,6 +276,7 @@ public struct MyStyleSettingView: View {
                         HStack(alignment: .bottom, spacing: CardMetrics.Spacing.horizontal) {
                             // "없음" 카드 (첫 번째)
                             NoneStyleCard(isSelected: store.selectedFavoriteStyle == nil)
+                                .opacity(store.selectedFavoriteStyle == nil ? 1 : CardMetrics.dimmedOpacity)
                                 .onTapGesture {
                                     // 고른 것을 해제
                                     if let currentStyle = store.selectedFavoriteStyle {
@@ -237,6 +291,7 @@ public struct MyStyleSettingView: View {
                                     label: style.shortTitle,
                                     isSelected: isStyleSelected(style)
                                 )
+                                .opacity(isStyleSelected(style) ? 1 : CardMetrics.dimmedOpacity)
                                 .onTapGesture {
                                     store.send(.view(.styleCardTapped(style)))
                                 }
@@ -250,6 +305,7 @@ public struct MyStyleSettingView: View {
                     HStack(alignment: .bottom, spacing: CardMetrics.Spacing.horizontal) {
                         // "없음" 카드 (첫 번째)
                         NoneStyleCard(isSelected: store.selectedFavoriteStyle == nil)
+                            .opacity(store.selectedFavoriteStyle == nil ? 1 : CardMetrics.dimmedOpacity)
                             .onTapGesture {
                                 // 고른 것을 해제
                                 if let currentStyle = store.selectedFavoriteStyle {
@@ -264,6 +320,7 @@ public struct MyStyleSettingView: View {
                                 label: style.shortTitle,
                                 isSelected: isStyleSelected(style)
                             )
+                            .opacity(isStyleSelected(style) ? 1 : CardMetrics.dimmedOpacity)
                             .onTapGesture {
                                 store.send(.view(.styleCardTapped(style)))
                             }
