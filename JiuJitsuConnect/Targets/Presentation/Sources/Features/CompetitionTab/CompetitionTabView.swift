@@ -15,15 +15,15 @@ public struct CompetitionTabView: View {
     let store: StoreOf<CompetitionTabFeature>
     // 알림함 종의 새 알림 점(#258). 홈이 조회해 둔 값 하나만 따라 그려, 두 탭의 점이 어긋나지 않게 한다.
     let hasUnreadNotification: Bool
-    // 웹 아래 시트가 열려 있는지(SET_SHEET_OPEN) — 머리줄도 웹 딤과 같이 어둡게 덮는다.
-    let isWebSheetOpen: Bool
+    // 웹 아래 시트의 딤이 깔려 있는지(SET_SHEET_OPEN의 dimmed) — 머리줄도 웹 딤과 같이 어둡게 덮는다.
+    let isWebSheetDimmed: Bool
     // 웹이 머리줄 뒤까지 유리 면을 그리는 중인지(SET_TOP_GLASS). 그리는 동안 머리줄 바탕을 비운다(홈과 같음).
     @State private var webDrawsTopGlass = false
 
-    public init(store: StoreOf<CompetitionTabFeature>, hasUnreadNotification: Bool, isWebSheetOpen: Bool = false) {
+    public init(store: StoreOf<CompetitionTabFeature>, hasUnreadNotification: Bool, isWebSheetDimmed: Bool = false) {
         self.store = store
         self.hasUnreadNotification = hasUnreadNotification
-        self.isWebSheetOpen = isWebSheetOpen
+        self.isWebSheetDimmed = isWebSheetDimmed
     }
 
     public var body: some View {
@@ -47,7 +47,7 @@ public struct CompetitionTabView: View {
 
             header
                 // 머리줄 바탕이 비어 있으면 그 뒤를 웹 딤이 이미 덮으므로 글자 · 아이콘만 어둡게 한다(두 번 어두워지지 않게).
-                .webSheetHeaderDim(isWebSheetOpen, webDimsBehind: webDrawsTopGlass && headerTint == nil)
+                .webSheetHeaderDim(isWebSheetDimmed, webDimsBehind: webDrawsTopGlass && headerTint == nil)
         }
         .background(Color.component.background.default)
         .toolbar(.hidden, for: .navigationBar)

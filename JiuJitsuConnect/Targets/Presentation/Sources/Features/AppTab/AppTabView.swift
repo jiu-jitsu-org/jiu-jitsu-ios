@@ -29,6 +29,8 @@ public struct AppTabView: View {
     @State private var deviceBottomInset: CGFloat = 0
     // 웹 바텀 시트가 떠 있는 탭(#314). 그 탭을 보는 동안 탭 바·맨 위로 버튼을 숨겨 시트가 화면 맨 아래까지 오게 한다.
     @State private var webSheetOpenTab: AppTabFeature.Tab?
+    // 웹 시트의 딤이 깔린 탭. 시트가 내려가기 시작하면 webSheetOpenTab보다 먼저 비워, 머리줄 딤이 웹 딤과 함께 걷힌다.
+    @State private var webSheetDimmedTab: AppTabFeature.Tab?
 
     private enum ScrollMetrics {
         // 이보다 위(맨 위 가까이)에선 늘 탭 바를 보인다.
@@ -72,7 +74,7 @@ public struct AppTabView: View {
                 ) {
                     CommunityView(
                         store: store.scope(state: \.home, action: \.home),
-                        isWebSheetOpen: webSheetOpenTab == .home
+                        isWebSheetDimmed: webSheetDimmedTab == .home
                     )
                         .modifier(tabRootModifier(for: .home))
                 } destination: { destinationStore in
@@ -96,7 +98,7 @@ public struct AppTabView: View {
                     CompetitionTabView(
                         store: store.scope(state: \.competition, action: \.competition),
                         hasUnreadNotification: store.home.hasUnreadNotification,
-                        isWebSheetOpen: webSheetOpenTab == .competition
+                        isWebSheetDimmed: webSheetDimmedTab == .competition
                     )
                         .modifier(tabRootModifier(for: .competition))
                 } destination: { destinationStore in
@@ -366,8 +368,8 @@ public struct AppTabView: View {
                 report: { offsetY, maxOffsetY, isUserScrolling in
                     handleScroll(tab: tab, offsetY: offsetY, maxOffsetY: maxOffsetY, isUserScrolling: isUserScrolling)
                 },
-                reportSheetOpen: { isOpen in
-                    handleWebSheet(tab: tab, isOpen: isOpen)
+                reportSheetOpen: { isOpen, isDimmed in
+                    handleWebSheet(tab: tab, isOpen: isOpen, isDimmed: isDimmed)
                 }
             )
         )
@@ -411,7 +413,10 @@ public struct AppTabView: View {
 
     /// 웹 시트가 열리면 탭 바를 내리고, 닫히면 시트를 열기 전 모습(스크롤로 숨겨 둔 상태 포함)으로 돌린다.
     /// 시트는 0.5초에 걸쳐 올라오므로 탭 바도 같은 0.5초로 내려간다.
-    private func handleWebSheet(tab: AppTabFeature.Tab, isOpen: Bool) {
+    /// 머리줄 딤은 탭 바와 따로 움직인다 — 시간·곡선은 webSheetHeaderDim이 웹 딤에 맞춰 정한다.
+    private func handleWebSheet(tab: AppTabFeature.Tab, isOpen: Bool, isDimmed: Bool) {
+        let nextDimmed: AppTabFeature.Tab? = isDimmed ? tab : (webSheetDimmedTab == tab ? nil : webSheetDimmedTab)
+        if nextDimmed != webSheetDimmedTab { webSheetDimmedTab = nextDimmed }
         let next: AppTabFeature.Tab? = isOpen ? tab : (webSheetOpenTab == tab ? nil : webSheetOpenTab)
         guard next != webSheetOpenTab else { return }
         withAnimation(Self.tabBarAnimation) { webSheetOpenTab = next }

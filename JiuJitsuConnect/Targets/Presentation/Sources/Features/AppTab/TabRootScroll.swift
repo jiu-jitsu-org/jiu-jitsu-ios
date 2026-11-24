@@ -21,7 +21,8 @@ struct TabRootScrollAction: Equatable {
         _ isUserScrolling: Bool
     ) -> Void
     /// 탭 첫 화면 웹의 바텀 시트가 열리고 닫힐 때(#314). 열린 동안 탭 바를 숨긴다.
-    let reportSheetOpen: @MainActor (_ isOpen: Bool) -> Void
+    /// isDimmed는 웹 딤이 깔린 동안만 true — 머리줄 딤이 따른다(닫기 시작하면 isOpen보다 먼저 꺼진다).
+    let reportSheetOpen: @MainActor (_ isOpen: Bool, _ isDimmed: Bool) -> Void
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.key == rhs.key

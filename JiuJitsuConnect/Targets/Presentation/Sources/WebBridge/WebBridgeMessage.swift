@@ -157,8 +157,8 @@ private extension WebBridgeInboundMessage {
             return "COMPETITION_HEADER_TINT  color=\(hex ?? "null")"
         case let .homeHeaderTint(hex):
             return "HOME_HEADER_TINT  color=\(hex ?? "null")"
-        case let .setSheetOpen(open):
-            return "SET_SHEET_OPEN  open=\(open)"
+        case let .setSheetOpen(open, dimmed):
+            return "SET_SHEET_OPEN  open=\(open) dimmed=\(dimmed)"
         case let .setTopGlass(active):
             return "SET_TOP_GLASS  active=\(active)"
         case let .contentCreated(kind):
@@ -279,8 +279,10 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     case homeHeaderTint(hex: String?)
     /// 웹 바텀 시트가 떠 있는지(#314 · jiu-jitsu-frontend#465). 탭 첫 화면 웹만 알린다 — 열린 동안 떠 있는 탭 바를 숨기고
     /// 가린 높이를 0으로 돌려, 시트가 탭 바 자리까지 내려오게 한다(안 그러면 그 자리를 WebKit이 시트 가장자리 색으로 채운다).
+    /// `dimmed`는 웹 딤이 깔린 동안만 true다. 닫기 시작하면 `open`은 true인 채 `dimmed`만 먼저 false로 온다 —
+    /// 머리줄 딤은 이 값을 따라 웹 딤과 함께 걷고, 탭 바는 시트가 다 내려간 뒤(`open` false) 돌려놓는다.
     /// 화면 표시만 바꾸는 신호라 BridgeWebView가 받아 처리하고 Feature로는 넘기지 않는다.
-    case setSheetOpen(Bool)
+    case setSheetOpen(open: Bool, dimmed: Bool)
     /// 웹이 앱 머리줄 뒤까지 비치는 유리 면을 그리는지(홈 · 대회 탭 목록). 그리는 동안 앱은 머리줄 바탕을 비워 두고
     /// (글자 · 아이콘만) 웹 유리 면 한 장이 머리줄과 칩 · 필터 줄을 끊김 없이 덮게 한다. 옛 웹은 보내지 않아 흰 머리줄 그대로다.
     /// 화면 표시만 바꾸는 신호라 BridgeWebView가 받아 처리하고 Feature로는 넘기지 않는다.
@@ -479,7 +481,9 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
             return .homeHeaderTint(hex: headerTintHex(payload))
         case .setSheetOpen:
             // 값이 어긋나면 닫힘으로 본다 — 탭 바가 숨은 채 갇히지 않게.
-            return .setSheetOpen((payload?["open"] as? Bool) ?? false)
+            let open = (payload?["open"] as? Bool) ?? false
+            // dimmed를 보내지 않는 옛 웹은 열림과 같다고 본다.
+            return .setSheetOpen(open: open, dimmed: open && (payload?["dimmed"] as? Bool ?? true))
         case .setTopGlass:
             // 값이 어긋나면 꺼짐으로 본다 — 머리줄이 빈 채로 글이 비쳐 보이지 않게.
             return .setTopGlass((payload?["active"] as? Bool) ?? false)

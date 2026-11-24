@@ -12,15 +12,15 @@ import CoreKit
 
 public struct CommunityView: View {
     let store: StoreOf<CommunityFeature>
-    // 웹 아래 시트가 열려 있는지(SET_SHEET_OPEN) — 머리줄도 웹 딤과 같이 어둡게 덮는다.
-    let isWebSheetOpen: Bool
+    // 웹 아래 시트의 딤이 깔려 있는지(SET_SHEET_OPEN의 dimmed) — 머리줄도 웹 딤과 같이 어둡게 덮는다.
+    let isWebSheetDimmed: Bool
     @Environment(\.scenePhase) private var scenePhase
     // 웹이 머리줄 뒤까지 유리 면을 그리는 중인지(SET_TOP_GLASS). 그리는 동안 머리줄 바탕을 비워 웹 유리 면 한 장이 비치게 한다.
     @State private var webDrawsTopGlass = false
 
-    public init(store: StoreOf<CommunityFeature>, isWebSheetOpen: Bool = false) {
+    public init(store: StoreOf<CommunityFeature>, isWebSheetDimmed: Bool = false) {
         self.store = store
-        self.isWebSheetOpen = isWebSheetOpen
+        self.isWebSheetDimmed = isWebSheetDimmed
     }
 
     private enum Metrics {
@@ -84,7 +84,7 @@ public struct CommunityView: View {
 
             gnb
                 // 머리줄 바탕이 비어 있으면 그 뒤를 웹 딤이 이미 덮으므로 글자 · 아이콘만 어둡게 한다(두 번 어두워지지 않게).
-                .webSheetHeaderDim(isWebSheetOpen, webDimsBehind: webDrawsTopGlass && headerTint == nil)
+                .webSheetHeaderDim(isWebSheetDimmed, webDimsBehind: webDrawsTopGlass && headerTint == nil)
         }
         .background(Color.component.background.default)
         .onAppear { store.send(.view(.onAppear)) }
