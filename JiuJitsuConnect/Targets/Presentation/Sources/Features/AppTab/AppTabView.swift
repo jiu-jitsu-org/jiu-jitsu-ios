@@ -148,9 +148,7 @@ public struct AppTabView: View {
             guard isInFront, isTabBarHidden else { return }
             withAnimation(Self.tabBarAnimation) { isTabBarHidden = false }
         }
-        .fullScreenCover(
-            item: $store.scope(state: \.loginCover, action: \.loginCover)
-        ) { loginStore in
+        .fullScreenCover(item: loginCoverBinding(isInCover: false)) { loginStore in
             LoginView(store: loginStore)
         }
         // OPEN_SUBVIEW(modal) — 게시글 상세를 모달로 띄운다. 모달 내부의 중첩 OPEN_SUBVIEW는
@@ -174,6 +172,14 @@ public struct AppTabView: View {
                     CompetitionInfoView(store: competitionInfoStore)
                 }
             }
+            // 모달 안 웹의 좋아요 · 댓글 등 게스트 행위도 로그인 안내 · 로그인 창을 모달 위에 띄운다.
+            .fullScreenCover(item: loginCoverBinding(isInCover: true)) { loginStore in
+                LoginView(store: loginStore)
+            }
+            .appAlert(
+                isPresented: loginPromptBinding(isInCover: true),
+                configuration: loginPromptAlertConfiguration
+            )
             // 모달 안 웹의 '알림 받기'(#257)면 아래 탭 화면의 알럿이 모달에 가려지므로 모달 위에 그린다.
             .appAlert(
                 isPresented: deviceNotificationAlertBinding(isInCover: true),
@@ -195,10 +201,7 @@ public struct AppTabView: View {
             )
         }
         .appAlert(
-            isPresented: Binding(
-                get: { store.isLoginPromptPresented },
-                set: { if !$0 { store.send(.view(.loginPromptDismissed)) } }
-            ),
+            isPresented: loginPromptBinding(isInCover: false),
             configuration: loginPromptAlertConfiguration
         )
         .appAlert(
@@ -290,6 +293,27 @@ public struct AppTabView: View {
                 style: .neutral,
                 action: { store.send(.view(.loginPromptCancelTapped)) }
             )
+        )
+    }
+
+    // 로그인 안내도 상세 모달 위 · 탭 화면 위 중 맨 위 한 곳에만 그린다.
+    private func loginPromptBinding(isInCover: Bool) -> Binding<Bool> {
+        Binding(
+            get: { store.isLoginPromptPresented && (store.home.detailCover != nil) == isInCover },
+            set: { if !$0 { store.send(.view(.loginPromptDismissed)) } }
+        )
+    }
+
+    // 로그인 창도 맨 위 한 곳에서 띄운다 — 상세 모달이 떠 있으면 탭 화면에 붙인 두 번째 fullScreenCover는 뜨지 못한다.
+    // 모달이 닫히거나 열려 자리가 바뀔 때 가려지는 쪽이 nil을 써 로그인 창을 닫지 않게, 지금 맡은 쪽만 값을 쓴다.
+    private func loginCoverBinding(isInCover: Bool) -> Binding<StoreOf<LoginFeature>?> {
+        let binding = $store.scope(state: \.loginCover, action: \.loginCover)
+        return Binding(
+            get: { (store.home.detailCover != nil) == isInCover ? binding.wrappedValue : nil },
+            set: { newValue in
+                guard (store.home.detailCover != nil) == isInCover else { return }
+                binding.wrappedValue = newValue
+            }
         )
     }
 
