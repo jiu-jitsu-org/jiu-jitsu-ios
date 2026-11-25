@@ -17,6 +17,9 @@ public struct LoginFeature: Sendable {
         public var loadingProvider: SNSProvider?
         public var isLoading: Bool { loadingProvider != nil }
         public var toast: ToastState?
+        /// 이 기기에서 마지막으로 로그인한 수단 — 그 버튼에 "최근 로그인"을 단다(#380).
+        /// 같은 사람도 소셜마다 다른 계정이라, 로그아웃 뒤 다른 버튼을 누르면 새 계정이 생긴다.
+        var lastLoginProvider: SNSProvider?
         
         var tempToken: String?
         
@@ -42,6 +45,7 @@ public struct LoginFeature: Sendable {
         case path(StackAction<Path.State, Path.Action>)
         
         public enum ViewAction: Sendable {
+            case onAppear
             case kakaoButtonTapped
             case googleButtonTapped
             case appleButtonTapped
@@ -91,6 +95,10 @@ public struct LoginFeature: Sendable {
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
+            case .view(.onAppear):
+                state.lastLoginProvider = authClient.lastLoginProvider()
+                return .none
+
                 // MARK: - 로그인 버튼 탭
             case .view(.googleButtonTapped):
                 guard !state.isLoading else { return .none }
@@ -140,6 +148,7 @@ public struct LoginFeature: Sendable {
                 return handleError(state: &state, error: error)
                 
             case let .internal(.serverLoginResponse(.success(authInfo))):
+                let tappedProvider = state.loadingProvider
                 state.loadingProvider = nil
                 Log.trace("서버 로그인 성공: isNewUser=\(authInfo.isNewUser ?? false)", category: .network, level: .info)
                 // 1. 신규 유저일 경우
@@ -149,7 +158,10 @@ public struct LoginFeature: Sendable {
                         return .send(.internal(.showToast(.init(message: "오류가 발생했습니다. 다시 시도해주세요.", status: .error))))
                     }
                     state.tempToken = tempToken
-                    state.sheet = .termsAgreement(.init())
+                    // 예전에 다른 수단으로 가입했을 수 있어 약관 시트에서 알린다(#380). 최근 수단이 지금 누른 것과
+                    // 다르면 그 수단을 짚어 준다 — 같으면(탈퇴 · 계정 삭제 등) 짚을 수단이 없어 일반 안내만.
+                    let otherProvider = state.lastLoginProvider.flatMap { $0 == tappedProvider ? nil : $0 }
+                    state.sheet = .termsAgreement(.init(recentOtherProvider: otherProvider))
                 } else {
                     // 2. 기존 유저일 경우
                     Log.trace("기존 유저 로그인 성공", category: .debug, level: .info)

@@ -1,6 +1,7 @@
 import SwiftUI
 import ComposableArchitecture
 import DesignSystem
+import Domain
 
 public struct LoginView: View {
     @Bindable var store: StoreOf<LoginFeature>
@@ -51,6 +52,7 @@ public struct LoginView: View {
         }
         // 파란 화면이 보일 때만 상태 막대를 흰색으로. 닉네임 설정·약관 시트가 뜨면 원래대로 돌아간다
         .lightStatusBar(store.path.isEmpty && store.sheet == nil)
+        .onAppear { store.send(.view(.onAppear)) }
     }
     
     #if BETA
@@ -79,6 +81,7 @@ public struct LoginView: View {
                 SocialLoginButton(
                     asset: Assets.Login.Logo.kakao,
                     isLoading: store.loadingProvider == .kakao,
+                    isRecent: store.lastLoginProvider == .kakao,
                     text: "카카오로 계속하기",
                     backgroundColor: Color.primitive.kakao.bg,
                     foregroundColor: Color.primitive.kakao.text
@@ -91,6 +94,7 @@ public struct LoginView: View {
                 SocialLoginButton(
                     asset: Assets.Login.Logo.google,
                     isLoading: store.loadingProvider == .google,
+                    isRecent: store.lastLoginProvider == .google,
                     text: "Google로 계속하기",
                     backgroundColor: Color.primitive.google.bg,
                     foregroundColor: Color.primitive.google.text,
@@ -103,6 +107,7 @@ public struct LoginView: View {
                 SocialLoginButton(
                     asset: Assets.Login.Logo.apple,
                     isLoading: store.loadingProvider == .apple,
+                    isRecent: store.lastLoginProvider == .apple,
                     text: "Apple로 계속하기",
                     backgroundColor: Color.primitive.apple.bg,
                     foregroundColor: Color.primitive.apple.text
@@ -129,7 +134,7 @@ public struct LoginView: View {
 
     private func calculateSheetHeight(itemCount: Int) -> CGFloat {
         // 기본 UI 높이 (핸들, 타이틀, 버튼, 여백 등)
-        let baseHeight: CGFloat = 24 + 48 + 16 + 16 + 8 + 52 + 8
+        let baseHeight: CGFloat = 24 + 48 + TermsAgreementView.signupNoticeBlockHeight + 16 + 16 + 8 + 52 + 8
         // 각 약관 항목 Row의 높이
         let rowHeight: CGFloat = 40
         // 항목 사이의 간격
@@ -155,6 +160,8 @@ struct SocialLoginButton: View {
     let asset: ImageAsset
     /// 서버 로그인 중 — 로고 자리에 스피너를 돌린다. 문구는 그대로 둬 버튼 폭이 들썩이지 않는다.
     var isLoading = false
+    /// 이 기기에서 마지막으로 로그인한 수단(#380) — 오른쪽 위에 "최근 로그인"을 걸쳐 단다.
+    var isRecent = false
     let text: String
     let backgroundColor: Color
     let foregroundColor: Color
@@ -181,7 +188,7 @@ struct SocialLoginButton: View {
         .frame(maxWidth: .infinity)
         .frame(height: 52)
         .accessibilityElement(children: .combine)
-        .accessibilityValue(isLoading ? "로그인하는 중" : "")
+        .accessibilityValue(accessibilityValue)
         .background(backgroundColor)
         .foregroundStyle(foregroundColor)
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -189,7 +196,45 @@ struct SocialLoginButton: View {
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(borderColor, lineWidth: 1)
         )
+        // 버튼 위 간격(10)과 시트 위 여백(28)에 걸치게 올려, 버튼 줄의 높이와 문구 자리를 바꾸지 않는다
+        .overlay(alignment: .topTrailing) {
+            if isRecent {
+                RecentLoginBadge()
+                    .offset(x: -12, y: -11)
+            }
+        }
     }
+
+    private var accessibilityValue: String {
+        if isLoading { return "로그인하는 중" }
+        return isRecent ? "최근 로그인" : ""
+    }
+}
+
+// MARK: - 최근 로그인 표시 (#380)
+/// 모양 · 자리는 디자인 확인 전 임시안이다. 흰 시트와 버튼 경계에 걸치므로 시트 색 테두리로 버튼에서 떼어 보이게 한다.
+private struct RecentLoginBadge: View {
+    var body: some View {
+        Text("최근 로그인")
+            .font(Font.pretendard.labelM)
+            .foregroundStyle(Color.semantic.primary.onPrimary)
+            .padding(.horizontal, 10)
+            .frame(height: 22)
+            .background(Color.semantic.primary.primary, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.primitive.bw.trueWhite, lineWidth: 2))
+            // 버튼의 accessibilityValue로 읽으므로 따로 읽지 않는다
+            .accessibilityHidden(true)
+    }
+}
+
+#Preview("Login View — 최근 로그인 카카오") {
+    LoginView(
+        store: Store(initialState: LoginFeature.State()) {
+            LoginFeature()
+        } withDependencies: {
+            $0.authClient.lastLoginProvider = { .kakao }
+        }
+    )
 }
 
 #Preview("Login View") {

@@ -9,6 +9,7 @@ import SwiftUI
 import ComposableArchitecture
 import DesignSystem
 import CoreKit
+import Domain
 
 private enum Style {
     static let headerHeight: CGFloat = 44
@@ -100,6 +101,9 @@ public struct SettingsView: View {
                                 store.send(.view(.loginButtonTapped))
                             }
                         } else {
+                            if let provider = store.loginProvider {
+                                SettingsLoginMethodRow(provider: provider)
+                            }
                             SettingsInteractiveRow(asset: Assets.Common.Icon.logOut, text: "로그아웃") {
                                 store.send(.view(.logoutButtonTapped))
                             }
@@ -205,8 +209,10 @@ public struct SettingsView: View {
         switch alertType {
         case .logout:
             return .init(
-                title: "로그아웃",
-                message: "로그아웃 하시겠습니까?",
+                title: "로그아웃할까요?",
+                // 다른 수단으로 로그인하면 새 계정이 생겨서 돌아올 수단을 알려 둔다(#380)
+                message: store.loginProvider.map { "다음에도 \($0.displayName)로 로그인해 주세요" }
+                    ?? "다음에도 같은 방법으로 로그인해 주세요",
                 primaryButton: .init(title: "로그아웃", style: .primary, action: { store.send(.view(.confirmLogout)) }),
                 secondaryButton: .init(title: "취소", style: .neutral, action: { store.send(.view(.alertDismissed)) })
             )
@@ -229,8 +235,48 @@ public struct SettingsView: View {
     }
 }
 
+// MARK: - 로그인 수단 (#380)
+/// 누르지 않는 줄. 소셜 로고는 버튼용 색이 들어 있어(Apple은 흰색) 다른 줄 아이콘처럼 한 가지 색으로 칠한다.
+private struct SettingsLoginMethodRow: View {
+    let provider: SNSProvider
+
+    var body: some View {
+        HStack(spacing: 8) {
+            logo.swiftUIImage
+                .renderingMode(.template)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 18, height: 18)
+                .foregroundStyle(Color.component.list.setting.leadingIcon)
+            Text("\(provider.displayName)로 로그인 중")
+                .font(Font.pretendard.bodyS)
+                .foregroundStyle(Color.component.list.setting.text)
+            Spacer()
+        }
+        .frame(minHeight: SettingsListMetrics.rowHeight)
+        .padding(.horizontal, 16)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var logo: ImageAsset {
+        switch provider {
+        case .kakao: Assets.Login.Logo.kakao
+        case .google: Assets.Login.Logo.google
+        case .apple: Assets.Login.Logo.apple
+        }
+    }
+}
+
+#Preview("로그인 수단 줄") {
+    SettingsSection {
+        ForEach(SNSProvider.allCases, id: \.self) { provider in
+            SettingsLoginMethodRow(provider: provider)
+        }
+    }
+    .padding(20)
+}
+
 // MARK: - SwiftUI Preview
-import Domain
 
 #Preview("Settings View") {
     SettingsView(

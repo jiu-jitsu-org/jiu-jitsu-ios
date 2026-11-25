@@ -57,6 +57,9 @@ public struct SettingsFeature: Sendable {
         public var toast: ToastState?
         // 탈퇴 요청이 서버에 가 있는 동안. MY 스택의 한 화면이라 닫히면 요청도 취소되므로(#241) 그동안 나가지 못하게 막는다.
         var isWithdrawing = false
+        // 지금 로그인한 수단(#380). 계정 묶음 맨 위 "카카오로 로그인 중"과 로그아웃 알럿이 쓴다.
+        // 같은 사람도 소셜마다 다른 계정이라, 로그아웃 뒤 같은 수단으로 돌아오도록 알려 둔다.
+        var loginProvider: SNSProvider?
         // 탈퇴 알럿을 연 계정이 Apple 회원인지(#398). Apple은 탈퇴 직전 확인 창이 한 번 더 떠서 알럿에서 미리 알린다.
         var isAppleWithdrawal = false
         // 문의 메일을 여는 중(#331). 빠르게 두 번 눌러도 메일 화면·토스트가 한 번만 뜨게 한다.
@@ -150,6 +153,7 @@ public struct SettingsFeature: Sendable {
             switch action {
             // MARK: UI Actions
             case .view(.onAppear):
+                state.loginProvider = state.authInfo.isGuest ? nil : authClient.storedProvider()
                 // 스플래시에서 받은 결과를 쓰고, 확인이 실패했거나 오래됐으면 한 번 더 받는다(#326).
                 if let checked = appVersionClient.lastChecked() {
                     state.isLatestVersion = Self.isLatest(state.appVersion, policy: checked.policy)
