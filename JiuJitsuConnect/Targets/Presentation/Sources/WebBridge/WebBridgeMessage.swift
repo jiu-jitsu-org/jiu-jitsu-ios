@@ -225,6 +225,11 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     case pageReady
     /// 비로그인 행위 시도 → "로그인이 필요해요" 안내 알럿 노출 요청.
     /// 사용자가 알럿에서 [로그인]을 선택해야 로그인 모달로 이어진다(소프트 유도).
+    /// `reason`은 웹과 약속한 영문 코드(jiu-jitsu-frontend#599, `messages.ts`의 `LoginPromptReason`)이고
+    /// 앱은 `AnalyticsEvent.LoginReason`으로 받는다. 알럿 제목이 이 값을 따른다(#392, `AppTabFeature.loginPromptTitle`).
+    /// `like` · `save` · `write` · `comment` · `reply` · `vote` · `interest` · `interest_filter` · `alert` ·
+    /// `info_report` · `record` · `report` · `block` · `profile` · `session_expired` (`my_tab`은 앱 전용).
+    /// 모르는 값 · 이유 없음(이유를 싣기 전 웹)은 기본 문구.
     case authLoginPrompt(reason: String?)
     /// 비로그인 행위 시도 → 로그인 모달을 즉시 노출 요청(다이렉트).
     case authLoginModal(reason: String?)

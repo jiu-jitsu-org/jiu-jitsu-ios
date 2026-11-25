@@ -225,6 +225,7 @@ extension AnalyticsEvent {
     }
 
     /// 로그인 안내 이유(사전 "로그인 안내"). 웹이 보낸 값은 이 목록에 있는 것만 싣는다 — 외부 입력이 GA에 새 분류로 쌓이지 않게.
+    /// 로그인 안내 알럿의 이유별 제목(#392)도 이 목록을 쓴다 — 값을 더하면 `AppTabFeature.loginPromptTitle`의 문구도 정한다.
     public enum LoginReason: String, Sendable {
         case write, comment, reply, like, save, vote, interest
         case interestFilter = "interest_filter"
