@@ -59,6 +59,8 @@ public struct AppTabFeature: Sendable {
         @Presents var loginCover: LoginFeature.State?
         // 게스트가 로그인이 필요한 행위(커뮤니티 글쓰기·대회 관심 등)를 할 때 노출되는 공통 AppAlert 표시 여부
         var isLoginPromptPresented: Bool = false
+        // 로그인 안내를 띄운 이유(#392). 알럿 제목이 이 값을 따르고, 모르는 이유 · 이유 없음은 nil(기본 문구).
+        var loginPromptReason: AnalyticsEvent.LoginReason?
         // 갱신 토큰 만료로 게스트가 됐음을 알림(#373). 로그아웃 · 탈퇴에는 띄우지 않는다.
         var isSessionExpiredAlertPresented = false
         // 탈퇴를 마쳤다는 안내(#385). 30일 유예와 다시 로그인하면 취소된다는 걸 알려, 무심코 로그인해 되살리지 않게 한다.
@@ -144,7 +146,7 @@ public struct AppTabFeature: Sendable {
         }
 
         public enum InternalAction: Sendable {
-            case showLoginPromptAlert
+            case showLoginPromptAlert(reason: AnalyticsEvent.LoginReason?)
             case showLoginModal
             case showDeviceNotificationAlert
             // 관심 대회 알림 켜기(#257) · 알림 권한 안내(#333) 중 권한 창에서 허용함. 그 사이 로그아웃했을 수 있어 지금 상태를 보고 FCM을 등록한다.
@@ -175,9 +177,11 @@ public struct AppTabFeature: Sendable {
             // 토큰 갱신 불가(세션 만료) → 게스트로 전환 + 웹 세션 정리.
             case handleSessionExpired
             // 대회 상세에서 연 기록 추가의 저장 결과(#250, #304). id·stack은 결과를 돌려줄 입력 화면과 그 화면이 쌓인 스택.
+            // webCompetitionId는 웹이 기록 추가를 열 때 보낸 대회 id — 성공하면 열린 웹에 알린다(#397).
             case competitionRecordSaved(
                 id: StackElementID,
                 stack: CompetitionRecordStack,
+                webCompetitionId: Int?,
                 competition: Competition,
                 TaskResult<CommunityProfile>
             )
@@ -268,7 +272,7 @@ public struct AppTabFeature: Sendable {
                 // 커뮤니티 웹뷰의 비로그인 행위 → "로그인이 필요해요" 안내 알럿(소프트 유도).
                 state.pendingWebLoginTab = .home
                 Log.trace("커뮤니티 로그인 알럿 요청: reason=\(reason ?? "-")", category: .view, level: .info)
-                return .send(.internal(.showLoginPromptAlert))
+                return .send(.internal(.showLoginPromptAlert(reason: Self.loginReason(from: reason))))
 
             case let .home(.delegate(.loginModalRequested(reason))):
                 // 커뮤니티 웹뷰의 비로그인 행위 → 로그인 모달 즉시 노출(다이렉트).
@@ -281,7 +285,8 @@ public struct AppTabFeature: Sendable {
             // 탭의 MY가 불러 둔 프로필을 넘겨 바로 그린다. 게스트는 커뮤니티 행위와 같이 로그인 안내를 띄운다.
             case .home(.delegate(.myProfileRequested)):
                 guard !state.authInfo.isGuest else {
-                    return .send(.internal(.showLoginPromptAlert))
+                    // 웹이 보낸 이유가 아니라 기본 문구를 쓴다 — 게스트에게 "프로필을 볼 수 있어요"는 어색하다(#392).
+                    return .send(.internal(.showLoginPromptAlert(reason: nil)))
                 }
                 CommunityFeature.pushMyProfile(.pushed(from: state.myPage), into: &state.home)
                 return .none
@@ -358,8 +363,8 @@ public struct AppTabFeature: Sendable {
 
             // MY 탭 웹 서브뷰는 로그인한 사람만 여는 화면(커뮤니티 활동·차단한 회원)이라 웹의 대기 중 행위를 되살릴 일이 없어
             // 웹발 로그인(pendingWebLoginTab)으로 표시하지 않는다.
-            case .myPage(.delegate(.webSubview(.loginPromptRequested))):
-                return .send(.internal(.showLoginPromptAlert))
+            case let .myPage(.delegate(.webSubview(.loginPromptRequested(reason)))):
+                return .send(.internal(.showLoginPromptAlert(reason: Self.loginReason(from: reason))))
 
             case .myPage(.delegate(.webSubview(.loginModalRequested))):
                 return .send(.internal(.showLoginModal))
@@ -376,9 +381,9 @@ public struct AppTabFeature: Sendable {
             // MARK: - 대회 탭 웹 (#240)
 
             // 비로그인 관심 등록 등 → 커뮤니티와 같이 로그인 안내. 로그인하면 대회 탭에 머물러 웹이 하던 행위로 돌아간다.
-            case .competition(.delegate(.webSubview(.loginPromptRequested))):
+            case let .competition(.delegate(.webSubview(.loginPromptRequested(reason)))):
                 state.pendingWebLoginTab = .competition
-                return .send(.internal(.showLoginPromptAlert))
+                return .send(.internal(.showLoginPromptAlert(reason: Self.loginReason(from: reason))))
 
             case .competition(.delegate(.webSubview(.loginModalRequested))):
                 state.pendingWebLoginTab = .competition
@@ -429,13 +434,13 @@ public struct AppTabFeature: Sendable {
 
             // 기록 추가 저장(#250). 대회 탭·홈 스택·홈 모달 안 스택 어디에 쌓였든 같은 저장을 거친다(#304).
             case let .competition(.path(.element(id: id, action: .competitionInfo(.delegate(.didFinishAdding(competition)))))):
-                return saveCompetitionRecord(competition, id: id, stack: .competition)
+                return saveCompetitionRecord(competition, id: id, stack: .competition, state: state)
 
             case let .home(.path(.element(id: id, action: .competitionInfo(.delegate(.didFinishAdding(competition)))))):
-                return saveCompetitionRecord(competition, id: id, stack: .home)
+                return saveCompetitionRecord(competition, id: id, stack: .home, state: state)
 
             case let .home(.coverPath(.element(id: id, action: .competitionInfo(.delegate(.didFinishAdding(competition)))))):
-                return saveCompetitionRecord(competition, id: id, stack: .homeCover)
+                return saveCompetitionRecord(competition, id: id, stack: .homeCover, state: state)
 
             // MARK: - DeepLink
 
@@ -474,9 +479,10 @@ public struct AppTabFeature: Sendable {
                 return .none
                 
             // MARK: - Login Logic
-            case .internal(.showLoginPromptAlert):
+            case let .internal(.showLoginPromptAlert(reason)):
                 // 만료 안내가 이미 [로그인]을 묻고 있으면 겹쳐 띄우지 않는다. 웹의 대기 행위는 그 알럿의 결과를 따른다(#373).
                 guard !state.isSessionExpiredAlertPresented else { return .none }
+                state.loginPromptReason = reason
                 state.isLoginPromptPresented = true
                 return .none
 
@@ -618,14 +624,17 @@ public struct AppTabFeature: Sendable {
                     .send(.competition(.session(.sessionExpired)))
                 )
 
-            case let .internal(.competitionRecordSaved(id, stack, competition, .success(profile))):
+            case let .internal(.competitionRecordSaved(id, stack, webCompetitionId, competition, .success(profile))):
                 // MY의 대회 기록 목록에도 바로 보이게 MY가 가진 프로필을 바꾼다.
-                // 저장 중 로그아웃·세션 만료로 게스트가 됐으면 이전 계정의 프로필을 다시 넣지 않는다.
+                // 저장 중 로그아웃·세션 만료로 게스트가 됐으면 이전 계정의 프로필을 다시 넣지 않고, 웹에도 알리지 않는다.
                 guard !state.authInfo.isGuest else { return .none }
                 state.myPage.communityProfile = profile
-                return Self.finishCompetitionRecordSave(.succeeded(competition), id: id, stack: stack, state: state)
+                return .merge(
+                    Self.finishCompetitionRecordSave(.succeeded(competition), id: id, stack: stack, state: state),
+                    Self.broadcastCompetitionRecordSaved(webCompetitionId: webCompetitionId)
+                )
 
-            case let .internal(.competitionRecordSaved(id, stack, _, .failure(error))):
+            case let .internal(.competitionRecordSaved(id, stack, _, _, .failure(error))):
                 Log.trace("Failed to add competition from competition detail: \(error)", category: .network, level: .error)
                 analyticsClient.logErrorShown(error)
                 // 입력 화면이 실패를 안내하고 입력값을 지켜 다시 저장하게 한다(MY와 같은 처리).

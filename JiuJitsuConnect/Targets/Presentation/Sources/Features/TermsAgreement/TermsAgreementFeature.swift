@@ -37,6 +37,8 @@ public struct TermsAgreementFeature: Sendable {
     @ObservableState
     public struct State: Equatable, Sendable {
         var rows: IdentifiedArrayOf<TermsAgreementRowFeature.State>
+        /// 이 기기에서 최근 로그인한 수단이 지금 가입하려는 수단과 다를 때 그 수단(#380). 안내 문구가 이 수단을 짚는다.
+        var recentOtherProvider: SNSProvider?
 
         @Presents var termsWebCover: TermsWebViewFeature.State?
 
@@ -61,7 +63,8 @@ public struct TermsAgreementFeature: Sendable {
             .init(title: "마케팅 정보 수신",         type: .optional, contentURL: TermsURL.marketingConsent)
         ]
 
-        public init() {
+        public init(recentOtherProvider: SNSProvider? = nil) {
+            self.recentOtherProvider = recentOtherProvider
             self.rows = .init(
                 uniqueElements: Self.fixedTerms.map { TermsAgreementRowFeature.State(term: $0) }
             )

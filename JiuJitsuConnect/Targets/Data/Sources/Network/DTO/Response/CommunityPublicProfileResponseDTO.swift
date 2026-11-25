@@ -23,6 +23,8 @@ struct CommunityPublicProfileResponseDTO: Decodable {
     let competitions: [CompetitionDTO]?
     /// 내가 이 회원을 차단했는지 — 비로그인이면 null, 아직 내려 주지 않는 서버에서는 키가 없다(#328)
     let isBlocked: Bool?
+    /// 그 회원이 고른 상단 바탕 무늬(#337). 고른 적 없거나 커뮤니티 프로필이 없으면 null
+    let backgroundPattern: String?
 
     func toDomain() -> CommunityPublicProfile {
         CommunityPublicProfile(
@@ -37,7 +39,8 @@ struct CommunityPublicProfileResponseDTO: Decodable {
             favoriteTechnique: favoriteTechnique.flatMap { TechniqueType(rawValue: $0) },
             favoriteSubmission: favoriteSubmission.flatMap { SubmissionType(rawValue: $0) },
             competitions: competitions?.flatMap { $0.toDomain() } ?? [],
-            isBlocked: isBlocked
+            isBlocked: isBlocked,
+            backgroundPattern: backgroundPattern.map(ProfileBackgroundPattern.init(rawValue:))
         )
     }
 }

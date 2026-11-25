@@ -190,7 +190,7 @@ public struct UserProfileFeature: Sendable {
                     title: "어떤 문제인가요?",
                     message: "신고는 익명으로 처리되며, 검토 후 조치돼요.",
                     options: Self.reportReasons,
-                    customTextPlaceholder: "신고할 내용을 입력해주세요.",
+                    customTextPlaceholder: "신고할 내용을 입력해 주세요.",
                     customTextMaxLength: SelectSheetPayload.defaultCustomTextMaxLength,
                     submitText: "신고하기"
                 )

@@ -51,7 +51,8 @@ public struct MyProfileHeaderView: View {
     let onProfileImageDisplayed: (String) -> Void
 
     /// 사진(링 포함) 위 여백 — safe area 아래. 무늬가 사진 가운데를 기준으로 그려져 함께 쓴다.
-    private static let avatarTopSpacing: CGFloat = 57
+    /// 남의 프로필(#337)도 같은 자리에 사진을 둔다.
+    static let avatarTopSpacing: CGFloat = 57
 
     // 기존 호출처 호환 유지를 위한 기본값 init
     public init(
@@ -139,35 +140,22 @@ public struct MyProfileHeaderView: View {
 
     // 띠 색 바탕 + 같은 계열 색 무늬(#320). 글자·버튼이 없는 빈 곳을 누르면 무늬 고르기.
     private var headerBackground: some View {
-        GeometryReader { proxy in
-            let avatarCenterY = safeAreaTop + Self.avatarTopSpacing + MyBeltRing.box / 2
-            ZStack {
-                beltRank.myHeaderColor
-                if let beltRank {
-                    MyHeaderPatternView(
-                        pattern: pattern,
-                        beltRank: beltRank,
-                        anchor: UnitPoint(x: 0.5, y: proxy.size.height > 0 ? avatarCenterY / proxy.size.height : 0)
-                    )
-                    .equatable()
-                    .id(pattern)
-                    .transition(.opacity)
-                }
-            }
-            .animation(.easeInOut(duration: 0.3), value: beltRank)
-            .animation(.easeInOut(duration: 0.3), value: pattern)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                guard canPickPattern else { return }
-                onBackgroundTapped()
-            }
-            // 빈 바탕 누르기는 VoiceOver로 찾을 수 없어 버튼으로 알린다.
-            .accessibilityElement()
-            .accessibilityLabel("배경 고르기")
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction { onBackgroundTapped() }
-            .accessibilityHidden(!canPickPattern)
+        MyHeaderBackground(
+            beltRank: beltRank,
+            pattern: pattern,
+            avatarCenterY: safeAreaTop + Self.avatarTopSpacing + MyBeltRing.box / 2
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard canPickPattern else { return }
+            onBackgroundTapped()
         }
+        // 빈 바탕 누르기는 VoiceOver로 찾을 수 없어 버튼으로 알린다.
+        .accessibilityElement()
+        .accessibilityLabel("배경 고르기")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { onBackgroundTapped() }
+        .accessibilityHidden(!canPickPattern)
     }
 
     private var canPickPattern: Bool { beltRank != nil && !isGuest }
@@ -271,6 +259,36 @@ public struct MyProfileHeaderView: View {
         .padding(.top, safeAreaTop + 12)
         .padding(.trailing, 16)
         .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+}
+
+// MARK: - MyHeaderBackground
+
+/// 띠 색 바탕 + 같은 계열 색 무늬(#320). MY와 남의 프로필(#337) 상단이 같이 쓴다. 띠가 없으면 기본색만 깐다.
+struct MyHeaderBackground: View {
+    let beltRank: BeltRank?
+    let pattern: MyHeaderPattern
+    /// 바탕 위에서 사진 가운데까지 높이 — 무늬를 이 점 기준으로 깐다.
+    let avatarCenterY: CGFloat
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                beltRank.myHeaderColor
+                if let beltRank {
+                    MyHeaderPatternView(
+                        pattern: pattern,
+                        beltRank: beltRank,
+                        anchor: UnitPoint(x: 0.5, y: proxy.size.height > 0 ? avatarCenterY / proxy.size.height : 0)
+                    )
+                    .equatable()
+                    .id(pattern)
+                    .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.3), value: beltRank)
+            .animation(.easeInOut(duration: 0.3), value: pattern)
+        }
     }
 }
 

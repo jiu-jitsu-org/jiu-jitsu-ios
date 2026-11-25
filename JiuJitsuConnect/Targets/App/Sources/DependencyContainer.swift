@@ -42,6 +42,7 @@ public final class DependencyContainer {
     private let fcmTokenRefreshRelay = FCMTokenRefreshRelay()
     private let beltPromptStorage = BeltPromptStorage()
     private let notificationPromptStorage = NotificationPromptStorage()
+    private let legacyHeaderPatternStorage = LegacyHeaderPatternStorage()
     private lazy var sharedNetworkService: NetworkService = DefaultNetworkService(
         tokenStorage: sharedTokenStorage,
         sessionEventBroadcaster: authSessionEventBroadcaster
@@ -113,6 +114,9 @@ public final class DependencyContainer {
             },
             storedProvider: {
                 self.authRepository.storedProvider()
+            },
+            lastLoginProvider: {
+                self.authRepository.lastLoginProvider()
             }
         )
     }
@@ -220,6 +224,13 @@ public final class DependencyContainer {
             canCheck: { self.beltPromptStorage.canCheck(now: $0) },
             markChecked: { self.beltPromptStorage.markChecked(now: $0) },
             snooze: { self.beltPromptStorage.snooze(now: $0) }
+        )
+    }
+
+    public func configureLegacyHeaderPatternClient() -> LegacyHeaderPatternClient {
+        LegacyHeaderPatternClient(
+            load: { self.legacyHeaderPatternStorage.load().flatMap(MyHeaderPattern.init(rawValue:)) },
+            clear: { self.legacyHeaderPatternStorage.clear() }
         )
     }
 

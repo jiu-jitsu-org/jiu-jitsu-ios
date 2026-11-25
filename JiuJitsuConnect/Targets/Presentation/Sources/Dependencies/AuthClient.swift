@@ -20,6 +20,8 @@ public struct AuthClient {
     public var appleAuthorizationCodeForWithdrawal: @Sendable () async throws -> String?
     /// 이 기기에 저장된 로그인 수단(#398). 탈퇴 알럿이 Apple 확인 창을 미리 알린다.
     public var storedProvider: @Sendable () -> Domain.SNSProvider?
+    /// 이 기기에서 마지막으로 로그인한 수단(#380). 로그아웃 · 세션 만료 뒤에도 남는다 — 로그인 화면의 "최근 로그인" 표시.
+    public var lastLoginProvider: @Sendable () -> Domain.SNSProvider?
 
     public init(
         loginWithGoogle: @Sendable @escaping () async throws -> Domain.SNSUser,
@@ -33,7 +35,8 @@ public struct AuthClient {
         storedAccessToken: @Sendable @escaping () -> String?,
         refreshSession: @Sendable @escaping () async throws -> String,
         appleAuthorizationCodeForWithdrawal: @Sendable @escaping () async throws -> String?,
-        storedProvider: @Sendable @escaping () -> Domain.SNSProvider?
+        storedProvider: @Sendable @escaping () -> Domain.SNSProvider?,
+        lastLoginProvider: @Sendable @escaping () -> Domain.SNSProvider?
     ) {
         self.loginWithGoogle = loginWithGoogle
         self.loginWithApple = loginWithApple
@@ -47,6 +50,7 @@ public struct AuthClient {
         self.refreshSession = refreshSession
         self.appleAuthorizationCodeForWithdrawal = appleAuthorizationCodeForWithdrawal
         self.storedProvider = storedProvider
+        self.lastLoginProvider = lastLoginProvider
     }
 }
 
@@ -99,8 +103,20 @@ extension AuthClient: DependencyKey {
         },
         storedProvider: {
             nil
+        },
+        lastLoginProvider: {
+            nil
         }
     )
+}
+
+extension AuthClient {
+    /// 미리보기용 — 테스트 값과 같고, 로그인 화면의 "최근 로그인"을 보이게 마지막 수단만 카카오로 둔다(#380).
+    public static let previewValue: Self = {
+        var client = testValue
+        client.lastLoginProvider = { .kakao }
+        return client
+    }()
 }
 
 // MARK: - Dependency Injection
@@ -148,6 +164,9 @@ extension AuthClient {
         },
         storedProvider: {
             fatalError("unimplemented.storedProvider is not implemented")
+        },
+        lastLoginProvider: {
+            fatalError("unimplemented.lastLoginProvider is not implemented")
         }
     )
 }

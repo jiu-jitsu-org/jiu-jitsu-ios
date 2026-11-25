@@ -11,6 +11,8 @@ import Foundation
 /// 웹 문서 로드 실패. `code`는 사전 `error_code` 값이다(문구 · 주소는 싣지 않는다).
 public struct WebLoadFailure: Equatable, Sendable {
     public let code: String
+    /// 기기가 망에 닿지 못해 실패함(#396). 덮개가 '연결이 불안정해요'를 보이고, 연결이 돌아오면 한 번 저절로 다시 불러온다.
+    let isConnectionProblem: Bool
 
     static let timeoutCode = "TIMEOUT"
     /// 웹 프로세스가 죽어 오류 화면으로 돌림(#352).
@@ -18,8 +20,9 @@ public struct WebLoadFailure: Equatable, Sendable {
     /// 첫 문서의 리다이렉트를 이동 정책이 막아 띄울 문서가 없음. WebKit이 취소(-999)로 알려도 새 로드에 밀린 취소와 다르다.
     static let blockedByPolicy = WebLoadFailure(code: "POLICY_BLOCKED")
 
-    init(code: String) {
+    init(code: String, isConnectionProblem: Bool = false) {
         self.code = code
+        self.isConnectionProblem = isConnectionProblem
     }
 
     var isTimeout: Bool { code == Self.timeoutCode }
@@ -37,9 +40,23 @@ public struct WebLoadFailure: Equatable, Sendable {
         if error.domain == NSURLErrorDomain, error.code == NSURLErrorTimedOut {
             self.init(code: Self.timeoutCode)
         } else {
-            self.init(code: String(error.code))
+            let isConnectionProblem = error.domain == NSURLErrorDomain && Self.connectionProblemCodes.contains(error.code)
+            self.init(code: String(error.code), isConnectionProblem: isConnectionProblem)
         }
     }
+
+    /// 기기 쪽 망 문제로 서버에 닿지 못한 코드. 연결 없음 · 연결 끊김 · 주소를 못 찾음(DNS) · 데이터 차단 등.
+    /// 앱 API(`NetworkService.connectionFailureCodes`)와 달리 `cannotConnectToHost`는 넣지 않는다 — 망은 살아 있고
+    /// 웹 서버가 꺼진 경우에 나서, '연결이 불안정해요'가 아니라 지금 문구로 둔다. 시간 초과도 서버가 늦은 것일 수 있어 지금 문구.
+    private static let connectionProblemCodes: Set<Int> = [
+        NSURLErrorNotConnectedToInternet,
+        NSURLErrorNetworkConnectionLost,
+        NSURLErrorCannotFindHost,
+        NSURLErrorDNSLookupFailed,
+        NSURLErrorDataNotAllowed,
+        NSURLErrorInternationalRoamingOff,
+        NSURLErrorCallIsActive
+    ]
 
     init(statusCode: Int) {
         self.init(code: "HTTP_\(statusCode)")

@@ -117,9 +117,9 @@ public struct MyProfileStyleSectionView: View {
                     category: item.type.title,
                     style: item.style,
                     beltRank: beltRank,
-                    // 좁은 기기(375pt)에서는 한 줄에 다 들어가지 않아 '지정해주세/요'로 끊긴다.
-                    // 보이지 않는 줄바꿈 자리(U+200B)를 두어 넘어갈 때는 '지정해/주세요'로 넘어가게 한다.
-                    emptyText: onStyleCardTapped == nil ? "아직 안 골랐어요" : "지정해\u{200B}주세요"
+                    // 좁은 기기(375pt)에서는 한 줄에 다 들어가지 않는다. '지정해 주세요'로 띄어 써(#400)
+                    // 넘어갈 때는 띄어쓰기 자리에서 '지정해/주세요'로 넘어간다.
+                    emptyText: onStyleCardTapped == nil ? "아직 안 골랐어요" : "지정해 주세요"
                 )
                 .frame(width: cardWidth, height: cardHeight)
             } back: {
@@ -298,12 +298,12 @@ public struct EmptyStyleView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            Text("나의 주짓수를 보여주세요")
+            Text("나의 주짓수를 보여 주세요")
                 .font(Font.pretendard.title3)
                 .foregroundStyle(Color.component.sectionHeader.title)
                 .padding(.bottom, 8)
 
-            Text("최애 포지션, 기술 등을 등록해보세요.")
+            Text("최애 포지션, 기술 등을 등록해 보세요.")
                 .font(Font.pretendard.bodyM)
                 .foregroundStyle(Color.component.sectionHeader.subTitle)
 

@@ -225,6 +225,7 @@ extension AnalyticsEvent {
     }
 
     /// 로그인 안내 이유(사전 "로그인 안내"). 웹이 보낸 값은 이 목록에 있는 것만 싣는다 — 외부 입력이 GA에 새 분류로 쌓이지 않게.
+    /// 로그인 안내 알럿의 이유별 제목(#392)도 이 목록을 쓴다 — 값을 더하면 `AppTabFeature.loginPromptTitle`의 문구도 정한다.
     public enum LoginReason: String, Sendable {
         case write, comment, reply, like, save, vote, interest
         case interestFilter = "interest_filter"
@@ -333,6 +334,8 @@ extension AnalyticsEvent {
         case commentsLike = "comments_like"
         case competitionEarlyBirdDeadline = "competition_early_bird_deadline"
         case competitionRegistrationDeadline = "competition_registration_deadline"
+        /// 어제 투표한 밸런스 게임 결과(#502). 서버 계약 전이라 이름은 제안값(웹 jiu-jitsu-frontend#683과 같음).
+        case balanceResult = "balance_result"
 
         /// 서버 값(`NEW_COMMENTS` 등). 사전에 없는 값은 nil — 새 종류가 GA에 새 분류로 쌓이지 않게.
         public init?(serverValue: String?) {

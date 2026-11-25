@@ -105,6 +105,25 @@ public struct MyProfileFeature: Sendable {
         /// 오를 때마다 링이 한 번 돈다.
         var beltEntranceTrigger = 0
 
+        // 상단 바탕 무늬는 서버가 기준이다(#337). 서버에 저장하기 전(#320) 이 기기에만 남긴 무늬는
+        // 처음 한 번 서버로 옮겨 담고 지운다. 옮겨 담기 전까지는 그 무늬로 그려 바탕이 기본 무늬로 튀지 않게 한다.
+        var legacyHeaderPattern: MyHeaderPattern?
+        var hasLoadedLegacyHeaderPattern = false
+
+        /// 상단 바탕 무늬 — 서버 값, 없으면 기기에 남은 무늬, 그것도 없으면 기본 무늬
+        var headerPattern: MyHeaderPattern {
+            if let pattern = communityProfile?.backgroundPattern {
+                return MyHeaderPattern(pattern)
+            }
+            return legacyHeaderPattern ?? .default
+        }
+
+        /// 이 무늬가 이미 서버에 저장돼 있는지. 보이는 무늬(`headerPattern`)가 아니라 서버 값으로 본다 —
+        /// 서버 값이 이 앱이 모르는 무늬면 기본 무늬로 보이지만, 회원이 기본 무늬를 고르면 저장해야 한다.
+        func isSavedHeaderPattern(_ pattern: MyHeaderPattern) -> Bool {
+            communityProfile?.backgroundPattern == pattern.serverValue
+        }
+
         public init(authInfo: AuthInfo, communityProfile: CommunityProfile? = nil) {
             self.authInfo = authInfo
             self.communityProfile = communityProfile
@@ -116,6 +135,8 @@ public struct MyProfileFeature: Sendable {
             state.userProfile = tab.userProfile
             state.isPushed = true
             state.hasPlayedBeltEntrance = tab.hasPlayedBeltEntrance
+            state.legacyHeaderPattern = tab.legacyHeaderPattern
+            state.hasLoadedLegacyHeaderPattern = tab.hasLoadedLegacyHeaderPattern
             return state
         }
     }
@@ -181,8 +202,8 @@ public struct MyProfileFeature: Sendable {
             /// View 상태로 띄운 시트가 열리고 닫힘(화면 기록용, #425)
             case competitionSheetPresentedChanged(Bool)
             case patternSheetPresentedChanged(Bool)
-            /// 머리 무늬를 다른 것으로 바꿈(기록용, #429). 무늬는 View의 AppStorage에 저장돼 리듀서가 할 일은 없다.
-            case headerPatternChanged
+            /// 머리 무늬를 다른 것으로 바꿈 — 서버에 저장하고(#337) 분석 기록도 남긴다(#429).
+            case headerPatternChanged(MyHeaderPattern)
             /// 헤더에 서버 사진이 그려짐(#157)
             case profileImageDisplayed(url: String)
             /// 커뮤니티에서 연 MY의 뒤로가기(#197)
@@ -245,6 +266,9 @@ public struct MyProfileFeature: Sendable {
             case competitionPinUpdated(CommunityProfile, isPinned: Bool) // 대회 고정/해제 저장 완료
             case competitionOrderSaved(CommunityProfile)    // 대회 순서 저장 완료
             case competitionOrderReverted(CommunityProfile) // 대회 순서 저장 실패 — 바꾸기 전 목록으로 되돌림
+            case headerPatternSaved(CommunityProfile)      // 상단 무늬 저장 완료 (#337)
+            case headerPatternReverted(CommunityProfile)   // 상단 무늬 저장 실패 — 고르기 전 프로필로 되돌림
+            case legacyHeaderPatternMigrated(TaskResult<CommunityProfile>) // 기기에 남은 무늬를 서버로 옮겨 담은 결과 (#337)
             // 알림 화면을 나간 뒤 대신 저장한 알림 설정이 서버에 반영됨. 루트의 분석 기록만 본다(#430).
             case notificationSettingSaved(NoticeSettingUpdate)
             
@@ -287,6 +311,7 @@ public struct MyProfileFeature: Sendable {
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.analyticsClient) var analyticsClient
     @Dependency(\.date) var date
+    @Dependency(\.legacyHeaderPatternClient) var legacyHeaderPatternClient
 
 
     public var body: some ReducerOf<Self> {
@@ -364,11 +389,12 @@ public struct MyProfileFeature: Sendable {
                 switch result {
                 case let .success(profile):
                     state.communityProfile = profile
+                    return migrateLegacyHeaderPatternIfNeeded(&state)
                 case let .failure(error):
                     // 백그라운드 재조회 실패는 기존 화면을 유지하고 조용히 넘긴다.
                     Log.trace("Failed to refresh profile: \(error)", category: .network, level: .error)
+                    return .none
                 }
-                return .none
 
             case let .internal(.refreshUserProfileResponse(result)):
                 guard !state.isUploadingInstructorVerification, !state.isUploadingProfileImage else { return .none }
@@ -398,7 +424,7 @@ public struct MyProfileFeature: Sendable {
             case let .internal(.profileResponse(.success(profile))):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
-                return .none
+                return migrateLegacyHeaderPatternIfNeeded(&state)
 
             case let .internal(.userProfileResponse(.success(profile))):
                 // 사진을 바꾸는 중이면 업로드 전 값이라 덮지 않는다 — 업로드 응답이 최신값을 넣는다.
@@ -619,7 +645,7 @@ public struct MyProfileFeature: Sendable {
                 case .academy:
                     updatedProfile = profile.updatingAcademy(value)
 
-                case .belt, .position, .submission, .technique, .competition, .instructorInfo:
+                case .belt, .position, .submission, .technique, .competition, .instructorInfo, .backgroundPattern:
                     // TODO: 다른 섹션 업데이트 구현
                     return .none
                 }
@@ -821,7 +847,7 @@ public struct MyProfileFeature: Sendable {
                 case .myStyleSetting?:
                     return .send(.destination(.presented(.myStyleSetting(.saveFailed))))
                 default:
-                    return .send(.internal(.showToast(.init(message: "저장에 실패했어요. 다시 시도해주세요", status: .error))))
+                    return .send(.internal(.showToast(.init(message: "저장하지 못했어요. 다시 시도해 주세요", status: .error))))
                 }
                 
             case let .internal(.showToast(toastState)):
@@ -889,7 +915,7 @@ public struct MyProfileFeature: Sendable {
                     } catch {
                         Log.trace("알림 화면 이탈 후 설정 저장 실패: \(error)", category: .network, level: .error)
                         analyticsClient.logErrorShown(error)
-                        await send(.internal(.showToast(.init(message: "알림 설정을 저장하지 못했어요. 다시 시도해주세요", status: .error))))
+                        await send(.internal(.showToast(.init(message: "알림 설정을 저장하지 못했어요. 다시 시도해 주세요", status: .error))))
                     }
                 }
 
@@ -1035,7 +1061,7 @@ public struct MyProfileFeature: Sendable {
                 state.isLoadingProfile = false
                 // MY 화면 토스트는 입력 화면에 가려지므로 입력 화면이 실패를 안내하고, 입력값을 지켜 다시 저장하게 한다.
                 guard case .competitionInfo? = state.destination else {
-                    return .send(.internal(.showToast(.init(message: "저장에 실패했어요. 다시 시도해주세요", status: .error))))
+                    return .send(.internal(.showToast(.init(message: "저장하지 못했어요. 다시 시도해 주세요", status: .error))))
                 }
                 return .send(.destination(.presented(.competitionInfo(.saveFinished(.failed)))))
 
@@ -1118,6 +1144,52 @@ public struct MyProfileFeature: Sendable {
 
             case let .internal(.competitionOrderReverted(profile)):
                 state.communityProfile = profile
+                return .none
+
+            // MARK: - 상단 바탕 무늬 (#320, #337)
+
+            case let .view(.headerPatternChanged(pattern)):
+                guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
+                guard let profile = state.communityProfile else { return Self.profileUnavailableToast() }
+                guard !state.isSavedHeaderPattern(pattern) else { return .none }
+                let updatedProfile = profile.updatingBackgroundPattern(pattern.serverValue)
+                // 시트를 닫자마자 바탕이 바뀌게 먼저 화면에 반영하고, 저장에 실패하면 되돌린다.
+                state.communityProfile = updatedProfile
+                Self.beginProfileSave(&state)
+                return .run { send in
+                    let result = await TaskResult {
+                        try await communityClient.updateProfile(updatedProfile, .backgroundPattern)
+                    }
+                    switch result {
+                    case .success(let saved):
+                        await send(.internal(.headerPatternSaved(saved)))
+                    case .failure(let error):
+                        await send(.internal(.headerPatternReverted(profile)))
+                        await send(.internal(.updateProfileResponse(.failure(error))))
+                    }
+                }
+
+            case let .internal(.headerPatternSaved(profile)):
+                state.isLoadingProfile = false
+                state.communityProfile = profile
+                // 서버에 무늬가 생겼으니 기기에 남은 무늬는 더 쓰지 않는다.
+                guard profile.backgroundPattern != nil else { return .none }
+                return clearLegacyHeaderPattern(&state)
+
+            case let .internal(.headerPatternReverted(profile)):
+                state.communityProfile = profile
+                return .none
+
+            case let .internal(.legacyHeaderPatternMigrated(.success(profile))):
+                state.isLoadingProfile = false
+                state.communityProfile = profile
+                guard profile.backgroundPattern != nil else { return .none }
+                return clearLegacyHeaderPattern(&state)
+
+            case let .internal(.legacyHeaderPatternMigrated(.failure(error))):
+                state.isLoadingProfile = false
+                // 회원이 한 일이 아니라 알리지 않는다. 기기 무늬는 남겨 두고 다음 조회 때 다시 옮겨 담는다.
+                Log.trace("Failed to migrate header pattern: \(error)", category: .network, level: .error)
                 return .none
 
             case let .internal(.competitionPinUpdated(profile, isPinned)):
@@ -1205,7 +1277,7 @@ public struct MyProfileFeature: Sendable {
             case .view(.profileImageEditButtonTapped):
                 // 업로드 중에 또 바꾸면 앞 업로드 응답이 새 사진을 덮을 수 있다(#155).
                 guard !state.isUploadingProfileImage else {
-                    return .send(.internal(.showToast(.init(message: "사진을 바꾸는 중이에요. 잠시 후 다시 시도해주세요", status: .info))))
+                    return .send(.internal(.showToast(.init(message: "사진을 바꾸는 중이에요. 잠시 후 다시 시도해 주세요", status: .info))))
                 }
                 // 프로필 이미지 수정 옵션 바텀시트 노출
                 // 실제로 이미지가 렌더링되는 상태일 때만 '삭제' 옵션 노출
@@ -1387,7 +1459,7 @@ public struct MyProfileFeature: Sendable {
                 Log.trace("Failed to upload profile image: \(error)", category: .network, level: .error)
                 analyticsClient.logErrorShown(error, as: .upload)
                 return .send(.internal(.showToast(.init(
-                    message: "이미지 업로드에 실패했어요. 다시 시도해주세요", status: .error
+                    message: "사진을 올리지 못했어요. 다시 시도해 주세요", status: .error
                 ))))
 
             case let .internal(.instructorVerificationImageUploadResponse(.success(registeredImage))):
@@ -1415,7 +1487,7 @@ public struct MyProfileFeature: Sendable {
                 Log.trace("Failed to upload instructor verification image: \(error)", category: .network, level: .error)
                 analyticsClient.logErrorShown(error, as: .upload)
                 return .send(.internal(.showToast(.init(
-                    message: "사진 업로드에 실패했어요. 다시 시도해주세요", status: .error
+                    message: "사진을 올리지 못했어요. 다시 시도해 주세요", status: .error
                 ))))
 
             case let .internal(.instructorVerificationRequestResponse(.success(uploadedImageUrl))):
@@ -1430,7 +1502,7 @@ public struct MyProfileFeature: Sendable {
                 )
                 // 승인 · 반려 알림이 없어 결과를 알려 준다고 약속하지 않고, 어디서 보는지 안내한다(#389).
                 return .send(.internal(.showToast(.init(
-                    message: "신청했어요. 결과는 관장 사범 인증 화면에서 확인할 수 있어요.", status: .success
+                    message: "신청했어요. 결과는 관장 사범 인증 화면에서 확인할 수 있어요", status: .success
                 ))))
 
             case let .internal(.instructorVerificationRequestResponse(.failure(error))):
@@ -1438,7 +1510,7 @@ public struct MyProfileFeature: Sendable {
                 Log.trace("Failed to request owner verification: \(error)", category: .network, level: .error)
                 analyticsClient.logErrorShown(error)
                 return .send(.internal(.showToast(.init(
-                    message: "인증 요청에 실패했어요. 다시 시도해주세요", status: .error
+                    message: "인증을 요청하지 못했어요. 다시 시도해 주세요", status: .error
                 ))))
 
             case let .internal(.profileImageUpdateResponse(.success(updatedProfile))):
@@ -1465,7 +1537,7 @@ public struct MyProfileFeature: Sendable {
                 Log.trace("Failed to update profile image url: \(error)", category: .network, level: .error)
                 analyticsClient.logErrorShown(error)
                 return .send(.internal(.showToast(.init(
-                    message: "프로필 저장에 실패했어요. 다시 시도해주세요", status: .error
+                    message: "프로필을 저장하지 못했어요. 다시 시도해 주세요", status: .error
                 ))))
 
             case .destination, .sheet, .imageCropCover, .path, .view, .internal, .delegate:
@@ -1535,6 +1607,31 @@ public struct MyProfileFeature: Sendable {
         )
     }
 
+    /// 서버에 저장하기 전 이 기기에만 남긴 상단 무늬를 서버로 옮겨 담는다(#337). 프로필을 받을 때마다 부른다.
+    /// 서버에 이미 무늬가 있으면(다른 기기에서 골랐거나 이미 옮겨 담음) 서버 값이 기준이라 기기 값만 지운다.
+    private func migrateLegacyHeaderPatternIfNeeded(_ state: inout State) -> Effect<Action> {
+        if !state.hasLoadedLegacyHeaderPattern {
+            state.hasLoadedLegacyHeaderPattern = true
+            state.legacyHeaderPattern = legacyHeaderPatternClient.load()
+        }
+        guard let legacy = state.legacyHeaderPattern, let profile = state.communityProfile else { return .none }
+        guard profile.backgroundPattern == nil else { return clearLegacyHeaderPattern(&state) }
+        // 다른 저장 중이면 그 응답이 프로필을 바꾸므로 다음 조회 때 옮긴다(#155).
+        guard !state.isLoadingProfile else { return .none }
+        let updatedProfile = profile.updatingBackgroundPattern(legacy.serverValue)
+        Self.beginProfileSave(&state)
+        return .run { send in
+            await send(.internal(.legacyHeaderPatternMigrated(
+                await TaskResult { try await communityClient.updateProfile(updatedProfile, .backgroundPattern) }
+            )))
+        }
+    }
+
+    private func clearLegacyHeaderPattern(_ state: inout State) -> Effect<Action> {
+        state.legacyHeaderPattern = nil
+        return .run { _ in legacyHeaderPatternClient.clear() }
+    }
+
     /// 프로필 저장을 시작한다. 진행 중이던 재조회 응답은 저장 전 값이라 버려지게 세대를 올린다(#155).
     private static func beginProfileSave(_ state: inout State) {
         state.isLoadingProfile = true
@@ -1543,7 +1640,7 @@ public struct MyProfileFeature: Sendable {
 
     /// 앞 저장(또는 처음 불러오기)이 끝나기 전에 새 저장 · 저장 화면 진입을 막을 때의 안내(#155).
     private static func savingInProgressToast() -> Effect<Action> {
-        .send(.internal(.showToast(.init(message: "아직 처리 중이에요. 잠시 후 다시 시도해주세요", status: .info))))
+        .send(.internal(.showToast(.init(message: "아직 처리 중이에요. 잠시 후 다시 시도해 주세요", status: .info))))
     }
 
     private static func profileUnavailableToast() -> Effect<Action> {
@@ -1567,7 +1664,7 @@ public struct MyProfileFeature: Sendable {
         let updatedProfile = entries.reduce(profile) { $0.removingCompetition($1) }
         // 지울 기록을 못 찾았으면(그사이 프로필이 바뀜) 저장하지 않는다 — 성공 토스트가 거짓이 된다.
         guard updatedProfile.competitions.count < profile.competitions.count else {
-            return .send(.internal(.showToast(.init(message: "삭제하지 못했어요. 다시 시도해주세요", status: .error))))
+            return .send(.internal(.showToast(.init(message: "삭제하지 못했어요. 다시 시도해 주세요", status: .error))))
         }
         Self.beginProfileSave(&state)
         return .run { send in

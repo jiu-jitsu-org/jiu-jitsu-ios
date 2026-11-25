@@ -27,11 +27,13 @@ public struct AppAlertView: View {
                     .font(.pretendard.title2)
                     .foregroundColor(Color.component.dialog.titleText)
                 
-                Text(configuration.message)
-                    .font(.pretendard.bodyM)
-                    .foregroundColor(Color.component.dialog.descriptionText)
-                    .lineLimit(configuration.messageLineLimit)
-                    .lineSpacing(4) // .lineHeight(8) 대신 사용
+                if let message = configuration.message {
+                    Text(message)
+                        .font(.pretendard.bodyM)
+                        .foregroundColor(Color.component.dialog.descriptionText)
+                        .lineLimit(configuration.messageLineLimit)
+                        .lineSpacing(4) // .lineHeight(8) 대신 사용
+                }
                 
                 HStack(spacing: 8) {
                     if let secondaryButton = configuration.secondaryButton {

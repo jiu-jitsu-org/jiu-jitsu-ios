@@ -10,7 +10,8 @@ import SwiftUI
 // MARK: - Configuration Models
 public struct AppAlertConfiguration {
     let title: Title
-    let message: String
+    /// nil이면 제목만 보인다. 제목으로 충분한 확인(로그아웃 등)에 본문을 억지로 채우지 않게 한다.
+    let message: String?
     let primaryButton: Button
     let secondaryButton: Button?
     /// 본문 최대 줄 수. 기본 3줄이고, 꼭 다 읽어야 하는 안내(탈퇴 등)는 nil로 줄 수 제한을 푼다(#398).
@@ -36,7 +37,7 @@ public struct AppAlertConfiguration {
         case truncatable(String, suffix: String)
     }
 
-    public init(title: Title, message: String, primaryButton: Button, secondaryButton: Button?, messageLineLimit: Int? = 3) {
+    public init(title: Title, message: String?, primaryButton: Button, secondaryButton: Button?, messageLineLimit: Int? = 3) {
         self.title = title
         self.message = message
         self.primaryButton = primaryButton
@@ -44,7 +45,7 @@ public struct AppAlertConfiguration {
         self.messageLineLimit = messageLineLimit
     }
 
-    public init(title: String, message: String, primaryButton: Button, secondaryButton: Button?, messageLineLimit: Int? = 3) {
+    public init(title: String, message: String?, primaryButton: Button, secondaryButton: Button?, messageLineLimit: Int? = 3) {
         self.init(
             title: .plain(title),
             message: message,

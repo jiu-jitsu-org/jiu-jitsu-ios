@@ -19,6 +19,8 @@ public struct CommunityFeature: Sendable {
     private enum CancelID: Hashable, Sendable {
         // 새 알림 여부 조회. 진입·복귀·포그라운드가 겹쳐 들어와도 마지막 요청만 반영한다.
         case unreadNotification
+        // 연결 문제로 실패한 피드가 연결이 돌아오길 지켜봄(#396).
+        case connectionWatch
     }
 
     /// 테스트용 도메인 변경 다이얼로그에서 한 번에 전환할 수 있는 서버 후보.
@@ -59,6 +61,8 @@ public struct CommunityFeature: Sendable {
         var scrollToTopToken: UUID?
         var isLoading: Bool = true
         var hasError: Bool = false
+        // 연결 문제로 실패했는지와 연결이 돌아오면 한 번 다시 불러오기(#396).
+        var connectionRetry = WebConnectionRetry()
 
         // 현재 백엔드 access token. 로그인 상태면 값이 있고, 게스트면 nil.
         // WEBVIEW_READY 핸드셰이크 시 초기 로그인 상태 동기화에 사용한다.
@@ -93,6 +97,11 @@ public struct CommunityFeature: Sendable {
 
         // 알림함은 로그인 사용자 전용이라 비로그인이면 종 아이콘 자체를 숨긴다(알림함 정책).
         var isNotificationButtonVisible: Bool { accessToken != nil }
+
+        // 피드 위에 상세가 떠 있으면 피드는 가려져 있다. 전체 화면 덮개(detailCover)는 아래 뷰에 onDisappear를 보내지 않아 여기서 거른다.
+        var isWatchingConnection: Bool {
+            connectionRetry.isWatchingConnection && path.isEmpty && detailCover == nil
+        }
 
         public init(accessToken: String? = nil) {
             self.accessToken = accessToken
@@ -134,6 +143,8 @@ public struct CommunityFeature: Sendable {
             // 앱이 포그라운드로 복귀.
             case sceneBecameActive
             case retryTapped
+            // 피드가 사용자에게 보이게 됨 · 가려짐(다른 탭 · 위에 쌓인 화면 · 백그라운드). 보일 때만 연결을 지켜본다(#396).
+            case visibilityChanged(Bool)
             case notificationTapped
             case searchTapped
 
@@ -162,6 +173,8 @@ public struct CommunityFeature: Sendable {
             case loadingStarted
             case loadingFinished
             case loadingFailed(WebLoadFailure)
+            // 연결 문제로 실패한 뒤 연결이 돌아옴(#396) → 한 번 저절로 다시 불러온다.
+            case connectionRestored
             case screenLoadMeasured(WebScreenLoad)
             // 당겨서 새로고침 시작(이때는 loadingStarted가 오지 않는다). 분석 기록(homePullRefresh)이 센다.
             case refreshStarted
@@ -218,6 +231,8 @@ public struct CommunityFeature: Sendable {
             case profileUpdated
             /// 남의 프로필에서 회원을 차단·해제함 → USER_BLOCK_CHANGED
             case userBlockChanged(userId: Int, blocked: Bool)
+            /// 대회 상세에서 연 기록 추가를 저장함(#397) → COMPETITION_RECORD_SAVED
+            case competitionRecordSaved(competitionId: String)
         }
     }
 
@@ -262,6 +277,8 @@ public struct CommunityFeature: Sendable {
     @Dependency(\.analyticsClient) var analyticsClient
     @Dependency(\.notificationPermissionClient) var notificationPermissionClient
     @Dependency(\.firebaseClient) var firebaseClient
+    @Dependency(\.networkPathClient) var networkPathClient
+    @Dependency(\.continuousClock) var clock
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -305,19 +322,19 @@ public struct CommunityFeature: Sendable {
                 return .none
 
             case .view(.retryTapped):
-                // URL이 아직도 nil이면 WKWebView가 생성되지 않으므로 재시도해도 콜백이 오지 않는다.
-                // 다시 만들어보고, 그래도 실패하면 에러 상태를 유지한다.
-                if state.url == nil {
-                    state.url = Self.makeCommunityURL()
-                }
-                guard state.url != nil else {
-                    state.hasError = true
-                    state.isLoading = false
-                    return .none
-                }
-                state.hasError = false
-                state.isLoading = true
-                state.loadToken = UUID()
+                state.connectionRetry.reset()
+                Self.retryLoad(&state)
+                return .none
+
+            case let .view(.visibilityChanged(isVisible)):
+                state.connectionRetry.screenVisibilityChanged(isVisible)
+                return .none
+
+            case .internal(.connectionRestored):
+                guard state.isWatchingConnection else { return .none }
+                Log.trace("연결이 돌아와 홈 피드를 다시 불러옴", category: .network, level: .info)
+                state.connectionRetry.autoReloaded()
+                Self.retryLoad(&state)
                 return .none
 
             // MARK: - 테스트용 웹뷰 도메인 변경
@@ -402,6 +419,7 @@ public struct CommunityFeature: Sendable {
             case .internal(.loadingStarted):
                 state.isLoading = true
                 state.hasError = false
+                state.connectionRetry.loadStarted()
                 state.headerTint = nil
                 return .none
 
@@ -412,11 +430,13 @@ public struct CommunityFeature: Sendable {
             case .internal(.loadingFinished):
                 state.isLoading = false
                 state.hasError = false
+                state.connectionRetry.loadSucceeded()
                 return .none
 
             case let .internal(.loadingFailed(failure)):
                 state.isLoading = false
                 state.hasError = true
+                state.connectionRetry.loadFailed(failure)
                 // 오류 화면 위에 지난 진한 머리줄이 남지 않게 한다.
                 state.headerTint = nil
                 WebAnalytics.loadFailed(failure, client: analyticsClient)
@@ -598,6 +618,11 @@ public struct CommunityFeature: Sendable {
                 Self.broadcastToDetails(.userBlockChanged(userId: userId, blocked: blocked), into: &state)
                 return .none
 
+            case let .session(.competitionRecordSaved(competitionId)):
+                Self.enqueue(.competitionRecordSaved(competitionId: competitionId), into: &state)
+                Self.broadcastToDetails(.competitionRecordSaved(competitionId: competitionId), into: &state)
+                return .none
+
             case .unreadNotificationRefreshRequested:
                 return refreshUnreadNotification(state)
 
@@ -689,6 +714,18 @@ public struct CommunityFeature: Sendable {
         }
         .forEach(\.path, action: \.path)
         .forEach(\.coverPath, action: \.coverPath)
+        // 상세가 열리고 닫히는 것(ifLet · forEach가 바꿈)까지 보려고 맨 바깥에 둔다.
+        .onChange(of: \.isWatchingConnection) { _, isWatching in
+            Reduce { _, _ in
+                WebConnectionRetry.watchEffect(
+                    isWatching: isWatching,
+                    id: CancelID.connectionWatch,
+                    networkPathClient: networkPathClient,
+                    clock: clock,
+                    restored: .internal(.connectionRestored)
+                )
+            }
+        }
     }
 
     // MARK: - 헤더 표시(새 알림 점)
@@ -1102,6 +1139,23 @@ public struct CommunityFeature: Sendable {
         return url
     }
 
+    /// 같은 주소로 다시 불러온다 — 재시도 버튼, 연결이 돌아옴(#396).
+    private static func retryLoad(_ state: inout State) {
+        // URL이 아직도 nil이면 WKWebView가 생성되지 않으므로 재시도해도 콜백이 오지 않는다.
+        // 다시 만들어보고, 그래도 실패하면 에러 상태를 유지한다.
+        if state.url == nil {
+            state.url = Self.makeCommunityURL()
+        }
+        guard state.url != nil else {
+            state.hasError = true
+            state.isLoading = false
+            return
+        }
+        state.hasError = false
+        state.isLoading = true
+        state.loadToken = UUID()
+    }
+
     // MARK: - 테스트용 도메인 오버라이드 (UserDefaults)
 
     /// 입력 주소로 URL을 다시 만들고 강제 reload되도록 상태를 초기화한다.
@@ -1113,6 +1167,7 @@ public struct CommunityFeature: Sendable {
         state.outbox.removeAll()
         // 새 웹이 다시 알려 줄 때까지 흰 머리줄 — 주소가 없어 오류 화면만 남을 때 지난 진한 색이 남지 않게.
         state.headerTint = nil
+        state.connectionRetry.reset()
         if url == nil {
             state.isLoading = false
             state.hasError = true

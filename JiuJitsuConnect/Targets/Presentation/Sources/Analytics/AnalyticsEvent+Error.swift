@@ -46,8 +46,9 @@ extension AnalyticsEvent {
         case .signInCancelled:
             return nil
         case .networkUnavailable:
-            // 앱 네트워크 계층은 연결 끊김과 시간 초과를 같은 오류로 넘긴다.
             mapped = (.network, nil)
+        case .timeout:
+            mapped = (.timeout, nil)
         case let .apiError(code, _):
             mapped = (.server, code.rawValue)
         case let .serverError(code, statusCode, _):

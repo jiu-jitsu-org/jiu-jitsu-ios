@@ -34,8 +34,7 @@ public struct MyProfileView: View {
     @State private var pendingCompetitionAction: (() -> Void)?
     /// 시트의 '순서 바꾸기' — 값이 바뀌면 대회 기록 칸이 순서 바꾸기를 시작한다.
     @State private var competitionReorderRequest = 0
-    // 헤더 바탕 무늬(#320) — 서버 없이 이 기기에만 저장한다.
-    @AppStorage(MyHeaderPattern.storageKey) private var headerPattern: MyHeaderPattern = .oss
+    // 헤더 바탕 무늬 고르기 시트(#320). 고른 무늬는 서버에 저장한다(#337).
     @State private var isPatternSheetPresented = false
     // 삭제 확인 알럿에 띄울 대회(부문별 기록)
     @State private var competitionPendingDelete: [Competition]?
@@ -218,11 +217,10 @@ public struct MyProfileView: View {
             }
             .sheet(isPresented: $isPatternSheetPresented) {
                 if let beltRank = store.communityProfile?.beltRank {
-                    MyHeaderPatternSheetView(current: headerPattern, beltRank: beltRank) { pattern in
-                        if pattern != headerPattern {
-                            store.send(.view(.headerPatternChanged))
+                    MyHeaderPatternSheetView(current: store.headerPattern, beltRank: beltRank) { pattern in
+                        if !store.state.isSavedHeaderPattern(pattern) {
+                            store.send(.view(.headerPatternChanged(pattern)))
                         }
-                        headerPattern = pattern
                         isPatternSheetPresented = false
                     }
                     .presentationDragIndicator(.hidden)
@@ -256,7 +254,7 @@ public struct MyProfileView: View {
             profileImageUrl: store.userProfile?.profileImageUrl,
             beltRank: store.communityProfile?.beltRank,
             beltStripe: store.communityProfile?.beltStripe,
-            pattern: headerPattern,
+            pattern: store.headerPattern,
             beltEntranceTrigger: store.beltEntranceTrigger,
             safeAreaTop: safeAreaTop,
             isOwner: store.userProfile?.userRole == .owner,

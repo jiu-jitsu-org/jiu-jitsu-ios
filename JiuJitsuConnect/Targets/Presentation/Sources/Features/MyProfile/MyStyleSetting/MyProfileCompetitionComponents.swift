@@ -809,7 +809,7 @@ private struct EmptyCompetitionView: View {
                     .frame(width: 22)
 
                 // 텍스트
-                Text("출전한 대회 정보를 입력해주세요")
+                Text("출전한 대회 정보를 입력해 주세요")
                     .font(.pretendard.bodyS)
                     .foregroundStyle(Color.component.list.setting.text)
 

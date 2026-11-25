@@ -491,7 +491,7 @@ public struct MyStyleSettingFeature: Sendable {
                 
             case .saveFailed:
                 state.isSaving = false
-                let toast = ToastState(message: "저장에 실패했어요. 다시 시도해주세요", status: .error)
+                let toast = ToastState(message: "저장하지 못했어요. 다시 시도해 주세요", status: .error)
                 state.toast = toast
                 return .run { [clock] send in
                     try await clock.sleep(for: toast.duration)

@@ -201,6 +201,8 @@ private extension WebBridgeOutboundMessage {
             return "PROFILE_UPDATED"
         case let .userBlockChanged(userId, blocked):
             return "USER_BLOCK_CHANGED  userId=\(userId) blocked=\(blocked)"
+        case let .competitionRecordSaved(competitionId):
+            return "COMPETITION_RECORD_SAVED  competitionId=\(competitionId)"
         case let .competitionAlertsResult(requestId, deviceEnabled):
             return "COMPETITION_ALERTS_RESULT  reqId=\(requestId) deviceEnabled=\(deviceEnabled)"
         case let .contentAlertsResult(requestId, deviceEnabled):
@@ -225,6 +227,11 @@ public enum WebBridgeInboundMessage: Equatable, Sendable {
     case pageReady
     /// 비로그인 행위 시도 → "로그인이 필요해요" 안내 알럿 노출 요청.
     /// 사용자가 알럿에서 [로그인]을 선택해야 로그인 모달로 이어진다(소프트 유도).
+    /// `reason`은 웹과 약속한 영문 코드(jiu-jitsu-frontend#599, `messages.ts`의 `LoginPromptReason`)이고
+    /// 앱은 `AnalyticsEvent.LoginReason`으로 받는다. 알럿 제목이 이 값을 따른다(#392, `AppTabFeature.loginPromptTitle`).
+    /// `like` · `save` · `write` · `comment` · `reply` · `vote` · `interest` · `interest_filter` · `alert` ·
+    /// `info_report` · `record` · `report` · `block` · `profile` · `session_expired` (`my_tab`은 앱 전용).
+    /// 모르는 값 · 이유 없음(이유를 싣기 전 웹)은 기본 문구.
     case authLoginPrompt(reason: String?)
     /// 비로그인 행위 시도 → 로그인 모달을 즉시 노출 요청(다이렉트).
     case authLoginModal(reason: String?)
@@ -869,6 +876,10 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
     case profileUpdated
     /// 남의 프로필 ⋯에서 회원을 차단·해제함(#328) → 웹이 떠 있는 화면을 다시 불러와 그 회원 글·댓글을 가리거나 다시 보인다(jiu-jitsu-frontend#488).
     case userBlockChanged(userId: Int, blocked: Bool)
+    /// 대회 상세 · 대회 탭 카드에서 연 기록 추가(OPEN_COMPETITION_RECORD)를 저장함(#397) → 웹이 그 대회의 '결과 남기기' 배너 · 카드를 닫고
+    /// 기록을 다시 확인한다(jiu-jitsu-frontend#545). competitionId는 웹이 기록 추가를 열 때 보낸 대회 id를 숫자 문자열("26")로 싣는다.
+    /// 저장에 성공했을 때만, 떠 있는 웹뷰 모두에 보낸다.
+    case competitionRecordSaved(competitionId: String)
     /// COMPETITION_ALERTS_ENABLED의 결과(#395). 기기 알림이 켜져 있을 때(방금 허용 포함)만 true — 웹은 true일 때만 성공 토스트를 띄운다.
     case competitionAlertsResult(requestId: String, deviceEnabled: Bool)
     /// CONTENT_ALERTS_ENABLED의 결과(#466). 모양 · 뜻은 COMPETITION_ALERTS_RESULT와 같다 — 웹은 false면 꺼짐 안내를 띄운다.
@@ -886,6 +897,7 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
         case .photosPicked: return "PHOTOS_PICKED"
         case .profileUpdated: return "PROFILE_UPDATED"
         case .userBlockChanged: return "USER_BLOCK_CHANGED"
+        case .competitionRecordSaved: return "COMPETITION_RECORD_SAVED"
         case .competitionAlertsResult: return "COMPETITION_ALERTS_RESULT"
         case .contentAlertsResult: return "CONTENT_ALERTS_RESULT"
         }
@@ -899,6 +911,8 @@ enum WebBridgeOutboundMessage: Equatable, Sendable {
             return nil
         case let .userBlockChanged(userId, blocked):
             return ["userId": userId, "blocked": blocked]
+        case let .competitionRecordSaved(competitionId):
+            return ["competitionId": competitionId]
         case let .competitionAlertsResult(requestId, deviceEnabled),
              let .contentAlertsResult(requestId, deviceEnabled):
             return ["requestId": requestId, "deviceEnabled": deviceEnabled]

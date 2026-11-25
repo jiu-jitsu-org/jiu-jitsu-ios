@@ -17,6 +17,9 @@ public struct LoginFeature: Sendable {
         public var loadingProvider: SNSProvider?
         public var isLoading: Bool { loadingProvider != nil }
         public var toast: ToastState?
+        /// 이 기기에서 마지막으로 로그인한 수단 — 그 버튼에 "최근 로그인"을 단다(#380).
+        /// 같은 사람도 소셜마다 다른 계정이라, 로그아웃 뒤 다른 버튼을 누르면 새 계정이 생긴다.
+        var lastLoginProvider: SNSProvider?
         
         var tempToken: String?
         
@@ -42,6 +45,7 @@ public struct LoginFeature: Sendable {
         case path(StackAction<Path.State, Path.Action>)
         
         public enum ViewAction: Sendable {
+            case onAppear
             case kakaoButtonTapped
             case googleButtonTapped
             case appleButtonTapped
@@ -91,6 +95,10 @@ public struct LoginFeature: Sendable {
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
+            case .view(.onAppear):
+                state.lastLoginProvider = authClient.lastLoginProvider()
+                return .none
+
                 // MARK: - 로그인 버튼 탭
             case .view(.googleButtonTapped):
                 guard !state.isLoading else { return .none }
@@ -140,16 +148,20 @@ public struct LoginFeature: Sendable {
                 return handleError(state: &state, error: error)
                 
             case let .internal(.serverLoginResponse(.success(authInfo))):
+                let tappedProvider = state.loadingProvider
                 state.loadingProvider = nil
                 Log.trace("서버 로그인 성공: isNewUser=\(authInfo.isNewUser ?? false)", category: .network, level: .info)
                 // 1. 신규 유저일 경우
                 if authInfo.isNewUser == true {
                     guard let tempToken = authInfo.tempToken else {
                         Log.trace("Temp Token is missing for new user.", category: .debug, level: .error)
-                        return .send(.internal(.showToast(.init(message: "오류가 발생했습니다. 다시 시도해주세요.", status: .error))))
+                        return .send(.internal(.showToast(.init(message: "로그인하지 못했어요. 다시 시도해 주세요", status: .error))))
                     }
                     state.tempToken = tempToken
-                    state.sheet = .termsAgreement(.init())
+                    // 이 기기에서 최근 로그인한 수단이 지금 누른 것과 다르면 약관 시트에서 짚어 준다(#380).
+                    // 기록이 없거나 같으면 안내하지 않는다 — 처음 가입하는 사람에겐 잡음이다.
+                    let otherProvider = state.lastLoginProvider.flatMap { $0 == tappedProvider ? nil : $0 }
+                    state.sheet = .termsAgreement(.init(recentOtherProvider: otherProvider))
                 } else {
                     // 2. 기존 유저일 경우
                     Log.trace("기존 유저 로그인 성공", category: .debug, level: .info)
@@ -165,7 +177,7 @@ public struct LoginFeature: Sendable {
                 guard let tempToken = state.tempToken else {
                     Log.trace("Temp Token is missing for new user.", category: .debug, level: .error)
                     state.sheet = nil
-                    return .send(.internal(.showToast(.init(message: "오류가 발생했습니다. 다시 시도해주세요.", status: .error))))
+                    return .send(.internal(.showToast(.init(message: "로그인하지 못했어요. 다시 시도해 주세요", status: .error))))
                 }
                 
                 state.sheet = nil
@@ -196,7 +208,7 @@ public struct LoginFeature: Sendable {
                 case .element(id: _, action: .nicknameSetting(.delegate(.signupSessionExpired))):
                     state.tempToken = nil
                     state.path.removeAll()
-                    return .send(.internal(.showToast(.init(message: "시간이 지나 가입이 중단됐어요. 다시 로그인해주세요.", status: .info))))
+                    return .send(.internal(.showToast(.init(message: "시간이 지나 가입이 중단됐어요. 다시 로그인해 주세요", status: .info))))
 
                     // 가입을 그만둠(#368) — 임시 토큰을 버리고 로그인 첫 화면으로. 그다음은 부모가 정한다
                     // (앱 첫 화면은 로그인 화면에 머물고, 앱 안 로그인 창은 둘러보기처럼 닫힌다).

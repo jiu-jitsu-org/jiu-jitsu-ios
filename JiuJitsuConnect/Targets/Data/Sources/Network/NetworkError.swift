@@ -23,21 +23,21 @@ public enum NetworkError: Error, LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "유효하지 않은 URL입니다."
+            return "요청 주소가 올바르지 않아요"
         case .invalidResponse:
-            return "유효하지 않은 응답입니다."
+            return "서버 응답이 올바르지 않아요"
         case .decodingError:
-            return "데이터를 변환하는 데 실패했습니다."
+            return "받은 데이터를 읽지 못했어요"
         case .statusCodeError(_, let response):
-            return response?.message ?? "서버 오류가 발생했습니다."
+            return response?.message ?? "서버에 문제가 생겼어요"
         case .timeout:
-            return "요청 시간이 초과되었습니다."
+            return "서버 응답이 늦어요"
         case .noConnection:
-            return "네트워크 연결을 확인해 주세요."
+            return "연결이 불안정해요"
         case .sessionExpired:
-            return "세션이 만료되었습니다. 다시 로그인해 주세요."
+            return "로그인이 만료됐어요. 다시 로그인해 주세요"
         case .unknown:
-            return "알 수 없는 오류가 발생했습니다."
+            return "잠시 문제가 생겼어요"
         }
     }
     
@@ -55,8 +55,11 @@ public enum NetworkError: Error, LocalizedError, Sendable {
     
     public func toDomainError() -> DomainError {
         switch self {
-        case .noConnection, .timeout:
+        case .noConnection:
             return .networkUnavailable
+
+        case .timeout:
+            return .timeout
             
         case .decodingError:
             return .dataParsingFailed

@@ -331,7 +331,7 @@ public struct NicknameSettingFeature: Sendable {
             analyticsClient.logErrorShown(error)
             state.validationState = .networkError
             state.isKeyboardVisible = false
-            return .send(.delegate(.signupFailed(message: "오류가 발생했습니다. 다시 시도해주세요.")))
+            return .send(.delegate(.signupFailed(message: "잠시 문제가 생겼어요. 다시 시도해 주세요")))
         }
         
         switch domainError {
@@ -443,15 +443,15 @@ public extension NicknameSettingFeature.ValidationState {
         switch self {
         case .idle, .networkError:
             // 수정 상황은 안내 문구를 따로 둔다(정책 2.1)
-            return mode == .edit ? "어떻게 수정할까요?" : "어떻게 불러드리면 될까요?"
+            return mode == .edit ? "어떻게 수정할까요?" : "어떻게 불러 드리면 될까요?"
         case .available:
-            return "사용 가능한 닉네임입니다."
+            return "사용할 수 있는 닉네임이에요"
         case .unavailable:
-            return "이미 사용 중인 닉네임입니다."
+            return "이미 사용 중인 닉네임이에요"
         case .invalidLength, .invalidCharacters:
-            return "한글/영문/숫자,\n2~12자로 작성해주세요"
+            return "한글/영문/숫자,\n2~12자로 작성해 주세요"
         case .saveFailed:
-            return "잠시 문제가 생겼어요.\n다시 시도해주세요"
+            return "잠시 문제가 생겼어요.\n다시 시도해 주세요"
         }
     }
     

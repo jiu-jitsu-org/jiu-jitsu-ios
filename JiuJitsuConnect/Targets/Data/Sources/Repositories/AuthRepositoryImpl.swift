@@ -85,6 +85,10 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
         SNSProvider(rawValue: tokenStorage.getProvider() ?? "")
     }
 
+    public func lastLoginProvider() -> SNSProvider? {
+        SNSProvider(rawValue: tokenStorage.getLastLoginProvider() ?? "")
+    }
+
     /// 탈퇴 시점에 Apple 재인증으로 **새 authorizationCode**를 발급받는다.
     /// 로그인 때 받은 code는 이미 만료되어 서버의 Apple 토큰 revoke에 쓸 수 없다(#41, BE #149).
     /// provider가 Apple이 아니면 재인증 창을 띄우지 않고 nil을 반환해 기존 탈퇴 경로를 그대로 탄다.
@@ -170,6 +174,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                     refreshToken: refreshToken,
                     provider: user.snsProvider.rawValue
                 )
+                tokenStorage.recordLastLoginProvider(user.snsProvider.rawValue)
             }
             
             // 3. 응답받은 Data 모델(LoginResponseDTO)을 Domain 모델(AuthInfo)로 변환하여 반환
@@ -252,6 +257,12 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                     refreshToken: refreshToken,
                     provider: provider
                 )
+                // 기록이 생기기 전 버전부터 자동 로그인만 해 온 사람은 마지막 로그인 수단이 비어 있다(#380).
+                // 한 번만 채우고 이미 있으면 두지 않는다. 401 갱신(NetworkService)에서는 하지 않는다 —
+                // 로그아웃 직후 늦게 끝난 갱신이 다른 값을 남길 수 있다.
+                if tokenStorage.getLastLoginProvider() == nil, SNSProvider(rawValue: provider) != nil {
+                    tokenStorage.recordLastLoginProvider(provider)
+                }
             }
             return responseDTO.toDomain()
             

@@ -51,6 +51,7 @@ struct JiuJitsuConnectApp: App {
                     $0.competitionClient = DependencyContainer.shared.configureCompetitionClient()
                     $0.beltPromptClient = DependencyContainer.shared.configureBeltPromptClient()
                     $0.notificationPromptClient = DependencyContainer.shared.configureNotificationPromptClient()
+                    $0.legacyHeaderPatternClient = DependencyContainer.shared.configureLegacyHeaderPatternClient()
                     $0.imageUploadClient = DependencyContainer.shared.configureImageUploadClient()
                     $0.imageClient = DependencyContainer.shared.configureImageClient()
                     $0.authSessionEventClient = DependencyContainer.shared.configureAuthSessionEventClient()

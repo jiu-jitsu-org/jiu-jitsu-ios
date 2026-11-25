@@ -21,6 +21,10 @@ public protocol AuthRepository: Sendable {
     /// 이 기기에 저장된 로그인 수단. 탈퇴 안내가 Apple 재인증 여부를 미리 알릴 때 쓴다(#398) —
     /// `appleAuthorizationCodeForWithdrawal`과 같은 값으로 판단해야 안내와 실제 동작이 어긋나지 않는다.
     func storedProvider() -> SNSProvider?
+
+    /// 이 기기에서 마지막으로 로그인한 수단. 로그아웃 · 세션 만료 뒤에도 남고 탈퇴하면 지워진다(#380).
+    /// 로그인 화면의 "최근 로그인" 표시와 신규 가입 안내에 쓴다.
+    func lastLoginProvider() -> SNSProvider?
     
     func serverLogin(user: SNSUser) async throws -> AuthInfo
     /// `fcmToken`을 함께 보내면 서버가 이 기기의 푸시 토큰 연결을 지운다(#269).

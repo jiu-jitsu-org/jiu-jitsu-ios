@@ -20,6 +20,11 @@ import Foundation
 public struct CommunityDetailFeature: Sendable {
     public init() {}
 
+    private enum CancelID: Hashable, Sendable {
+        // 연결 문제로 실패한 웹이 연결이 돌아오길 지켜봄(#396). 쌓인 화면은 스택이 화면마다 따로 나눈다.
+        case connectionWatch
+    }
+
     @ObservableState
     public struct State: Equatable, Sendable {
         // OPEN_SUBVIEW에서 검증된 동일 origin 절대 URL. 같은 글을 다른 쿼리로 다시 열 때만 바뀐다(`reload(_:url:)`).
@@ -37,6 +42,8 @@ public struct CommunityDetailFeature: Sendable {
         // 네이티브가 스피너를 띄운다. 첫 응답부터는 웹 스켈레톤이 로딩 모습을 맡는다(#299 이후).
         var isAwaitingFirstResponse: Bool = true
         var hasError: Bool = false
+        // 연결 문제로 실패했는지와 연결이 돌아오면 한 번 다시 불러오기(#396).
+        var connectionRetry = WebConnectionRetry()
         // 웹 프로세스가 죽어 글쓰기 · 수정 화면의 작성 내용이 사라짐(#352). 오류 화면에 함께 알린다.
         var hasLostDraft = false
         // 글쓰기 · 수정으로 연 웹뷰의 프로세스가 죽음(#352). 등록 뒤엔 같은 웹뷰가 상세로 바뀌어(router.replace)
@@ -125,6 +132,8 @@ public struct CommunityDetailFeature: Sendable {
 
         public enum ViewAction: Sendable {
             case retryTapped
+            // 화면이 사용자에게 보이게 됨 · 가려짐(다른 탭 · 위에 쌓인 화면 · 백그라운드). 보일 때만 연결을 지켜본다(#396).
+            case visibilityChanged(Bool)
             // 로딩/에러 오버레이의 뒤로가기 탭. 웹이 응답할 수 없는 상태에서만 노출되므로
             // 가드를 묻지 않고 직접 닫는다(정상 화면의 뒤로가기는 웹 헤더가 CLOSE_SUBVIEW로 처리).
             case backTapped
@@ -150,6 +159,8 @@ public struct CommunityDetailFeature: Sendable {
             case refreshStarted
             case loadingFinished
             case loadingFailed(WebLoadFailure)
+            // 연결 문제로 실패한 뒤 연결이 돌아옴(#396) → 한 번 저절로 다시 불러온다.
+            case connectionRestored
             case screenLoadMeasured(WebScreenLoad)
             case webProcessTerminated
             case keyboardVisibilityChanged(Bool)
@@ -208,18 +219,33 @@ public struct CommunityDetailFeature: Sendable {
         case profileUpdated
         /// 남의 프로필에서 회원을 차단·해제함(#328) — PROFILE_UPDATED와 같은 통로로 열린 웹뷰 모두에 알린다.
         case userBlockChanged(userId: Int, blocked: Bool)
+        /// 대회 상세에서 연 기록 추가를 저장함(#397) — 같은 통로로 열린 웹뷰 모두에 COMPETITION_RECORD_SAVED를 알린다.
+        case competitionRecordSaved(competitionId: String)
     }
 
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.analyticsClient) var analyticsClient
     @Dependency(\.notificationPermissionClient) var notificationPermissionClient
     @Dependency(\.firebaseClient) var firebaseClient
+    @Dependency(\.networkPathClient) var networkPathClient
+    @Dependency(\.continuousClock) var clock
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
             case .view(.retryTapped):
                 Self.reload(&state)
+                return .none
+
+            case let .view(.visibilityChanged(isVisible)):
+                state.connectionRetry.screenVisibilityChanged(isVisible)
+                return .none
+
+            case .internal(.connectionRestored):
+                guard state.connectionRetry.isWatchingConnection, !state.isClosing, !state.hidesRetry else { return .none }
+                Log.trace("연결이 돌아와 다시 불러옴: \(state.url.path)", category: .network, level: .info)
+                Self.reload(&state)
+                state.connectionRetry.autoReloaded()
                 return .none
 
             case .view(.backTapped):
@@ -290,6 +316,7 @@ public struct CommunityDetailFeature: Sendable {
                 state.isLoading = true
                 state.isAwaitingFirstResponse = true
                 state.hasError = false
+                state.connectionRetry.loadStarted()
                 state.hasLostDraft = false
                 state.isPageReady = false
                 // 문서를 새로 불러오면 직전 페이지의 가드는 의미가 없다. 웹은 언마운트 때 false를 보내지만
@@ -309,12 +336,14 @@ public struct CommunityDetailFeature: Sendable {
                 state.isLoading = false
                 state.isAwaitingFirstResponse = false
                 state.hasError = false
+                state.connectionRetry.loadSucceeded()
                 return .none
 
             case let .internal(.loadingFailed(failure)):
                 state.isLoading = false
                 state.isAwaitingFirstResponse = false
                 state.hasError = true
+                state.connectionRetry.loadFailed(failure)
                 WebAnalytics.loadFailed(failure, client: analyticsClient)
                 return .none
 
@@ -343,6 +372,7 @@ public struct CommunityDetailFeature: Sendable {
                 state.isLoading = false
                 state.isAwaitingFirstResponse = false
                 state.hasError = true
+                state.connectionRetry.loadFailed(.processTerminated)
                 state.pendingConfirmDialog = nil
                 state.pendingSelectSheet = nil
                 state.pendingPhotoPick = nil
@@ -493,6 +523,17 @@ public struct CommunityDetailFeature: Sendable {
                 return .none
             }
         }
+        .onChange(of: { $0.connectionRetry.isWatchingConnection }) { _, isWatching in
+            Reduce { _, _ in
+                WebConnectionRetry.watchEffect(
+                    isWatching: isWatching,
+                    id: CancelID.connectionWatch,
+                    networkPathClient: networkPathClient,
+                    clock: clock,
+                    restored: .internal(.connectionRestored)
+                )
+            }
+        }
     }
 
     /// 같은 주소를 처음부터 다시 불러온다 — 다시 시도 버튼, 보고 있는 글의 푸시 · 링크(#383).
@@ -503,6 +544,7 @@ public struct CommunityDetailFeature: Sendable {
         guard !state.hidesRetry else { return }
         if let url { state.url = url }
         state.hasError = false
+        state.connectionRetry.reset()
         state.hasLostDraft = false
         state.isLoading = true
         state.isAwaitingFirstResponse = true
@@ -534,6 +576,8 @@ public struct CommunityDetailFeature: Sendable {
             enqueue(.profileUpdated, into: &state)
         case let .userBlockChanged(userId, blocked):
             enqueue(.userBlockChanged(userId: userId, blocked: blocked), into: &state)
+        case let .competitionRecordSaved(competitionId):
+            enqueue(.competitionRecordSaved(competitionId: competitionId), into: &state)
         }
     }
 

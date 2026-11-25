@@ -197,6 +197,7 @@ extension CommunityPublicProfile {
         competitions: [
             Competition(competitionYear: 2026, competitionName: "서울 오픈", competitionRank: .silver, competitionBelt: .black),
             Competition(competitionYear: 2025, competitionName: "전국 주짓수 선수권", competitionRank: .gold, competitionBelt: .brown)
-        ]
+        ],
+        backgroundPattern: .wrap
     )
 }

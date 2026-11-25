@@ -275,11 +275,11 @@ public struct AppTabView: View {
     }
 
     // 게스트가 인증 필요 동작(커뮤니티 글쓰기·대회 관심 등)을 시도할 때 노출되는 공통 로그인 유도 알럿.
-    // 특정 화면에 종속되지 않도록 문구를 일반화해 여러 진입점에서 그대로 재사용한다.
+    // 제목은 웹이 보낸 이유를 따르고(#392), 본문 · 버튼은 모든 진입점에서 같다.
     private var loginPromptAlertConfiguration: AppAlertConfiguration {
         AppAlertConfiguration(
-            title: "로그인하고 더 많은\n기능을 이용해보세요",
-            message: "커뮤니티 참여와 프로필 설정이 가능해요.",
+            title: AppTabFeature.loginPromptTitle(for: store.loginPromptReason),
+            message: AppTabFeature.loginPromptMessage,
             primaryButton: .init(
                 title: "로그인",
                 style: .primary,
@@ -353,6 +353,8 @@ public struct AppTabView: View {
         if store.mountedTabs.contains(tab) {
             let isActive = store.selectedTab == tab
             content()
+                // 다른 탭에 가린 웹 화면이 연결을 지켜보지 않게 한다(#396). 탭은 뷰를 유지해 onDisappear가 오지 않는다.
+                .environment(\.isTabSelected, isActive)
                 // 탭은 바로 보이고 사라진다.
                 .animation(nil) { $0.opacity(isActive ? 1 : 0) }
                 .allowsHitTesting(isActive)
