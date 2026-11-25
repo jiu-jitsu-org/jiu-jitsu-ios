@@ -17,12 +17,14 @@ enum StyleCardMetrics {
 /// 스타일 카드 앞면 컴포넌트
 ///
 /// 메인 화면에 표시되는 큰 스타일 카드의 앞면입니다.
-/// 내 띠 색을 옅게 푼 단색 바탕에 내 띠 캐릭터가 그 기술을 거는 그림, 타이틀, 설명을 둡니다(#495).
+/// 기술마다 다른 바탕 그래픽(`StyleCardBackdrop`) 위에 내 띠 캐릭터가 그 기술을 거는 그림, 타이틀, 설명을 둡니다(#495).
 struct StyleCard: View {
     let style: any StyleSelectable
     let isSelected: Bool
     /// 캐릭터가 맬 띠. 띠가 없으면 흰띠로 그린다.
     var beltRank: BeltRank? = nil
+    /// 바탕 시안. 앱은 `StyleCardBackdrop.current`를 쓰고, 미리보기에서만 바꿔 본다.
+    var backdrop: StyleCardBackdrop = .current
 
     // MARK: - Metrics
 
@@ -36,21 +38,26 @@ struct StyleCard: View {
     var body: some View {
         let belt = beltRank ?? .white
         let tone = belt.styleCardTone
+        let poseImage = style.poseImage(belt: belt).swiftUIImage
+        // 어두운 바탕이면 흰 글자, 밝은 바탕이면 진한 띠 색 글자
+        let titleColor = backdrop.isDark ? Color.white : tone.title
+        let textColor = backdrop.isDark ? Color.white.opacity(0.84) : tone.text
 
         VStack(alignment: .center, spacing: 0) {
             Spacer()
 
-            // 내 띠 캐릭터가 그 기술을 거는 그림
-            style.poseImage(belt: belt).swiftUIImage
+            // 내 띠 캐릭터가 그 기술을 거는 그림 — 어두운 바탕에선 그림자로 바탕과 떼어 놓는다
+            poseImage
                 .resizable()
                 .scaledToFit()
                 .frame(width: Metrics.poseSize, height: Metrics.poseSize)
+                .shadow(color: .black.opacity(backdrop.isDark ? 0.3 : 0), radius: 4, y: 6)
 
             // 풀 타이틀
             // 한 줄에 다 들어가게 — 긴 이름(이스케이프 디펜스)만 글자를 줄이고 나머지는 40 그대로
             Text(style.fullTitle.replacingOccurrences(of: "\n", with: " "))
                 .font(.cookieRun.custom(weight: .black, size: 40))
-                .foregroundStyle(tone.title)
+                .foregroundStyle(titleColor)
                 .multilineTextAlignment(.center)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
@@ -61,7 +68,7 @@ struct StyleCard: View {
             // 카드 설명
             Text(style.cardDescription)
                 .font(.pretendard.custom(weight: .medium, size: 16))
-                .foregroundStyle(tone.text)
+                .foregroundStyle(textColor)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
                 // 세 줄 안에 다 들어가게 — 한 줄이 넘치는 설명(하체 관절기)만 글자를 조금 줄인다
@@ -71,7 +78,12 @@ struct StyleCard: View {
                 .padding(.bottom, 32)
         }
         .frame(width: 262, height: 394)
-        .background(tone.background)
+        .background {
+            StyleCardBackdropView(
+                backdrop: backdrop, impact: style.impact,
+                colors: StyleCardBackdropColors(belt: belt), poseImage: poseImage
+            )
+        }
         .clipShape(RoundedRectangle(cornerRadius: StyleCardMetrics.cornerRadius))
     }
 }
@@ -295,6 +307,29 @@ private extension StylePose {
                 StyleCard(style: TechniqueType.sweeps, isSelected: true)
                 StyleCard(style: TechniqueType.escapes, isSelected: true)
                 StyleCard(style: TechniqueType.guardPasses, isSelected: true)
+            }
+        }
+        .padding()
+    }
+    .background(Color.component.background.default)
+}
+
+#Preview("StyleCard - 바탕 시안 × 기술 (#495)") {
+    let styles: [any StyleSelectable] = [
+        PositionType.top, PositionType.guard,
+        SubmissionType.armLocks, SubmissionType.chokes, SubmissionType.legLocks,
+        TechniqueType.takedowns, TechniqueType.sweeps, TechniqueType.escapes, TechniqueType.guardPasses
+    ]
+    ScrollView([.vertical, .horizontal]) {
+        VStack(alignment: .leading, spacing: 24) {
+            ForEach(StyleCardBackdrop.allCases) { backdrop in
+                Text(backdrop.title)
+                    .font(.pretendard.title2)
+                HStack(spacing: 16) {
+                    ForEach(styles.indices, id: \.self) { index in
+                        StyleCard(style: styles[index], isSelected: true, beltRank: .purple, backdrop: backdrop)
+                    }
+                }
             }
         }
         .padding()

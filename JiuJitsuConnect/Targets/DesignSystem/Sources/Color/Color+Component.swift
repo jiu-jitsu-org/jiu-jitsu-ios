@@ -497,6 +497,83 @@ public struct ComponentColors {
                 }
             }
         }
+
+        /// 최애 기술 카드 앞면 바탕 그래픽(#495) — 띠 · 도복 · 매트 같은 그림을 그릴 때 쓰는 띠별 색 한 벌.
+        /// 밝은 바탕은 `StyleCard.Tone.background`를 그대로 쓰고, 여기엔 그 위에 얹는 색만 둔다.
+        /// 캐릭터가 띠 색이라, 캐릭터 뒤에 깔리는 큰 띠 그림은 `soft` · `strap`처럼 한 톤 밝게 칠한다.
+        public let styleCardBackdrop = StyleCardBackdrop()
+
+        public struct StyleCardBackdrop {
+            /// 맞부딪힘 시안의 상대 쪽(회색 캐릭터) 바탕 — 띠와 상관없이 같다
+            public let opponent = Color(hex: "#3A3E46")
+            public let opponentDeep = Color(hex: "#24272D")
+            public let opponentSpark = Color(hex: "#C9CDD3")
+
+            public let white = Palette(
+                deep: "#1B1F25", base: "#2E343D", mid: "#8994A2", light: "#DCE2E9",
+                soft: "#C9D0D9", strap: "#A9B3BF", glow: "#FFFFFF", glowOpacity: 0.30,
+                gi: "#2B3D5C", giIsDark: true
+            )
+            public let blue = Palette(
+                deep: "#041E45", base: "#0A3772", mid: "#0091FF", light: "#8CCBFF",
+                soft: "#A9D7FF", strap: "#62B8FF", glow: "#E6F4FF", glowOpacity: 0.40,
+                gi: "#F6F7F8", giIsDark: false
+            )
+            public let purple = Palette(
+                deep: "#26093F", base: "#43156B", mid: "#B44DF0", light: "#E7B5FF",
+                soft: "#EAC6FF", strap: "#DE9BFF", glow: "#F9EBFF", glowOpacity: 0.40,
+                gi: "#F6F7F8", giIsDark: false
+            )
+            public let brown = Palette(
+                deep: "#26120A", base: "#472415", mid: "#A66040", light: "#E9B996",
+                soft: "#E3C4AE", strap: "#CC8E6C", glow: "#FFF1E6", glowOpacity: 0.50,
+                gi: "#F6F7F8", giIsDark: false
+            )
+            /// 검정 캐릭터가 어두운 바탕에 묻히지 않게 캐릭터 뒤 빛을 가장 세게 둔다.
+            public let black = Palette(
+                deep: "#0A0A0B", base: "#1D1D20", mid: "#55555B", light: "#C4C4C8",
+                soft: "#BEBEC3", strap: "#909097", glow: "#FFFFFF", glowOpacity: 0.75,
+                gi: "#F6F7F8", giIsDark: false
+            )
+
+            public struct Palette {
+                /// 어두운 바탕의 가장 진한 색(바닥)
+                public let deep: Color
+                /// 어두운 바탕
+                public let base: Color
+                /// 띠 색 쪽 중간 색(선 · 무늬)
+                public let mid: Color
+                /// 어두운 바탕 위 밝은 색
+                public let light: Color
+                /// 밝은 바탕 위 큰 띠 그림
+                public let soft: Color
+                /// 캐릭터 뒤를 지나가는 띠(바늘땀 띠)
+                public let strap: Color
+                /// 캐릭터 바로 뒤를 밝히는 빛
+                public let glow: Color
+                public let glowOpacity: Double
+                /// 도복 색 — 흰띠는 흰 캐릭터가 뜨게 파란 도복
+                public let gi: Color
+                public let giIsDark: Bool
+
+                init(
+                    deep: String, base: String, mid: String, light: String,
+                    soft: String, strap: String, glow: String, glowOpacity: Double,
+                    gi: String, giIsDark: Bool
+                ) {
+                    self.deep = Color(hex: deep)
+                    self.base = Color(hex: base)
+                    self.mid = Color(hex: mid)
+                    self.light = Color(hex: light)
+                    self.soft = Color(hex: soft)
+                    self.strap = Color(hex: strap)
+                    self.glow = Color(hex: glow)
+                    self.glowOpacity = glowOpacity
+                    self.gi = Color(hex: gi)
+                    self.giIsDark = giIsDark
+                }
+            }
+        }
     }
 
     // MARK: - Belt Card
