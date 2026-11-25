@@ -76,7 +76,11 @@ public final class UserRepositoryImpl: UserRepository {
         do {
             let endpoint = UserEndpoint.withdrawal(authorizationCode: authorizationCode)
             let responseDTO: Bool = try await networkService.request(endpoint: endpoint)
-            
+
+            // 탈퇴한 계정의 수단을 "최근 로그인"으로 계속 권하지 않는다(#380).
+            if responseDTO {
+                tokenStorage.clearLastLoginProvider()
+            }
             return responseDTO
             
         } catch let error as NetworkError {

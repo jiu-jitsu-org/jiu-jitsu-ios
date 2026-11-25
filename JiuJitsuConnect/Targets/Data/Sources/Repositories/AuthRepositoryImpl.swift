@@ -85,6 +85,10 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
         SNSProvider(rawValue: tokenStorage.getProvider() ?? "")
     }
 
+    public func lastLoginProvider() -> SNSProvider? {
+        SNSProvider(rawValue: tokenStorage.getLastLoginProvider() ?? "")
+    }
+
     /// 탈퇴 시점에 Apple 재인증으로 **새 authorizationCode**를 발급받는다.
     /// 로그인 때 받은 code는 이미 만료되어 서버의 Apple 토큰 revoke에 쓸 수 없다(#41, BE #149).
     /// provider가 Apple이 아니면 재인증 창을 띄우지 않고 nil을 반환해 기존 탈퇴 경로를 그대로 탄다.

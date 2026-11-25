@@ -13,7 +13,14 @@ public protocol TokenStorage: Sendable {
     func getAccessToken() -> String?
     func getRefreshToken() -> String?
     func getProvider() -> String?
+    /// 토큰을 지운다. 마지막 로그인 수단(`getLastLoginProvider`)은 남긴다 — 로그아웃 · 세션 만료 뒤
+    /// 로그인 화면이 "최근 로그인"을 보여 줘야 한다(#380).
     func clear()
+
+    /// 이 기기에서 마지막으로 로그인에 성공한 SNS 종류(#380). `clear()`로는 지워지지 않는다.
+    func getLastLoginProvider() -> String?
+    /// 탈퇴처럼 이 기기에서 계정을 정리할 때만 지운다(#380).
+    func clearLastLoginProvider()
 
     func setAutoLoginEnabled(_ enabled: Bool)
     func isAutoLoginEnabled() -> Bool
@@ -25,6 +32,8 @@ public final class DefaultTokenStorage: TokenStorage {
         static let accessToken = "accessToken"
         static let refreshToken = "refreshToken"
         static let provider = "provider"
+        /// `provider`는 세션과 함께 지워지므로 따로 둔다(#380).
+        static let lastLoginProvider = "lastLoginProvider"
         static let autoLoginEnabled = "autoLoginEnabled"
     }
 
@@ -45,6 +54,7 @@ public final class DefaultTokenStorage: TokenStorage {
         saveToKeychain(key: Keys.accessToken, value: accessToken)
         saveToKeychain(key: Keys.refreshToken, value: refreshToken)
         UserDefaults.standard.set(provider, forKey: Keys.provider)
+        UserDefaults.standard.set(provider, forKey: Keys.lastLoginProvider)
     }
 
     public func getAccessToken() -> String? {
@@ -72,6 +82,19 @@ public final class DefaultTokenStorage: TokenStorage {
         deleteFromKeychain(key: Keys.refreshToken)
         UserDefaults.standard.removeObject(forKey: Keys.provider)
         UserDefaults.standard.removeObject(forKey: Keys.autoLoginEnabled)
+    }
+
+    // MARK: - Last Login Provider (#380)
+    public func getLastLoginProvider() -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return UserDefaults.standard.string(forKey: Keys.lastLoginProvider)
+    }
+
+    public func clearLastLoginProvider() {
+        lock.lock()
+        defer { lock.unlock() }
+        UserDefaults.standard.removeObject(forKey: Keys.lastLoginProvider)
     }
 
     // MARK: - Auto Login
