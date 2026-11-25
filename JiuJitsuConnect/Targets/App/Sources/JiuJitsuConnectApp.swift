@@ -18,9 +18,13 @@ struct JiuJitsuConnectApp: App {
         AppConfigurator.configureExternalSDKs()
     }
 
+    // App 본문은 다시 계산될 수 있어, Store는 처음 그릴 때 한 번만 만들고 그 뒤로는 같은 것을 쓴다.
+    // 만드는 때(첫 본문)는 그대로 둔다 — Firebase 설정이 AppDelegate 뒤에 오는 순서를 바꾸지 않는다.
+    @MainActor private static var store: StoreOf<AppFeature>?
+
     var body: some Scene {
         WindowGroup {
-            AppView(store: createStore())
+            AppView(store: sharedStore())
                 .onOpenURL { url in
                     if AuthApi.isKakaoTalkLoginUrl(url) {
                         _ = AuthController.handleOpenUrl(url: url)
@@ -33,6 +37,13 @@ struct JiuJitsuConnectApp: App {
         }
     }
     
+    private func sharedStore() -> StoreOf<AppFeature> {
+        if let store = Self.store { return store }
+        let store = createStore()
+        Self.store = store
+        return store
+    }
+
     // Store 생성 함수
     private func createStore() -> StoreOf<AppFeature> {
         // 테스트 환경이 아닐 때만 Live 의존성 주입
