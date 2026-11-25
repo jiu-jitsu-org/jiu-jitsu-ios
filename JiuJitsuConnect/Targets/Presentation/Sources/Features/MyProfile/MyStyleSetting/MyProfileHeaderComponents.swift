@@ -344,7 +344,8 @@ private struct ProfileImageView: View {
             // VoiceOver에선 사진만 '다시 보기' 버튼으로 읽는다. 수정 띠는 아래 overlay라 따로 읽힌다.
             // 동작 줄이기에선 MyBeltRingView가 움직이지 않는다.
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("띠 링 다시 보기")
+            .accessibilityLabel(profilePhotoAccessibilityLabel(beltRank: beltRank, beltStripe: beltStripe))
+            .accessibilityHint("띠 링이 다시 돌아요")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { replayTrigger += 1 }
             // 사진 원 안쪽 아래를 띠로 덮는다 — MyBeltRingView가 사진을 원으로 잘라 링·틈은 덮지 않고,
@@ -457,6 +458,12 @@ private struct ProfileImageView: View {
     }
 }
 
+/// 사진 요소가 읽을 이름 — 사진 둘레 링이 띠를 보여 주니 띠도 함께 읽는다. MY와 남의 프로필이 같이 쓴다.
+func profilePhotoAccessibilityLabel(beltRank: BeltRank?, beltStripe: BeltStripe?) -> String {
+    guard let beltRank else { return "프로필 사진" }
+    return (["프로필 사진, \(beltRank.displayName) 띠", beltStripe?.displayName].compactMap { $0 }).joined(separator: " ")
+}
+
 // MARK: - NicknameEditRow
 
 /// 닉네임 + 수정 버튼 행
@@ -491,7 +498,8 @@ private struct NicknameEditRow: View {
                 .editRowHitArea()
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(nickname), 닉네임 수정")
+            // 뱃지는 그림뿐이라 라벨에 인증 여부를 넣는다.
+            .accessibilityLabel(isOwner ? "\(nickname), 관장·사범 인증, 닉네임 수정" : "\(nickname), 닉네임 수정")
         }
         .frame(height: height)
         .padding(.horizontal, 20)

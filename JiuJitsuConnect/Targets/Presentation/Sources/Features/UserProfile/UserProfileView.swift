@@ -239,7 +239,8 @@ private struct UserProfileHeaderView: View {
                     profileImage
                 }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("띠 링 다시 보기")
+                .accessibilityLabel(profilePhotoAccessibilityLabel(beltRank: beltRank, beltStripe: beltStripe))
+                .accessibilityHint("띠 링이 다시 돌아요")
                 .accessibilityAddTraits(.isButton)
                 .accessibilityAction { replayTrigger += 1 }
             }
@@ -313,6 +314,8 @@ private struct UserProfileBeltCardView: View {
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 40, height: 40)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
+                    // 옆 글자가 띠를 읽으니 그림 이름(에셋 경로)은 읽지 않게 한다.
+                    .accessibilityHidden(true)
             } else {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color.primitive.coolGray.cg50)
@@ -344,6 +347,8 @@ private struct UserProfileBeltCardView: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: 20, height: 20)
+                        // 옆 '관장·사범' 글자가 뜻을 읽으니 그림 이름(에셋 경로)은 읽지 않게 한다.
+                        .accessibilityHidden(true)
 
                     Text("관장·사범")
                         .font(Font.pretendard.buttonS)
