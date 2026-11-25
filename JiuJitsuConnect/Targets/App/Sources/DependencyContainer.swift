@@ -114,6 +114,9 @@ public final class DependencyContainer {
             },
             storedProvider: {
                 self.authRepository.storedProvider()
+            },
+            lastLoginProvider: {
+                self.authRepository.lastLoginProvider()
             }
         )
     }
