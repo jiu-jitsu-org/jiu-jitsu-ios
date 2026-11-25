@@ -263,6 +263,9 @@ public struct MyProfileFeature: Sendable {
             case competitionAddFailed                              // 대회 정보 추가 저장 실패
             case competitionUpdated(CommunityProfile) // 대회 정보 수정 저장 완료
             case competitionDeleted(CommunityProfile) // 대회 정보 삭제 저장 완료
+            case competitionDeleteFailed              // 대회 정보 삭제 저장 실패 — 저장이 아니라 삭제 실패로 알린다(QA A3-3)
+            // 바꿀 기록을 새로 받은 목록에서 못 찾아 저장하지 않음(QA A3-1, A3-7) — 화면을 서버 목록으로 맞추고 실패로 알린다.
+            case competitionTargetMissing(latest: CommunityProfile, isDelete: Bool)
             case competitionPinUpdated(CommunityProfile, isPinned: Bool) // 대회 고정/해제 저장 완료
             case competitionOrderSaved(CommunityProfile)    // 대회 순서 저장 완료
             case competitionOrderReverted(CommunityProfile) // 대회 순서 저장 실패 — 바꾸기 전 목록으로 되돌림
@@ -981,7 +984,7 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case let .destination(.presented(.competitionInfo(.delegate(.didFinishAdding(competition))))):
-                guard let profile = state.communityProfile else {
+                guard state.communityProfile != nil else {
                     state.destination = nil
                     return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
@@ -990,12 +993,11 @@ public struct MyProfileFeature: Sendable {
                     category: .debug,
                     level: .info
                 )
-                let updatedProfile = profile.addingCompetition(competition)
                 // 저장 결과를 보고 완료 화면('부문 추가')으로 넘어가야 하므로 입력 화면은 닫지 않는다(#123).
                 Self.beginProfileSave(&state)
                 return .run { send in
                     let result = await TaskResult {
-                        try await communityClient.updateProfile(updatedProfile, .competition)
+                        try await saveCompetitions { $0.addingCompetition(competition) }
                     }
                     switch result {
                     case .success(let saved):
@@ -1008,7 +1010,7 @@ public struct MyProfileFeature: Sendable {
                 }
 
             case let .destination(.presented(.competitionInfo(.delegate(.didFinishEditing(original, updated))))):
-                guard let profile = state.communityProfile else {
+                guard state.communityProfile != nil else {
                     state.destination = nil
                     return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
@@ -1017,16 +1019,21 @@ public struct MyProfileFeature: Sendable {
                     category: .debug,
                     level: .info
                 )
-                let updatedProfile = profile.updatingCompetition(original: original, with: updated)
                 state.destination = nil
                 Self.beginProfileSave(&state)
                 return .run { send in
                     let result = await TaskResult {
-                        try await communityClient.updateProfile(updatedProfile, .competition)
+                        // 고칠 원래 기록을 새 목록에서 못 찾으면 바뀐 것 없이 저장하고 성공이라 하지 않게 멈춘다(QA A3-7).
+                        try await saveCompetitions { latest in
+                            guard Self.containsAll([original], in: latest.competitions) else { return nil }
+                            return latest.updatingCompetition(original: original, with: updated)
+                        }
                     }
                     switch result {
                     case .success(let saved):
                         await send(.internal(.competitionUpdated(saved)))
+                    case .failure(let missing as CompetitionTargetMissing):
+                        await send(.internal(.competitionTargetMissing(latest: missing.latest, isDelete: false)))
                     case .failure(let error):
                         await send(.internal(.updateProfileResponse(.failure(error))))
                     }
@@ -1075,6 +1082,17 @@ public struct MyProfileFeature: Sendable {
                 state.communityProfile = profile
                 return .send(.internal(.showToast(.init(message: "대회 정보를 삭제했어요", status: .success))))
 
+            case .internal(.competitionDeleteFailed):
+                state.isLoadingProfile = false
+                return .send(.internal(.showToast(.init(message: "삭제하지 못했어요. 다시 시도해 주세요", status: .error))))
+
+            case let .internal(.competitionTargetMissing(latest, isDelete)):
+                state.isLoadingProfile = false
+                // 다른 곳에서 바뀐 목록을 그대로 보여 줘 회원이 지금 기록을 보고 다시 하게 한다.
+                state.communityProfile = latest
+                let message = isDelete ? "삭제하지 못했어요. 다시 시도해 주세요" : "저장하지 못했어요. 다시 시도해 주세요"
+                return .send(.internal(.showToast(.init(message: message, status: .error))))
+
             case let .view(.addDivisionTapped(entries)):
                 guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
                 state.destination = .competitionInfo(
@@ -1101,15 +1119,19 @@ public struct MyProfileFeature: Sendable {
                         ))))
                     }
                 }
-                let updatedProfile = profile.settingCompetitionsPinned(entries, isPinned: isPinning)
                 Self.beginProfileSave(&state)
                 return .run { send in
                     let result = await TaskResult {
-                        try await communityClient.updateProfile(updatedProfile, .competition)
+                        try await saveCompetitions { latest in
+                            guard Self.containsAll(entries, in: latest.competitions) else { return nil }
+                            return latest.settingCompetitionsPinned(entries, isPinned: isPinning)
+                        }
                     }
                     switch result {
                     case .success(let saved):
                         await send(.internal(.competitionPinUpdated(saved, isPinned: isPinning)))
+                    case .failure(let missing as CompetitionTargetMissing):
+                        await send(.internal(.competitionTargetMissing(latest: missing.latest, isDelete: false)))
                     case .failure(let error):
                         await send(.internal(.updateProfileResponse(.failure(error))))
                     }
@@ -1126,11 +1148,17 @@ public struct MyProfileFeature: Sendable {
                 Self.beginProfileSave(&state)
                 return .run { send in
                     let result = await TaskResult {
-                        try await communityClient.updateProfile(updatedProfile, .competition)
+                        try await saveCompetitions { latest in
+                            guard Self.containsAll(groups.flatMap { $0 }, in: latest.competitions) else { return nil }
+                            return latest.reorderingCompetitions(groups)
+                        }
                     }
                     switch result {
                     case .success(let saved):
                         await send(.internal(.competitionOrderSaved(saved)))
+                    case .failure(let missing as CompetitionTargetMissing):
+                        // 먼저 옮겨 둔 순서 대신 서버 목록으로 맞춘다.
+                        await send(.internal(.competitionTargetMissing(latest: missing.latest, isDelete: false)))
                     case .failure(let error):
                         await send(.internal(.competitionOrderReverted(profile)))
                         await send(.internal(.updateProfileResponse(.failure(error))))
@@ -1669,15 +1697,48 @@ public struct MyProfileFeature: Sendable {
         Self.beginProfileSave(&state)
         return .run { send in
             let result = await TaskResult {
-                try await communityClient.updateProfile(updatedProfile, .competition)
+                try await saveCompetitions { latest in
+                    guard Self.containsAll(entries, in: latest.competitions) else { return nil }
+                    return entries.reduce(latest) { $0.removingCompetition($1) }
+                }
             }
             switch result {
             case .success(let saved):
                 await send(.internal(.competitionDeleted(saved)))
+            case .failure(let missing as CompetitionTargetMissing):
+                await send(.internal(.competitionTargetMissing(latest: missing.latest, isDelete: true)))
             case .failure(let error):
-                await send(.internal(.updateProfileResponse(.failure(error))))
+                Log.trace("Failed to delete competition: \(error)", category: .network, level: .error)
+                analyticsClient.logErrorShown(error)
+                await send(.internal(.competitionDeleteFailed))
             }
         }
+    }
+
+    /// 바꿀 기록을 새로 받은 목록에서 못 찾아 저장하지 않음 — 화면을 맞출 서버 목록을 싣는다(QA A3-1).
+    private struct CompetitionTargetMissing: Error {
+        let latest: CommunityProfile
+    }
+
+    /// 대회 저장은 목록 전체 교체라, 들고 있던 프로필이 낡았으면 그사이 다른 곳(탭 MY · 쌓인 MY · 웹 '내 기록에 남기기')에서
+    /// 바꾼 기록을 서버에서 지운다(QA A3-1). 웹 경로처럼 저장 직전에 새로 받아 그 위에 바꾼다.
+    /// `change`가 nil이면(바꿀 기록이 새 목록에 없음) 덮어쓰지 않고 `CompetitionTargetMissing`을 던진다.
+    private func saveCompetitions(
+        _ change: @Sendable (CommunityProfile) -> CommunityProfile?
+    ) async throws -> CommunityProfile {
+        let latest = try await communityClient.fetchProfile()
+        guard let updated = change(latest) else { throw CompetitionTargetMissing(latest: latest) }
+        return try await communityClient.updateProfile(updated, .competition)
+    }
+
+    /// 대상 기록이 목록에 모두 있는지. 기록에 식별자가 없어 값으로 찾고, 값이 같은 기록이 여럿이면 그 개수까지 센다.
+    private static func containsAll(_ targets: [Competition], in competitions: [Competition]) -> Bool {
+        var remaining = competitions
+        for target in targets {
+            guard let index = remaining.firstIndex(of: target) else { return false }
+            remaining.remove(at: index)
+        }
+        return true
     }
 }
 // MARK: - Sendable Conformances
