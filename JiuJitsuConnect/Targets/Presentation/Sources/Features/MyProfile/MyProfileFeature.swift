@@ -97,6 +97,16 @@ public struct MyProfileFeature: Sendable {
         /// 커뮤니티에서 내 사진을 눌러 스택에 쌓은 MY인지(#197). 탭 화면이 아니라 왼쪽 위에 뒤로가기가 붙고 탭바가 없다.
         var isPushed: Bool = false
 
+        /// 쌓인 MY를 지금 닫으면 안 되는지 — 스택에서 빠지면 저장 · 업로드 effect가 함께 취소돼
+        /// 결과 안내 없이 저장이 끊긴다(QA A2-1). 처음 불러오는 중(프로필 없음)은 끊겨도 잃을 게 없어 막지 않는다.
+        var blocksLeaving: Bool {
+            isPushed && (
+                isUploadingProfileImage
+                    || isUploadingInstructorVerification
+                    || (isLoadingProfile && communityProfile != nil)
+            )
+        }
+
         // 띠 링 등장 움직임(#320) — 세션에서 MY가 처음 보일 때 한 번, 띠를 바꾼 직후 다시.
         // 탭이 미리 마운트돼 화면의 onAppear로는 '보인 때'를 알 수 없어 탭 진입(tabEntered)·쌓은 MY의 onAppear로 정한다.
         var hasPlayedBeltEntrance = false
@@ -357,6 +367,7 @@ public struct MyProfileFeature: Sendable {
                 return .send(.internal(.loadProfile))
 
             case .view(.backTapped):
+                guard !state.blocksLeaving else { return Self.savingInProgressToast() }
                 return .run { _ in await self.dismiss() }
 
             case .view(.tabEntered), .view(.sceneBecameActive):

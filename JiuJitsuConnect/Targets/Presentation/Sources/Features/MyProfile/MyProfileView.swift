@@ -89,6 +89,14 @@ public struct MyProfileView: View {
             }
             .toolbar(store.isPushed ? .hidden : .automatic, for: .navigationBar)
             .navigationBarBackButtonHidden(store.isPushed)
+            // 저장 · 업로드 중엔 스와이프로도 나가지 못하게 하고 뒤로가기와 같이 안내한다(QA A2-1).
+            .background {
+                if store.blocksLeaving {
+                    InteractivePopBlocker {
+                        store.send(.view(.backTapped))
+                    }
+                }
+            }
     }
 
     // 남의 프로필(UserProfileView)·웹 상세의 뒤로가기와 같은 자리·크기(아이콘 24 / 터치 40). 띠 색 헤더 위라 흰색.
