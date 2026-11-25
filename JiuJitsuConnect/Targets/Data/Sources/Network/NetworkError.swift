@@ -31,9 +31,9 @@ public enum NetworkError: Error, LocalizedError, Sendable {
         case .statusCodeError(_, let response):
             return response?.message ?? "서버에 문제가 생겼어요"
         case .timeout:
-            return "요청 시간이 초과되었습니다."
+            return "서버 응답이 늦어요"
         case .noConnection:
-            return "네트워크 연결을 확인해 주세요."
+            return "연결이 불안정해요"
         case .sessionExpired:
             return "로그인이 만료됐어요. 다시 로그인해 주세요"
         case .unknown:
