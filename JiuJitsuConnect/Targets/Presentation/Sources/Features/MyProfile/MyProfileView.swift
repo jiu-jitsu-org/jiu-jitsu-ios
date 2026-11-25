@@ -114,6 +114,7 @@ public struct MyProfileView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("뒤로 가기")
     }
 
     private var screen: some View {

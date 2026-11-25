@@ -179,6 +179,7 @@ public struct UserProfileView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("뒤로 가기")
     }
 
     // MY 헤더의 ⋯와 같은 시스템 메뉴 — 바깥을 누르면 닫히고 VoiceOver가 메뉴로 읽는다(#399).

@@ -94,7 +94,7 @@ public struct AnalyticsSettingView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("뒤로")
+            .accessibilityLabel("뒤로 가기")
 
             Spacer()
 

@@ -72,6 +72,7 @@ public struct MyProfileCompetitionSection: View {
                     }
                     .frame(width: 32, height: 32)
                     .buttonStyle(.plain)
+                    .accessibilityLabel("대회 기록 추가")
                 }
             }
 
