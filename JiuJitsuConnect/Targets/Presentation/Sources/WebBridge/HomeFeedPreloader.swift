@@ -161,6 +161,9 @@ final class HomeFeedPreload {
                     coordinator.webView(webView, didFail: nil, withError: error)
                 case let .message(body):
                     coordinator.receiveBridgeMessage(body)
+                case .terminated:
+                    // 이어받기 전에 웹 프로세스가 죽었으면 홈 웹뷰와 같은 복구(#479)를 탄다 — 아니면 로딩 덮개 · 흰 화면이 남는다.
+                    coordinator.webViewWebContentProcessDidTerminate(webView)
                 }
             }
         }
@@ -175,6 +178,8 @@ private final class HomeFeedPreloadRecorder: NSObject, WKNavigationDelegate, WKS
         case failed(Error)
         /// 보낸 프레임 검사(OSS 웹 메인 프레임)를 받을 때 마친 메시지. 넘길 때는 프레임 정보가 없다.
         case message(Any)
+        /// 웹 콘텐츠 프로세스 종료(메모리 압박 · 백그라운드)
+        case terminated
     }
 
     // 받은 시각과 함께 둔다 — 이어받은 홈이 화면 속도를 실제로 온 때로 잰다(#431).
@@ -218,6 +223,11 @@ private final class HomeFeedPreloadRecorder: NSObject, WKNavigationDelegate, WKS
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         events.append((.failed(error), .now))
+    }
+
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        Log.trace("🏠 home-preload: 웹 프로세스 종료 받아 둠", category: .view, level: .error)
+        events.append((.terminated, .now))
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
