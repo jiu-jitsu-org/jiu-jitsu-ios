@@ -30,6 +30,7 @@ struct PostCommunityProfileRequestDTO: Codable {
     let teachingPhilosophy: String?
     let teachingStartDate: String?
     let teachingDetail: String?
+    let backgroundPattern: String?
 
     /// Domain 모델로부터 DTO 생성
     /// - Parameters:
@@ -56,6 +57,8 @@ struct PostCommunityProfileRequestDTO: Codable {
         self.teachingPhilosophy = profile.teachingPhilosophy
         self.teachingStartDate = profile.teachingStartDate
         self.teachingDetail = profile.teachingDetail
+        // 무늬는 무늬 저장(BACKGROUND_PATTERN)에서만 보낸다(#337).
+        self.backgroundPattern = section == .backgroundPattern ? profile.backgroundPattern?.rawValue : nil
     }
 }
 

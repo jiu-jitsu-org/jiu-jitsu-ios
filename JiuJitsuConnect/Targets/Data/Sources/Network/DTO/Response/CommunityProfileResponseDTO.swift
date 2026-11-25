@@ -31,6 +31,8 @@ struct CommunityProfileResponseDTO: Codable {
     let teachingPhilosophy: String?
     let teachingStartDate: String?
     let teachingDetail: String?
+    /// 상단 바탕 무늬(#337). 고른 적 없으면 null
+    let backgroundPattern: String?
     
     /// DTO를 Domain 모델로 변환
     func toDomain() -> CommunityProfile {
@@ -57,7 +59,8 @@ struct CommunityProfileResponseDTO: Codable {
             medalCount: medalCount?.toDomain() ?? .zero,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
-            teachingDetail: teachingDetail
+            teachingDetail: teachingDetail,
+            backgroundPattern: backgroundPattern.map(ProfileBackgroundPattern.init(rawValue:))
         )
     }
 }

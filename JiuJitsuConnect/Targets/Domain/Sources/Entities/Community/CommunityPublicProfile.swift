@@ -25,6 +25,8 @@ public struct CommunityPublicProfile: Equatable, Sendable {
     public let competitions: [Competition]
     /// 내가 이 회원을 차단했는지(한 방향). 비로그인이거나 서버가 아직 내려 주지 않으면 nil — 차단 메뉴를 숨긴다(#328)
     public let isBlocked: Bool?
+    /// 그 회원이 고른 상단 바탕 무늬(#337). 고른 적 없으면 nil — 앱 기본 무늬
+    public let backgroundPattern: ProfileBackgroundPattern?
 
     public init(
         userId: Int,
@@ -38,7 +40,8 @@ public struct CommunityPublicProfile: Equatable, Sendable {
         favoriteTechnique: TechniqueType? = nil,
         favoriteSubmission: SubmissionType? = nil,
         competitions: [Competition] = [],
-        isBlocked: Bool? = nil
+        isBlocked: Bool? = nil,
+        backgroundPattern: ProfileBackgroundPattern? = nil
     ) {
         self.userId = userId
         self.nickname = nickname
@@ -52,5 +55,6 @@ public struct CommunityPublicProfile: Equatable, Sendable {
         self.favoriteSubmission = favoriteSubmission
         self.competitions = competitions
         self.isBlocked = isBlocked
+        self.backgroundPattern = backgroundPattern
     }
 }

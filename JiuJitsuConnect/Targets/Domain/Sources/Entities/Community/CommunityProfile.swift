@@ -68,6 +68,9 @@ public struct CommunityProfile: Codable, Equatable, Sendable {
     
     /// 지도 상세 정보 (코치/관장용)
     public let teachingDetail: String?
+
+    /// 상단 바탕 무늬(#337). 고른 적 없으면 nil — 앱 기본 무늬로 그린다.
+    public let backgroundPattern: ProfileBackgroundPattern?
     
     public init(
         nickname: String,
@@ -89,7 +92,8 @@ public struct CommunityProfile: Codable, Equatable, Sendable {
         medalCount: MedalCount = .zero,
         teachingPhilosophy: String? = nil,
         teachingStartDate: String? = nil,
-        teachingDetail: String? = nil
+        teachingDetail: String? = nil,
+        backgroundPattern: ProfileBackgroundPattern? = nil
     ) {
         self.nickname = nickname
         self.profileImageUrl = profileImageUrl
@@ -111,6 +115,7 @@ public struct CommunityProfile: Codable, Equatable, Sendable {
         self.teachingPhilosophy = teachingPhilosophy
         self.teachingStartDate = teachingStartDate
         self.teachingDetail = teachingDetail
+        self.backgroundPattern = backgroundPattern
     }
 }
 
@@ -211,7 +216,8 @@ extension CommunityProfile {
             medalCount: medalCount,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
-            teachingDetail: teachingDetail
+            teachingDetail: teachingDetail,
+            backgroundPattern: backgroundPattern
         )
     }
 
@@ -237,7 +243,8 @@ extension CommunityProfile {
             medalCount: medalCount,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
-            teachingDetail: teachingDetail
+            teachingDetail: teachingDetail,
+            backgroundPattern: backgroundPattern
         )
     }
 
@@ -263,7 +270,8 @@ extension CommunityProfile {
             medalCount: medalCount,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
-            teachingDetail: teachingDetail
+            teachingDetail: teachingDetail,
+            backgroundPattern: backgroundPattern
         )
     }
 
@@ -289,7 +297,8 @@ extension CommunityProfile {
             medalCount: medalCount,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
-            teachingDetail: teachingDetail
+            teachingDetail: teachingDetail,
+            backgroundPattern: backgroundPattern
         )
     }
     
@@ -315,7 +324,8 @@ extension CommunityProfile {
             medalCount: medalCount,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
-            teachingDetail: teachingDetail
+            teachingDetail: teachingDetail,
+            backgroundPattern: backgroundPattern
         )
     }
 
@@ -341,7 +351,8 @@ extension CommunityProfile {
             medalCount: medalCount,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
-            teachingDetail: teachingDetail
+            teachingDetail: teachingDetail,
+            backgroundPattern: backgroundPattern
         )
     }
 
@@ -367,7 +378,37 @@ extension CommunityProfile {
             medalCount: medalCount,
             teachingPhilosophy: teachingPhilosophy,
             teachingStartDate: teachingStartDate,
-            teachingDetail: teachingDetail
+            teachingDetail: teachingDetail,
+            backgroundPattern: backgroundPattern
+        )
+    }
+}
+
+extension CommunityProfile {
+    /// 상단 바탕 무늬 업데이트 (#337)
+    public func updatingBackgroundPattern(_ pattern: ProfileBackgroundPattern) -> CommunityProfile {
+        CommunityProfile(
+            nickname: nickname,
+            profileImageUrl: profileImageUrl,
+            beltRank: beltRank,
+            beltStripe: beltStripe,
+            gender: gender,
+            weightKg: weightKg,
+            academyName: academyName,
+            competitions: competitions,
+            bestSubmission: bestSubmission,
+            favoriteSubmission: favoriteSubmission,
+            bestTechnique: bestTechnique,
+            favoriteTechnique: favoriteTechnique,
+            bestPosition: bestPosition,
+            favoritePosition: favoritePosition,
+            isWeightHidden: isWeightHidden,
+            isOwner: isOwner,
+            medalCount: medalCount,
+            teachingPhilosophy: teachingPhilosophy,
+            teachingStartDate: teachingStartDate,
+            teachingDetail: teachingDetail,
+            backgroundPattern: pattern
         )
     }
 }
@@ -401,6 +442,9 @@ public enum ProfileSection: String, Codable, Sendable, CaseIterable, Equatable {
     /// 지도자 정보 (teachingPhilosophy, teachingStartDate, teachingDetail)
     case instructorInfo = "OWNER_INFO"
 
+    /// 상단 바탕 무늬만 (backgroundPattern, #337) — 띠·체급 등은 그대로 둔다
+    case backgroundPattern = "BACKGROUND_PATTERN"
+
     // NOTE: 프로필 이미지(`profileImageUrl`)는 커뮤니티 프로필 섹션이 아닌
     // user-level 데이터로 분리되어 `PUT /api/user/profile`로 갱신한다.
 
@@ -421,7 +465,51 @@ public enum ProfileSection: String, Codable, Sendable, CaseIterable, Equatable {
             return "대회 기록"
         case .instructorInfo:
             return "지도자 정보"
+        case .backgroundPattern:
+            return "배경"
         }
+    }
+}
+
+/// 프로필 상단 바탕 무늬 (`backgroundPattern`, #337)
+///
+/// 무늬는 앞으로 늘 수 있어, 이 앱이 모르는 값도 디코딩을 깨지 않고 `unknown`으로 받아 둔다(앱은 기본 무늬로 그린다).
+/// 모르는 값을 nil(고른 적 없음)과 섞지 않아야 기기에 남은 예전 무늬로 새 무늬를 덮어쓰지 않는다.
+public enum ProfileBackgroundPattern: RawRepresentable, Codable, Equatable, Hashable, Sendable {
+    case ossHand
+    case bigBelt
+    case beltTip
+    case wrap
+    /// 새 버전 앱에서 고른, 이 앱이 모르는 무늬
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "OSS_HAND": self = .ossHand
+        case "BIG_BELT": self = .bigBelt
+        case "BELT_TIP": self = .beltTip
+        case "WRAP": self = .wrap
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .ossHand: return "OSS_HAND"
+        case .bigBelt: return "BIG_BELT"
+        case .beltTip: return "BELT_TIP"
+        case .wrap: return "WRAP"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
     }
 }
 
