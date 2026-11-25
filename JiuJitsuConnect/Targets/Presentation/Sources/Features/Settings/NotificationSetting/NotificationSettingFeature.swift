@@ -284,7 +284,8 @@ public struct NotificationSettingFeature: Sendable {
                 if let lastSaved = state.lastSavedSetting {
                     state.apply(lastSaved)
                 }
-                return handleError(error)
+                // 취소된 앞 요청이 이미 서버에 닿았을 수 있어, 되돌린 값이 서버 값과 다를 수 있다 — 서버 값을 한 번 다시 읽는다.
+                return .merge(handleError(error), fetchSetting(generation: state.saveGeneration))
 
             // MARK: - Toast Actions
 
