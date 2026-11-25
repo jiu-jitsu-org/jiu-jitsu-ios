@@ -211,8 +211,11 @@ private struct BlinkingCursorView: View {
             .fill(Color.component.textfieldDisplay.focus.text)
             .frame(width: 2, height: 36)
             .opacity(isVisible ? 1 : 0)
-            .onAppear {
-                Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+            // 반복 Timer는 커서가 사라져도 멈추지 않고 나타날 때마다 쌓인다 — 화면 수명에 묶인 task로 깜빡인다.
+            .task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    guard !Task.isCancelled else { return }
                     withAnimation(.easeInOut(duration: 0.1)) {
                         isVisible.toggle()
                     }
