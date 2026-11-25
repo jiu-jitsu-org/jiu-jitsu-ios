@@ -58,28 +58,10 @@ extension BeltRank {
     var beltSurfaceColor: Color {
         self == .white ? Color.component.myBelt.whiteRing : beltColor
     }
-
-    /// 다른 사람 프로필 헤더 배경색 (MY는 `beltColor`를 쓴다)
-    /// 띠 몸 색으로 칠하되, 몸 색이 너무 밝거나(흰띠) 어두우면(검은띠) 그 띠의 바 색으로 칠한다 —
-    /// 흰띠는 검은 바(먹색), 검은띠는 빨간 바.
-    var headerBackgroundColor: Color {
-        switch self {
-        case .white:
-            return Color.component.myProfileHeader.bg.black
-        case .blue:
-            return Color.component.myProfileHeader.bg.blue
-        case .purple:
-            return Color.component.myProfileHeader.bg.purple
-        case .brown:
-            return Color.component.myProfileHeader.bg.brwon
-        case .black:
-            return Color.component.myProfileHeader.bg.blackBeltBar
-        }
-    }
 }
 
 extension Optional where Wrapped == BeltRank {
-    /// MY 헤더 바탕(#320). 띠가 없으면 기본색.
+    /// MY · 남의 프로필(#337) 헤더 바탕(#320). 띠가 없으면 기본색.
     var myHeaderColor: Color {
         self?.beltColor ?? Color.component.myProfileHeader.bg.default
     }
@@ -89,15 +71,5 @@ extension Optional where Wrapped == BeltRank {
         self?.isLightBelt == true
             ? Color.component.myBelt.onLight
             : Color.component.list.setting.background
-    }
-
-    /// Optional BeltRank의 헤더 배경색 (nil일 경우 기본색)
-    var headerBackgroundColor: Color {
-        switch self {
-        case .none:
-            return Color.component.myProfileHeader.bg.default
-        case .some(let beltRank):
-            return beltRank.headerBackgroundColor
-        }
     }
 }

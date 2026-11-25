@@ -3,7 +3,7 @@
 //  Presentation
 //
 //  MY 헤더 바탕 무늬와 무늬 고르기 시트 (#320).
-//  무늬는 띠 색 위에 같은 계열 색으로 옅게 깐다. 고른 무늬는 이 기기에만 저장한다(서버 없음).
+//  무늬는 띠 색 위에 같은 계열 색으로 옅게 깐다. 고른 무늬는 서버에 저장해 남의 프로필에도 같이 보인다(#337).
 //
 
 import SwiftUI
@@ -19,8 +19,8 @@ public enum MyHeaderPattern: String, CaseIterable, Identifiable, Sendable {
     case beltTip
     case wrap
 
-    /// UserDefaults(@AppStorage) 키
-    static let storageKey = "myHeaderPattern"
+    /// 고른 적 없거나 이 앱이 모르는 무늬일 때
+    static let `default`: MyHeaderPattern = .oss
 
     public var id: String { rawValue }
 
@@ -30,6 +30,33 @@ public enum MyHeaderPattern: String, CaseIterable, Identifiable, Sendable {
         case .oss: return "OSS 손"
         case .beltTip: return "띠 끝"
         case .wrap: return "감긴 띠"
+        }
+    }
+}
+
+// MARK: - 서버 무늬 값 (#337)
+
+extension MyHeaderPattern {
+    /// 서버 값으로 그릴 무늬. 고른 적 없거나(nil) 이 앱이 모르는 무늬면 기본 무늬.
+    init(_ pattern: ProfileBackgroundPattern?) {
+        switch pattern {
+        case .ossHand?: self = .oss
+        case .bigBelt?: self = .plain
+        case .beltTip?: self = .beltTip
+        case .wrap?: self = .wrap
+        case .unknown?, nil: self = .default
+        }
+    }
+
+    /// 서버에 저장할 값.
+    /// 서버 값은 '큰 띠' 무늬가 있던 때(jiu-jitsu-backend#234) 정해져 '단색'이 없다. '큰 띠'가 빠지고 그 자리에 '단색'이 들어와
+    /// 단색을 BIG_BELT로 저장한다 — 서버에 단색 값이 생기면 여기와 위 `init`만 고친다.
+    var serverValue: ProfileBackgroundPattern {
+        switch self {
+        case .plain: return .bigBelt
+        case .oss: return .ossHand
+        case .beltTip: return .beltTip
+        case .wrap: return .wrap
         }
     }
 }

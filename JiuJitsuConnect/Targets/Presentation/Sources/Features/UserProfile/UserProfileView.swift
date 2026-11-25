@@ -9,8 +9,6 @@ import DesignSystem
 import Domain
 
 private enum Metrics {
-    // MY와 같은 헤더 위 여백
-    static let headerTopSpacing: CGFloat = 68
     // 도장명(없으면 닉네임)과 벨트 카드 사이 — MY와 같은 13
     static let gapAboveCard: CGFloat = 13
     static let horizontalPadding: CGFloat = 20
@@ -102,6 +100,8 @@ public struct UserProfileView: View {
                         academyName: profile.academyName,
                         profileImageUrl: profile.profileImageUrl,
                         beltRank: profile.beltRank,
+                        beltStripe: profile.beltStripe,
+                        pattern: MyHeaderPattern(profile.backgroundPattern),
                         safeAreaTop: safeAreaTop,
                         bottomSpacing: Metrics.gapAboveCard + beltCardHeight / 2
                     )
@@ -155,7 +155,12 @@ public struct UserProfileView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // 웹 상세의 뒤로가기와 같은 자리·크기(아이콘 24 / 터치 40). 띠 색 헤더 위에서는 흰색.
+    /// 띠 색 헤더 위 아이콘 색 — MY와 같이 밝은 띠(흰띠)면 어둡게, 아니면 흰색(#337)
+    private var headerForeground: Color {
+        (store.profile?.beltRank).myHeaderForeground
+    }
+
+    // 웹 상세의 뒤로가기와 같은 자리·크기(아이콘 24 / 터치 40). 띠 색 헤더 위에서는 헤더 글자색.
     private func backButton(onHeader: Bool) -> some View {
         Button {
             store.send(.view(.backTapped))
@@ -167,7 +172,7 @@ public struct UserProfileView: View {
                 .frame(width: 24, height: 24)
                 .foregroundStyle(
                     onHeader
-                        ? Color.component.list.setting.background
+                        ? headerForeground
                         : Color.component.header.iconButton
                 )
                 .frame(width: 40, height: 40)
@@ -194,7 +199,7 @@ public struct UserProfileView: View {
                 .renderingMode(.template)
                 .resizable()
                 .frame(width: 16, height: 16)
-                .foregroundStyle(Color.component.list.setting.background)
+                .foregroundStyle(headerForeground)
                 .frame(width: 40, height: 40)
                 .contentShape(Rectangle())
         }
@@ -206,41 +211,63 @@ public struct UserProfileView: View {
 
 // MARK: - UserProfileHeaderView
 
-/// 사진 · 닉네임 · 도장 — MY 헤더에서 고치기 버튼을 뺀 모양
+/// 사진 · 닉네임 · 도장 — MY 헤더에서 고치기 버튼을 뺀 모양.
+/// 사진 둘레 띠 링 · 띠 색 바탕 · 그 회원이 고른 무늬는 MY와 같은 부품으로 그린다(#337). 띠가 없으면 기본 바탕에 점선 링.
 private struct UserProfileHeaderView: View {
     let nickname: String
     let academyName: String?
     let profileImageUrl: String?
     let beltRank: BeltRank?
+    let beltStripe: BeltStripe?
+    let pattern: MyHeaderPattern
     let safeAreaTop: CGFloat
     let bottomSpacing: CGFloat
 
+    /// MY처럼 사진·링을 누르면 링이 다시 돈다. 들어올 때 저절로 돌지는 않는다 — 남의 프로필은 자주 열고 닫는다.
+    @State private var replayTrigger = 0
+
+    private var foreground: Color { beltRank.myHeaderForeground }
+
     var body: some View {
         VStack(spacing: 0) {
-            Spacer().frame(height: safeAreaTop + Metrics.headerTopSpacing)
+            Spacer().frame(height: safeAreaTop + MyProfileHeaderView.avatarTopSpacing)
 
-            profileImage
-                .frame(width: 90, height: 90)
-                .background(Color.component.list.setting.background)
-                .clipShape(RoundedRectangle(cornerRadius: 24))
+            MyBeltRingView(beltRank: beltRank, beltStripe: beltStripe, replayTrigger: replayTrigger) {
+                ZStack {
+                    Color.component.list.setting.background
+                    profileImage
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("띠 링 다시 보기")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { replayTrigger += 1 }
+            }
+            .contentShape(Circle())
+            .onTapGesture { replayTrigger += 1 }
 
             Text(nickname)
                 .font(Font.pretendard.title3)
-                .foregroundStyle(Color.component.list.setting.background)
+                .foregroundStyle(foreground)
                 .frame(height: 29)
-                .padding(.top, 12)
+                .padding(.top, 10)
 
             if let academyName {
                 Text(academyName)
                     .font(Font.pretendard.bodyS)
-                    .foregroundStyle(Color.component.list.setting.background.opacity(0.7))
+                    .foregroundStyle(foreground.opacity(0.7))
                     .frame(height: 32)
             }
 
             Spacer().frame(height: bottomSpacing)
         }
         .frame(maxWidth: .infinity)
-        .background(beltRank.headerBackgroundColor)
+        .background {
+            MyHeaderBackground(
+                beltRank: beltRank,
+                pattern: pattern,
+                avatarCenterY: safeAreaTop + MyProfileHeaderView.avatarTopSpacing + MyBeltRing.box / 2
+            )
+        }
     }
 
     @ViewBuilder
