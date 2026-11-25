@@ -47,6 +47,9 @@ public struct MyProfileFeature: Sendable {
         // user-level 프로필 — 관장사범 인증 신청 상태(ownerVerification) 등.
         // 닉네임/프로필이미지 등 community와 겹치는 필드는 표시에 쓰지 않는다(단일 소스는 communityProfile).
         var userProfile: UserProfile?
+        // user 프로필을 바꾸는 일(사진 업로드 · 삭제, 관장 사범 인증 신청)을 몇 번 시작했는지.
+        // 그 전에 나간 조회 응답이 늦게 와 방금 바꾼 사진 · 인증 상태를 옛 값으로 덮지 않게 버리는 데 쓴다(QA A2-7).
+        var userProfileGeneration = 0
         
         // 토스트 메시지 상태
         var toast: ToastState?
@@ -252,10 +255,10 @@ public struct MyProfileFeature: Sendable {
             case profileResponse(TaskResult<CommunityProfile>)
             // user-level 프로필(GET /api/user/profile) 응답 — 관장사범 인증 신청 상태(ownerVerification) 등.
             // community 프로필과 독립적으로 처리해 한쪽 실패가 다른 쪽을 막지 않게 한다.
-            case userProfileResponse(TaskResult<UserProfile>)
+            case userProfileResponse(TaskResult<UserProfile>, generation: Int)
             case refreshProfile
             case refreshProfileResponse(TaskResult<CommunityProfile>, saveGeneration: Int)
-            case refreshUserProfileResponse(TaskResult<UserProfile>)
+            case refreshUserProfileResponse(TaskResult<UserProfile>, generation: Int)
             case updateProfileSection(ProfileSection, String?)
             case saveBeltInfoOnly(rank: BeltRank, stripe: BeltStripe)
             // 스타일 저장 (특기 + 최애 한 번에)
@@ -390,11 +393,12 @@ public struct MyProfileFeature: Sendable {
                       !state.isRefreshingProfile else { return .none }
                 state.isRefreshingProfile = true
                 let saveGeneration = state.profileSaveGeneration
+                let userGeneration = state.userProfileGeneration
                 return .run { send in
                     async let communityResult = TaskResult { try await communityClient.fetchProfile() }
                     async let userResult = TaskResult { try await userClient.fetchUserProfile() }
                     await send(.internal(.refreshProfileResponse(communityResult, saveGeneration: saveGeneration)))
-                    await send(.internal(.refreshUserProfileResponse(userResult)))
+                    await send(.internal(.refreshUserProfileResponse(userResult, generation: userGeneration)))
                 }
                 .cancellable(id: CancelID.profileRefresh, cancelInFlight: true)
 
@@ -412,8 +416,9 @@ public struct MyProfileFeature: Sendable {
                     return .none
                 }
 
-            case let .internal(.refreshUserProfileResponse(result)):
-                guard !state.isUploadingInstructorVerification, !state.isUploadingProfileImage else { return .none }
+            case let .internal(.refreshUserProfileResponse(result, generation)):
+                guard !state.isUploadingInstructorVerification, !state.isUploadingProfileImage,
+                      generation == state.userProfileGeneration else { return .none }
                 switch result {
                 case let .success(profile):
                     state.userProfile = profile
@@ -427,6 +432,7 @@ public struct MyProfileFeature: Sendable {
                 guard !state.authInfo.isGuest else { return .none }
                 state.isLoadingProfile = true
                 state.profileLoadFailed = false
+                let userGeneration = state.userProfileGeneration
                 // community 프로필과 user 프로필을 병렬 조회 — 둘은 서로 다른 엔드포인트이고
                 // 의존성이 없어 직렬로 기다릴 이유가 없다. 각각 독립 TaskResult로 흘려보내
                 // user 조회 실패가 화면(community) 로딩을 막지 않게 한다.
@@ -434,7 +440,7 @@ public struct MyProfileFeature: Sendable {
                     async let communityResult = TaskResult { try await communityClient.fetchProfile() }
                     async let userResult = TaskResult { try await userClient.fetchUserProfile() }
                     await send(.internal(.profileResponse(communityResult)))
-                    await send(.internal(.userProfileResponse(userResult)))
+                    await send(.internal(.userProfileResponse(userResult, generation: userGeneration)))
                 }
 
             case let .internal(.profileResponse(.success(profile))):
@@ -442,15 +448,15 @@ public struct MyProfileFeature: Sendable {
                 state.communityProfile = profile
                 return migrateLegacyHeaderPatternIfNeeded(&state)
 
-            case let .internal(.userProfileResponse(.success(profile))):
-                // 사진을 바꾸는 중이면 업로드 전 값이라 덮지 않는다 — 업로드 응답이 최신값을 넣는다.
-                guard !state.isUploadingProfileImage else { return .none }
+            case let .internal(.userProfileResponse(.success(profile), generation)):
+                // 사진을 바꾸는 중이거나 그사이 바꿨으면 바꾸기 전 값이라 덮지 않는다 — 업로드 응답이 최신값을 넣는다.
+                guard !state.isUploadingProfileImage, generation == state.userProfileGeneration else { return .none }
                 state.userProfile = profile
                 // 서버 값이 기준이다. 남은 미리보기가 웹·다른 기기에서 바꾸거나 지운 사진을 가리지 않게 걷는다(#157).
                 state.pendingProfileImageData = nil
                 return .none
 
-            case let .internal(.userProfileResponse(.failure(error))):
+            case let .internal(.userProfileResponse(.failure(error), _)):
                 // user 프로필 조회 실패는 화면 표시를 막지 않는다(인증 뱃지 등 부가 정보 한정).
                 Log.trace("Failed to load user profile: \(error)", category: .network, level: .error)
                 return .none
@@ -1278,6 +1284,7 @@ public struct MyProfileFeature: Sendable {
                 // 인증 사진은 노출되지 않는 검수용이라 Optimistic Update 대신 로딩 오버레이로
                 // 진행을 표시하고 터치를 막는다. 완료·실패 응답에서 해제 후 결과 토스트(#62).
                 state.isUploadingInstructorVerification = true
+                state.userProfileGeneration += 1
                 Log.trace(
                     "관장 사범 인증 - 크롭 생략, 원본 업로드 시작 (\(data.count) bytes)",
                     category: .network,
@@ -1373,6 +1380,7 @@ public struct MyProfileFeature: Sendable {
                 }
                 let updatedProfile = profile.updatingProfileImage(url: nil, fileId: nil)
                 state.isUploadingProfileImage = true
+                state.userProfileGeneration += 1
                 // Optimistic UX — 헤더를 즉시 기본 아이콘으로 전환
                 state.isProfileImageDeleting = true
                 Log.trace("프로필 이미지 - 삭제 요청 (imageFileId=\(imageFileId))", category: .network, level: .info)
@@ -1457,6 +1465,7 @@ public struct MyProfileFeature: Sendable {
                     ))))
                 }
                 state.isUploadingProfileImage = true
+                state.userProfileGeneration += 1
                 // Optimistic UX — 크롭 결과를 헤더에 즉시 노출 (네트워크와 무관하게)
                 state.pendingProfileImageData = croppedData
                 Log.trace(
