@@ -174,6 +174,7 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                     refreshToken: refreshToken,
                     provider: user.snsProvider.rawValue
                 )
+                tokenStorage.recordLastLoginProvider(user.snsProvider.rawValue)
             }
             
             // 3. 응답받은 Data 모델(LoginResponseDTO)을 Domain 모델(AuthInfo)로 변환하여 반환

@@ -42,6 +42,10 @@ public final class UserRepositoryImpl: UserRepository {
                     refreshToken: refreshToken,
                     provider: provider
                 )
+                // 서버가 준 값이라 앱이 아는 수단일 때만 남긴다(#380)
+                if SNSProvider(rawValue: provider) != nil {
+                    tokenStorage.recordLastLoginProvider(provider)
+                }
             }
             
             // 3. 응답받은 Data 모델을 Domain 모델로 변환하여 반환

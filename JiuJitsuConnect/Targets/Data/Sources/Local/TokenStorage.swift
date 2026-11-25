@@ -19,6 +19,9 @@ public protocol TokenStorage: Sendable {
 
     /// 이 기기에서 마지막으로 로그인에 성공한 SNS 종류(#380). `clear()`로는 지워지지 않는다.
     func getLastLoginProvider() -> String?
+    /// 로그인 · 가입 완료에서만 부른다. 토큰 갱신(`save`)과 나눈 이유: 로그아웃 직후 늦게 끝난 갱신이
+    /// 빈 `provider`로 저장해도 마지막 로그인 수단이 지워지지 않게 한다.
+    func recordLastLoginProvider(_ provider: String)
     /// 탈퇴처럼 이 기기에서 계정을 정리할 때만 지운다(#380).
     func clearLastLoginProvider()
 
@@ -54,7 +57,6 @@ public final class DefaultTokenStorage: TokenStorage {
         saveToKeychain(key: Keys.accessToken, value: accessToken)
         saveToKeychain(key: Keys.refreshToken, value: refreshToken)
         UserDefaults.standard.set(provider, forKey: Keys.provider)
-        UserDefaults.standard.set(provider, forKey: Keys.lastLoginProvider)
     }
 
     public func getAccessToken() -> String? {
@@ -89,6 +91,13 @@ public final class DefaultTokenStorage: TokenStorage {
         lock.lock()
         defer { lock.unlock() }
         return UserDefaults.standard.string(forKey: Keys.lastLoginProvider)
+    }
+
+    public func recordLastLoginProvider(_ provider: String) {
+        guard !provider.isEmpty else { return }
+        lock.lock()
+        defer { lock.unlock() }
+        UserDefaults.standard.set(provider, forKey: Keys.lastLoginProvider)
     }
 
     public func clearLastLoginProvider() {
