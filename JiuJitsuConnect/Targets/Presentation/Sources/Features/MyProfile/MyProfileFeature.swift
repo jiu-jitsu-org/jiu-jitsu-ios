@@ -1139,8 +1139,13 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case let .internal(.presentPickedVerificationImage(data)):
-                // 픽커가 내려가는 사이 다른 시트를 열었거나 신청이 진행 중이면 띄우지 않는다
-                guard state.sheet == nil, !state.isUploadingInstructorVerification else { return .none }
+                // 실제로는 걸리지 않는 방어다. 300ms 동안은 픽커 · 고르기 시트가 내려가는 전환 중이라 MY를 눌러
+                // 다른 시트를 열 수 없고, 업로드는 이 인증 시트의 [이 사진으로 신청]에서만 시작된다.
+                // 그래도 걸리면 시트를 겹쳐 띄우지 않고, 조용히 사라지지 않게 기록을 남긴다.
+                guard state.sheet == nil, !state.isUploadingInstructorVerification else {
+                    Log.trace("관장 사범 인증 - 고른 사진 확인 시트를 띄우지 못함(다른 시트 또는 업로드 중)", category: .view, level: .error)
+                    return .none
+                }
                 state.sheet = .instructorVerification(
                     Self.instructorVerificationState(from: state, pickedImageData: data)
                 )

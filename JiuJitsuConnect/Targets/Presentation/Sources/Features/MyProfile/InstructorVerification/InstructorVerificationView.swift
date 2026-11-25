@@ -186,6 +186,8 @@ public struct InstructorVerificationView: View {
         }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ko_KR")
+        // 서버가 서울 시각으로 기록하므로 날짜도 서울 기준으로 보여 준다 — 해외 기기에서 하루 어긋나지 않게
+        formatter.timeZone = TimeZone(identifier: "Asia/Seoul")
         formatter.dateFormat = "M월 d일"
         return "\(formatter.string(from: requestedAt))에 낸 사진을 확인하고 있어요 (2~3일)"
     }
