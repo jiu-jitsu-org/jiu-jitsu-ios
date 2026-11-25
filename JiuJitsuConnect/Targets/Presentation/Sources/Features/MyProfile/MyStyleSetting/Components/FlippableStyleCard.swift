@@ -22,8 +22,6 @@ struct FlippableStyleCard: View {
     let style: any StyleSelectable
     /// 앞면 캐릭터가 맬 띠
     var beltRank: BeltRank?
-    /// 조명이 켜졌는지
-    var isLit: Bool
     /// 앞면이 보이기 시작할 때(첫 회전 시작) 한 번 부른다
     var onRevealed: () -> Void
 
@@ -38,14 +36,12 @@ struct FlippableStyleCard: View {
         category: String,
         style: any StyleSelectable,
         beltRank: BeltRank? = nil,
-        isLit: Bool = false,
         playsIntro: Bool = false,
         onRevealed: @escaping () -> Void = {}
     ) {
         self.category = category
         self.style = style
         self.beltRank = beltRank
-        self.isLit = isLit
         self.onRevealed = onRevealed
         let initialAngle: Double = playsIntro ? Metrics.flipAngle : 0
         _dragAngle = State(initialValue: initialAngle)
@@ -107,7 +103,7 @@ struct FlippableStyleCard: View {
     
     var body: some View {
         FlipCard(angle: dragAngle, perspective: Metrics.perspective) {
-            StyleCard(style: style, isSelected: true, beltRank: beltRank, isLit: isLit)
+            StyleCard(style: style, isSelected: true, beltRank: beltRank)
         } back: {
             StyleCardBack(category: category, style: style)
         }

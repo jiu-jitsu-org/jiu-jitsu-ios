@@ -22,6 +22,9 @@ public struct MyStyleSettingView: View {
 
     private var isRevealed: Bool { revealedType == store.settingType }
 
+    /// 아래 줄에서 바꿀 때 새 카드가 들어오는 쪽 — 1이면 오른쪽에서, -1이면 왼쪽에서
+    @State private var swapDirection: CGFloat = 1
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// 동작 줄이기를 켰으면 조명이 바로 켜진다
@@ -73,6 +76,7 @@ public struct MyStyleSettingView: View {
         static let lightDuration: Double = 0.7
         /// 조명이 켜지기 전 카드는 어둠 속에 있다
         static let unlitBrightness: Double = -0.35
+        static let swapAnimation: Animation = .spring(response: 0.48, dampingFraction: 0.72)
     }
 
     public var body: some View {
@@ -170,25 +174,24 @@ public struct MyStyleSettingView: View {
     
     private var styleCardsView: some View {
         let currentStyle = store.selectedFavoriteStyle
-        
-        return HStack {
-            Spacer()
-            
+
+        // 바꿀 때 이전 카드와 새 카드가 잠깐 겹쳐 지나가도록 ZStack에 둔다
+        return ZStack {
             if let style = currentStyle {
                 // 선택된 스타일 카드 (플립 가능)
                 FlippableStyleCard(
                     category: store.settingType.title,
                     style: style,
                     beltRank: store.beltRank,
-                    isLit: isRevealed,
                     playsIntro: !isRevealed,
                     onRevealed: {
                         withAnimation(lightAnimation) { revealedType = store.settingType }
                     }
                 )
                 .brightness(isRevealed ? 0 : StageMetrics.unlitBrightness)
-                // 다음 단계(기술 · 서브미션)로 넘어가면 새 카드로 다시 돈다
-                .id(store.settingType.title)
+                // 다른 카드를 고르거나 다음 단계(기술 · 서브미션)로 넘어가면 새 카드로 바뀐다
+                .id("\(store.settingType.title)-\(style.id)")
+                .transition(cardSwapTransition)
             } else {
                 // "없음"이 선택된 상태 - EmptySelectionCard 표시
                 EmptySelectionCard(
@@ -196,18 +199,50 @@ public struct MyStyleSettingView: View {
                         // 탭 동작 없음 (이미 선택된 상태)
                     }
                 )
+                .transition(cardSwapTransition)
             }
-            
-            Spacer()
         }
+        .frame(maxWidth: .infinity)
         .frame(height: StageMetrics.cardSize.height)
         .background {
-            StageLight(cardSize: StageMetrics.cardSize, cornerRadius: 40)
+            StageLight(cardSize: StageMetrics.cardSize, cornerRadius: StyleCardMetrics.cornerRadius)
                 .opacity(isRevealed && currentStyle != nil ? 1 : 0)
                 .animation(lightAnimation, value: currentStyle == nil)
         }
     }
-    
+
+    // MARK: - Card Swap
+
+    /// 새 카드는 고른 쪽에서 밀려 들어오고, 이전 카드는 반대쪽으로 기울며 빠진다(#495)
+    private var cardSwapTransition: AnyTransition {
+        .asymmetric(
+            insertion: .modifier(active: CardSwapEffect(position: swapDirection), identity: CardSwapEffect(position: 0)),
+            removal: .modifier(active: CardSwapEffect(position: -swapDirection), identity: CardSwapEffect(position: 0))
+        )
+    }
+
+    /// 아래 줄에서 카드를 눌렀을 때
+    private func styleTapped(_ style: any StyleSelectable) {
+        // 고른 카드를 다시 누르면 선택이 풀려 맨 앞 '없음'으로 간다
+        let current = store.selectedFavoriteStyle
+        let next: (any StyleSelectable)? = current?.id == style.id ? nil : style
+        guard !reduceMotion else {
+            store.send(.view(.styleCardTapped(style)))
+            return
+        }
+        // 빠지는 카드는 마지막으로 그려진 방향으로 나간다. 방향을 먼저 그려 둔 다음 순서에 고른다.
+        swapDirection = lineIndex(of: next) >= lineIndex(of: current) ? 1 : -1
+        Task { @MainActor in
+            store.send(.view(.styleCardTapped(style)), animation: StageMetrics.swapAnimation)
+        }
+    }
+
+    /// 아래 줄에서의 자리. '없음'이 맨 앞(-1)이다.
+    private func lineIndex(of style: (any StyleSelectable)?) -> Int {
+        guard let style else { return -1 }
+        return store.availableStyles.firstIndex { $0.id == style.id } ?? -1
+    }
+
     private var completeButton: some View {
         VStack(spacing: 0) {
             CTAButton(
@@ -280,7 +315,7 @@ public struct MyStyleSettingView: View {
                                 .onTapGesture {
                                     // 고른 것을 해제
                                     if let currentStyle = store.selectedFavoriteStyle {
-                                        store.send(.view(.styleCardTapped(currentStyle)))
+                                        styleTapped(currentStyle)
                                     }
                                 }
                             
@@ -293,7 +328,7 @@ public struct MyStyleSettingView: View {
                                 )
                                 .opacity(isStyleSelected(style) ? 1 : CardMetrics.dimmedOpacity)
                                 .onTapGesture {
-                                    store.send(.view(.styleCardTapped(style)))
+                                    styleTapped(style)
                                 }
                             }
                         }
@@ -309,7 +344,7 @@ public struct MyStyleSettingView: View {
                             .onTapGesture {
                                 // 고른 것을 해제
                                 if let currentStyle = store.selectedFavoriteStyle {
-                                    store.send(.view(.styleCardTapped(currentStyle)))
+                                    styleTapped(currentStyle)
                                 }
                             }
                         
@@ -322,7 +357,7 @@ public struct MyStyleSettingView: View {
                             )
                             .opacity(isStyleSelected(style) ? 1 : CardMetrics.dimmedOpacity)
                             .onTapGesture {
-                                store.send(.view(.styleCardTapped(style)))
+                                styleTapped(style)
                             }
                         }
                     }
@@ -353,6 +388,26 @@ public struct MyStyleSettingView: View {
     
     private func isStyleSelected(_ style: any StyleSelectable) -> Bool {
         store.selectedFavoriteStyle?.id == style.id
+    }
+}
+
+// MARK: - CardSwapEffect
+
+/// 카드를 바꿀 때 옆으로 밀려나는 정도. 0이면 제자리, ±1이면 옆으로 빠져 안 보인다.
+private struct CardSwapEffect: ViewModifier {
+    let position: CGFloat
+
+    /// 카드 폭(262)의 약 70%
+    private static let distance: CGFloat = 180
+    private static let tilt: Double = 10
+    private static let shrink: CGFloat = 0.12
+
+    func body(content: Content) -> some View {
+        content
+            .offset(x: position * Self.distance)
+            .rotationEffect(.degrees(position * Self.tilt))
+            .scaleEffect(1 - abs(position) * Self.shrink)
+            .opacity(1 - abs(position))
     }
 }
 

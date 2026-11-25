@@ -17,7 +17,8 @@ struct StyleCardBackSurface: View {
     private enum Design {
         static let cardWidth: CGFloat = 827
         static let cardHeight: CGFloat = 972
-        static let letterScale: CGFloat = 10.49
+        // 시안 그대로(10.49)는 S가 카드를 거의 다 덮어 시끄러워, 62%로 줄이고 더 옅게 깐다(#495)
+        static let letterScale: CGFloat = 10.49 * 0.62
         static let letterAngle: Double = -30.3
     }
 
@@ -33,7 +34,7 @@ struct StyleCardBackSurface: View {
                 Color(hex: "#656565")
 
                 LogoLetterShape()
-                    .fill(Color(hex: "#777777"))
+                    .fill(Color(hex: "#6F6F6F"))
                     .frame(
                         width: LogoLetterShape.size.width * scale,
                         height: LogoLetterShape.size.height * scale
@@ -100,7 +101,7 @@ private struct LogoLetterShape: Shape {
 
 #Preview("StyleCardBackSurface") {
     HStack {
-        StyleCardBackSurface(cornerRadius: 16).frame(width: 110, height: 130)
-        StyleCardBackSurface(cornerRadius: 40, borderWidth: 2).frame(width: 262, height: 394)
+        StyleCardBackSurface(cornerRadius: 24).frame(width: 110, height: 130)
+        StyleCardBackSurface(cornerRadius: StyleCardMetrics.cornerRadius, borderWidth: 2).frame(width: 262, height: 394)
     }
 }
