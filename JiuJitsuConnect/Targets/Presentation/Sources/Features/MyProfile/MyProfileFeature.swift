@@ -1074,8 +1074,10 @@ public struct MyProfileFeature: Sendable {
                     let result = await TaskResult {
                         // 고칠 원래 기록을 새 목록에서 못 찾으면 바뀐 것 없이 저장하고 성공이라 하지 않게 멈춘다(QA A3-7).
                         try await saveCompetitions { latest in
-                            guard Self.containsAll([original], in: latest.competitions) else { return nil }
-                            return latest.updatingCompetition(original: original, with: updated)
+                            guard let target = Self.resolve([original], in: latest.competitions)?.first else { return nil }
+                            // 고정·자리는 새 목록 값을 따른다 — 수정 화면은 들고 있던 원래 기록의 값을 그대로 실었다.
+                            let edited = updated.settingPinned(target.isPinned, displayOrder: target.displayOrder)
+                            return latest.updatingCompetition(original: target, with: edited)
                         }
                     }
                     switch result {
@@ -1172,8 +1174,8 @@ public struct MyProfileFeature: Sendable {
                 return .run { send in
                     let result = await TaskResult {
                         try await saveCompetitions { latest in
-                            guard Self.containsAll(entries, in: latest.competitions) else { return nil }
-                            return latest.settingCompetitionsPinned(entries, isPinned: isPinning)
+                            guard let targets = Self.resolve(entries, in: latest.competitions) else { return nil }
+                            return latest.settingCompetitionsPinned(targets, isPinned: isPinning)
                         }
                     }
                     switch result {
@@ -1198,8 +1200,14 @@ public struct MyProfileFeature: Sendable {
                 return .run { send in
                     let result = await TaskResult {
                         try await saveCompetitions { latest in
-                            guard Self.containsAll(groups.flatMap { $0 }, in: latest.competitions) else { return nil }
-                            return latest.reorderingCompetitions(groups)
+                            guard let targets = Self.resolve(groups.flatMap { $0 }, in: latest.competitions) else { return nil }
+                            // 찾은 새 목록 값을 원래 줄 묶음대로 다시 나눈다.
+                            var rest = targets[...]
+                            let latestGroups = groups.map { group in
+                                defer { rest = rest.dropFirst(group.count) }
+                                return Array(rest.prefix(group.count))
+                            }
+                            return latest.reorderingCompetitions(latestGroups)
                         }
                     }
                     switch result {
@@ -1788,8 +1796,8 @@ public struct MyProfileFeature: Sendable {
         return .run { send in
             let result = await TaskResult {
                 try await saveCompetitions { latest in
-                    guard Self.containsAll(entries, in: latest.competitions) else { return nil }
-                    return entries.reduce(latest) { $0.removingCompetition($1) }
+                    guard let targets = Self.resolve(entries, in: latest.competitions) else { return nil }
+                    return targets.reduce(latest) { $0.removingCompetition($1) }
                 }
             }
             switch result {
@@ -1821,14 +1829,21 @@ public struct MyProfileFeature: Sendable {
         return try await communityClient.updateProfile(updated, .competition)
     }
 
-    /// 대상 기록이 목록에 모두 있는지. 기록에 식별자가 없어 값으로 찾고, 값이 같은 기록이 여럿이면 그 개수까지 센다.
-    private static func containsAll(_ targets: [Competition], in competitions: [Competition]) -> Bool {
+    /// 대상 기록을 새로 받은 목록에서 찾아 그 목록의 값으로 돌려준다. 하나라도 없으면 nil.
+    /// 기록에 식별자가 없어 값으로 찾되, 고정·자리(isPinned · displayOrder)는 다른 곳에서 바뀌었거나 서버가 달리 정리해
+    /// 돌려줄 수 있어 견주지 않는다 — 그것만 달라 '못 찾음'으로 저장이 실패하지 않게. 값이 모두 같은 기록을 먼저 고르고,
+    /// 같은 기록이 여럿이면 이미 고른 것은 다시 고르지 않아 개수까지 맞춘다.
+    private static func resolve(_ targets: [Competition], in competitions: [Competition]) -> [Competition]? {
         var remaining = competitions
+        var resolved: [Competition] = []
         for target in targets {
-            guard let index = remaining.firstIndex(of: target) else { return false }
-            remaining.remove(at: index)
+            let unpinned = target.settingPinned(false, displayOrder: nil)
+            guard let index = remaining.firstIndex(of: target)
+                ?? remaining.firstIndex(where: { $0.settingPinned(false, displayOrder: nil) == unpinned })
+            else { return nil }
+            resolved.append(remaining.remove(at: index))
         }
-        return true
+        return resolved
     }
 }
 // MARK: - Sendable Conformances
