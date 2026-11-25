@@ -75,6 +75,8 @@ extension AppTabFeature {
     func reduceAccountNotice(_ action: Action, into state: inout State) -> Effect<Action> {
         switch action {
         case .internal(.withdrawalCleanupFinished):
+            // 정리하는 사이 다시 로그인했으면(같은 계정이면 탈퇴 취소) '탈퇴 신청이 끝났어요'는 틀린 안내라 띄우지 않는다.
+            guard state.authInfo.isGuest else { return .none }
             state.isWithdrawalNoticePresented = true
             return .none
         case .view(.withdrawalNoticeDismissed):
