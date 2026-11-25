@@ -353,6 +353,8 @@ public struct AppTabView: View {
         if store.mountedTabs.contains(tab) {
             let isActive = store.selectedTab == tab
             content()
+                // 다른 탭에 가린 웹 화면이 연결을 지켜보지 않게 한다(#396). 탭은 뷰를 유지해 onDisappear가 오지 않는다.
+                .environment(\.isTabSelected, isActive)
                 // 탭은 바로 보이고 사라진다.
                 .animation(nil) { $0.opacity(isActive ? 1 : 0) }
                 .allowsHitTesting(isActive)

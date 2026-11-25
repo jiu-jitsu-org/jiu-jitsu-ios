@@ -42,6 +42,7 @@ public struct CommunityDetailView: View {
                 .allowsHitTesting(showsBackButton)
                 .accessibilityHidden(!showsBackButton)
         }
+        .onWebScreenVisibilityChange { store.send(.view(.visibilityChanged($0))) }
         // chromeless: 네이티브 내비게이션 바를 숨겨 웹 자체 헤더만 보이게 한다.
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
@@ -153,7 +154,7 @@ public struct CommunityDetailView: View {
     private var errorOverlay: some View {
         VStack(spacing: 13) {
             VStack(spacing: 4) {
-                Text("잠시 문제가 생겼어요")
+                Text(store.connectionRetry.errorTitle)
                     .font(.pretendard.bodyM)
                     .foregroundStyle(Color.component.errorState.default.titleText)
                 if store.hasLostDraft {
