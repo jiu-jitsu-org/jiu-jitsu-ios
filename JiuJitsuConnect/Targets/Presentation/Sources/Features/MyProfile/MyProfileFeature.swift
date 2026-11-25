@@ -844,7 +844,7 @@ public struct MyProfileFeature: Sendable {
                 case .myStyleSetting?:
                     return .send(.destination(.presented(.myStyleSetting(.saveFailed))))
                 default:
-                    return .send(.internal(.showToast(.init(message: "저장에 실패했어요. 다시 시도해주세요", status: .error))))
+                    return .send(.internal(.showToast(.init(message: "저장하지 못했어요. 다시 시도해 주세요", status: .error))))
                 }
                 
             case let .internal(.showToast(toastState)):
@@ -912,7 +912,7 @@ public struct MyProfileFeature: Sendable {
                     } catch {
                         Log.trace("알림 화면 이탈 후 설정 저장 실패: \(error)", category: .network, level: .error)
                         analyticsClient.logErrorShown(error)
-                        await send(.internal(.showToast(.init(message: "알림 설정을 저장하지 못했어요. 다시 시도해주세요", status: .error))))
+                        await send(.internal(.showToast(.init(message: "알림 설정을 저장하지 못했어요. 다시 시도해 주세요", status: .error))))
                     }
                 }
 
@@ -1058,7 +1058,7 @@ public struct MyProfileFeature: Sendable {
                 state.isLoadingProfile = false
                 // MY 화면 토스트는 입력 화면에 가려지므로 입력 화면이 실패를 안내하고, 입력값을 지켜 다시 저장하게 한다.
                 guard case .competitionInfo? = state.destination else {
-                    return .send(.internal(.showToast(.init(message: "저장에 실패했어요. 다시 시도해주세요", status: .error))))
+                    return .send(.internal(.showToast(.init(message: "저장하지 못했어요. 다시 시도해 주세요", status: .error))))
                 }
                 return .send(.destination(.presented(.competitionInfo(.saveFinished(.failed)))))
 
@@ -1255,7 +1255,7 @@ public struct MyProfileFeature: Sendable {
             case .view(.profileImageEditButtonTapped):
                 // 업로드 중에 또 바꾸면 앞 업로드 응답이 새 사진을 덮을 수 있다(#155).
                 guard !state.isUploadingProfileImage else {
-                    return .send(.internal(.showToast(.init(message: "사진을 바꾸는 중이에요. 잠시 후 다시 시도해주세요", status: .info))))
+                    return .send(.internal(.showToast(.init(message: "사진을 바꾸는 중이에요. 잠시 후 다시 시도해 주세요", status: .info))))
                 }
                 // 프로필 이미지 수정 옵션 바텀시트 노출
                 // 실제로 이미지가 렌더링되는 상태일 때만 '삭제' 옵션 노출
@@ -1449,7 +1449,7 @@ public struct MyProfileFeature: Sendable {
                 Log.trace("Failed to upload profile image: \(error)", category: .network, level: .error)
                 analyticsClient.logErrorShown(error, as: .upload)
                 return .send(.internal(.showToast(.init(
-                    message: "이미지 업로드에 실패했어요. 다시 시도해주세요", status: .error
+                    message: "사진을 올리지 못했어요. 다시 시도해 주세요", status: .error
                 ))))
 
             case let .internal(.instructorVerificationImageUploadResponse(.success(registeredImage))):
@@ -1477,7 +1477,7 @@ public struct MyProfileFeature: Sendable {
                 Log.trace("Failed to upload instructor verification image: \(error)", category: .network, level: .error)
                 analyticsClient.logErrorShown(error, as: .upload)
                 return .send(.internal(.showToast(.init(
-                    message: "사진 업로드에 실패했어요. 다시 시도해주세요", status: .error
+                    message: "사진을 올리지 못했어요. 다시 시도해 주세요", status: .error
                 ))))
 
             case let .internal(.instructorVerificationRequestResponse(.success(uploadedImageUrl))):
@@ -1492,7 +1492,7 @@ public struct MyProfileFeature: Sendable {
                 )
                 // 승인 · 반려 알림이 없어 결과를 알려 준다고 약속하지 않고, 어디서 보는지 안내한다(#389).
                 return .send(.internal(.showToast(.init(
-                    message: "신청했어요. 결과는 관장 사범 인증 화면에서 확인할 수 있어요.", status: .success
+                    message: "신청했어요. 결과는 관장 사범 인증 화면에서 확인할 수 있어요", status: .success
                 ))))
 
             case let .internal(.instructorVerificationRequestResponse(.failure(error))):
@@ -1500,7 +1500,7 @@ public struct MyProfileFeature: Sendable {
                 Log.trace("Failed to request owner verification: \(error)", category: .network, level: .error)
                 analyticsClient.logErrorShown(error)
                 return .send(.internal(.showToast(.init(
-                    message: "인증 요청에 실패했어요. 다시 시도해주세요", status: .error
+                    message: "인증을 요청하지 못했어요. 다시 시도해 주세요", status: .error
                 ))))
 
             case let .internal(.profileImageUpdateResponse(.success(updatedProfile))):
@@ -1527,7 +1527,7 @@ public struct MyProfileFeature: Sendable {
                 Log.trace("Failed to update profile image url: \(error)", category: .network, level: .error)
                 analyticsClient.logErrorShown(error)
                 return .send(.internal(.showToast(.init(
-                    message: "프로필 저장에 실패했어요. 다시 시도해주세요", status: .error
+                    message: "프로필을 저장하지 못했어요. 다시 시도해 주세요", status: .error
                 ))))
 
             case .destination, .sheet, .imageCropCover, .path, .view, .internal, .delegate:
@@ -1609,7 +1609,7 @@ public struct MyProfileFeature: Sendable {
 
     /// 앞 저장(또는 처음 불러오기)이 끝나기 전에 새 저장 · 저장 화면 진입을 막을 때의 안내(#155).
     private static func savingInProgressToast() -> Effect<Action> {
-        .send(.internal(.showToast(.init(message: "아직 처리 중이에요. 잠시 후 다시 시도해주세요", status: .info))))
+        .send(.internal(.showToast(.init(message: "아직 처리 중이에요. 잠시 후 다시 시도해 주세요", status: .info))))
     }
 
     private static func profileUnavailableToast() -> Effect<Action> {
@@ -1633,7 +1633,7 @@ public struct MyProfileFeature: Sendable {
         let updatedProfile = entries.reduce(profile) { $0.removingCompetition($1) }
         // 지울 기록을 못 찾았으면(그사이 프로필이 바뀜) 저장하지 않는다 — 성공 토스트가 거짓이 된다.
         guard updatedProfile.competitions.count < profile.competitions.count else {
-            return .send(.internal(.showToast(.init(message: "삭제하지 못했어요. 다시 시도해주세요", status: .error))))
+            return .send(.internal(.showToast(.init(message: "삭제하지 못했어요. 다시 시도해 주세요", status: .error))))
         }
         Self.beginProfileSave(&state)
         return .run { send in

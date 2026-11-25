@@ -45,7 +45,7 @@ public enum APIErrorCode: String, Equatable {
     public var displayMessage: String {
         switch self {
         default:
-            return "알 수 없는 오류가 발생했습니다."
+            return "잠시 문제가 생겼어요. 다시 시도해 주세요"
         }
     }
 }

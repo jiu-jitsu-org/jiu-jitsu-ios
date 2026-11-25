@@ -155,7 +155,7 @@ public struct LoginFeature: Sendable {
                 if authInfo.isNewUser == true {
                     guard let tempToken = authInfo.tempToken else {
                         Log.trace("Temp Token is missing for new user.", category: .debug, level: .error)
-                        return .send(.internal(.showToast(.init(message: "오류가 발생했습니다. 다시 시도해주세요.", status: .error))))
+                        return .send(.internal(.showToast(.init(message: "로그인하지 못했어요. 다시 시도해 주세요", status: .error))))
                     }
                     state.tempToken = tempToken
                     // 이 기기에서 최근 로그인한 수단이 지금 누른 것과 다르면 약관 시트에서 짚어 준다(#380).
@@ -177,7 +177,7 @@ public struct LoginFeature: Sendable {
                 guard let tempToken = state.tempToken else {
                     Log.trace("Temp Token is missing for new user.", category: .debug, level: .error)
                     state.sheet = nil
-                    return .send(.internal(.showToast(.init(message: "오류가 발생했습니다. 다시 시도해주세요.", status: .error))))
+                    return .send(.internal(.showToast(.init(message: "로그인하지 못했어요. 다시 시도해 주세요", status: .error))))
                 }
                 
                 state.sheet = nil
@@ -208,7 +208,7 @@ public struct LoginFeature: Sendable {
                 case .element(id: _, action: .nicknameSetting(.delegate(.signupSessionExpired))):
                     state.tempToken = nil
                     state.path.removeAll()
-                    return .send(.internal(.showToast(.init(message: "시간이 지나 가입이 중단됐어요. 다시 로그인해주세요.", status: .info))))
+                    return .send(.internal(.showToast(.init(message: "시간이 지나 가입이 중단됐어요. 다시 로그인해 주세요", status: .info))))
 
                     // 가입을 그만둠(#368) — 임시 토큰을 버리고 로그인 첫 화면으로. 그다음은 부모가 정한다
                     // (앱 첫 화면은 로그인 화면에 머물고, 앱 안 로그인 창은 둘러보기처럼 닫힌다).
