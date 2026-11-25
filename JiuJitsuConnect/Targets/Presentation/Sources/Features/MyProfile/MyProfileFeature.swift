@@ -274,7 +274,9 @@ public struct MyProfileFeature: Sendable {
             case legacyHeaderPatternMigrated(TaskResult<CommunityProfile>) // 기기에 남은 무늬를 서버로 옮겨 담은 결과 (#337)
             // 알림 화면을 나간 뒤 대신 저장한 알림 설정이 서버에 반영됨. 루트의 분석 기록만 본다(#430).
             case notificationSettingSaved(NoticeSettingUpdate)
-            
+            // 알림 화면을 나간 뒤 대신 저장하다 실패함 — 맨 위에 보이는 화면에 알린다(QA A4-2).
+            case notificationSettingSaveFailed
+
             case showToast(ToastState)
             case toastDismissed
             case presentBeltPromotion(BeltPromotion)     // 더 높은 띠·그랄로 저장됨 → 축하 장면 띄우기 (#278, #286)
@@ -918,12 +920,20 @@ public struct MyProfileFeature: Sendable {
                     } catch {
                         Log.trace("알림 화면 이탈 후 설정 저장 실패: \(error)", category: .network, level: .error)
                         analyticsClient.logErrorShown(error)
-                        await send(.internal(.showToast(.init(message: "알림 설정을 저장하지 못했어요. 다시 시도해 주세요", status: .error))))
+                        await send(.internal(.notificationSettingSaveFailed))
                     }
                 }
 
             case .internal(.notificationSettingSaved):
                 return .none
+
+            case .internal(.notificationSettingSaveFailed):
+                let toast = ToastState(message: "알림 설정을 저장하지 못했어요. 다시 시도해 주세요", status: .error)
+                // 알림 화면을 나오면 설정 화면이 MY 위에 남아 MY 토스트가 가려진다 — 설정이 맨 위면 설정 화면에 띄운다(QA A4-2).
+                if let id = state.path.ids.last, case .settings? = state.path[id: id] {
+                    return .send(.path(.element(id: id, action: .settings(.internal(.showToast(toast))))))
+                }
+                return .send(.internal(.showToast(toast)))
 
             case let .path(.element(id: _, action: .settings(.delegate(delegate)))):
                 return .send(.delegate(.settings(delegate)))
