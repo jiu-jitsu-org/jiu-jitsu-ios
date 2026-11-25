@@ -98,7 +98,7 @@ private struct Cone: Shape {
 
 #Preview("StageLight") {
     ZStack {
-        StageLight(cardSize: CGSize(width: 262, height: 394), cornerRadius: 40)
+        StageLight(cardSize: CGSize(width: 262, height: 394), cornerRadius: StyleCardMetrics.cornerRadius)
         RoundedRectangle(cornerRadius: 40)
             .fill(Color.orange)
             .frame(width: 262, height: 394)

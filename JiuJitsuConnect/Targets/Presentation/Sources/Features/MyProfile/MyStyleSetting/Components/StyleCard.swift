@@ -9,83 +9,70 @@ import SwiftUI
 import DesignSystem
 import Domain
 
+/// 고르기 화면 큰 카드(앞면 · 뒷면 · 조명 · 빈 카드)가 함께 쓰는 모서리
+enum StyleCardMetrics {
+    static let cornerRadius: CGFloat = 56
+}
+
 /// 스타일 카드 앞면 컴포넌트
 ///
 /// 메인 화면에 표시되는 큰 스타일 카드의 앞면입니다.
-/// 배경 이미지, 내 띠 캐릭터가 그 기술을 거는 그림, 타이틀, 설명을 포함합니다.
+/// 내 띠 색을 옅게 푼 단색 바탕에 내 띠 캐릭터가 그 기술을 거는 그림, 타이틀, 설명을 둡니다(#495).
 struct StyleCard: View {
     let style: any StyleSelectable
     let isSelected: Bool
     /// 캐릭터가 맬 띠. 띠가 없으면 흰띠로 그린다.
     var beltRank: BeltRank? = nil
-    /// 조명이 켜졌는지 — 켜지면 카드 윗부분이 빛을 받아 밝아진다. 캐릭터와 글자는 그대로.
-    var isLit = false
-    
+
     // MARK: - Metrics
 
     private enum Metrics {
-        // 배경 이미지 frame과 외곽 frame 2곳에서 공유
-        static let cardWidth: CGFloat = 262
-        static let cardHeight: CGFloat = 394
         // 캐릭터 그림 — 아래 글자 영역(타이틀·설명)을 뺀 높이를 채운다
         static let poseSize: CGFloat = 216
     }
 
     // MARK: - Body
-    
+
     var body: some View {
-        ZStack(alignment: .center) {
-            // 배경 이미지 - 카드 크기에 딱 맞게 (비율 무시하고 꽉 채움)
-            style.backgroundImage.swiftUIImage
+        let belt = beltRank ?? .white
+        let tone = belt.styleCardTone
+
+        VStack(alignment: .center, spacing: 0) {
+            Spacer()
+
+            // 내 띠 캐릭터가 그 기술을 거는 그림
+            style.poseImage(belt: belt).swiftUIImage
                 .resizable()
-                .frame(width: Metrics.cardWidth, height: Metrics.cardHeight)
+                .scaledToFit()
+                .frame(width: Metrics.poseSize, height: Metrics.poseSize)
 
-            LinearGradient(
-                stops: [
-                    .init(color: .white.opacity(0.14), location: 0),
-                    .init(color: .white.opacity(0), location: 0.5)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .opacity(isLit ? 1 : 0)
+            // 풀 타이틀
+            // 한 줄에 다 들어가게 — 긴 이름(이스케이프 디펜스)만 글자를 줄이고 나머지는 40 그대로
+            Text(style.fullTitle.replacingOccurrences(of: "\n", with: " "))
+                .font(.cookieRun.custom(weight: .black, size: 40))
+                .foregroundStyle(tone.title)
+                .multilineTextAlignment(.center)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .padding(.horizontal, 16)
+                .frame(height: 54)
+                .padding(.bottom, 20)
 
-            VStack(alignment: .center, spacing: 0) {
-                Spacer()
-                
-                // 내 띠 캐릭터가 그 기술을 거는 그림
-                style.poseImage(belt: beltRank ?? .white).swiftUIImage
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: Metrics.poseSize, height: Metrics.poseSize)
-
-                // 풀 타이틀
-                // 한 줄에 다 들어가게 — 긴 이름(이스케이프 디펜스)만 글자를 줄이고 나머지는 40 그대로
-                Text(style.fullTitle.replacingOccurrences(of: "\n", with: " "))
-                    .font(.cookieRun.custom(weight: .black, size: 40))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .padding(.horizontal, 16)
-                    .frame(height: 54)
-                    .padding(.bottom, 20)
-
-                // 카드 설명
-                Text(style.cardDescription)
-                    .font(.pretendard.custom(weight: .medium, size: 16))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(4)
-                    // 세 줄 안에 다 들어가게 — 한 줄이 넘치는 설명(하체 관절기)만 글자를 조금 줄인다
-                    .minimumScaleFactor(0.9)
-                    .frame(height: 72)
-                    .padding(.horizontal, 25)
-                    .padding(.bottom, 32)
-            }
+            // 카드 설명
+            Text(style.cardDescription)
+                .font(.pretendard.custom(weight: .medium, size: 16))
+                .foregroundStyle(tone.text)
+                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+                // 세 줄 안에 다 들어가게 — 한 줄이 넘치는 설명(하체 관절기)만 글자를 조금 줄인다
+                .minimumScaleFactor(0.9)
+                .frame(height: 72)
+                .padding(.horizontal, 25)
+                .padding(.bottom, 32)
         }
-        .frame(width: Metrics.cardWidth, height: Metrics.cardHeight)
-        .cornerRadius(40)
+        .frame(width: 262, height: 394)
+        .background(tone.background)
+        .clipShape(RoundedRectangle(cornerRadius: StyleCardMetrics.cornerRadius))
     }
 }
 

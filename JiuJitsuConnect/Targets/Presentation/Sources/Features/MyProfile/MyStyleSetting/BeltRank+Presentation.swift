@@ -58,6 +58,18 @@ extension BeltRank {
     var beltSurfaceColor: Color {
         self == .white ? Color.component.myBelt.whiteRing : beltColor
     }
+
+    /// 최애 기술 카드 앞면 색(#495) — 띠 색을 옅게 푼 바탕과 진한 띠 색 글자
+    var styleCardTone: ComponentColors.MyBelt.StyleCard.Tone {
+        let card = Color.component.myBelt.styleCard
+        switch self {
+        case .white: return card.white
+        case .blue: return card.blue
+        case .purple: return card.purple
+        case .brown: return card.brown
+        case .black: return card.black
+        }
+    }
 }
 
 extension Optional where Wrapped == BeltRank {

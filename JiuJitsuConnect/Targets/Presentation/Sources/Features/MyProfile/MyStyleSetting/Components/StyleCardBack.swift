@@ -21,23 +21,25 @@ struct StyleCardBack: View {
 
     var body: some View {
         ZStack {
-            StyleCardBackSurface(cornerRadius: 40, borderWidth: 2)
+            StyleCardBackSurface(cornerRadius: StyleCardMetrics.cornerRadius, borderWidth: 2)
 
+            // 글자 · 로고가 카드에 비해 커 보여 한 단계씩 줄였다(#495)
             VStack(spacing: 0) {
                 // 앱 로고 (흰 글자)
                 Assets.Splash.logo.swiftUIImage
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 122)
+                    .frame(width: 84)
 
                 Text(category)
-                    .font(.pretendard.custom(weight: .medium, size: 24))
+                    .font(.pretendard.custom(weight: .medium, size: 15))
+                    .kerning(0.6)
                     .foregroundStyle(Color.white.opacity(0.8))
-                    .padding(.top, 44)
+                    .padding(.top, 26)
 
-                // 시안 글자 크기 그대로 두되 긴 이름(스윕 · 뒤집기)만 폭에 맞춰 줄인다
+                // 긴 이름(스윕 · 뒤집기)만 폭에 맞춰 줄인다
                 Text(style.fullTitle)
-                    .font(.pretendard.custom(weight: .semiBold, size: 38))
+                    .font(.pretendard.custom(weight: .semiBold, size: 26))
                     .foregroundStyle(Color.white)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)

@@ -15,22 +15,15 @@ import DesignSystem
 struct EmptySelectionCard: View {
     let onTap: () -> Void
     
-    // MARK: - Metrics
-
-    private enum Metrics {
-        // 배경 fill·테두리·외곽 clip 3곳에서 공유
-        static let cornerRadius: CGFloat = 40
-    }
-
     // MARK: - Body
 
     var body: some View {
         ZStack {
             // 배경 - 점선 테두리와 어두운 배경
-            RoundedRectangle(cornerRadius: Metrics.cornerRadius)
+            RoundedRectangle(cornerRadius: StyleCardMetrics.cornerRadius)
                 .fill(Color.primitive.coolGray.cg900)
 
-            RoundedRectangle(cornerRadius: Metrics.cornerRadius)
+            RoundedRectangle(cornerRadius: StyleCardMetrics.cornerRadius)
                 .strokeBorder(
                     style: StrokeStyle(lineWidth: 2, dash: [8, 8])
                 )
@@ -53,7 +46,7 @@ struct EmptySelectionCard: View {
             .offset(y: -13.5)
         }
         .frame(width: 262, height: 394)
-        .cornerRadius(Metrics.cornerRadius)
+        .cornerRadius(StyleCardMetrics.cornerRadius)
     }
 }
 

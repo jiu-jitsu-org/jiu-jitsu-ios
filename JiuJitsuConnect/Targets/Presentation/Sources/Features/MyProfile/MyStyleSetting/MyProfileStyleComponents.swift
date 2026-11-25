@@ -17,6 +17,7 @@ import Domain
 /// 포지션·서브미션까지 넓게 '기술'로 묶어 부른다.
 ///
 /// 처음에는 무엇을 골랐는지 안 보이게 뒤집힌 채 포개져 있고, 누르면 펼쳐지며 앞면이 나온다.
+/// 포개진 동안은 맨 위 카드가 뒤집힐 듯 들썩여 눌러 볼 수 있다고 알린다(#495). 한 번 펼쳐 본 뒤로는 하지 않는다.
 /// 특기는 자기 평가라 입력 부담이 커서 최애만 보여 준다(#118). 남이 보는 프로필도 같은 모양을 쓴다.
 public struct MyProfileStyleSectionView: View {
     let favoritePosition: (any StyleSelectable)?
@@ -31,6 +32,10 @@ public struct MyProfileStyleSectionView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isOpen = false
     @State private var width: CGFloat = 0
+    /// 맨 위 카드가 들썩이는 중인지
+    @State private var isHinting = false
+    /// 한 번이라도 펼쳐 봤으면 더는 들썩이지 않는다
+    @AppStorage("favoriteStyleCardsOpened") private var hasOpenedBefore = false
 
     public init(
         favoritePosition: (any StyleSelectable)?,
@@ -62,6 +67,15 @@ public struct MyProfileStyleSectionView: View {
         /// 포갠 카드는 기울어 위아래로 더 나온다
         static let pileHeightRatio: CGFloat = 1.22
         static let flipAngle: Double = 180
+
+        /// 들썩일 때 — 옆면(90도)까지는 가지 않아 앞면은 보이지 않는다
+        static let hintAngle: Double = 132
+        static let hintLift: CGFloat = 0.06
+        static let hintTilt: Double = 3
+        static let hintScale: CGFloat = 1.04
+        static let hintFirstDelay: Duration = .milliseconds(900)
+        static let hintHold: Duration = .milliseconds(380)
+        static let hintInterval: Duration = .seconds(4)
     }
 
     private var items: [Item] {
@@ -105,14 +119,17 @@ public struct MyProfileStyleSectionView: View {
             // 누를 때만 움직인다. 프로필이 늦게 불러와져 빈 칸에서 채워질 때는 그 자리에서 바로 덮인다.
             .animation(spreadAnimation(at: 0), value: isOpen)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .task(id: hintsActive) { await playHints() }
         }
     }
 
     private func card(_ item: Item, at index: Int) -> some View {
-        Button {
+        let lifted = isHinting && index == hintedIndex
+
+        return Button {
             cardTapped(item.type)
         } label: {
-            FlipCard(angle: showsOpen ? 0 : Metrics.flipAngle) {
+            FlipCard(angle: showsOpen ? 0 : (lifted ? Metrics.hintAngle : Metrics.flipAngle)) {
                 FavoriteStyleCardFront(
                     category: item.type.title,
                     style: item.style,
@@ -132,8 +149,10 @@ public struct MyProfileStyleSectionView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel(for: item))
         .accessibilityHint(accessibilityHint)
-        .rotationEffect(.degrees(showsOpen ? 0 : Metrics.pileAngle[index]))
+        .rotationEffect(.degrees(showsOpen ? 0 : Metrics.pileAngle[index] + (lifted ? Metrics.hintTilt : 0)))
+        .scaleEffect(lifted ? Metrics.hintScale : 1)
         .position(center(at: index))
+        .offset(y: lifted ? -cardHeight * Metrics.hintLift : 0)
         .animation(spreadAnimation(at: index), value: isOpen)
     }
 
@@ -152,6 +171,8 @@ public struct MyProfileStyleSectionView: View {
 
     private func cardTapped(_ type: MyStyleSettingType) {
         guard showsOpen else {
+            isHinting = false
+            hasOpenedBefore = true
             isOpen = true
             return
         }
@@ -174,6 +195,30 @@ public struct MyProfileStyleSectionView: View {
         return "최애 \(item.type.title), \(item.style?.tabTitle ?? "없음")"
     }
 
+    // MARK: - Hint
+
+    /// 맨 위(마지막에 그려지는) 카드
+    private var hintedIndex: Int { items.count - 1 }
+
+    private var hintsActive: Bool {
+        !showsOpen && !reduceMotion && !hasOpenedBefore
+    }
+
+    /// 포개진 동안 처음 한 번, 그 뒤로 몇 초마다 맨 위 카드가 뒤집힐 듯 들썩인다.
+    private func playHints() async {
+        guard hintsActive else {
+            isHinting = false
+            return
+        }
+        try? await Task.sleep(for: Metrics.hintFirstDelay)
+        while !Task.isCancelled {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.5)) { isHinting = true }
+            try? await Task.sleep(for: Metrics.hintHold)
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.7)) { isHinting = false }
+            try? await Task.sleep(for: Metrics.hintInterval)
+        }
+    }
+
     // MARK: - Animation
 
     /// 맨 위(오른쪽) 카드부터 미끄러지듯 자리를 잡는다.
@@ -192,7 +237,7 @@ public struct MyProfileStyleSectionView: View {
 // MARK: - FavoriteStyleCard
 
 private enum FavoriteStyleCardMetrics {
-    static let cornerRadius: CGFloat = 16
+    static let cornerRadius: CGFloat = 24
 }
 
 /// 뒷면 — 로고와 분류만. 무엇을 골랐는지는 적지 않는다.
@@ -202,21 +247,22 @@ private struct FavoriteStyleCardBack: View {
     var body: some View {
         StyleCardBackSurface(cornerRadius: FavoriteStyleCardMetrics.cornerRadius)
             .overlay {
-                VStack(spacing: 10) {
+                // 큰 카드 뒷면처럼 로고 · 글자를 한 단계 줄였다(#495)
+                VStack(spacing: 7) {
                     Assets.Splash.logo.swiftUIImage
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 54)
+                        .frame(width: 40)
 
                     Text(category)
-                        .font(.pretendard.custom(weight: .medium, size: 13))
+                        .font(.pretendard.custom(weight: .medium, size: 11))
                         .foregroundStyle(Color.white.opacity(0.8))
                 }
             }
     }
 }
 
-/// 앞면 — 설정 화면 큰 카드와 같은 바탕 무늬에 내 띠 캐릭터 · 분류 · 이름
+/// 앞면 — 설정 화면 큰 카드처럼 내 띠 색을 옅게 푼 바탕에 내 띠 캐릭터 · 분류 · 이름
 private struct FavoriteStyleCardFront: View {
     let category: String
     let style: (any StyleSelectable)?
@@ -235,19 +281,22 @@ private struct FavoriteStyleCardFront: View {
     }
 
     private func filled(_ style: any StyleSelectable) -> some View {
-        VStack(spacing: 0) {
-            style.poseImage(belt: beltRank ?? .white).swiftUIImage
+        let belt = beltRank ?? .white
+        let tone = belt.styleCardTone
+
+        return VStack(spacing: 0) {
+            style.poseImage(belt: belt).swiftUIImage
                 .resizable()
                 .scaledToFit()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             Text(category)
                 .font(.pretendard.custom(weight: .medium, size: 11))
-                .foregroundStyle(Color.white.opacity(0.8))
+                .foregroundStyle(tone.text)
 
             Text(style.fullTitle)
                 .font(.cookieRun.custom(weight: .black, size: 15))
-                .foregroundStyle(Color.white)
+                .foregroundStyle(tone.title)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
@@ -257,11 +306,7 @@ private struct FavoriteStyleCardFront: View {
         .padding(.top, 6)
         .padding(.bottom, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background {
-            style.backgroundImage.swiftUIImage
-                .resizable()
-                .scaledToFill()
-        }
+        .background(tone.background)
     }
 
     private var empty: some View {
