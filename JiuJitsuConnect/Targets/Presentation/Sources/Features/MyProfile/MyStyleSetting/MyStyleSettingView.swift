@@ -22,8 +22,8 @@ public struct MyStyleSettingView: View {
 
     private var isRevealed: Bool { revealedType == store.settingType }
 
-    /// 아래 줄에서 바꿀 때 새 카드가 들어오는 쪽 — 1이면 오른쪽에서, -1이면 왼쪽에서
-    @State private var swapDirection: CGFloat = 1
+    /// 아래 줄에서 바꿀 때 새 카드가 들어오는 쪽
+    @State private var swapDirection = CardSwapDirection()
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -216,8 +216,14 @@ public struct MyStyleSettingView: View {
     /// 새 카드는 고른 쪽에서 밀려 들어오고, 이전 카드는 반대쪽으로 기울며 빠진다(#495)
     private var cardSwapTransition: AnyTransition {
         .asymmetric(
-            insertion: .modifier(active: CardSwapEffect(position: swapDirection), identity: CardSwapEffect(position: 0)),
-            removal: .modifier(active: CardSwapEffect(position: -swapDirection), identity: CardSwapEffect(position: 0))
+            insertion: .modifier(
+                active: CardSwapEffect(phase: .incoming, direction: swapDirection),
+                identity: CardSwapEffect(phase: .settled, direction: swapDirection)
+            ),
+            removal: .modifier(
+                active: CardSwapEffect(phase: .outgoing, direction: swapDirection),
+                identity: CardSwapEffect(phase: .settled, direction: swapDirection)
+            )
         )
     }
 
@@ -230,11 +236,8 @@ public struct MyStyleSettingView: View {
             store.send(.view(.styleCardTapped(style)))
             return
         }
-        // 빠지는 카드는 마지막으로 그려진 방향으로 나간다. 방향을 먼저 그려 둔 다음 순서에 고른다.
-        swapDirection = lineIndex(of: next) >= lineIndex(of: current) ? 1 : -1
-        Task { @MainActor in
-            store.send(.view(.styleCardTapped(style)), animation: StageMetrics.swapAnimation)
-        }
+        swapDirection.value = lineIndex(of: next) >= lineIndex(of: current) ? 1 : -1
+        store.send(.view(.styleCardTapped(style)), animation: StageMetrics.swapAnimation)
     }
 
     /// 아래 줄에서의 자리. '없음'이 맨 앞(-1)이다.
@@ -393,9 +396,29 @@ public struct MyStyleSettingView: View {
 
 // MARK: - CardSwapEffect
 
-/// 카드를 바꿀 때 옆으로 밀려나는 정도. 0이면 제자리, ±1이면 옆으로 빠져 안 보인다.
+/// 카드를 바꿀 때 새 카드가 들어오는 쪽 — 1이면 오른쪽에서, -1이면 왼쪽에서.
+///
+/// 빠지는 카드의 전환 효과는 마지막으로 그려질 때 만들어진다. 방향을 값으로 넘기면 고르기 직전의
+/// 방향으로 나가므로, 참조로 넘겨 빠지기 시작하는 순간의 방향을 읽게 한다.
+@Observable
+private final class CardSwapDirection {
+    var value: CGFloat = 1
+}
+
+/// 카드를 바꿀 때 옆으로 밀려나는 정도. 제자리면 0, 들어오기 전 · 빠진 뒤면 옆으로 빠져 안 보인다.
 private struct CardSwapEffect: ViewModifier {
-    let position: CGFloat
+    enum Phase { case incoming, settled, outgoing }
+
+    let phase: Phase
+    let direction: CardSwapDirection
+
+    private var position: CGFloat {
+        switch phase {
+        case .incoming: return direction.value
+        case .settled: return 0
+        case .outgoing: return -direction.value
+        }
+    }
 
     /// 카드 폭(262)의 약 70%
     private static let distance: CGFloat = 180

@@ -478,8 +478,8 @@ public struct ComponentColors {
         public struct StyleCard {
             /// 캐릭터가 같은 띠 색을 매고 있어, 바탕은 띠 색보다 훨씬 밝게 두어야 묻히지 않는다.
             /// 흰띠는 흰 캐릭터가 뜨게 은색 쪽으로, 검정띠는 밝은 회색으로 잡는다.
-            /// `text`는 `title`에 바탕을 20% 섞은 색(설명 · 분류).
-            public let white = Tone(background: "#E3E7EC", title: "#4B535E", text: "#69717A")
+            /// `text`는 `title`에 바탕을 20% 섞은 색(설명 · 분류). 흰띠만 그러면 대비가 4.5:1에 못 미쳐 10%만 섞는다.
+            public let white = Tone(background: "#E3E7EC", title: "#4B535E", text: "#5A626C")
             public let blue = Tone(background: "#D3EBFF", title: "#00396F", text: "#2A5D8C")
             public let purple = Tone(background: "#F3E0FF", title: "#4A1866", text: "#6C4085")
             public let brown = Tone(background: "#F1E1D6", title: "#3F2011", text: "#634738")
