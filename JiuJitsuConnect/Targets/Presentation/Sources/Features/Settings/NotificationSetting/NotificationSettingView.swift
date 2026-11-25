@@ -61,8 +61,9 @@ public struct NotificationSettingView: View {
                             SettingsToggleRow(
                                 asset: Assets.Common.Icon.bell,
                                 text: "커뮤니티 활동 알림",
-                                // 서버가 이 스위치로 끄는 푸시: 새 댓글 · 답글 · 글 좋아요 · 댓글 좋아요(#393). '언급' 알림은 없다.
-                                subtitle: "댓글, 답글, 좋아요",
+                                // 서버가 이 스위치로 끄는 푸시: 새 댓글 · 답글 · 글 좋아요 · 댓글 좋아요(#393), 어제 투표한 밸런스 게임 결과(#502).
+                                // '언급' 알림은 없다.
+                                subtitle: "댓글, 답글, 좋아요, 밸런스 게임 결과",
                                 isLoading: !store.isLoaded,
                                 isOn: Binding(
                                     get: { store.isCommunityNotificationEnabled },

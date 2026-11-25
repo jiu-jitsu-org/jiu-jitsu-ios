@@ -333,6 +333,8 @@ extension AnalyticsEvent {
         case commentsLike = "comments_like"
         case competitionEarlyBirdDeadline = "competition_early_bird_deadline"
         case competitionRegistrationDeadline = "competition_registration_deadline"
+        /// 어제 투표한 밸런스 게임 결과(#502). 서버 계약 전이라 이름은 제안값(웹 jiu-jitsu-frontend#683과 같음).
+        case balanceResult = "balance_result"
 
         /// 서버 값(`NEW_COMMENTS` 등). 사전에 없는 값은 nil — 새 종류가 GA에 새 분류로 쌓이지 않게.
         public init?(serverValue: String?) {
