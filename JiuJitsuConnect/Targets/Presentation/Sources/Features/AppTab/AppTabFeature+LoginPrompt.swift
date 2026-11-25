@@ -23,7 +23,9 @@ extension AppTabFeature {
         case .comment: "로그인하고 댓글로\n이야기해 보세요"
         case .reply: "로그인하고 답글로\n대화를 이어 가 보세요"
         case .vote: "로그인하고 투표해 보세요"
-        case .interest, .alert: "로그인하면 관심 대회\n마감 전날 알려 드려요"
+        case .interest: "로그인하면 관심 대회\n마감 전날 알려 드려요"
+        // 대회 알림뿐 아니라 글 · 밸런스 '알림 받기'(401 뒤)에서도 와서 대회에 묶지 않는다.
+        case .alert: "로그인하면 알림을\n받을 수 있어요"
         case .interestFilter: "로그인하면 관심 대회만\n모아 볼 수 있어요"
         case .infoReport: "로그인하고 잘못된 정보를\n알려 주세요"
         case .record: "로그인하면 내 기록에\n남길 수 있어요"

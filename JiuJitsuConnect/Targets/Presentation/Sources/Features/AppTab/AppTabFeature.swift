@@ -283,7 +283,8 @@ public struct AppTabFeature: Sendable {
             // 탭의 MY가 불러 둔 프로필을 넘겨 바로 그린다. 게스트는 커뮤니티 행위와 같이 로그인 안내를 띄운다.
             case .home(.delegate(.myProfileRequested)):
                 guard !state.authInfo.isGuest else {
-                    return .send(.internal(.showLoginPromptAlert(reason: .profile)))
+                    // 웹이 보낸 이유가 아니라 기본 문구를 쓴다 — 게스트에게 "프로필을 볼 수 있어요"는 어색하다(#392).
+                    return .send(.internal(.showLoginPromptAlert(reason: nil)))
                 }
                 CommunityFeature.pushMyProfile(.pushed(from: state.myPage), into: &state.home)
                 return .none
