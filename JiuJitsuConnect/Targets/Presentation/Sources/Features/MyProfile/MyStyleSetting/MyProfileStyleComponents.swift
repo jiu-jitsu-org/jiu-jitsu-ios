@@ -149,6 +149,8 @@ public struct MyProfileStyleSectionView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel(for: item))
         .accessibilityHint(accessibilityHint)
+        // 눌러도 아무 일 없는 카드는 버튼으로 읽지 않는다
+        .accessibilityRemoveTraits(isInert ? .isButton : [])
         .rotationEffect(.degrees(showsOpen ? 0 : Metrics.pileAngle[index] + (lifted ? Metrics.hintTilt : 0)))
         .scaleEffect(lifted ? Metrics.hintScale : 1)
         .position(center(at: index))
@@ -185,7 +187,13 @@ public struct MyProfileStyleSectionView: View {
         }
     }
 
+    /// 남이 보는 프로필에서 셋 다 비었으면 늘 펼친 채라 덮이지도 않아, 눌러도 아무 일이 없다.
+    private var isInert: Bool {
+        onStyleCardTapped == nil && items.allSatisfy { $0.style == nil }
+    }
+
     private var accessibilityHint: String {
+        guard !isInert else { return "" }
         guard showsOpen else { return "세 장을 펼쳐요" }
         return onStyleCardTapped == nil ? "다시 덮어요" : "고르는 화면으로 가요"
     }
