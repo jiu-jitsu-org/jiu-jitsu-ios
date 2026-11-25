@@ -589,7 +589,12 @@ public struct MyProfileFeature: Sendable {
             case .destination(.presented(.nicknameSetting(.delegate(.cancel)))):
                 // 취소 - 아무것도 하지 않음
                 return .none
-                
+
+            case .destination(.dismiss):
+                // 닉네임 저장 중 뒤로가면 저장이 화면과 함께 취소돼 결과를 못 받는다. 서버엔 반영됐을 수 있어 다시 받는다(QA A2-15).
+                guard case .nicknameSetting? = state.destination else { return .none }
+                return .send(.internal(.refreshProfile))
+
             case let .destination(.presented(.myStyleSetting(.delegate(.didConfirmStyle(type, bestKey, favoriteKey))))):
                 // 스타일 저장 (최애 + 받아 둔 특기) → register 시 다음 단계, edit 시 화면 닫기
                 // 저장 화면은 저장 중엔 열리지 않으므로, 여기 걸리는 건 같은 화면의 '완료' 연타뿐이다(#155).
