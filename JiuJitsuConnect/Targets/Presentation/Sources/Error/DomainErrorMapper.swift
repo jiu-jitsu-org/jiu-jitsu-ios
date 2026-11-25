@@ -20,10 +20,10 @@ public struct DomainErrorMapper {
             return .toast("네트워크 연결을 확인해주세요.")
             
         case .accountProblem(let provider):
-            return .toast("\(provider.displayName) 계정을 확인 후 다시 시도해주세요.")
+            return .toast("\(provider.displayName) 계정을 확인한 뒤 다시 시도해 주세요")
             
         case .permissionRequired(_, let permissionName):
-            return .toast("서비스 이용을 위해 [\(permissionName)] 제공 동의가 필요합니다.")
+            return .toast("서비스를 이용하려면 [\(permissionName)] 제공에 동의해 주세요")
             
         case .apiError(let code, _):
             // 이 매퍼는 "공통" 매퍼입니다.
@@ -47,12 +47,12 @@ public struct DomainErrorMapper {
             if code != nil {
                 return .info(APIErrorCode.unknown.displayMessage)
             }
-            return .toast("오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
+            return .toast("잠시 문제가 생겼어요. 다시 시도해 주세요")
         
         // 개발자 확인용 에러는 일반 메시지로 통일
         case .dataParsingFailed, .cannotFindRootViewController, .dependencyNotFound, .missingProfileData, .unknown:
             Log.trace("Critical Error: \(domainError)", category: .network, level: .error)
-            return .toast("오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
+            return .toast("잠시 문제가 생겼어요. 다시 시도해 주세요")
         }
     }
 }
@@ -80,7 +80,7 @@ extension DomainErrorMapper {
             return AuthFailureNotice(message: text ?? Self.retryMessage, code: code.rawValue)
         case .apiError(.socialVerificationFailed, _):
             let code = APIErrorCode.socialVerificationFailed.rawValue
-            return AuthFailureNotice(message: "로그인 정보를 확인하지 못했어요. 다시 시도해 주세요.", code: code)
+            return AuthFailureNotice(message: "로그인 정보를 확인하지 못했어요. 다시 시도해 주세요", code: code)
         case let .apiError(code, _):
             return AuthFailureNotice(message: Self.retryMessage, code: code.rawValue)
         case let .serverError(code, statusCode, _):
@@ -98,5 +98,5 @@ extension DomainErrorMapper {
         }
     }
 
-    private static let retryMessage = "오류가 생겼어요. 잠시 후 다시 시도해 주세요."
+    private static let retryMessage = "잠시 문제가 생겼어요. 다시 시도해 주세요"
 }

@@ -159,8 +159,8 @@ public struct MyAcademySettingFeature: Sendable {
                 // 입력값은 그대로 두어 같은 화면에서 다시 저장 · 삭제하게 한다.
                 state.isSaving = false
                 let message = state.pendingRequest == .delete
-                    ? "삭제에 실패했어요. 다시 시도해주세요"
-                    : "저장에 실패했어요. 다시 시도해주세요"
+                    ? "삭제하지 못했어요. 다시 시도해 주세요"
+                    : "저장하지 못했어요. 다시 시도해 주세요"
                 state.pendingRequest = nil
                 let toast = ToastState(message: message, status: .error)
                 state.toast = toast
@@ -241,9 +241,9 @@ public extension MyAcademySettingFeature.ValidationState {
     var message: String {
         switch self {
         case .idle:
-            return "도장 이름을 입력해주세요"
+            return "도장 이름을 입력해 주세요"
         case .invalidLength, .invalidCharacters:
-            return "한글/영문/숫자로 작성해주세요"
+            return "한글/영문/숫자로 작성해 주세요"
         }
     }
     

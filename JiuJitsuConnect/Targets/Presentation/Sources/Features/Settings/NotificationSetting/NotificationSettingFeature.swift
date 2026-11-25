@@ -255,7 +255,7 @@ public struct NotificationSettingFeature: Sendable {
                 analyticsClient.logErrorShown(error)
                 // 토글은 스켈레톤으로 둔 채 그 자리에서 다시 불러올 수 있게 한다.
                 return .send(.internal(.showToast(.init(
-                    message: "알림 설정을 불러오지 못했어요.",
+                    message: "알림 설정을 불러오지 못했어요",
                     status: .error,
                     button: .init(title: "다시 시도", action: .done)
                 ))))

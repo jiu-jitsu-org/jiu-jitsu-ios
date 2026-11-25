@@ -74,7 +74,7 @@ private extension MyAcademySettingView {
         ZStack {
             // 정책 1: 초기 상태에서 플레이스홀더를 보여줍니다.
             if !store.isTextFieldActive {
-                Text("도장명을 입력해주세요")
+                Text("도장명을 입력해 주세요")
                     .font(Font.pretendard.display1)
                     .foregroundStyle(Color.gray.opacity(0.5))
                     .allowsHitTesting(false)

@@ -442,7 +442,7 @@ public struct CompetitionInfoFeature: Sendable {
             case .saveFinished(.failed):
                 // 입력한 값은 그대로 두어 같은 화면에서 다시 저장할 수 있게 한다.
                 state.isSaving = false
-                return showToast(&state, message: "저장에 실패했어요. 다시 시도해주세요")
+                return showToast(&state, message: "저장하지 못했어요. 다시 시도해 주세요")
 
             case .view(.toastSwiped), .internal(.toastDismissed):
                 state.toast = nil
