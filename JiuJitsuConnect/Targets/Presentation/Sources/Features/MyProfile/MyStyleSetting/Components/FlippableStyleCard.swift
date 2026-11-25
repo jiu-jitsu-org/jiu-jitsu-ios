@@ -164,8 +164,13 @@ struct FlippableStyleCard: View {
     
     // MARK: - Gesture Handlers
 
+    /// 손을 놓은 뒤 · '카드 뒤집기'로 도는 회전. 동작 줄이기에선 등장처럼 돌지 않고 면만 바뀐다.
+    private var flipAnimation: Animation? {
+        reduceMotion ? nil : .spring(response: Metrics.springResponse, dampingFraction: Metrics.springDamping)
+    }
+
     private func flip(by angle: Double) {
-        withAnimation(.spring(response: Metrics.springResponse, dampingFraction: Metrics.springDamping)) {
+        withAnimation(flipAnimation) {
             cumulativeRotation += angle
             dragAngle = cumulativeRotation
         }
@@ -188,7 +193,7 @@ struct FlippableStyleCard: View {
         let velocity = value.predictedEndTranslation.width - value.translation.width
         let shouldFlip = abs(dragDistance) > Metrics.dragThreshold || abs(velocity) > Metrics.velocityThreshold
         
-        withAnimation(.spring(response: Metrics.springResponse, dampingFraction: Metrics.springDamping)) {
+        withAnimation(flipAnimation) {
             if shouldFlip {
                 // 드래그 방향에 따라 ±180도 회전
                 if dragDistance < 0 {
