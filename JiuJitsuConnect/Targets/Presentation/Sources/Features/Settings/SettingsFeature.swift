@@ -57,7 +57,7 @@ public struct SettingsFeature: Sendable {
         public var toast: ToastState?
         // 탈퇴 요청이 서버에 가 있는 동안. MY 스택의 한 화면이라 닫히면 요청도 취소되므로(#241) 그동안 나가지 못하게 막는다.
         var isWithdrawing = false
-        // 지금 로그인한 수단(#380). 계정 묶음 맨 위 "카카오로 로그인 중"과 로그아웃 알럿이 쓴다.
+        // 지금 로그인한 수단(#380). 계정 묶음 맨 위 "카카오로 로그인 중"에 쓴다.
         // 같은 사람도 소셜마다 다른 계정이라, 로그아웃 뒤 같은 수단으로 돌아오도록 알려 둔다.
         var loginProvider: SNSProvider?
         // 탈퇴 알럿을 연 계정이 Apple 회원인지(#398). Apple은 탈퇴 직전 확인 창이 한 번 더 떠서 알럿에서 미리 알린다.

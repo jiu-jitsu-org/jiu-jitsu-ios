@@ -158,8 +158,8 @@ public struct LoginFeature: Sendable {
                         return .send(.internal(.showToast(.init(message: "오류가 발생했습니다. 다시 시도해주세요.", status: .error))))
                     }
                     state.tempToken = tempToken
-                    // 예전에 다른 수단으로 가입했을 수 있어 약관 시트에서 알린다(#380). 최근 수단이 지금 누른 것과
-                    // 다르면 그 수단을 짚어 준다 — 같으면(탈퇴 · 계정 삭제 등) 짚을 수단이 없어 일반 안내만.
+                    // 이 기기에서 최근 로그인한 수단이 지금 누른 것과 다르면 약관 시트에서 짚어 준다(#380).
+                    // 기록이 없거나 같으면 안내하지 않는다 — 처음 가입하는 사람에겐 잡음이다.
                     let otherProvider = state.lastLoginProvider.flatMap { $0 == tappedProvider ? nil : $0 }
                     state.sheet = .termsAgreement(.init(recentOtherProvider: otherProvider))
                 } else {

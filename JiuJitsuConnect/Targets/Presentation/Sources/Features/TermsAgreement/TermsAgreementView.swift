@@ -13,14 +13,14 @@ import Domain
 public struct TermsAgreementView: View {
 
     private enum Metrics {
-        static let noticeTopPadding: CGFloat = 12
-        /// 안내는 늘 두 줄로 끊어 둔다. 기기 폭에 따라 줄 수가 바뀌면 시트 높이 계산이 어긋난다.
-        static let noticeHeight: CGFloat = 52
+        static let noticeTopPadding: CGFloat = 8
+        /// 한 줄 고정. 시트 높이를 미리 계산하므로 줄 수가 바뀌면 안 된다.
+        static let noticeHeight: CGFloat = 20
     }
 
-    /// 가입 안내 한 줄이 시트에 더하는 높이(#380). 시트 높이를 정하는 `LoginView`가 쓴다.
-    static let signupNoticeBlockHeight: CGFloat = Metrics.noticeTopPadding + Metrics.noticeHeight
-    
+    /// 최근 로그인 안내 한 줄이 시트에 더하는 높이(#380). 안내가 있을 때만 `LoginView`가 시트 높이에 더한다.
+    static let recentLoginNoticeBlockHeight: CGFloat = Metrics.noticeTopPadding + Metrics.noticeHeight
+
     @Bindable var store: StoreOf<TermsAgreementFeature>
 
     public init(store: StoreOf<TermsAgreementFeature>) {
@@ -45,9 +45,11 @@ public struct TermsAgreementView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 24)
 
-            signupNotice
-                .padding(.horizontal, 20)
-                .padding(.top, Metrics.noticeTopPadding)
+            if let provider = store.recentOtherProvider {
+                recentLoginNotice(provider)
+                    .padding(.horizontal, 20)
+                    .padding(.top, Metrics.noticeTopPadding)
+            }
             
             // 동의 항목 리스트
             VStack(spacing: 4) {
@@ -82,40 +84,26 @@ public struct TermsAgreementView: View {
         }
     }
 
-    // MARK: - 가입 안내 (#380)
-    /// 같은 사람도 소셜마다 다른 계정이라, 다른 버튼을 눌러 여기까지 왔다면 새 계정이 생긴다는 것을 동의 전에 알린다.
-    private var signupNotice: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            ForEach(noticeLines, id: \.self) { line in
-                Text(line)
-            }
-        }
-        .font(Font.pretendard.captionM)
-        .foregroundStyle(Color.semantic.text.secondary)
-        .lineLimit(1)
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: Metrics.noticeHeight)
-        .background(Color.semantic.surface.secondary, in: RoundedRectangle(cornerRadius: 10))
-        .accessibilityElement(children: .combine)
-    }
-
-    private var noticeLines: [String] {
-        guard let provider = store.recentOtherProvider else {
-            return ["예전에 다른 방법으로 가입했다면", "그 방법으로 로그인해 주세요"]
-        }
-        let name = provider.displayName
-        return ["최근엔 \(name)로 로그인했어요", "같은 계정을 쓰려면 \(name)로 로그인해 주세요"]
+    // MARK: - 최근 로그인 안내 (#380)
+    /// 같은 사람도 소셜마다 다른 계정이라, 이 기기에서 다른 수단으로 로그인했었다면 동의 전에 짚어 준다.
+    /// 처음 가입하는 사람에겐 잡음이라 기록이 없거나 같은 수단이면 보이지 않는다.
+    private func recentLoginNotice(_ provider: SNSProvider) -> some View {
+        Text("예전엔 \(provider.displayName)로 로그인했어요")
+            .font(Font.pretendard.bodyS)
+            .foregroundStyle(Color.semantic.text.secondary)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: Metrics.noticeHeight)
     }
 }
 
-#Preview("약관 시트 — 일반 안내") {
+#Preview("약관 시트 — 안내 없음") {
     TermsAgreementView(store: Store(initialState: TermsAgreementFeature.State()) {
         TermsAgreementFeature()
     })
 }
 
-#Preview("약관 시트 — 최근 로그인 수단 안내") {
+#Preview("약관 시트 — 예전 로그인 수단 안내") {
     TermsAgreementView(store: Store(initialState: TermsAgreementFeature.State(recentOtherProvider: .kakao)) {
         TermsAgreementFeature()
     })

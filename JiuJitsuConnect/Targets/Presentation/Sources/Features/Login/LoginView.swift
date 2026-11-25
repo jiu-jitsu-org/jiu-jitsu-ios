@@ -43,7 +43,10 @@ public struct LoginView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .presentationDragIndicator(.hidden)
                     .presentationDetents(
-                        [.height(calculateSheetHeight(itemCount: termsStore.state.rows.count))]
+                        [.height(calculateSheetHeight(
+                            itemCount: termsStore.state.rows.count,
+                            hasRecentLoginNotice: termsStore.state.recentOtherProvider != nil
+                        ))]
                     )
                     .presentationBackground(
                         Color.component.bottomSheet.selected.container.background
@@ -132,9 +135,10 @@ public struct LoginView: View {
         .animation(.easeInOut(duration: 0.15), value: store.loadingProvider)
     }
 
-    private func calculateSheetHeight(itemCount: Int) -> CGFloat {
+    private func calculateSheetHeight(itemCount: Int, hasRecentLoginNotice: Bool) -> CGFloat {
         // 기본 UI 높이 (핸들, 타이틀, 버튼, 여백 등)
-        let baseHeight: CGFloat = 24 + 48 + TermsAgreementView.signupNoticeBlockHeight + 16 + 16 + 8 + 52 + 8
+        let noticeHeight = hasRecentLoginNotice ? TermsAgreementView.recentLoginNoticeBlockHeight : 0
+        let baseHeight: CGFloat = 24 + 48 + noticeHeight + 16 + 16 + 8 + 52 + 8
         // 각 약관 항목 Row의 높이
         let rowHeight: CGFloat = 40
         // 항목 사이의 간격

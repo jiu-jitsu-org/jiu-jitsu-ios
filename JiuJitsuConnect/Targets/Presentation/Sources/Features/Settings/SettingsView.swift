@@ -210,9 +210,8 @@ public struct SettingsView: View {
         case .logout:
             return .init(
                 title: "로그아웃할까요?",
-                // 다른 수단으로 로그인하면 새 계정이 생겨서 돌아올 수단을 알려 둔다(#380)
-                message: store.loginProvider.map { "다음에도 \($0.displayName)로 로그인해 주세요" }
-                    ?? "다음에도 같은 방법으로 로그인해 주세요",
+                // 돌아올 수단은 로그인 화면의 "최근 로그인"이 알려 주므로 본문은 두지 않는다(#380)
+                message: nil,
                 primaryButton: .init(title: "로그아웃", style: .primary, action: { store.send(.view(.confirmLogout)) }),
                 secondaryButton: .init(title: "취소", style: .neutral, action: { store.send(.view(.alertDismissed)) })
             )
