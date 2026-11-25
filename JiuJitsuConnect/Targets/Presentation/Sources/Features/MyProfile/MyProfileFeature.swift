@@ -563,6 +563,11 @@ public struct MyProfileFeature: Sendable {
             // MARK: - Delegate 처리 (자식 Feature로부터)
 
             case let .destination(.presented(.academySetting(.delegate(.saveAcademyName(academyName))))):
+                // 이름을 그대로 두고 '확인'하면 저장 없이 닫는다 — 닉네임 화면과 같이(정책 2.2, QA A2-13).
+                if let current = state.communityProfile?.academyName, current == academyName, !state.isLoadingProfile {
+                    state.destination = nil
+                    return .none
+                }
                 // 도장 이름 저장 요청 받음 → API 호출
                 return .send(.internal(.updateProfileSection(.academy, academyName)))
 
@@ -637,6 +642,10 @@ public struct MyProfileFeature: Sendable {
                 // 지난 저장에서 시트 닫힘을 기다리던 축하가 남아 있으면 이번 저장 뒤에 엉뚱하게 뜨지 않게 비운다.
                 state.pendingPromotion = nil
                 state.isBeltEntranceAfterPromotion = false
+                // 띠 · 그랄을 그대로 두고 '확인'하면 저장 없이 닫는다(QA A2-13).
+                if let profile = state.communityProfile, profile.beltRank == rank, profile.beltStripe == stripe {
+                    return .none
+                }
                 return .send(.internal(.saveBeltInfoOnly(rank: rank, stripe: stripe)))
                 
             case let .internal(.saveBeltInfoOnly(rank, stripe)):
