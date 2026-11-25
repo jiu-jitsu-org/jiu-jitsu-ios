@@ -258,7 +258,8 @@ public struct CompetitionTabFeature: Sendable {
     private static func openUserProfile(userId: Int, into state: inout State) -> Effect<Action> {
         // 연타·중복 전달로 같은 프로필이 겹쳐 쌓이지 않게 한다
         if case let .userProfile(current)? = state.path.last, current.userId == userId { return .none }
-        state.path.append(.userProfile(.init(userId: userId)))
+        // 게스트에게는 띠를 묻지 않는다(#130) — 물으면 그날 확인 기회만 쓰고 로그인 뒤엔 묻지 않는다(QA A2-14).
+        state.path.append(.userProfile(.init(userId: userId, canPromptBelt: state.web?.accessToken != nil)))
         return .none
     }
 }
