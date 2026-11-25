@@ -88,12 +88,22 @@ public struct TermsAgreementView: View {
     /// 같은 사람도 소셜마다 다른 계정이라, 이 기기에서 다른 수단으로 로그인했었다면 동의 전에 짚어 준다.
     /// 처음 가입하는 사람에겐 잡음이라 기록이 없거나 같은 수단이면 보이지 않는다.
     private func recentLoginNotice(_ provider: SNSProvider) -> some View {
-        Text("예전엔 \(provider.displayName)로 로그인했어요")
-            .font(Font.pretendard.bodyS)
-            .foregroundStyle(Color.semantic.text.secondary)
-            .lineLimit(1)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: Metrics.noticeHeight)
+        HStack(spacing: 4) {
+            // 경고 노랑은 아직 토스트 토큰에만 있다(semantic 토큰이 생기면 바꾼다)
+            Image(systemName: "exclamationmark.triangle.fill")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 15, height: 15)
+                .foregroundStyle(Color.component.toast.icon.warning)
+                .accessibilityLabel("주의")
+            Text("예전엔 \(provider.displayName)로 로그인했어요")
+                .font(Font.pretendard.bodyS)
+                .foregroundStyle(Color.semantic.text.secondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: Metrics.noticeHeight)
+        .accessibilityElement(children: .combine)
     }
 }
 
