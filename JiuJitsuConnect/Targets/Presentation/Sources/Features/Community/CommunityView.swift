@@ -88,6 +88,7 @@ public struct CommunityView: View {
         }
         .background(Color.component.background.default)
         .onAppear { store.send(.view(.onAppear)) }
+        .onWebScreenVisibilityChange { store.send(.view(.visibilityChanged($0))) }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { store.send(.view(.sceneBecameActive)) }
         }
@@ -182,7 +183,7 @@ public struct CommunityView: View {
     private var errorOverlay: some View {
         VStack(spacing: 0) {
             VStack(spacing: 13) {
-                Text("잠시 문제가 생겼어요")
+                Text(store.connectionRetry.errorTitle)
                     .font(.pretendard.bodyM)
                     .foregroundStyle(Color.component.errorState.default.titleText)
                 Button {

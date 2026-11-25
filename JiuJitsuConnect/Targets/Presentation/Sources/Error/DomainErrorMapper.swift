@@ -17,7 +17,10 @@ public struct DomainErrorMapper {
             return .none // 정책: UI 표시 안 함
         
         case .networkUnavailable:
-            return .toast("네트워크 연결을 확인해주세요.")
+            return .toast("연결이 불안정해요")
+
+        case .timeout:
+            return .toast("서버 응답이 늦어요. 잠시 뒤 다시 시도해 주세요")
             
         case .accountProblem(let provider):
             return .toast("\(provider.displayName) 계정을 확인 후 다시 시도해주세요.")
@@ -87,7 +90,7 @@ extension DomainErrorMapper {
             // 서버 코드가 없으면 HTTP 상태라도 남긴다.
             let shown = code ?? statusCode.map(String.init)
             return AuthFailureNotice(message: Self.retryMessage, code: shown)
-        case .networkUnavailable, .accountProblem, .permissionRequired,
+        case .networkUnavailable, .timeout, .accountProblem, .permissionRequired,
              .dataParsingFailed, .cannotFindRootViewController, .dependencyNotFound, .missingProfileData, .unknown:
             switch toDisplayError(from: error) {
             case .toast(let message), .info(let message), .alert(let message):

@@ -134,7 +134,7 @@ private struct CompetitionListWebView: View {
 
             if store.hasError {
                 VStack(spacing: 13) {
-                    Text("잠시 문제가 생겼어요")
+                    Text(store.connectionRetry.errorTitle)
                         .font(.pretendard.bodyM)
                         .foregroundStyle(Color.component.errorState.default.titleText)
                     Button {
@@ -151,6 +151,7 @@ private struct CompetitionListWebView: View {
                 .padding(.top, 44)
             }
         }
+        .onWebScreenVisibilityChange { store.send(.view(.visibilityChanged($0))) }
         // 웹이 요청한 확인 알럿·선택 시트는 탭바까지 덮도록 AppTabView가 그린다(홈 피드와 같음).
     }
 }

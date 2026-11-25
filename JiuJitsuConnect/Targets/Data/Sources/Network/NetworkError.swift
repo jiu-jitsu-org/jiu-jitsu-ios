@@ -55,8 +55,11 @@ public enum NetworkError: Error, LocalizedError, Sendable {
     
     public func toDomainError() -> DomainError {
         switch self {
-        case .noConnection, .timeout:
+        case .noConnection:
             return .networkUnavailable
+
+        case .timeout:
+            return .timeout
             
         case .decodingError:
             return .dataParsingFailed
