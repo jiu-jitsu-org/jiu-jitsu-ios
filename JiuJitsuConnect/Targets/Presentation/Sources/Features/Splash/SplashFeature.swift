@@ -263,6 +263,8 @@ public struct SplashFeature: Sendable {
                 // autoLogin은 저장된 로그인이 없으면 nil을 돌려주므로, 실패는 저장된 로그인이 있다는 뜻이다.
                 // 서버가 세션 종료를 알렸을 때만 로그인 화면으로 가고, 그 밖엔 토큰을 지키고 다시 시도를 묻는다(#367).
                 if case let .apiError(code, _)? = error as? DomainError, code.endsSession {
+                    // 미리 불러오기가 심은 세션 쿠키를 지운다. 남으면 둘러보기 · 링크로 연 게스트 홈이 이전 계정으로 잠깐 그려진다.
+                    await WebSessionCookie.clear()
                     await send(.internal(.autoLoginFinished(nil, isSessionExpired: true)))
                 } else {
                     await send(.internal(.autoLoginConnectionFailed(isTimedOut: false)))
