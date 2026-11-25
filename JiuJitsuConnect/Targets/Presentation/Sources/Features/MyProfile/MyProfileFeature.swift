@@ -16,7 +16,7 @@ import CoreKit
 public struct MyProfileFeature: Sendable {
     public init() {}
     
-    private enum CancelID { case toast, profileImageUpload, instructorVerificationUpload, profileRefresh }
+    private enum CancelID { case toast, profileImageUpload, instructorVerificationUpload, profileRefresh, userProfileForEntry }
 
     @ObservableState
     public struct State: Equatable, Sendable {
@@ -259,6 +259,8 @@ public struct MyProfileFeature: Sendable {
             case refreshProfile
             case refreshProfileResponse(TaskResult<CommunityProfile>, saveGeneration: Int)
             case refreshUserProfileResponse(TaskResult<UserProfile>, generation: Int)
+            // user 프로필이 없어 사진 바꾸기 · 관장 사범 인증을 열기 전에 다시 받은 결과(QA A2-2, A3-10). 받으면 그 화면을 연다.
+            case userProfileFetchedForEntry(TaskResult<UserProfile>, generation: Int, entry: UserProfileEntry)
             case updateProfileSection(ProfileSection, String?)
             case saveBeltInfoOnly(rank: BeltRank, stripe: BeltStripe)
             // 스타일 저장 (특기 + 최애 한 번에)
@@ -315,6 +317,12 @@ public struct MyProfileFeature: Sendable {
             case instructorVerificationRequestResponse(TaskResult<String>)
 
             // 닉네임 갱신 응답 (이미지와 동일한 PUT /api/user/profile 사용)
+
+            /// user 프로필이 있어야 여는 화면
+            public enum UserProfileEntry: Sendable {
+                case profileImageEdit
+                case instructorVerification
+            }
         }
     }
     
@@ -1262,6 +1270,8 @@ public struct MyProfileFeature: Sendable {
 
             case .view(.instructorVerificationMenuTapped):
                 guard !state.isUploadingInstructorVerification else { return .none }
+                // 신청 상태를 모르면 '미신청'으로 단정해 심사 중인 회원에게도 신청 화면이 뜬다 — 먼저 다시 받는다(QA A3-10).
+                guard state.userProfile != nil else { return fetchUserProfile(for: .instructorVerification, state: state) }
                 state.sheet = .instructorVerification(Self.instructorVerificationState(from: state))
                 return .none
 
@@ -1324,6 +1334,26 @@ public struct MyProfileFeature: Sendable {
                     ))))
                 }
 
+            case let .internal(.userProfileFetchedForEntry(result, generation, entry)):
+                switch result {
+                case let .success(profile):
+                    if !state.isUploadingProfileImage, generation == state.userProfileGeneration {
+                        state.userProfile = profile
+                        state.pendingProfileImageData = nil
+                    }
+                    // 받는 사이 다른 시트가 열렸으면 겹쳐 띄우지 않는다.
+                    guard state.userProfile != nil, state.sheet == nil else { return .none }
+                    switch entry {
+                    case .profileImageEdit:
+                        return .send(.view(.profileImageEditButtonTapped))
+                    case .instructorVerification:
+                        return .send(.view(.instructorVerificationMenuTapped))
+                    }
+                case let .failure(error):
+                    Log.trace("Failed to load user profile before \(entry): \(error)", category: .network, level: .error)
+                    return Self.profileUnavailableToast()
+                }
+
             case let .internal(.presentImageEditSheet(purpose, canDelete)):
                 state.sheet = .profileImageEdit(
                     ProfileImageEditFeature.State(purpose: purpose, canDelete: canDelete)
@@ -1335,6 +1365,8 @@ public struct MyProfileFeature: Sendable {
                 guard !state.isUploadingProfileImage else {
                     return .send(.internal(.showToast(.init(message: "사진을 바꾸는 중이에요. 잠시 후 다시 시도해 주세요", status: .info))))
                 }
+                // user 프로필이 없으면 사진을 다 고르고 자른 뒤에야 실패한다 — 열기 전에 다시 받는다(QA A2-2).
+                guard state.userProfile != nil else { return fetchUserProfile(for: .profileImageEdit, state: state) }
                 // 프로필 이미지 수정 옵션 바텀시트 노출
                 // 실제로 이미지가 렌더링되는 상태일 때만 '삭제' 옵션 노출
                 let canDelete = state.userProfile?.hasProfileImage ?? false
@@ -1663,6 +1695,20 @@ public struct MyProfileFeature: Sendable {
                 ?? "",
             pickedImageData: pickedImageData
         )
+    }
+
+    /// user 프로필을 다시 받아, 받으면 그 화면을 연다(QA A2-2, A3-10). 연타하면 앞 요청은 취소한다.
+    private func fetchUserProfile(for entry: Action.InternalAction.UserProfileEntry, state: State) -> Effect<Action> {
+        guard !state.authInfo.isGuest else { return .none }
+        let generation = state.userProfileGeneration
+        return .run { send in
+            await send(.internal(.userProfileFetchedForEntry(
+                await TaskResult { try await userClient.fetchUserProfile() },
+                generation: generation,
+                entry: entry
+            )))
+        }
+        .cancellable(id: CancelID.userProfileForEntry, cancelInFlight: true)
     }
 
     /// 서버에 저장하기 전 이 기기에만 남긴 상단 무늬를 서버로 옮겨 담는다(#337). 프로필을 받을 때마다 부른다.
