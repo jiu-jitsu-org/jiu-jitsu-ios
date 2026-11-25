@@ -293,6 +293,8 @@ private struct TermsWKWebView: UIViewRepresentable {
         var loadedReloadToken: Int = 0
         private var offsetObservation: NSKeyValueObservation?
         private var didLoad = false
+        // HTTP 오류 응답을 막아 실패를 알렸고, WebKit이 한 번 더 보낼 중단 실패를 기다리는 중
+        private var isAwaitingHTTPCancel = false
 
         init(onScroll: @escaping (CGFloat) -> Void, onLoadFinish: @escaping () -> Void, onLoadFail: @escaping () -> Void) {
             self.onScroll = onScroll
@@ -312,6 +314,7 @@ private struct TermsWKWebView: UIViewRepresentable {
 
         // MARK: WKNavigationDelegate
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            isAwaitingHTTPCancel = false
             // 네비게이션 시작 시점에도 한 번 더 스크롤을 차단한다.
             TermsWKWebView.setScrollBlocked(true, on: webView.scrollView)
             Log.trace("didStartProvisionalNavigation — panEnabled=\(webView.scrollView.panGestureRecognizer.isEnabled)", category: .view, level: .debug)
@@ -333,7 +336,32 @@ private struct TermsWKWebView: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
             Log.trace("didFailProvisionalNavigation — error=\(error.localizedDescription)", category: .view, level: .error)
+            // 상태 코드를 보고 막은 로드의 중단 알림이다 — 실패는 그때 알렸다.
+            if isAwaitingHTTPCancel {
+                isAwaitingHTTPCancel = false
+                return
+            }
             handleFailure(webView, error: error)
+        }
+
+        // HTTP 4xx/5xx는 WKWebView 관점에서 정상 로드라 didFail이 오지 않는다 — 서버 오류 페이지 대신
+        // 커뮤니티 웹뷰(BridgeWebView)처럼 메인 프레임 상태 코드를 보고 실패 화면(재시도)을 보인다.
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationResponse: WKNavigationResponse,
+            decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
+        ) {
+            if navigationResponse.isForMainFrame,
+               let http = navigationResponse.response as? HTTPURLResponse,
+               !(200..<400).contains(http.statusCode) {
+                Log.trace("Terms webview HTTP error: \(http.statusCode)", category: .network, level: .error)
+                decisionHandler(.cancel)
+                isAwaitingHTTPCancel = true
+                enableScrollAtTop(webView, notifyFinish: false)
+                onLoadFail()
+                return
+            }
+            decisionHandler(.allow)
         }
 
         // MARK: WKUIDelegate
