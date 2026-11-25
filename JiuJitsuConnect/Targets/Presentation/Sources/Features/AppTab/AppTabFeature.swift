@@ -177,9 +177,11 @@ public struct AppTabFeature: Sendable {
             // 토큰 갱신 불가(세션 만료) → 게스트로 전환 + 웹 세션 정리.
             case handleSessionExpired
             // 대회 상세에서 연 기록 추가의 저장 결과(#250, #304). id·stack은 결과를 돌려줄 입력 화면과 그 화면이 쌓인 스택.
+            // webCompetitionId는 웹이 기록 추가를 열 때 보낸 대회 id — 성공하면 열린 웹에 알린다(#397).
             case competitionRecordSaved(
                 id: StackElementID,
                 stack: CompetitionRecordStack,
+                webCompetitionId: Int?,
                 competition: Competition,
                 TaskResult<CommunityProfile>
             )
@@ -432,13 +434,13 @@ public struct AppTabFeature: Sendable {
 
             // 기록 추가 저장(#250). 대회 탭·홈 스택·홈 모달 안 스택 어디에 쌓였든 같은 저장을 거친다(#304).
             case let .competition(.path(.element(id: id, action: .competitionInfo(.delegate(.didFinishAdding(competition)))))):
-                return saveCompetitionRecord(competition, id: id, stack: .competition)
+                return saveCompetitionRecord(competition, id: id, stack: .competition, state: state)
 
             case let .home(.path(.element(id: id, action: .competitionInfo(.delegate(.didFinishAdding(competition)))))):
-                return saveCompetitionRecord(competition, id: id, stack: .home)
+                return saveCompetitionRecord(competition, id: id, stack: .home, state: state)
 
             case let .home(.coverPath(.element(id: id, action: .competitionInfo(.delegate(.didFinishAdding(competition)))))):
-                return saveCompetitionRecord(competition, id: id, stack: .homeCover)
+                return saveCompetitionRecord(competition, id: id, stack: .homeCover, state: state)
 
             // MARK: - DeepLink
 
@@ -622,14 +624,17 @@ public struct AppTabFeature: Sendable {
                     .send(.competition(.session(.sessionExpired)))
                 )
 
-            case let .internal(.competitionRecordSaved(id, stack, competition, .success(profile))):
+            case let .internal(.competitionRecordSaved(id, stack, webCompetitionId, competition, .success(profile))):
                 // MY의 대회 기록 목록에도 바로 보이게 MY가 가진 프로필을 바꾼다.
-                // 저장 중 로그아웃·세션 만료로 게스트가 됐으면 이전 계정의 프로필을 다시 넣지 않는다.
+                // 저장 중 로그아웃·세션 만료로 게스트가 됐으면 이전 계정의 프로필을 다시 넣지 않고, 웹에도 알리지 않는다.
                 guard !state.authInfo.isGuest else { return .none }
                 state.myPage.communityProfile = profile
-                return Self.finishCompetitionRecordSave(.succeeded(competition), id: id, stack: stack, state: state)
+                return .merge(
+                    Self.finishCompetitionRecordSave(.succeeded(competition), id: id, stack: stack, state: state),
+                    Self.broadcastCompetitionRecordSaved(webCompetitionId: webCompetitionId)
+                )
 
-            case let .internal(.competitionRecordSaved(id, stack, _, .failure(error))):
+            case let .internal(.competitionRecordSaved(id, stack, _, _, .failure(error))):
                 Log.trace("Failed to add competition from competition detail: \(error)", category: .network, level: .error)
                 analyticsClient.logErrorShown(error)
                 // 입력 화면이 실패를 안내하고 입력값을 지켜 다시 저장하게 한다(MY와 같은 처리).

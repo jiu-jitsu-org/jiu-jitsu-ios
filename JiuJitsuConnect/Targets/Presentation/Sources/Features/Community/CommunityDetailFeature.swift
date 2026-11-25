@@ -219,6 +219,8 @@ public struct CommunityDetailFeature: Sendable {
         case profileUpdated
         /// 남의 프로필에서 회원을 차단·해제함(#328) — PROFILE_UPDATED와 같은 통로로 열린 웹뷰 모두에 알린다.
         case userBlockChanged(userId: Int, blocked: Bool)
+        /// 대회 상세에서 연 기록 추가를 저장함(#397) — 같은 통로로 열린 웹뷰 모두에 COMPETITION_RECORD_SAVED를 알린다.
+        case competitionRecordSaved(competitionId: String)
     }
 
     @Dependency(\.dismiss) var dismiss
@@ -574,6 +576,8 @@ public struct CommunityDetailFeature: Sendable {
             enqueue(.profileUpdated, into: &state)
         case let .userBlockChanged(userId, blocked):
             enqueue(.userBlockChanged(userId: userId, blocked: blocked), into: &state)
+        case let .competitionRecordSaved(competitionId):
+            enqueue(.competitionRecordSaved(competitionId: competitionId), into: &state)
         }
     }
 
