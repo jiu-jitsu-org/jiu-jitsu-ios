@@ -218,6 +218,8 @@ public struct CommunityFeature: Sendable {
             case profileUpdated
             /// 남의 프로필에서 회원을 차단·해제함 → USER_BLOCK_CHANGED
             case userBlockChanged(userId: Int, blocked: Bool)
+            /// 대회 상세에서 연 기록 추가를 저장함(#397) → COMPETITION_RECORD_SAVED
+            case competitionRecordSaved(competitionId: String)
         }
     }
 
@@ -596,6 +598,11 @@ public struct CommunityFeature: Sendable {
             case let .session(.userBlockChanged(userId, blocked)):
                 Self.enqueue(.userBlockChanged(userId: userId, blocked: blocked), into: &state)
                 Self.broadcastToDetails(.userBlockChanged(userId: userId, blocked: blocked), into: &state)
+                return .none
+
+            case let .session(.competitionRecordSaved(competitionId)):
+                Self.enqueue(.competitionRecordSaved(competitionId: competitionId), into: &state)
+                Self.broadcastToDetails(.competitionRecordSaved(competitionId: competitionId), into: &state)
                 return .none
 
             case .unreadNotificationRefreshRequested:

@@ -67,14 +67,41 @@ extension AppTabFeature {
     /// MY가 들고 있는 프로필은 앱을 켤 때 받은 값일 수 있어(로그인 직후엔 아직 받는 중), 저장 직전에 늘 새로 받아
     /// 그 위에 더한다 — 그 사이 다른 곳에서 남긴 기록이 지워지지 않게.
     /// 저장 결과를 보고 완료 화면('부문 추가')으로 넘어가야 하므로 입력 화면은 닫지 않는다.
-    func saveCompetitionRecord(_ competition: Competition, id: StackElementID, stack: CompetitionRecordStack) -> Effect<Action> {
-        .run { [communityClient] send in
+    /// 웹이 연 대회 id는 지금 읽어 둔다 — 저장 중 입력 화면이 닫혀도 저장이 끝나면 웹에 알려야 한다(#397).
+    func saveCompetitionRecord(
+        _ competition: Competition,
+        id: StackElementID,
+        stack: CompetitionRecordStack,
+        state: State
+    ) -> Effect<Action> {
+        let webCompetitionId = Self.competitionRecord(id: id, stack: stack, state: state)?.webCompetitionId
+        return .run { [communityClient] send in
             let result = await TaskResult {
                 let profile = try await communityClient.fetchProfile()
                 return try await communityClient.updateProfile(profile.addingCompetition(competition), .competition)
             }
-            await send(.internal(.competitionRecordSaved(id: id, stack: stack, competition: competition, result)))
+            await send(.internal(.competitionRecordSaved(
+                id: id,
+                stack: stack,
+                webCompetitionId: webCompetitionId,
+                competition: competition,
+                result
+            )))
         }
+    }
+
+    /// 기록 저장 성공을 열린 웹뷰 모두(홈 · 대회 탭 · MY 스택)에 알린다(#397). 웹은 그 대회의 '결과 남기기' 배너 · 카드를 닫는다.
+    /// 기록 추가를 연 탭이 아닌 곳에도 같은 대회가 떠 있을 수 있어 PROFILE_UPDATED처럼 모두에 보낸다.
+    /// 웹이 대회 id 없이 열었으면 닫을 배너를 가리킬 수 없어 보내지 않는다.
+    static func broadcastCompetitionRecordSaved(webCompetitionId: Int?) -> Effect<Action> {
+        guard let webCompetitionId else { return .none }
+        // 웹과 정한 모양은 숫자 문자열("26")이다(jiu-jitsu-frontend#545).
+        let competitionId = String(webCompetitionId)
+        return .merge(
+            .send(.home(.session(.competitionRecordSaved(competitionId: competitionId)))),
+            .send(.competition(.session(.competitionRecordSaved(competitionId: competitionId)))),
+            .send(.myPage(.session(.competitionRecordSaved(competitionId: competitionId))))
+        )
     }
 
     /// 저장 결과를 기록 추가 입력 화면에 돌려준다. 저장 중 입력 화면이 닫혔으면(예외적) 돌려줄 곳이 없다.
@@ -84,17 +111,34 @@ extension AppTabFeature {
         stack: CompetitionRecordStack,
         state: State
     ) -> Effect<Action> {
+        guard competitionRecord(id: id, stack: stack, state: state) != nil else { return .none }
         let action = CompetitionInfoFeature.Action.saveFinished(result)
         switch stack {
         case .competition:
-            guard case .competitionInfo? = state.competition.path[id: id] else { return .none }
             return .send(.competition(.path(.element(id: id, action: .competitionInfo(action)))))
         case .home:
-            guard case .competitionInfo? = state.home.path[id: id] else { return .none }
             return .send(.home(.path(.element(id: id, action: .competitionInfo(action)))))
         case .homeCover:
-            guard case .competitionInfo? = state.home.coverPath[id: id] else { return .none }
             return .send(.home(.coverPath(.element(id: id, action: .competitionInfo(action)))))
+        }
+    }
+
+    /// 그 스택에 쌓인 기록 추가 입력 화면. 닫혔으면 nil.
+    private static func competitionRecord(
+        id: StackElementID,
+        stack: CompetitionRecordStack,
+        state: State
+    ) -> CompetitionInfoFeature.State? {
+        switch stack {
+        case .competition:
+            guard case let .competitionInfo(record)? = state.competition.path[id: id] else { return nil }
+            return record
+        case .home:
+            guard case let .competitionInfo(record)? = state.home.path[id: id] else { return nil }
+            return record
+        case .homeCover:
+            guard case let .competitionInfo(record)? = state.home.coverPath[id: id] else { return nil }
+            return record
         }
     }
 }

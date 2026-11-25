@@ -127,6 +127,10 @@ public struct CompetitionInfoFeature: Sendable {
         // 연도가 정해진 대회는 연도를 바꿔도 끊는다 — 서버가 등록 연도로 되돌리고, 같은 이름·연도의 다른 기록과 겹치면 거절한다.
         var linkedCompetition: LinkedCompetition?
 
+        /// 대회 상세 웹이 기록 추가를 열 때 보낸 대회 id(#397). 이름·연도를 고쳐 연결(`linkedCompetition`)이 끊겨도 남는다 —
+        /// 저장에 성공하면 웹에 이 대회의 '결과 남기기'를 닫으라고 알리는데, 웹은 자기가 보낸 그 값으로 배너를 찾는다.
+        private(set) var webCompetitionId: Int?
+
         // 4단계: 출전 부문 — 건너뛸 수 있다.
         // 도복 대회가 더 흔해 새 기록은 도복으로, 출전 띠는 지금 띠로, 체급은 지난 기록의 체급으로 미리 골라 둔다
         // (대부분 그대로 '완료'만 누르게, #190).
@@ -261,6 +265,7 @@ public struct CompetitionInfoFeature: Sendable {
             self.init(mode: .add, currentBelt: currentBelt, recentWeightLimit: recentWeightLimit)
             self.entry = .competitionDetail
             self.name = prefilledName
+            self.webCompetitionId = competitionId
             self.linkedCompetition = competitionId.map {
                 LinkedCompetition(id: $0, name: prefilledName, year: year)
             }
