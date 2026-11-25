@@ -1,0 +1,524 @@
+<title>OSS 리액션 스티커</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* 레이아웃: 스티커가 주인공인 넓은 그리드 + 좁은 설명 단. 섹션 머리말은 굵은 디스플레이 글씨로 짧게. */
+:root {
+  --bg: #F2F3F6;
+  --surface: #FFFFFF;
+  --ink: #121317;
+  --muted: #5A6070;
+  --line: #DDE0E7;
+  --accent: #2F5BFF;
+  --chip: #E7E9F0;
+  --display: "Black Han Sans", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --r: 18px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1014; --surface: #181A20; --ink: #F2F3F5; --muted: #A3A8B6; --line: #2A2D37; --accent: #7F98FF; --chip: #23262F;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1014; --surface: #181A20; --ink: #F2F3F5; --muted: #A3A8B6; --line: #2A2D37; --accent: #7F98FF; --chip: #23262F;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.6; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--display); font-weight: 400; letter-spacing: -0.01em; text-wrap: balance; margin: 0; }
+h2 { font-size: clamp(28px, 4vw, 40px); line-height: 1.1; }
+h3 { font-size: 22px; line-height: 1.15; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: var(--muted); }
+.mono { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+/* hero */
+.hero { padding-block: 40px 28px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 32px; align-items: center; }
+.hero h1 { font-size: clamp(44px, 7vw, 84px); line-height: 0.98; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.lede { font-size: 17px; max-width: 34em; margin-top: 16px; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.fact { background: var(--chip); border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 500; }
+.hero-stack { position: relative; aspect-ratio: 1.15; max-width: 100%; }
+.art { position: relative; overflow: hidden; }
+.art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.hero-stack .tile { position: absolute; width: 50%; border-radius: 22px; overflow: hidden; box-shadow: 0 18px 40px -18px rgba(10, 20, 60, 0.45); background: #fff; }
+.hero-stack .tile:nth-child(1) { left: 0; top: 10%; transform: rotate(-6deg); }
+.hero-stack .tile:nth-child(2) { left: 26%; top: 0; transform: rotate(3deg); z-index: 2; width: 52%; }
+.hero-stack .tile:nth-child(3) { right: 0; top: 30%; transform: rotate(8deg); }
+
+/* nav */
+.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.nav .wrap { display: flex; gap: 6px; overflow-x: auto; padding-block: 10px; scrollbar-width: none; }
+.nav a { flex: none; text-decoration: none; color: var(--ink); font-size: 14px; font-weight: 600; padding: 6px 12px; border-radius: 999px; }
+.nav a:hover, .nav a:focus-visible { background: var(--chip); outline: none; }
+
+section { padding-block: 48px 8px; }
+.sec-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 24px; align-items: end; margin-bottom: 24px; }
+.sec-head p { max-width: 40em; }
+
+/* 캐릭터 공식 */
+.formula { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr) auto) minmax(0, 1.25fr); align-items: center; gap: 12px; }
+.formula figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 10px; }
+.formula figure img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; background: #fff; border-radius: 10px; }
+.formula figcaption { font-size: 13px; margin-top: 8px; line-height: 1.4; }
+.formula figcaption b { display: block; font-size: 14px; }
+.op { font-family: var(--display); font-size: 34px; color: var(--muted); }
+.formula figure.result { border-color: var(--accent); border-width: 2px; }
+
+/* 레퍼런스 */
+.refs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.ref { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: grid; gap: 8px; align-content: start; }
+.ref .tag { font-size: 12px; font-weight: 600; color: var(--accent); }
+.note { margin-top: 12px; font-size: 13px; }
+
+/* 3D 그리드 */
+.ggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 18px; }
+.gcard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; display: grid; grid-template-rows: auto 1fr; }
+.gcard .art { position: relative; aspect-ratio: 1; overflow: hidden; background: #ddd; }
+.gcard .art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.gcard .body { padding: 14px 16px 16px; display: grid; gap: 4px; align-content: start; }
+.gcard .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.gcard h3 { font-size: 22px; }
+.badge { font-size: 11px; font-weight: 600; border-radius: 999px; padding: 2px 8px; background: var(--chip); white-space: nowrap; }
+.badge.loop { background: var(--accent); color: #fff; }
+.small { font-size: 13px; line-height: 1.5; }
+
+/* 2프레임 루프: b 를 절반 동안 보이게, 몸 전체는 살짝 눌렸다 펴짐 */
+.loop2 .fr-b { animation: flipB var(--per, 0.9s) steps(1, end) infinite; }
+.loop2 .bob { position: absolute; inset: 0; animation: bob var(--per, 0.9s) ease-in-out infinite; transform-origin: 50% 88%; }
+.loop1 .bob { position: absolute; inset: 0; animation: bob1 2.4s ease-in-out infinite; transform-origin: 50% 88%; }
+@keyframes flipB { 0% { opacity: 0; } 50% { opacity: 1; } }
+/* 리액션 성격별 움직임. 배경 가장자리가 보이지 않게 살짝 확대한 상태에서 움직인다 */
+.bob.hop { animation: hop var(--per, 0.9s) cubic-bezier(.3,.7,.4,1) infinite; }
+.bob.sway { animation: sway calc(var(--per, 0.9s) * 2) ease-in-out infinite; }
+.bob.breathe { animation: breathe calc(var(--per, 0.9s) * 1.6) ease-in-out infinite; }
+.bob.pulse { animation: pulse var(--per, 0.9s) ease-out infinite; }
+@keyframes hop { 0%, 100% { transform: scale(1.06) translateY(0); } 15% { transform: scale(1.075, 1.04) translateY(0.6%); } 45% { transform: scale(1.05, 1.08) translateY(-3.2%); } 75% { transform: scale(1.06) translateY(0); } }
+@keyframes sway { 0%, 100% { transform: scale(1.07) rotate(-1.6deg); } 50% { transform: scale(1.07) rotate(1.6deg); } }
+@keyframes breathe { 0%, 100% { transform: scale(1.06, 1.06); } 50% { transform: scale(1.075, 1.09) translateY(-1%); } }
+@keyframes pulse { 0%, 100% { transform: scale(1.06); } 18% { transform: scale(1.1); } 40% { transform: scale(1.065); } }
+@keyframes bob { 0%, 100% { transform: scale(1, 1); } 25% { transform: scale(1.012, 0.985); } 75% { transform: scale(0.99, 1.014) translateY(-0.6%); } }
+@keyframes bob1 { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-1.2%) scale(1.01); } }
+.paused .fr-b, .paused .bob { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .fr-b, .bob { animation: none !important; } }
+
+/* 스타일 비교 */
+.styles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.style { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; display: grid; grid-template-rows: auto 1fr; }
+.style .art { aspect-ratio: 1; position: relative; overflow: hidden; background: #E8E9ED; }
+.style .art img, .style .art canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.style .body { padding: 14px 16px 16px; display: grid; gap: 6px; align-content: start; }
+.pc { display: grid; gap: 2px; font-size: 13px; }
+.pc span::before { content: "＋ "; color: #1AA36B; font-weight: 700; }
+.pc span.minus::before { content: "－ "; color: #D4364A; }
+
+/* 컨트롤 */
+.controls { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); margin-bottom: 18px; }
+.ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ctl > span { font-size: 13px; font-weight: 600; color: var(--muted); }
+.seg { display: inline-flex; background: var(--chip); border-radius: 999px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; color: var(--ink); font: 600 13px var(--body); padding: 5px 12px; border-radius: 999px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.seg button:focus-visible, .sw:focus-visible, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sw { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; position: relative; }
+.sw[aria-pressed="true"] { border-color: var(--ink); box-shadow: 0 0 0 2px var(--surface) inset; }
+.sw::after { content: ""; position: absolute; left: 3px; right: 3px; top: 50%; height: 5px; margin-top: -2.5px; background: var(--band, #1E1F23); border-radius: 2px; }
+.btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 600 13px var(--body); padding: 6px 14px; border-radius: 999px; cursor: pointer; }
+
+.group { margin-bottom: 28px; }
+.group-head { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; margin-bottom: 12px; }
+.vgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.vcard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; display: grid; grid-template-rows: auto 1fr; cursor: pointer; text-align: left; padding: 0; font: inherit; color: inherit; }
+.vcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.vcard canvas { width: 100%; aspect-ratio: 1; display: block; }
+.vcard .body { padding: 12px 14px 14px; display: grid; gap: 3px; align-content: start; }
+
+dialog { border: 0; border-radius: 22px; padding: 0; max-width: min(920px, calc(100vw - 32px)); width: 100%; background: var(--surface); color: var(--ink); }
+dialog::backdrop { background: rgba(8, 10, 20, 0.55); }
+.dlg { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 20px; padding: 20px; }
+.dlg canvas.big { width: 100%; aspect-ratio: 1; border-radius: 14px; display: block; }
+.frames { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.frames figure { margin: 0; }
+.frames canvas { width: 100%; aspect-ratio: 1; border-radius: 8px; display: block; }
+.frames figcaption { font-size: 11px; text-align: center; color: var(--muted); }
+.dlg .close { justify-self: end; }
+
+/* 폰 목업 */
+.phones { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+.phone { background: #0D0E12; border-radius: 38px; padding: 10px; box-shadow: 0 24px 50px -28px rgba(10, 20, 60, 0.6); }
+.screen { background: #F6F7F9; color: #15171C; border-radius: 30px; overflow: hidden; aspect-ratio: 9 / 18.5; display: flex; flex-direction: column; font-size: 13px; }
+.sbar { height: 30px; display: flex; justify-content: space-between; align-items: center; padding: 0 18px; font-size: 11px; font-weight: 600; }
+.apphead { padding: 8px 16px 10px; font-weight: 700; font-size: 16px; border-bottom: 1px solid #E5E7EC; background: #fff; }
+.post { background: #fff; margin: 10px; border-radius: 14px; padding: 12px; display: grid; gap: 6px; }
+.post .who { font-size: 12px; color: #6A7080; }
+.cmt { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 8px; padding: 8px 12px; }
+.av { width: 28px; height: 28px; border-radius: 50%; background: #DCE2F0; }
+.cmt .name { font-size: 12px; font-weight: 700; }
+.cmt img { width: 104px; height: 104px; border-radius: 14px; display: block; margin-top: 4px; object-fit: cover; }
+.done { flex: 1; display: grid; place-items: center; align-content: center; gap: 10px; padding: 20px; text-align: center; background: #fff; }
+.done img { width: 74%; border-radius: 26px; }
+.done b { font-size: 18px; }
+.cta { margin: 12px 16px 18px; background: #2F5BFF; color: #fff; border-radius: 14px; text-align: center; font-weight: 700; padding: 13px; }
+.empty { flex: 1; display: grid; place-items: center; align-content: center; gap: 8px; padding: 24px; text-align: center; }
+.empty img { width: 62%; border-radius: 50%; }
+.cap { margin-top: 12px; font-size: 13px; }
+
+/* 다음 단계 */
+.next { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: grid; gap: 8px; align-content: start; }
+.step ol, .step ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.ask { border-color: var(--accent); }
+footer { padding-block: 40px 56px; font-size: 13px; }
+
+@media (max-width: 960px) {
+  .hero, .sec-head { grid-template-columns: 1fr; }
+  .styles, .vgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .phones, .next, .refs { grid-template-columns: 1fr; }
+  .phones { max-width: 340px; }
+  .formula { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .formula .op { display: none; }
+  .dlg { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .vgrid { gap: 10px; }
+  .vcard .body { padding: 10px; }
+  .formula { grid-template-columns: 1fr 1fr; }
+}
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <div>
+      <p class="eyebrow">주짓수 커넥트 · 캐릭터 리액션 시안</p>
+      <h1>OSS<br><em>리액션</em> 스티커</h1>
+      <p class="lede">띠 캐릭터 몸에 주짓수 동작 캐릭터의 얇은 팔·다리와 흰 장갑 손을 달고, 도장에서 실제로 쓰는 손짓을 짧은 반복 짤로 만들었습니다. 노노, 화이팅, 쏘쏘, 탭까지 한 장에 한 감정입니다.</p>
+      <div class="facts" id="facts"></div>
+    </div>
+    <div class="hero-stack" id="heroStack" aria-label="대표 3D 리액션 세 장"></div>
+  </header>
+</div>
+
+<nav class="nav" aria-label="섹션">
+  <div class="wrap">
+    <a href="#character">캐릭터</a>
+    <a href="#refs">레퍼런스</a>
+    <a href="#gemini">3D 리액션</a>
+    <a href="#styles">스타일 비교</a>
+    <a href="#motion">움직임 16종</a>
+    <a href="#app">앱에 넣으면</a>
+    <a href="#next">다음 단계</a>
+  </div>
+</nav>
+
+<main class="wrap">
+  <section id="character">
+    <div class="sec-head">
+      <h2>캐릭터는 이렇게 합쳤습니다</h2>
+      <p class="muted">몸과 얼굴은 띠 캐릭터, 팔·다리·장갑 손·신발은 MY 화면의 주짓수 동작 캐릭터 그대로입니다. 셋 다 앱에 이미 있는 그림이고, Gemini에 이 셋을 같이 보여 주고 리액션을 그리게 했습니다.</p>
+    </div>
+    <div class="formula">
+      <figure><img src="gemini/ref/1-body.png" alt="띠 캐릭터: 흰 몸, 검은 띠 위 흰 선 눈"><figcaption><b>띠 캐릭터 몸</b>흰 몸 + 검은 띠 + 띠 위 흰 선 눈</figcaption></figure>
+      <span class="op" aria-hidden="true">+</span>
+      <figure><img src="gemini/ref/2-limbs.png" alt="주짓수 동작 캐릭터: 얇은 팔다리와 흰 장갑"><figcaption><b>동작 캐릭터 팔·다리</b>얇은 고무호스 팔다리, 흰 신발</figcaption></figure>
+      <span class="op" aria-hidden="true">+</span>
+      <figure><img src="gemini/ref/4-glove.png" alt="흰 장갑 손 샤카 아이콘"><figcaption><b>흰 장갑 손</b>네 손가락 장갑 (샤카 아이콘)</figcaption></figure>
+      <span class="op" aria-hidden="true">=</span>
+      <figure class="result" id="resultFig"><figcaption><b>리액션 캐릭터</b>손짓으로 감정을 말함</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="refs">
+    <div class="sec-head">
+      <h2>레퍼런스에서 가져온 것</h2>
+      <p class="muted">세 레퍼런스에서 하나씩 가져왔습니다. 짧은 반복, 사람 손짓, 쨍한 색입니다.</p>
+    </div>
+    <div class="refs">
+      <div class="ref"><span class="tag">OFFICE PIGGY 루프 스티커</span><h3>1~2초 반복, 한 장에 한 감정</h3><p class="small muted">짤처럼 끝없이 도는 짧은 동작. 그래서 리액션마다 시작과 끝이 이어지는 동작 하나만 넣었습니다.</p></div>
+      <div class="ref"><span class="tag">UNHCR 캐릭터 스티커</span><h3>사람 손짓을 그대로</h3><p class="small muted">검지 세워 절레절레, 화이팅, 쏘쏘. 흰 장갑 손 덕분에 사람 손짓을 그대로 옮길 수 있습니다.</p></div>
+      <div class="ref"><span class="tag">Bazr 일러스트 시스템</span><h3>쨍한 색, 스포티·힙</h3><p class="small muted">리액션마다 원색 배경 하나와 작은 도형 장식(동그라미·세모·물결선). 플랫 일러스트 시안도 따로 뽑았습니다.</p></div>
+    </div>
+    <p class="note muted">Behance 페이지는 자동으로 열리지 않아서, 말씀해 주신 설명과 보내 주신 캡처를 기준으로 했습니다.</p>
+  </section>
+
+  <section id="gemini">
+    <div class="sec-head">
+      <h2>3D 리액션 — Gemini로 뽑은 시안</h2>
+      <p class="muted"><b>2프레임 루프</b>는 Gemini에 같은 장면에서 손 위치만 바꾼 두 번째 그림을 시켜서 번갈아 보여 주는 짤입니다. 여기에 리액션 성격대로 콩콩 뛰기·숨쉬기·좌우 흔들기·두근거림을 하나씩 얹었습니다. 실제 제작 땐 두 장을 키프레임 삼아 사이 동작을 채우면 됩니다.</p>
+    </div>
+    <div class="controls">
+      <button class="btn" id="gPause" type="button">정지</button>
+      <span class="small muted" id="gCount"></span>
+    </div>
+    <div class="ggrid" id="ggrid"></div>
+    <p class="note muted">헥헥·OSS처럼 두 번째 프레임이 첫 프레임과 거의 같은 것도 있습니다. Gemini가 “나머지는 그대로”를 너무 충실히 지킨 경우라, 실제 제작 땐 키프레임을 사람이 잡는 게 낫습니다. 오른쪽 아래 작은 반짝이 표시는 Gemini가 넣는 표시입니다. 실제 에셋으로 쓸 땐 디자이너가 이 그림을 바탕으로 다시 렌더하거나 표시 없는 방식으로 다시 뽑아야 합니다.</p>
+  </section>
+
+  <section id="styles">
+    <div class="sec-head">
+      <h2>스타일 비교</h2>
+      <p class="muted">같은 캐릭터를 네 가지로 그려 봤습니다. 앱 안에는 3D 원색 배경, 공유용 스티커는 다이컷이 잘 맞습니다.</p>
+    </div>
+    <div class="styles" id="styleGrid"></div>
+  </section>
+
+  <section id="motion">
+    <div class="sec-head">
+      <h2>움직임 연구 16종</h2>
+      <p class="muted">Gemini는 정지 그림만 만들어서, 동작 타이밍은 코드로 그린 캐릭터로 따로 잡았습니다. 손짓·몸 움직임·반복 길이를 확인하는 용도입니다. 카드를 누르면 한 바퀴를 8프레임으로 펼쳐 봅니다.</p>
+    </div>
+    <div class="controls" role="group" aria-label="움직임 연구 보기 설정">
+      <div class="ctl"><span>스타일</span>
+        <div class="seg" id="segStyle">
+          <button type="button" data-v="A">소프트 3D</button>
+          <button type="button" data-v="B" aria-pressed="true">스포티 팝</button>
+          <button type="button" data-v="C">스트리트 스티커</button>
+        </div>
+      </div>
+      <div class="ctl"><span>띠</span><div id="belts" style="display:flex;gap:6px"></div></div>
+      <div class="ctl"><span>속도</span>
+        <div class="seg" id="segSpeed">
+          <button type="button" data-v="1" aria-pressed="true">1x</button>
+          <button type="button" data-v="0.5">0.5x</button>
+        </div>
+      </div>
+      <button class="btn" id="vPause" type="button">정지</button>
+    </div>
+    <div id="groups"></div>
+  </section>
+
+  <section id="app">
+    <div class="sec-head">
+      <h2>앱에 넣으면</h2>
+      <p class="muted">앱 안에서는 글자 없는 버전을 씁니다. 댓글 리액션, 기록 완료, 빈 화면이 가장 먼저 쓸 자리입니다.</p>
+    </div>
+    <div class="phones" id="phones"></div>
+  </section>
+
+  <section id="next">
+    <div class="sec-head">
+      <h2>다음 단계</h2>
+      <p class="muted">고르실 것과, 고른 뒤 실제 에셋으로 만드는 순서입니다.</p>
+    </div>
+    <div class="next">
+      <div class="step ask"><h3>정해 주실 것</h3>
+        <ol>
+          <li>먼저 만들 리액션 6~8개 (위 카드 이름으로)</li>
+          <li>스타일 하나: 3D 원색 배경 / 다이컷 스티커 / 플랫</li>
+          <li>띠 색: 흰띠만, 또는 5가지 모두</li>
+          <li>쓸 곳: 앱 안 먼저, 공유 스티커는 나중</li>
+        </ol>
+      </div>
+      <div class="step"><h3>실제 에셋으로</h3>
+        <ol>
+          <li>고른 리액션을 디자이너가 3D로 다듬어 키프레임 2~3장</li>
+          <li>앱 안: Lottie(이미 앱에 있음) 또는 짧은 HEVC 투명 영상</li>
+          <li>공유 스티커: 360px 반복 GIF·APNG</li>
+          <li>글자는 그림에 굽지 않고 앱에서 얹기</li>
+        </ol>
+      </div>
+      <div class="step"><h3>만든 방법</h3>
+        <ul>
+          <li>Gemini에 참고 그림 4장(띠 몸, 동작 캐릭터 2장, 장갑) + 리액션별 지시문</li>
+          <li>루프는 같은 대화에서 “손 위치만 바꾼 다음 프레임”을 한 번 더</li>
+          <li>지시문·참고 그림·원본은 저장소 <span class="mono">design/reaction-stickers/</span>에</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer class="muted" id="foot"></footer>
+</main>
+
+<dialog id="dlg" aria-labelledby="dlgTitle">
+  <div class="dlg">
+    <canvas class="big" id="dlgBig"></canvas>
+    <div>
+      <div class="row" style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+        <h3 id="dlgTitle"></h3>
+        <button class="btn close" id="dlgClose" type="button">닫기</button>
+      </div>
+      <p class="small" id="dlgWhen"></p>
+      <p class="small muted" id="dlgMotion"></p>
+      <div class="frames" id="dlgFrames"></div>
+    </div>
+  </div>
+</dialog>
+
+<script src="gemini/items.js"></script>
+<script src="stickers.js"></script>
+<script>
+/* Gemini 결과 목록 (파일은 gemini/web/) */
+const GEM = window.GEM_ITEMS || [];
+const S = window.Stickers;
+
+function el(tag, attrs, html) {
+  const e = document.createElement(tag);
+  if (attrs) for (const k in attrs) { if (k === 'class') e.className = attrs[k]; else if (k === 'style') e.style.cssText = attrs[k]; else e.setAttribute(k, attrs[k]); }
+  if (html != null) e.innerHTML = html;
+  return e;
+}
+function gemArt(item, cls) {
+  const art = el('div', { class: 'art ' + (item.frames.length > 1 ? 'loop2' : 'loop1') + (cls ? ' ' + cls : ''), style: '--per:' + (item.per || 0.9) + 's' });
+  const bob = el('div', { class: 'bob' + (item.anim ? ' ' + item.anim : '') });
+  bob.appendChild(el('img', { src: 'gemini/web/' + item.frames[0], alt: item.alt || item.name, loading: 'lazy' }));
+  if (item.frames[1]) bob.appendChild(el('img', { class: 'fr-b', src: 'gemini/web/' + item.frames[1], alt: '', loading: 'lazy' }));
+  art.appendChild(bob);
+  return art;
+}
+const byId = Object.fromEntries(GEM.map((g) => [g.id, g]));
+
+/* hero */
+(function () {
+  const pick = ['fight', 'nono', 'soso'].map((id) => byId[id]).filter(Boolean);
+  const hs = document.getElementById('heroStack');
+  (pick.length ? pick : GEM.slice(0, 3)).forEach((g) => { const t = el('div', { class: 'tile' }); const a = gemArt(g); a.style.aspectRatio = '1'; a.style.position = 'relative'; t.appendChild(a); hs.appendChild(t); });
+  const loops = GEM.filter((g) => g.frames.length > 1).length;
+  document.getElementById('facts').innerHTML = [
+    `3D 시안 ${GEM.filter((g) => g.kind === '3d').length}종`, `그중 루프 짤 ${loops}개`, `스타일 4안`, `움직임 연구 ${S.REACTIONS.length}종`, `띠 5색`,
+  ].map((t) => `<span class="fact">${t}</span>`).join('');
+  const r = byId.nono || GEM[0];
+  if (r) { const f = document.getElementById('resultFig'); const img = el('img', { src: 'gemini/web/' + r.frames[0], alt: '합쳐진 리액션 캐릭터' }); f.insertBefore(img, f.firstChild); }
+})();
+
+/* 3D 그리드 */
+(function () {
+  const g = document.getElementById('ggrid');
+  const list = GEM.filter((x) => x.kind === '3d');
+  list.forEach((it) => {
+    const card = el('article', { class: 'gcard' });
+    card.appendChild(gemArt(it));
+    const body = el('div', { class: 'body' });
+    body.innerHTML = `<div class="row"><h3>${it.name}</h3><span class="badge ${it.frames.length > 1 ? 'loop' : ''}">${it.frames.length > 1 ? '2프레임 루프' : '한 장'}</span></div>
+      <p class="small">${it.when}</p><p class="small muted">${it.use}</p>`;
+    card.appendChild(body);
+    g.appendChild(card);
+  });
+  document.getElementById('gCount').textContent = `${list.length}종 · 위 순서대로 손짓 → 매트 위 → 기분`;
+  const btn = document.getElementById('gPause');
+  btn.addEventListener('click', () => { const p = document.getElementById('gemini').classList.toggle('paused'); document.getElementById('heroStack').classList.toggle('paused', p); btn.textContent = p ? '재생' : '정지'; });
+})();
+
+/* 스타일 비교 */
+(function () {
+  const g = document.getElementById('styleGrid');
+  const items = [
+    { art: byId.nono, name: '3D · 원색 배경', pros: ['앱 동작 캐릭터와 같은 질감', '리액션마다 색으로 감정 구분'], cons: ['프레임마다 3D 렌더 필요'] },
+    { art: byId.hello, name: '3D · 다이컷 스티커', pros: ['카톡·인스타 공유에 바로', '배경 없이 어디든 얹힘'], cons: ['앱 안 카드엔 다소 무거움'] },
+    { art: byId.flat, name: '플랫 일러스트', pros: ['가장 스포티·힙', 'Lottie로 가볍게'], cons: ['지금 3D 캐릭터와 결이 다름', '이 시안은 신발이 하나 더 그려짐 (AI 오류)'] },
+    { canvas: 'fight', name: '코드로 그린 벡터', pros: ['파일이 가장 가벼움', '띠 색 5가지 바로 전환'], cons: ['질감이 단순함 (움직임 확인용)'] },
+  ];
+  items.forEach((it) => {
+    const c = el('article', { class: 'style' });
+    if (it.art) c.appendChild(gemArt(it.art));
+    else { const a = el('div', { class: 'art' }); a.appendChild(el('canvas', { 'data-r': it.canvas, 'data-style': 'B', 'aria-label': '벡터로 그린 화이팅 리액션' })); c.appendChild(a); }
+    const b = el('div', { class: 'body' });
+    b.innerHTML = `<h3>${it.name}</h3><div class="pc">${it.pros.map((p) => `<span>${p}</span>`).join('')}${it.cons.map((p) => `<span class="minus">${p}</span>`).join('')}</div>`;
+    c.appendChild(b);
+    if (it.art || it.canvas) g.appendChild(c);
+  });
+  if (byId.sheet) {
+    const c = el('article', { class: 'style', style: 'grid-column: 1 / -1; grid-template-columns: minmax(0,1fr) minmax(0,1fr); grid-template-rows: auto;' });
+    c.appendChild(gemArt(byId.sheet));
+    const b = el('div', { class: 'body', style: 'align-content:center;padding:24px' });
+    b.innerHTML = `<h3>스티커 시트</h3><p class="small muted">공유 스티커 팩 표지나 앱스토어 스크린샷에 쓸 수 있는 모음입니다. 한 번에 여러 자세를 뽑아 캐릭터가 흔들리지 않는지도 같이 봤습니다.</p>`;
+    c.appendChild(b);
+    g.appendChild(c);
+  }
+})();
+
+/* 움직임 연구 */
+(function () {
+  const st = S.state;
+  const groups = document.getElementById('groups');
+  S.GROUPS.forEach((gr) => {
+    const box = el('div', { class: 'group' });
+    box.appendChild(el('div', { class: 'group-head' }, `<h3>${gr.name}</h3><span class="small muted">${gr.note}</span>`));
+    const grid = el('div', { class: 'vgrid' });
+    S.REACTIONS.filter((r) => r.group === gr.id).forEach((r) => {
+      const b = el('button', { class: 'vcard', type: 'button', 'aria-label': `${r.name} 자세히 보기` });
+      b.appendChild(el('canvas', { 'data-r': r.id }));
+      b.appendChild(el('div', { class: 'body' }, `<div class="row" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><h3 style="font-size:20px">${r.name}</h3><span class="mono muted">${r.T.toFixed(1)}초</span></div><p class="small">${r.when}</p><p class="small muted">${r.motion}</p>`));
+      b.addEventListener('click', () => openDlg(r));
+      grid.appendChild(b);
+    });
+    box.appendChild(grid);
+    groups.appendChild(box);
+  });
+  const segS = document.getElementById('segStyle');
+  segS.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; st.style = b.dataset.v; segS.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b)); S.redrawAll(); save(); });
+  const segV = document.getElementById('segSpeed');
+  segV.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; st.speed = +b.dataset.v; segV.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b)); });
+  const belts = document.getElementById('belts');
+  Object.entries(S.BELTS).forEach(([k, v]) => {
+    const b = el('button', { class: 'sw', type: 'button', 'aria-label': v.label, 'aria-pressed': k === st.belt, style: `background:${v.body};--band:${v.band}` });
+    b.addEventListener('click', () => { st.belt = k; belts.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b)); S.redrawAll(); save(); });
+    belts.appendChild(b);
+  });
+  const vp = document.getElementById('vPause');
+  vp.addEventListener('click', () => { st.playing = !st.playing; vp.textContent = st.playing ? '정지' : '재생'; });
+  function save() { try { localStorage.setItem('oss-sticker-view', JSON.stringify({ style: st.style, belt: st.belt })); } catch (e) {} }
+  try {
+    const v = JSON.parse(localStorage.getItem('oss-sticker-view') || 'null');
+    if (v) {
+      if (v.style) { st.style = v.style; segS.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x.dataset.v === v.style)); }
+      if (v.belt && S.BELTS[v.belt]) { st.belt = v.belt; belts.querySelectorAll('button').forEach((x, i) => x.setAttribute('aria-pressed', Object.keys(S.BELTS)[i] === v.belt)); }
+    }
+  } catch (e) {}
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) { st.playing = false; vp.textContent = '재생'; }
+
+  const dlg = document.getElementById('dlg');
+  function openDlg(r) {
+    document.getElementById('dlgTitle').textContent = r.name;
+    document.getElementById('dlgWhen').textContent = `언제: ${r.when} · 쓸 곳: ${r.use}`;
+    document.getElementById('dlgMotion').textContent = `움직임: ${r.motion} · 한 바퀴 ${r.T.toFixed(1)}초`;
+    document.getElementById('dlgBig').dataset.r = r.id;
+    const fr = document.getElementById('dlgFrames');
+    fr.innerHTML = '';
+    for (let i = 0; i < 8; i++) {
+      const f = el('figure');
+      f.appendChild(el('canvas', { 'data-r': r.id, 'data-t': String(i / 8), 'data-label': 'off' }));
+      f.appendChild(el('figcaption', null, `${Math.round((i / 8) * r.T * 1000)}ms`));
+      fr.appendChild(f);
+    }
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+    S.mount(dlg);
+    requestAnimationFrame(() => S.redrawAll());
+  }
+  document.getElementById('dlgClose').addEventListener('click', () => dlg.close());
+  dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+})();
+
+/* 폰 목업 */
+(function () {
+  const ph = document.getElementById('phones');
+  const img = (id) => (byId[id] ? 'gemini/web/' + byId[id].frames[0] : '');
+  const sb = '<div class="sbar"><span>9:41</span><span>●●● ▮</span></div>';
+  const a = el('figure', { style: 'margin:0' });
+  a.innerHTML = `<div class="phone"><div class="screen">${sb}<div class="apphead">커뮤니티</div>
+    <div class="post"><span class="who">파란띠 · 3년차 (예시)</span><b>오늘 롤에서 처음으로 암바 걸었어요</b><span class="small" style="color:#6A7080">상대가 탭 치자마자 소리 질렀습니다 ㅋㅋ</span></div>
+    <div class="cmt"><span class="av"></span><div><div class="name">흰띠 · 6개월 (예시)</div><img src="${img('nice')}" alt="나이스 스티커 댓글"></div></div>
+    <div class="cmt"><span class="av"></span><div><div class="name">보라띠 · 5년차 (예시)</div><img src="${img('nono')}" alt="노노 스티커 댓글"></div></div>
+  </div></div><figcaption class="cap"><b>댓글 리액션</b><br><span class="muted">글 대신 스티커로 답하기. 노노·나이스·ㅋㅋㅋ가 제일 많이 쓰일 자리.</span></figcaption>`;
+  const b = el('figure', { style: 'margin:0' });
+  b.innerHTML = `<div class="phone"><div class="screen">${sb}<div class="done"><img src="${img('promote')}" alt="승급 축하 스티커"><b>파란띠가 됐어요</b><span style="color:#6A7080">띠 정보를 바꿨어요. 축하해요!</span></div><div class="cta">확인</div></div></div>
+    <figcaption class="cap"><b>기록 완료</b><br><span class="muted">띠·그랄 수정, 대회 기록 저장 뒤 한 번 크게.</span></figcaption>`;
+  const c = el('figure', { style: 'margin:0' });
+  c.innerHTML = `<div class="phone"><div class="screen">${sb}<div class="apphead">내 운동 기록</div><div class="empty"><img src="${img('sleepy')}" alt="쉬는 날 스티커"><b>오늘은 기록이 없어요</b><span style="color:#6A7080">쉬는 날도 운동의 일부예요</span></div></div></div>
+    <figcaption class="cap"><b>빈 화면</b><br><span class="muted">텅 빈 목록 대신 캐릭터 한 마리.</span></figcaption>`;
+  [a, b, c].forEach((x) => ph.appendChild(x));
+})();
+
+document.getElementById('foot').innerHTML = `만든 날 2026-11-26 · 3D 그림은 Gemini 생성 시안이라 실제 에셋이 아닙니다. 움직임 연구는 <span class="mono">stickers.js</span> 한 파일로 그립니다.`;
+
+const go = () => { S.mount(document); S.start(); };
+if (document.fonts && document.fonts.load) document.fonts.load('30px "Black Han Sans"').finally(go); else go();
+</script>
