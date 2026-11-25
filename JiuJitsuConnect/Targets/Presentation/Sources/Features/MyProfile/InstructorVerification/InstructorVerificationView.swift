@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 import ComposableArchitecture
 import DesignSystem
 import Domain
@@ -18,15 +19,27 @@ public struct InstructorVerificationView: View {
 
     /// 시트 본문 자연 높이 — 호출부에서 `presentationDetents`에 사용.
     /// 다른 시트(`BeltSettingView` 등)와 동일한 정적 상수 패턴.
-    /// Figma 디자인 가이드 기준 전체 바텀 시트 높이 = 409
-    /// (본문 내재 369 + iOS 26 Liquid Glass partial sheet 내부 inset 보정 ~40)
-    /// - 기존 인증 사진 미리보기가 있으면 이미지 블록(top 16 + 80) 만큼 더 높게 잡는다.
-    /// - 거절 상태는 경고 줄에 사유가 들어가 두 줄까지 늘 수 있어 한 줄(21)만큼 더 잡는다.
-    /// - 승인 상태는 안내박스 없이 닉네임 미리보기와 확인 버튼만 있다 — 본문 내재 248(24 + 69 + 16 + 64 + 75) + 여백 56.
+    /// 업로드 계열 단계는 시뮬레이터에서 잰 본문 내재 높이에 iOS 26 Liquid Glass partial sheet 보정(~27)을 더한다.
+    /// 보정값은 #388 이전 처음 시트(Figma 409, 본문 내재 382)에서 가져와, 단계마다 안내박스~CTA 간격이 같게 한다.
+    /// - 처음: 본문 457 — 빨간 경고 줄 대신 서류 예시(제목 + 세 줄)가 들어간다.
+    /// - 사진 고른 뒤: 본문 567 — 경고 줄 없이 미리보기(4 + 200 + 12)가 들어간다.
+    /// - 심사 중: 본문 457 — 경고 줄 없이 썸네일(4 + 90 + 12)이 들어간다. 사진 URL이 없으면 썸네일만큼(106) 낮다.
+    /// - 반려: #388 이전과 같다. 사유가 두 줄까지 늘 수 있어 처음 시트보다 한 줄(21) 더 잡는다.
+    /// - 승인: 안내박스 없이 닉네임 미리보기와 확인 버튼만 있다 — 본문 내재 248(24 + 69 + 16 + 64 + 75) + 여백 56.
     ///   업로드 시트의 안내박스~CTA 간격(~60)과 맞춘 값이다. 문의처가 있으면 문의 버튼(4 + 51)이 붙는다.
-    public static func contentHeight(hasImage: Bool, isRejected: Bool, isApproved: Bool, hasContact: Bool) -> CGFloat {
-        if isApproved { return 304 + (hasContact ? 55 : 0) }
-        return (hasImage ? 505 : 409) + (isRejected ? 21 : 0)
+    public static func contentHeight(for state: InstructorVerificationFeature.State) -> CGFloat {
+        switch state.phase {
+        case .approved:
+            return 304 + (state.contactEmail != nil ? 55 : 0)
+        case .notRequested:
+            return 484
+        case .picked:
+            return 594
+        case .pending:
+            return state.existingImageUrl != nil ? 484 : 378
+        case .rejected:
+            return 430
+        }
     }
 
     public init(store: StoreOf<InstructorVerificationFeature>) {
@@ -39,30 +52,44 @@ public struct InstructorVerificationView: View {
         // titleSection / noticeBox / ctaSection 3곳에서 공유되는 좌우 여백
         static let horizontalPadding: CGFloat = 20
         static let noticeCornerRadius: CGFloat = 15
-        // 기존 인증 사진 미리보기 — 정사각 썸네일
+        // 심사 중 썸네일(정사각) · 고른 사진 미리보기 공통 모서리
         static let imageSize: CGFloat = 90
         static let imageCornerRadius: CGFloat = 15
+        // 타이틀과 사진 · 사진과 안내박스 사이 — 썸네일 · 미리보기 공통
+        static let imageTopPadding: CGFloat = 4
+        static let imageBottomPadding: CGFloat = 12
     }
+
+    /// 운영에서 받는 서류 예시(#388). 처음 화면의 경고 줄 자리에 보여 준다.
+    private static let documentExamples = [
+        "사범 자격증",
+        "도장 사업자 등록증",
+        "이름과 도장명이 함께 보이는 사진"
+    ]
 
     // MARK: - Body
 
     @ViewBuilder
     public var body: some View {
-        if store.isApproved {
+        switch store.phase {
+        case .approved:
             approvedBody
-        } else {
-            uploadBody
+        case .notRequested, .rejected:
+            uploadBody(title: "관장 사범 인증하기", subtitle: "인증 가능한 사진을 업로드해 주세요.")
+        case .picked:
+            uploadBody(title: "관장 사범 인증하기", subtitle: "이름과 도장명이 잘 보이는지 확인해 주세요.")
+        case .pending:
+            uploadBody(title: "심사 중이에요", subtitle: pendingSubtitle)
         }
     }
 
-    private var uploadBody: some View {
+    private func uploadBody(title: String, subtitle: String) -> some View {
         VStack(spacing: 0) {
             handleBar
-            titleSection(title: "관장 사범 인증하기", subtitle: "인증 가능한 사진을 업로드해주세요.")
+            titleSection(title: title, subtitle: subtitle)
             VStack(spacing: 0) {
-                // 이미 제출한 인증 사진이 있으면 타이틀과 안내박스 사이에 미리보기로 노출
-                existingImageSection
-                    .padding(.top, 20)
+                // 고른 사진(신청 전)이나 심사 중인 사진을 타이틀과 안내박스 사이에 보여 준다
+                imageSection
                 noticeBox
                     .padding(.bottom, 20)
             }
@@ -152,7 +179,51 @@ public struct InstructorVerificationView: View {
         .padding(.horizontal, Metrics.horizontalPadding)
     }
 
-    /// 이미 제출한 인증 사진 미리보기. 미제출(`existingImageUrl == nil`)이면 렌더링하지 않는다.
+    /// 심사 중이면 낸 날짜와 기다릴 기간을 알린다. 날짜를 모르면 날짜 없이 안내한다.
+    private var pendingSubtitle: String {
+        guard let requestedAt = store.verification.requestedAt else {
+            return "사진을 확인하고 있어요 (2~3일)"
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateFormat = "M월 d일"
+        return "\(formatter.string(from: requestedAt))에 낸 사진을 확인하고 있어요 (2~3일)"
+    }
+
+    @ViewBuilder
+    private var imageSection: some View {
+        switch store.phase {
+        case let .picked(data):
+            pickedImagePreview(data)
+                .padding(.top, Metrics.imageTopPadding)
+                .padding(.bottom, Metrics.imageBottomPadding)
+        case .pending:
+            existingImageSection
+        case .notRequested, .rejected, .approved:
+            EmptyView()
+        }
+    }
+
+    /// 고른 사진 미리보기 — 서류 글자가 보이도록 자르지 않고 비율 그대로 크게 보여 준다.
+    private func pickedImagePreview(_ data: Data) -> some View {
+        Group {
+            if let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: Metrics.imageCornerRadius))
+            } else {
+                RoundedRectangle(cornerRadius: Metrics.imageCornerRadius)
+                    .fill(Color.primitive.coolGray.cg100)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 200)
+        .padding(.horizontal, Metrics.horizontalPadding)
+        .accessibilityLabel("고른 사진")
+    }
+
+    /// 심사 중인 인증 사진 썸네일. 사진 URL이 없으면 렌더링하지 않는다.
     @ViewBuilder
     private var existingImageSection: some View {
         if let urlString = store.existingImageUrl,
@@ -172,28 +243,22 @@ public struct InstructorVerificationView: View {
             .clipShape(RoundedRectangle(cornerRadius: Metrics.imageCornerRadius))
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Metrics.horizontalPadding)
-            .padding(.bottom, 10)
+            .padding(.top, Metrics.imageTopPadding)
+            .padding(.bottom, Metrics.imageBottomPadding)
         }
     }
 
     private var noticeBox: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 4) {
-                // SF Symbol — 디자인 시스템에 경고 아이콘 에셋이 없어 시스템 심볼로 대체
-                Assets.MyProfile.Icon.triangleAlert.swiftUIImage
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 18, height: 18)
-                    .frame(height: 21)
-                    .foregroundStyle(Color.semantic.error.error)
-
-                Text(warningText)
-                    .font(Font.pretendard.bodyS)
-                    .foregroundStyle(Color.semantic.error.error)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+            switch store.phase {
+            case .notRequested:
+                documentExamplesSection
+            case .rejected:
+                rejectedWarning
+            case .picked, .pending, .approved:
+                // 사진을 이미 골랐거나 낸 뒤라 무엇을 올릴지 다시 말하지 않는다. 상태는 제목 · 부제가 알린다.
+                EmptyView()
             }
-            .frame(minHeight: 21)
 
             // 승인 · 반려 알림은 보내지 않아 '알려드립니다'라고 약속하지 않는다(#389). 결과는 이 시트에서 본다.
             // 입구 위치(MY ⋯)는 바뀔 수 있어 경로 대신 '이 화면'이라고 쓴다.
@@ -217,32 +282,63 @@ public struct InstructorVerificationView: View {
         .padding(.horizontal, Metrics.horizontalPadding)
     }
 
-    /// 거절됐으면 왜 다시 올려야 하는지를, 검토 중이면 기다리면 된다는 것을, 아니면 올릴 사진의 조건을 알린다.
-    /// 검토 중에도 '업로드해주세요'만 보이면 제출이 안 된 줄 알고 다시 올린다 — 결과를 이 화면에서 보라고 안내하므로(#389) 상태를 밝힌다.
-    private var warningText: String {
-        let verification = store.verification
-        switch verification.status {
-        case .rejected:
-            if let reason = verification.rejectReason {
-                return "반려 사유: \(reason)"
+    /// 처음 화면 — 부제와 같은 말을 한 번 더 하는 대신, 어떤 사진이면 되는지 보여 준다(#388).
+    private var documentExamplesSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("이런 사진이면 돼요")
+                .font(Font.pretendard.bodyS)
+                .foregroundStyle(Color.component.sectionHeader.title)
+                .frame(minHeight: 21)
+
+            ForEach(Self.documentExamples, id: \.self) { example in
+                HStack(alignment: .top, spacing: 6) {
+                    Text("·")
+                        .accessibilityHidden(true)
+                    Text(example)
+                }
+                .font(Font.pretendard.bodyS)
+                .foregroundStyle(Color.primitive.coolGray.cg700)
+                .frame(minHeight: 21)
             }
-            return "인증이 반려됐어요. 사진을 다시 올려주세요."
-        case .pending:
-            return "관리자가 확인하고 있어요. 다른 사진으로 바꾸려면 다시 올려주세요."
-        case .notRequested, .approved:
-            return "인증 가능한 사진을 업로드해주세요."
         }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// 반려 사유 경고 줄. 사유가 없으면 반려됐다는 것만 알린다.
+    private var rejectedWarning: some View {
+        HStack(alignment: .top, spacing: 4) {
+            // SF Symbol — 디자인 시스템에 경고 아이콘 에셋이 없어 시스템 심볼로 대체
+            Assets.MyProfile.Icon.triangleAlert.swiftUIImage
+                .resizable()
+                .scaledToFit()
+                .frame(width: 18, height: 18)
+                .frame(height: 21)
+                .foregroundStyle(Color.semantic.error.error)
+
+            Text(store.verification.rejectReason.map { "반려 사유: \($0)" } ?? "인증이 반려됐어요. 사진을 다시 올려 주세요.")
+                .font(Font.pretendard.bodyS)
+                .foregroundStyle(Color.semantic.error.error)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(minHeight: 21)
     }
 
     private var ctaSection: some View {
         VStack(spacing: 0) {
-            CTAButton(
-                // 기존 인증 사진이 있으면 "재업로드"로 안내
-                title: store.existingImageUrl == nil ? "사진 업로드" : "사진 재업로드",
-                action: { store.send(.view(.uploadTapped)) }
-            )
-
-            cancelButton
+            switch store.phase {
+            case .picked:
+                CTAButton(title: "이 사진으로 신청", action: { store.send(.view(.submitTapped)) })
+                CTAButton(title: "다시 고르기", type: .text) {
+                    store.send(.view(.repickTapped))
+                }
+            case .pending:
+                CTAButton(title: "사진 바꾸기", action: { store.send(.view(.uploadTapped)) })
+                cancelButton
+            case .notRequested, .rejected, .approved:
+                CTAButton(title: "사진 업로드", action: { store.send(.view(.uploadTapped)) })
+                cancelButton
+            }
         }
         .padding(.top, 8)
         .padding(.horizontal, Metrics.horizontalPadding)
@@ -285,13 +381,28 @@ public struct InstructorVerificationView: View {
     )
 }
 
+#Preview("관장 사범 인증 - 사진 고른 뒤") {
+    let sample = UIGraphicsImageRenderer(size: CGSize(width: 300, height: 400)).image { context in
+        UIColor.systemGray4.setFill()
+        context.fill(CGRect(x: 0, y: 0, width: 300, height: 400))
+    }
+    InstructorVerificationView(
+        store: Store(
+            initialState: InstructorVerificationFeature.State(pickedImageData: sample.jpegData(compressionQuality: 0.8))
+        ) {
+            InstructorVerificationFeature()
+        }
+    )
+}
+
 #Preview("관장 사범 인증 - 심사 중") {
     InstructorVerificationView(
         store: Store(
             initialState: InstructorVerificationFeature.State(
                 verification: OwnerVerification(
                     status: .pending,
-                    documentImageUrl: "https://ik.imagekit.io/preview/verification_preview.jpg"
+                    documentImageUrl: "https://ik.imagekit.io/preview/verification_preview.jpg",
+                    requestedAt: Date()
                 )
             )
         ) {

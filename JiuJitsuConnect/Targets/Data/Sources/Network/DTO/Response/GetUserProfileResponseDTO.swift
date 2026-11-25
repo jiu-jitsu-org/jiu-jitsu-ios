@@ -61,6 +61,21 @@ struct OwnerVerificationDTO: Decodable {
     /// 제출한 인증 서류 — 파일 id + URL 객체. 미제출 시 `nil`.
     let documentImage: ImageRefDTO?
     let rejectReason: String?
+    /// 신청 일시. 서버는 시간대 없는 `LocalDateTime`(서울 시각, 예: `2026-11-17T14:03:22.123456`)으로 준다.
+    let requestedAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case status, documentImage, rejectReason, requestedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        status = try container.decodeIfPresent(String.self, forKey: .status)
+        documentImage = try container.decodeIfPresent(ImageRefDTO.self, forKey: .documentImage)
+        rejectReason = try container.decodeIfPresent(String.self, forKey: .rejectReason)
+        // 신청 날짜는 시트 부제에만 쓰는 곁가지라, 형식이 바뀌어도(배열 등) 프로필 전체를 못 읽게 두지 않는다.
+        requestedAt = try? container.decodeIfPresent(String.self, forKey: .requestedAt)
+    }
 
     func toDomain() -> OwnerVerification {
         OwnerVerification(
@@ -70,8 +85,36 @@ struct OwnerVerificationDTO: Decodable {
             documentImageUrl: Self.normalizeDocumentImage(documentImage?.imageUrl),
             rejectReason: rejectReason
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .flatMap { $0.isEmpty ? nil : $0 }
+                .flatMap { $0.isEmpty ? nil : $0 },
+            requestedAt: Self.parseRequestedAt(requestedAt)
         )
+    }
+
+    /// 서버 신청 일시 → `Date`. 읽지 못하면 `nil`(화면은 날짜 없이 안내한다).
+    /// - 시간대가 붙어 오면(`Z`, `+09:00`) 그대로 읽는다.
+    /// - 시간대가 없으면 서버 시각(Asia/Seoul)으로 본다. 소수 초 자릿수가 0~9자리로 달라 초까지만 읽는다.
+    private static func parseRequestedAt(_ raw: String?) -> Date? {
+        guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return nil }
+
+        let iso = ISO8601DateFormatter()
+        for options: ISO8601DateFormatter.Options in [
+            [.withInternetDateTime, .withFractionalSeconds],
+            [.withInternetDateTime]
+        ] {
+            iso.formatOptions = options
+            if let date = iso.date(from: raw) { return date }
+        }
+
+        let local = raw.replacingOccurrences(of: " ", with: "T")
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(identifier: "Asia/Seoul")
+        for (format, length) in [("yyyy-MM-dd'T'HH:mm:ss", 19), ("yyyy-MM-dd'T'HH:mm", 16), ("yyyy-MM-dd", 10)] {
+            formatter.dateFormat = format
+            if let date = formatter.date(from: String(local.prefix(length))) { return date }
+        }
+        return nil
     }
 
     /// 인증 이미지 sentinel 정규화. 빈 문자열/기본 placeholder는 "미제출"을 뜻하므로 `nil`.

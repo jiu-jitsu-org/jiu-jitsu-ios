@@ -258,6 +258,8 @@ public struct MyProfileFeature: Sendable {
             case presentImageCrop(Data)
             // 관장 사범 인증 → 사진 첨부 시트로의 시트-시트 전환을 위한 딜레이 발화
             case presentImageEditSheet(ProfileImageEditFeature.Purpose, canDelete: Bool)
+            // 인증 사진을 고른 뒤 픽커가 내려가면 인증 시트를 다시 띄워 신청 전에 확인받는다(#388)
+            case presentPickedVerificationImage(Data)
 
             // 프로필 이미지 업로드/반영 응답
             case profileImageUploadResponse(TaskResult<RegisteredImage>)   // CDN 업로드 + 서버 등록 결과(id 포함)
@@ -284,6 +286,7 @@ public struct MyProfileFeature: Sendable {
     @Dependency(\.noticeClient) var noticeClient
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.analyticsClient) var analyticsClient
+    @Dependency(\.date) var date
 
 
     public var body: some ReducerOf<Self> {
@@ -1132,22 +1135,36 @@ public struct MyProfileFeature: Sendable {
 
             case .view(.instructorVerificationMenuTapped):
                 guard !state.isUploadingInstructorVerification else { return .none }
-                // 역할이 OWNER인데 신청 기록이 없는 회원(승인 API 이전에 권한을 받은 경우)도 완료로 본다.
-                // 기록이 있으면 서버 상태를 그대로 따른다.
-                let recorded = state.userProfile?.ownerVerification ?? .notRequested
-                let verification = state.userProfile?.userRole == .owner && recorded.status == .notRequested
-                    ? OwnerVerification(status: .approved)
-                    : recorded
+                state.sheet = .instructorVerification(Self.instructorVerificationState(from: state))
+                return .none
+
+            case let .internal(.presentPickedVerificationImage(data)):
+                // 픽커가 내려가는 사이 다른 시트를 열었거나 신청이 진행 중이면 띄우지 않는다
+                guard state.sheet == nil, !state.isUploadingInstructorVerification else { return .none }
                 state.sheet = .instructorVerification(
-                    InstructorVerificationFeature.State(
-                        verification: verification,
-                        nickname: state.communityProfile?.nickname
-                            ?? state.userProfile?.nickname
-                            ?? state.authInfo.userInfo?.nickname
-                            ?? ""
-                    )
+                    Self.instructorVerificationState(from: state, pickedImageData: data)
                 )
                 return .none
+
+            case let .sheet(.presented(.instructorVerification(.delegate(.didConfirmImage(data))))):
+                state.sheet = nil
+                // 순차 3-홉(ImageKit 토큰 발급 → ImageKit 업로드 → PUT /api/user/owner)이 2~5초 걸린다.
+                // 인증 사진은 노출되지 않는 검수용이라 Optimistic Update 대신 로딩 오버레이로
+                // 진행을 표시하고 터치를 막는다. 완료·실패 응답에서 해제 후 결과 토스트(#62).
+                state.isUploadingInstructorVerification = true
+                Log.trace(
+                    "관장 사범 인증 - 크롭 생략, 원본 업로드 시작 (\(data.count) bytes)",
+                    category: .network,
+                    level: .info
+                )
+                return .run { send in
+                    await send(.internal(.instructorVerificationImageUploadResponse(
+                        await TaskResult {
+                            try await imageUploadClient.uploadImage(data, .instructorVerification)
+                        }
+                    )))
+                }
+                .cancellable(id: CancelID.instructorVerificationUpload)
 
             case .sheet(.presented(.instructorVerification(.delegate(.didSelectUpload)))):
                 // 시트→시트 전환 — 안내 시트 dismiss 후 짧은 딜레이를 두고 사진 첨부 시트 노출
@@ -1267,7 +1284,7 @@ public struct MyProfileFeature: Sendable {
                 // 사진 선택 완료 — picker dismiss + 액션 시트 정리.
                 // purpose에 따라 다음 단계 분기:
                 //   - 프로필 이미지: 1:1 크롭 단계로 진행 (헤더 아바타는 정사각형이라 필수)
-                //   - 관장 사범 인증: 크롭 생략, 바로 ImageKit 업로드
+                //   - 관장 사범 인증: 크롭 생략, 인증 시트로 돌아가 미리보기로 확인받은 뒤 업로드(#388)
                 //     (검수용 사진은 자격증/명판 등 원본 컴포지션 유지가 중요)
                 state.imageCaptureSource = nil
                 state.sheet = nil
@@ -1282,25 +1299,13 @@ public struct MyProfileFeature: Sendable {
                     }
 
                 case .instructorVerification:
-                    // 파이프라인이 여기서 끝나므로 purpose 리셋
+                    // 고르기 단계가 여기서 끝나므로 purpose 리셋
                     state.pendingImagePurpose = nil
-                    // 순차 3-홉(ImageKit 토큰 발급 → ImageKit 업로드 → PUT /api/user/owner)이 2~5초 걸린다.
-                    // 인증 사진은 노출되지 않는 검수용이라 Optimistic Update 대신 로딩 오버레이로
-                    // 진행을 표시하고 터치를 막는다. 완료·실패 응답에서 해제 후 결과 토스트(#62).
-                    state.isUploadingInstructorVerification = true
-                    Log.trace(
-                        "관장 사범 인증 - 크롭 생략, 원본 업로드 시작 (\(data.count) bytes)",
-                        category: .network,
-                        level: .info
-                    )
+                    // 누르는 순간 바로 제출되지 않게, 픽커 · 고르기 시트가 내려간 뒤 인증 시트에 미리보기로 띄운다.
                     return .run { send in
-                        await send(.internal(.instructorVerificationImageUploadResponse(
-                            await TaskResult {
-                                try await imageUploadClient.uploadImage(data, .instructorVerification)
-                            }
-                        )))
+                        try await clock.sleep(for: .milliseconds(300))
+                        await send(.internal(.presentPickedVerificationImage(data)))
                     }
-                    .cancellable(id: CancelID.instructorVerificationUpload)
                 }
 
             case .view(.imagePickerCancelled):
@@ -1416,7 +1421,7 @@ public struct MyProfileFeature: Sendable {
                 // 즉시 반영해 시트 재진입 시 최신 상태가 보이도록 한다.
                 // 다음 MY 진입 시 loadProfile이 실제값으로 덮어쓰므로 드리프트가 남지 않는다.
                 state.userProfile = state.userProfile?.updatingOwnerVerification(
-                    OwnerVerification(status: .pending, documentImageUrl: uploadedImageUrl)
+                    OwnerVerification(status: .pending, documentImageUrl: uploadedImageUrl, requestedAt: date.now)
                 )
                 // 승인 · 반려 알림이 없어 결과를 알려 준다고 약속하지 않고, 어디서 보는지 안내한다(#389).
                 return .send(.internal(.showToast(.init(
@@ -1502,6 +1507,27 @@ public struct MyProfileFeature: Sendable {
         } else {
             state.isWaitingBeltEntrance = true
         }
+    }
+
+    /// 관장 사범 인증 시트 상태. 사진을 고른 뒤 다시 띄울 때는 고른 사진을 함께 싣는다(#388).
+    private static func instructorVerificationState(
+        from state: State,
+        pickedImageData: Data? = nil
+    ) -> InstructorVerificationFeature.State {
+        // 역할이 OWNER인데 신청 기록이 없는 회원(승인 API 이전에 권한을 받은 경우)도 완료로 본다.
+        // 기록이 있으면 서버 상태를 그대로 따른다.
+        let recorded = state.userProfile?.ownerVerification ?? .notRequested
+        let verification = state.userProfile?.userRole == .owner && recorded.status == .notRequested
+            ? OwnerVerification(status: .approved)
+            : recorded
+        return InstructorVerificationFeature.State(
+            verification: verification,
+            nickname: state.communityProfile?.nickname
+                ?? state.userProfile?.nickname
+                ?? state.authInfo.userInfo?.nickname
+                ?? "",
+            pickedImageData: pickedImageData
+        )
     }
 
     /// 프로필 저장을 시작한다. 진행 중이던 재조회 응답은 저장 전 값이라 버려지게 세대를 올린다(#155).

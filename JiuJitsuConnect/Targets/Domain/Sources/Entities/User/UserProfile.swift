@@ -35,11 +35,19 @@ public struct OwnerVerification: Equatable, Sendable {
     public let documentImageUrl: String?
     /// 거절 사유. 관리자가 남기지 않으면 `nil`.
     public let rejectReason: String?
+    /// 가장 최근 신청 일시. 서버가 주지 않았거나 읽지 못하면 `nil`.
+    public let requestedAt: Date?
 
-    public init(status: Status, documentImageUrl: String? = nil, rejectReason: String? = nil) {
+    public init(
+        status: Status,
+        documentImageUrl: String? = nil,
+        rejectReason: String? = nil,
+        requestedAt: Date? = nil
+    ) {
         self.status = status
         self.documentImageUrl = documentImageUrl
         self.rejectReason = rejectReason
+        self.requestedAt = requestedAt
     }
 
     public static let notRequested = OwnerVerification(status: .notRequested)
