@@ -59,6 +59,8 @@ public struct AppTabFeature: Sendable {
         @Presents var loginCover: LoginFeature.State?
         // 게스트가 로그인이 필요한 행위(커뮤니티 글쓰기·대회 관심 등)를 할 때 노출되는 공통 AppAlert 표시 여부
         var isLoginPromptPresented: Bool = false
+        // 로그인 안내를 띄운 이유(#392). 알럿 제목이 이 값을 따르고, 모르는 이유 · 이유 없음은 nil(기본 문구).
+        var loginPromptReason: AnalyticsEvent.LoginReason?
         // 갱신 토큰 만료로 게스트가 됐음을 알림(#373). 로그아웃 · 탈퇴에는 띄우지 않는다.
         var isSessionExpiredAlertPresented = false
         // 탈퇴를 마쳤다는 안내(#385). 30일 유예와 다시 로그인하면 취소된다는 걸 알려, 무심코 로그인해 되살리지 않게 한다.
@@ -144,7 +146,7 @@ public struct AppTabFeature: Sendable {
         }
 
         public enum InternalAction: Sendable {
-            case showLoginPromptAlert
+            case showLoginPromptAlert(reason: AnalyticsEvent.LoginReason?)
             case showLoginModal
             case showDeviceNotificationAlert
             // 관심 대회 알림 켜기(#257) · 알림 권한 안내(#333) 중 권한 창에서 허용함. 그 사이 로그아웃했을 수 있어 지금 상태를 보고 FCM을 등록한다.
@@ -268,7 +270,7 @@ public struct AppTabFeature: Sendable {
                 // 커뮤니티 웹뷰의 비로그인 행위 → "로그인이 필요해요" 안내 알럿(소프트 유도).
                 state.pendingWebLoginTab = .home
                 Log.trace("커뮤니티 로그인 알럿 요청: reason=\(reason ?? "-")", category: .view, level: .info)
-                return .send(.internal(.showLoginPromptAlert))
+                return .send(.internal(.showLoginPromptAlert(reason: Self.loginReason(from: reason))))
 
             case let .home(.delegate(.loginModalRequested(reason))):
                 // 커뮤니티 웹뷰의 비로그인 행위 → 로그인 모달 즉시 노출(다이렉트).
@@ -281,7 +283,7 @@ public struct AppTabFeature: Sendable {
             // 탭의 MY가 불러 둔 프로필을 넘겨 바로 그린다. 게스트는 커뮤니티 행위와 같이 로그인 안내를 띄운다.
             case .home(.delegate(.myProfileRequested)):
                 guard !state.authInfo.isGuest else {
-                    return .send(.internal(.showLoginPromptAlert))
+                    return .send(.internal(.showLoginPromptAlert(reason: .profile)))
                 }
                 CommunityFeature.pushMyProfile(.pushed(from: state.myPage), into: &state.home)
                 return .none
@@ -358,8 +360,8 @@ public struct AppTabFeature: Sendable {
 
             // MY 탭 웹 서브뷰는 로그인한 사람만 여는 화면(커뮤니티 활동·차단한 회원)이라 웹의 대기 중 행위를 되살릴 일이 없어
             // 웹발 로그인(pendingWebLoginTab)으로 표시하지 않는다.
-            case .myPage(.delegate(.webSubview(.loginPromptRequested))):
-                return .send(.internal(.showLoginPromptAlert))
+            case let .myPage(.delegate(.webSubview(.loginPromptRequested(reason)))):
+                return .send(.internal(.showLoginPromptAlert(reason: Self.loginReason(from: reason))))
 
             case .myPage(.delegate(.webSubview(.loginModalRequested))):
                 return .send(.internal(.showLoginModal))
@@ -376,9 +378,9 @@ public struct AppTabFeature: Sendable {
             // MARK: - 대회 탭 웹 (#240)
 
             // 비로그인 관심 등록 등 → 커뮤니티와 같이 로그인 안내. 로그인하면 대회 탭에 머물러 웹이 하던 행위로 돌아간다.
-            case .competition(.delegate(.webSubview(.loginPromptRequested))):
+            case let .competition(.delegate(.webSubview(.loginPromptRequested(reason)))):
                 state.pendingWebLoginTab = .competition
-                return .send(.internal(.showLoginPromptAlert))
+                return .send(.internal(.showLoginPromptAlert(reason: Self.loginReason(from: reason))))
 
             case .competition(.delegate(.webSubview(.loginModalRequested))):
                 state.pendingWebLoginTab = .competition
@@ -474,9 +476,10 @@ public struct AppTabFeature: Sendable {
                 return .none
                 
             // MARK: - Login Logic
-            case .internal(.showLoginPromptAlert):
+            case let .internal(.showLoginPromptAlert(reason)):
                 // 만료 안내가 이미 [로그인]을 묻고 있으면 겹쳐 띄우지 않는다. 웹의 대기 행위는 그 알럿의 결과를 따른다(#373).
                 guard !state.isSessionExpiredAlertPresented else { return .none }
+                state.loginPromptReason = reason
                 state.isLoginPromptPresented = true
                 return .none
 

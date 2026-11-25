@@ -128,7 +128,7 @@ extension AppFeature.Analytics {
         case let .destination(.presented(.appTab(.home(.delegate(.loginPromptRequested(reason)))))),
              let .destination(.presented(.appTab(.competition(.delegate(.webSubview(.loginPromptRequested(reason))))))),
              let .destination(.presented(.appTab(.myPage(.delegate(.webSubview(.loginPromptRequested(reason))))))):
-            state.analytics.loginPromptReason = reason.flatMap(AnalyticsEvent.LoginReason.init(rawValue:))
+            state.analytics.loginPromptReason = AppTabFeature.loginReason(from: reason)
 
         case .destination(.presented(.appTab(.home(.delegate(.myProfileRequested))))):
             guard case let .appTab(appTab)? = state.destination, appTab.authInfo.isGuest else { return }
