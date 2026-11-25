@@ -257,6 +257,12 @@ public final class AuthRepositoryImpl: NSObject, AuthRepository, ASAuthorization
                     refreshToken: refreshToken,
                     provider: provider
                 )
+                // 기록이 생기기 전 버전부터 자동 로그인만 해 온 사람은 마지막 로그인 수단이 비어 있다(#380).
+                // 한 번만 채우고 이미 있으면 두지 않는다. 401 갱신(NetworkService)에서는 하지 않는다 —
+                // 로그아웃 직후 늦게 끝난 갱신이 다른 값을 남길 수 있다.
+                if tokenStorage.getLastLoginProvider() == nil, SNSProvider(rawValue: provider) != nil {
+                    tokenStorage.recordLastLoginProvider(provider)
+                }
             }
             return responseDTO.toDomain()
             
