@@ -318,9 +318,10 @@ public struct MyStyleSettingView: View {
                                 .opacity(store.selectedFavoriteStyle == nil ? 1 : CardMetrics.dimmedOpacity)
                                 .onTapGesture {
                                     // 고른 것을 해제
-                                    if let currentStyle = store.selectedFavoriteStyle {
-                                        styleTapped(currentStyle)
-                                    }
+                                    noneCardTapped()
+                                }
+                                .smallCardAccessibility(label: "없음", isSelected: store.selectedFavoriteStyle == nil) {
+                                    noneCardTapped()
                                 }
                             
                             // 나머지 스타일 카드들
@@ -332,6 +333,9 @@ public struct MyStyleSettingView: View {
                                 )
                                 .opacity(isStyleSelected(style) ? 1 : CardMetrics.dimmedOpacity)
                                 .onTapGesture {
+                                    styleTapped(style)
+                                }
+                                .smallCardAccessibility(label: style.tabTitle, isSelected: isStyleSelected(style)) {
                                     styleTapped(style)
                                 }
                             }
@@ -347,9 +351,10 @@ public struct MyStyleSettingView: View {
                             .opacity(store.selectedFavoriteStyle == nil ? 1 : CardMetrics.dimmedOpacity)
                             .onTapGesture {
                                 // 고른 것을 해제
-                                if let currentStyle = store.selectedFavoriteStyle {
-                                    styleTapped(currentStyle)
-                                }
+                                noneCardTapped()
+                            }
+                            .smallCardAccessibility(label: "없음", isSelected: store.selectedFavoriteStyle == nil) {
+                                noneCardTapped()
                             }
                         
                         // 나머지 스타일 카드들
@@ -361,6 +366,9 @@ public struct MyStyleSettingView: View {
                             )
                             .opacity(isStyleSelected(style) ? 1 : CardMetrics.dimmedOpacity)
                             .onTapGesture {
+                                styleTapped(style)
+                            }
+                            .smallCardAccessibility(label: style.tabTitle, isSelected: isStyleSelected(style)) {
                                 styleTapped(style)
                             }
                         }
@@ -392,6 +400,25 @@ public struct MyStyleSettingView: View {
     
     private func isStyleSelected(_ style: any StyleSelectable) -> Bool {
         store.selectedFavoriteStyle?.id == style.id
+    }
+
+    /// '없음' 카드 — 고른 것이 있으면 그 카드를 다시 누른 것처럼 풀어 준다
+    private func noneCardTapped() {
+        if let currentStyle = store.selectedFavoriteStyle {
+            styleTapped(currentStyle)
+        }
+    }
+}
+
+// MARK: - Accessibility
+
+private extension View {
+    /// 아래 줄 카드 — 보이는 글자는 줄임말("조르")이라 온이름으로 읽고, 고른 카드는 선택됨으로 알린다.
+    func smallCardAccessibility(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        accessibilityElement(children: .ignore)
+            .accessibilityLabel(label)
+            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+            .accessibilityAction { action() }
     }
 }
 
