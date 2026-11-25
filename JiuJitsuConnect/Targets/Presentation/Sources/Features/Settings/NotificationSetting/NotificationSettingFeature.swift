@@ -139,7 +139,9 @@ public struct NotificationSettingFeature: Sendable {
                 return .merge(fetchSetting(generation: state.saveGeneration), loadDeviceNotificationStatus())
 
             case .view(.sceneBecameActive):
-                return loadDeviceNotificationStatus()
+                // 조회가 실패한 채면 서버 값도 다시 읽는다. 다시 시도 토스트가 사라지면 스켈레톤에서 빠져나올 길이 없다.
+                guard !state.isLoaded else { return loadDeviceNotificationStatus() }
+                return .merge(fetchSetting(generation: state.saveGeneration), loadDeviceNotificationStatus())
 
             case let .internal(.deviceNotificationStatusLoaded(status)):
                 state.deviceNotificationStatus = status
