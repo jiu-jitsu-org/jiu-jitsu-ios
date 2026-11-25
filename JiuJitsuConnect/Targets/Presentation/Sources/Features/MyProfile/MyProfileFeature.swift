@@ -118,6 +118,12 @@ public struct MyProfileFeature: Sendable {
             return legacyHeaderPattern ?? .default
         }
 
+        /// 이 무늬가 이미 서버에 저장돼 있는지. 보이는 무늬(`headerPattern`)가 아니라 서버 값으로 본다 —
+        /// 서버 값이 이 앱이 모르는 무늬면 기본 무늬로 보이지만, 회원이 기본 무늬를 고르면 저장해야 한다.
+        func isSavedHeaderPattern(_ pattern: MyHeaderPattern) -> Bool {
+            communityProfile?.backgroundPattern == pattern.serverValue
+        }
+
         public init(authInfo: AuthInfo, communityProfile: CommunityProfile? = nil) {
             self.authInfo = authInfo
             self.communityProfile = communityProfile
@@ -1142,7 +1148,7 @@ public struct MyProfileFeature: Sendable {
             case let .view(.headerPatternChanged(pattern)):
                 guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
                 guard let profile = state.communityProfile else { return Self.profileUnavailableToast() }
-                guard pattern != state.headerPattern else { return .none }
+                guard !state.isSavedHeaderPattern(pattern) else { return .none }
                 let updatedProfile = profile.updatingBackgroundPattern(pattern.serverValue)
                 // 시트를 닫자마자 바탕이 바뀌게 먼저 화면에 반영하고, 저장에 실패하면 되돌린다.
                 state.communityProfile = updatedProfile

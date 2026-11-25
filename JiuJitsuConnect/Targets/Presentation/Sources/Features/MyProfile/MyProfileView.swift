@@ -218,7 +218,7 @@ public struct MyProfileView: View {
             .sheet(isPresented: $isPatternSheetPresented) {
                 if let beltRank = store.communityProfile?.beltRank {
                     MyHeaderPatternSheetView(current: store.headerPattern, beltRank: beltRank) { pattern in
-                        if pattern != store.headerPattern {
+                        if !store.state.isSavedHeaderPattern(pattern) {
                             store.send(.view(.headerPatternChanged(pattern)))
                         }
                         isPatternSheetPresented = false
