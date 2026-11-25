@@ -98,6 +98,11 @@ public struct CommunityFeature: Sendable {
         // 알림함은 로그인 사용자 전용이라 비로그인이면 종 아이콘 자체를 숨긴다(알림함 정책).
         var isNotificationButtonVisible: Bool { accessToken != nil }
 
+        // 피드 위에 상세가 떠 있으면 피드는 가려져 있다. 전체 화면 덮개(detailCover)는 아래 뷰에 onDisappear를 보내지 않아 여기서 거른다.
+        var isWatchingConnection: Bool {
+            connectionRetry.isWatchingConnection && path.isEmpty && detailCover == nil
+        }
+
         public init(accessToken: String? = nil) {
             self.accessToken = accessToken
             let url = CommunityFeature.makeCommunityURL()
@@ -324,7 +329,7 @@ public struct CommunityFeature: Sendable {
                 return .none
 
             case .internal(.connectionRestored):
-                guard state.connectionRetry.isWatchingConnection else { return .none }
+                guard state.isWatchingConnection else { return .none }
                 Log.trace("연결이 돌아와 홈 피드를 다시 불러옴", category: .network, level: .info)
                 state.connectionRetry.autoReloaded()
                 Self.retryLoad(&state)
@@ -697,7 +702,13 @@ public struct CommunityFeature: Sendable {
                 return .none
             }
         }
-        .onChange(of: { $0.connectionRetry.isWatchingConnection }) { _, isWatching in
+        .ifLet(\.$detailCover, action: \.detailCover) {
+            CommunityDetailFeature()
+        }
+        .forEach(\.path, action: \.path)
+        .forEach(\.coverPath, action: \.coverPath)
+        // 상세가 열리고 닫히는 것(ifLet · forEach가 바꿈)까지 보려고 맨 바깥에 둔다.
+        .onChange(of: \.isWatchingConnection) { _, isWatching in
             Reduce { _, _ in
                 WebConnectionRetry.watchEffect(
                     isWatching: isWatching,
@@ -708,11 +719,6 @@ public struct CommunityFeature: Sendable {
                 )
             }
         }
-        .ifLet(\.$detailCover, action: \.detailCover) {
-            CommunityDetailFeature()
-        }
-        .forEach(\.path, action: \.path)
-        .forEach(\.coverPath, action: \.coverPath)
     }
 
     // MARK: - 헤더 표시(새 알림 점)

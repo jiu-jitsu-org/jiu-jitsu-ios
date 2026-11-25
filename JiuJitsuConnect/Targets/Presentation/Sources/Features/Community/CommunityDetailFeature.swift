@@ -240,7 +240,7 @@ public struct CommunityDetailFeature: Sendable {
                 return .none
 
             case .internal(.connectionRestored):
-                guard state.connectionRetry.isWatchingConnection, !state.isClosing else { return .none }
+                guard state.connectionRetry.isWatchingConnection, !state.isClosing, !state.hidesRetry else { return .none }
                 Log.trace("연결이 돌아와 다시 불러옴: \(state.url.path)", category: .network, level: .info)
                 Self.reload(&state)
                 state.connectionRetry.autoReloaded()
