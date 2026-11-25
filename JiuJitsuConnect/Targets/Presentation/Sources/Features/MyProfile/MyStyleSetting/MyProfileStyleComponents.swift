@@ -384,6 +384,8 @@ private struct DecorativeCardsView: View {
             }
         }
         .frame(height: 282)
+        // 장식 그림이라 VoiceOver에서는 건너뛴다(그림 이름을 읽지 않게).
+        .accessibilityHidden(true)
     }
     
     private func decorativeCard(config: DecorativeCardConfig, centerX: CGFloat) -> some View {

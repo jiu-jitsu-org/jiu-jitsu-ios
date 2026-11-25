@@ -130,6 +130,8 @@ struct FlippableStyleCard: View {
                     handleDragEnded(value)
                 }
         )
+        // 보이는 면의 글자를 한 번에 읽고, 뒤집기 동작도 그 한 요소에 붙인다.
+        .accessibilityElement(children: .combine)
         .accessibilityAction(named: "카드 뒤집기") { flip(by: Metrics.flipAngle) }
         .task { await playIntro() }
     }
