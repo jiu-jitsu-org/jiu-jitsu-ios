@@ -345,11 +345,14 @@ public struct AppTabFeature: Sendable {
                 return .none
 
             // MY(탭이든 커뮤니티에 쌓인 것이든)에서 프로필을 저장하면 열린 웹뷰 모두가 내 프로필을 다시 불러오게 한다(jiu-jitsu-frontend#413).
-            case .myPage(.delegate(.profileUpdated)), .home(.delegate(.profileUpdated)):
+            case .myPage(.delegate(.profileUpdated)):
+                return Self.broadcastProfileUpdated()
+            // 홈 · 대회 탭에 쌓인 MY나 남의 프로필 띠 묻기에서 저장함 → 웹에 알리고, 탭 MY도 다시 불러온다.
+            // 탭 MY는 프로필이 있으면 다시 나타나도 부르지 않아, 그대로 두면 다른 탭에 갔다 와야 바뀌었다(QA A2-3).
+            case .home(.delegate(.profileUpdated)), .competition(.delegate(.profileUpdated)):
                 return .merge(
-                    .send(.home(.session(.profileUpdated))),
-                    .send(.competition(.session(.profileUpdated))),
-                    .send(.myPage(.session(.profileUpdated)))
+                    Self.broadcastProfileUpdated(),
+                    .send(.myPage(.internal(.refreshProfile)))
                 )
             // 어느 탭에서 연 남의 프로필이든 차단·해제하면 열린 웹뷰 모두가 그 회원 글·댓글을 다시 불러오게 한다(#328).
             case let .home(.delegate(.userBlockChanged(userId, blocked))),
@@ -732,6 +735,15 @@ public struct AppTabFeature: Sendable {
         let allTabs = Set(Tab.allCases)
         guard state.mountedTabs != allTabs, !state.home.isLoading, !state.isGreetingShowing else { return }
         state.mountedTabs = allTabs
+    }
+
+    /// 내 프로필이 바뀜 → 열린 웹뷰 모두가 내 프로필을 다시 불러오게 한다(jiu-jitsu-frontend#413).
+    private static func broadcastProfileUpdated() -> Effect<Action> {
+        .merge(
+            .send(.home(.session(.profileUpdated))),
+            .send(.competition(.session(.profileUpdated))),
+            .send(.myPage(.session(.profileUpdated)))
+        )
     }
 
 }

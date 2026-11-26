@@ -587,9 +587,11 @@ public struct MyProfileFeature: Sendable {
                 state.communityProfile = state.communityProfile?.updatingNickname(nickname)
                 // 닉네임 화면이 이미 저장했다. 그 전에 나간 재조회 응답이 옛 닉네임으로 덮지 않게 세대를 올린다.
                 state.profileSaveGeneration += 1
-                return .send(.internal(.showToast(.init(
-                    message: "닉네임 수정을 완료했어요", status: .success
-                ))))
+                // 열린 웹뷰도 새 닉네임을 쓰게 알린다(QA A2-4 — 웹이 닉네임까지 다시 읽는 건 jiu-jitsu-frontend 쪽 일).
+                return .merge(
+                    .send(.internal(.showToast(.init(message: "닉네임 수정을 완료했어요", status: .success)))),
+                    .send(.delegate(.profileUpdated))
+                )
                 
             case .destination(.presented(.nicknameSetting(.delegate(.cancel)))):
                 // 취소 - 아무것도 하지 않음
@@ -868,6 +870,9 @@ public struct MyProfileFeature: Sendable {
                          previousProfile?.beltStripe != updatedProfile.beltStripe {
                     // 벨트 정보 수정
                     message = "벨트 정보 수정을 완료했어요"
+                } else if previousProfile?.academyName != updatedProfile.academyName {
+                    // 도장 이름 수정 — 다른 섹션 문구('벨트 정보 수정을 완료했어요')와 같은 꼴(QA A2-13)
+                    message = "도장 정보 수정을 완료했어요"
                 } else {
                     // 기타
                     message = "프로필 수정을 완료했어요"
@@ -1004,6 +1009,13 @@ public struct MyProfileFeature: Sendable {
 
             case let .path(.element(id: _, action: .userProfile(.delegate(.blockChanged(userId, blocked))))):
                 return .send(.delegate(.userBlockChanged(userId: userId, blocked: blocked)))
+
+            // 이 MY 위에 쌓은 남의 프로필 띠 묻기에서 내 띠를 저장함(QA A2-3) — 뒤로 돌아왔을 때 새 띠가 보이게 다시 불러오고, 웹에도 알린다.
+            case .path(.element(id: _, action: .userProfile(.delegate(.profileUpdated)))):
+                return .merge(
+                    .send(.internal(.refreshProfile)),
+                    .send(.delegate(.profileUpdated))
+                )
 
             case let .openUserProfile(userId):
                 // 연타·중복 전달로 같은 프로필이 겹쳐 쌓이지 않게 한다
@@ -1639,7 +1651,11 @@ public struct MyProfileFeature: Sendable {
                 let message = updatedProfile.profileImageUrl == nil
                     ? "프로필 이미지를 삭제했어요"
                     : "프로필 이미지를 변경했어요"
-                return .send(.internal(.showToast(.init(message: message, status: .success))))
+                // 열린 웹뷰도 새 사진을 쓰게 알린다(QA A2-4 — 웹이 사진까지 다시 읽는 건 jiu-jitsu-frontend 쪽 일).
+                return .merge(
+                    .send(.internal(.showToast(.init(message: message, status: .success)))),
+                    .send(.delegate(.profileUpdated))
+                )
 
             case let .internal(.profileImageUpdateResponse(.failure(error))):
                 state.isUploadingProfileImage = false

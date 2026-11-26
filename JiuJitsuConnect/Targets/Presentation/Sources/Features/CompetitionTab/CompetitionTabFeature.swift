@@ -94,6 +94,8 @@ public struct CompetitionTabFeature: Sendable {
             case competitionRecordRequested(OpenCompetitionRecordPayload)
             // 이 스택에 쌓인 남의 프로필에서 회원을 차단·해제함(#328) → 부모가 열린 웹뷰 모두에 USER_BLOCK_CHANGED를 보낸다.
             case userBlockChanged(userId: Int, blocked: Bool)
+            // 이 스택에 쌓인 남의 프로필 띠 묻기에서 내 띠를 저장함(QA A2-3) → 부모가 열린 웹뷰에 PROFILE_UPDATED, MY 다시 불러오기.
+            case profileUpdated
         }
     }
 
@@ -184,6 +186,9 @@ public struct CompetitionTabFeature: Sendable {
 
             case let .path(.element(id: _, action: .userProfile(.delegate(.blockChanged(userId, blocked))))):
                 return .send(.delegate(.userBlockChanged(userId: userId, blocked: blocked)))
+
+            case .path(.element(id: _, action: .userProfile(.delegate(.profileUpdated)))):
+                return .send(.delegate(.profileUpdated))
 
             // 알림함에서 읽은 알림 · 글 상세를 열어 읽음 처리된 그 글의 알림(#401)을 점에 반영한다(홈과 같은 처리).
             // forEach보다 먼저 실행돼 pop 대상이 아직 스택에 남아 있고, 여러 화면이 한 번에 닫히기도 해 pop 범위 전체를 본다.
