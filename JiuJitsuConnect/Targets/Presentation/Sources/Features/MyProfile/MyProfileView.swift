@@ -616,7 +616,10 @@ private extension View {
                     onPicked: { image in
                         // 큰 사진은 줄이고 바로 세워, 메인 스레드 밖에서 인코딩한다(QA A2-6).
                         Task { @MainActor in
-                            if let data = await PickedImagePreparer.jpegData(from: image) {
+                            let data = await PickedImagePreparer.jpegData(from: image)
+                            // 줄이는 사이 고르기를 닫았으면(밀어서 닫기 등) 늦게 나온 사진으로 자르기를 열지 않는다.
+                            guard store.wrappedValue.imageCaptureSource != nil else { return }
+                            if let data {
                                 store.wrappedValue.send(.view(.imagePicked(data)))
                             } else {
                                 store.wrappedValue.send(.view(.imagePickerCancelled))
@@ -634,7 +637,10 @@ private extension View {
                     onPicked: { image in
                         // 큰 사진은 줄이고 바로 세워, 메인 스레드 밖에서 인코딩한다(QA A2-6).
                         Task { @MainActor in
-                            if let data = await PickedImagePreparer.jpegData(from: image) {
+                            let data = await PickedImagePreparer.jpegData(from: image)
+                            // 줄이는 사이 고르기를 닫았으면(밀어서 닫기 등) 늦게 나온 사진으로 자르기를 열지 않는다.
+                            guard store.wrappedValue.imageCaptureSource != nil else { return }
+                            if let data {
                                 store.wrappedValue.send(.view(.imagePicked(data)))
                             } else {
                                 store.wrappedValue.send(.view(.imagePickerCancelled))

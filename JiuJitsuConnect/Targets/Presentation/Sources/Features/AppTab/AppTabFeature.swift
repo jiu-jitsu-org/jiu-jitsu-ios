@@ -352,7 +352,7 @@ public struct AppTabFeature: Sendable {
             case .home(.delegate(.profileUpdated)), .competition(.delegate(.profileUpdated)):
                 return .merge(
                     Self.broadcastProfileUpdated(),
-                    .send(.myPage(.internal(.refreshProfile)))
+                    .send(.myPage(.internal(.profileChangedElsewhere)))
                 )
             // 어느 탭에서 연 남의 프로필이든 차단·해제하면 열린 웹뷰 모두가 그 회원 글·댓글을 다시 불러오게 한다(#328).
             case let .home(.delegate(.userBlockChanged(userId, blocked))),

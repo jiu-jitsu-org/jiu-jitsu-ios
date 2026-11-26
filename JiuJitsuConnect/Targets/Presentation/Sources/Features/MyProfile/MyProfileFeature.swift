@@ -257,6 +257,8 @@ public struct MyProfileFeature: Sendable {
             // community 프로필과 독립적으로 처리해 한쪽 실패가 다른 쪽을 막지 않게 한다.
             case userProfileResponse(TaskResult<UserProfile>, generation: Int)
             case refreshProfile
+            /// 다른 화면(남의 프로필 띠 묻기 등)에서 내 프로필을 바꿈 — 이미 나가 있던 재조회는 바뀌기 전 값일 수 있어 버리고 새로 부른다(QA A2-3)
+            case profileChangedElsewhere
             case refreshProfileResponse(TaskResult<CommunityProfile>, saveGeneration: Int)
             case refreshUserProfileResponse(TaskResult<UserProfile>, generation: Int)
             // user 프로필이 없어 사진 바꾸기 · 관장 사범 인증을 열기 전에 다시 받은 결과(QA A2-2, A3-10). 받으면 그 화면을 연다.
@@ -390,6 +392,12 @@ public struct MyProfileFeature: Sendable {
                 guard state.communityProfile != nil else {
                     return .send(.view(.onAppear))
                 }
+                return .send(.internal(.refreshProfile))
+
+            case .internal(.profileChangedElsewhere):
+                // 앞서 나간 재조회 응답은 세대가 달라 버려지고, 진행 표시를 풀어 아래 재조회가 막히지 않게 한다.
+                state.profileSaveGeneration += 1
+                state.isRefreshingProfile = false
                 return .send(.internal(.refreshProfile))
 
             case .internal(.refreshProfile):
@@ -1013,7 +1021,7 @@ public struct MyProfileFeature: Sendable {
             // 이 MY 위에 쌓은 남의 프로필 띠 묻기에서 내 띠를 저장함(QA A2-3) — 뒤로 돌아왔을 때 새 띠가 보이게 다시 불러오고, 웹에도 알린다.
             case .path(.element(id: _, action: .userProfile(.delegate(.profileUpdated)))):
                 return .merge(
-                    .send(.internal(.refreshProfile)),
+                    .send(.internal(.profileChangedElsewhere)),
                     .send(.delegate(.profileUpdated))
                 )
 
