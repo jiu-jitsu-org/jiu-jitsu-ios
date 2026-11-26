@@ -11,6 +11,7 @@ public struct SplashFeature: Sendable {
         case onAppearLaunch
         case minimumDisplay
         case versionCheck
+        case connectionWatch
     }
 
     // 스플래시 최소 노출 시간
@@ -31,6 +32,7 @@ public struct SplashFeature: Sendable {
     @Dependency(\.homeFeedPreloadClient) var homeFeedPreload
     @Dependency(\.appVersionClient) var appVersionClient
     @Dependency(\.openURL) var openURL
+    @Dependency(\.networkPathClient) var networkPathClient
 
     @ObservableState
     public struct State: Equatable {
@@ -124,11 +126,13 @@ public struct SplashFeature: Sendable {
                 return finishIfReady(&state)
 
             case .view(.connectionRetryTapped):
+                // 저절로 다시 시도한 뒤 늦게 누른 버튼 · 이미 넘어간 화면에서 온 재시도는 버린다.
+                guard state.isConnectionFailurePresented else { return .none }
                 state.isConnectionFailurePresented = false
                 state.autoLoginResult = nil
                 // 같은 연결 실패로 버전 확인도 '최신'으로 넘겼을 수 있어 다시 확인한다 — 꼭 필요한 업데이트를 건너뛰지 않게.
                 state.updateRequirement = nil
-                return .merge(autoLoginEffect(), checkVersion())
+                return .merge(.cancel(id: CancelID.connectionWatch), autoLoginEffect(), checkVersion())
 
             case let .internal(.versionChecked(requirement)):
                 state.updateRequirement = requirement
@@ -204,7 +208,7 @@ public struct SplashFeature: Sendable {
         // 꼭 필요한 업데이트 다음, 권장 업데이트 안내보다 먼저 묻는다 — 연결이 안 되면 업데이트 확인도 믿을 수 없다.
         if result.isConnectionFailed {
             state.isConnectionFailurePresented = true
-            return .none
+            return watchConnectionRestored()
         }
 
         switch requirement {
@@ -276,6 +280,26 @@ public struct SplashFeature: Sendable {
             }
         }
         .cancellable(id: CancelID.onAppearLaunch, cancelInFlight: true)
+    }
+
+    /// 연결 실패 안내 중 망이 끊겼다가 다시 붙으면 1초 뒤 한 번 저절로 다시 시도한다(QA A1-08, 웹 화면 #396과 같은 원칙).
+    /// 안내가 뜰 때 이미 연결돼 있으면(5xx · 시간 초과 등) 끊김 → 연결을 볼 때까지 기다린다 — 연결된 채로 실패를 되풀이하지 않게.
+    private func watchConnectionRestored() -> Effect<Action> {
+        .run { [networkPathClient, clock] send in
+            var sawDisconnected = false
+            for await isConnected in networkPathClient.isConnectedUpdates() {
+                guard isConnected else {
+                    sawDisconnected = true
+                    continue
+                }
+                guard sawDisconnected else { continue }
+                // 망이 막 붙은 직후엔 주소 찾기 · 경로가 아직 안 잡혀 또 실패하기 쉽다.
+                try await clock.sleep(for: .seconds(1))
+                await send(.view(.connectionRetryTapped))
+                return
+            }
+        }
+        .cancellable(id: CancelID.connectionWatch, cancelInFlight: true)
     }
 
     /// 자동 로그인을 `duration`까지만 기다린다. 먼저 끝난 쪽 하나만 결과로 쓴다.

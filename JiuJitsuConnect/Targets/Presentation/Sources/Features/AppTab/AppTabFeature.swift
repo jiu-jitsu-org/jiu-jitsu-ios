@@ -545,10 +545,15 @@ public struct AppTabFeature: Sendable {
                 return .merge(
                     .cancel(id: CancelID.deviceTokenSync),
                     .cancel(id: CancelID.webTokenRefresh),
-                    .run { send in
+                    .run { [clock] send in
                         // 서버가 이 기기의 토큰 연결을 지우도록 함께 보낸다.
                         let fcmToken = firebaseClient.loadCachedToken().flatMap { $0.isEmpty ? nil : $0 }
-                        _ = try? await authClient.serverLogout(fcmToken)
+                        // 느리고 끊기는 망에서 기본 제한 시간(30초)을 다 기다리면 그동안 화면이 로그인 상태 그대로라
+                        // 무반응으로 보이고, 그사이 앱을 끄면 로그아웃이 안 된 채 남는다(QA A1-06).
+                        // 서버 결과와 상관없이 로그아웃하는 정책(#65)이라 서버 요청은 최대 5초만 기다린다.
+                        await Self.runWithTimeout(.seconds(5), clock: clock) {
+                            _ = try? await authClient.serverLogout(fcmToken)
+                        }
                         await authClient.signOut()
                         await WebSessionCookie.clear()
                         // 서버 요청이 실패해(오프라인 등) 연결이 남아도 이전 계정 푸시가 오지 않게 기기 토큰도 폐기한다.
@@ -735,6 +740,20 @@ public struct AppTabFeature: Sendable {
         let allTabs = Set(Tab.allCases)
         guard state.mountedTabs != allTabs, !state.home.isLoading, !state.isGreetingShowing else { return }
         state.mountedTabs = allTabs
+    }
+
+    /// `operation`을 최대 `duration`만 기다린다. 시간이 지나면 작업을 취소하고 돌아온다(진행 중인 요청은 취소로 끊긴다).
+    static func runWithTimeout(
+        _ duration: Duration,
+        clock: any Clock<Duration>,
+        _ operation: @escaping @Sendable () async -> Void
+    ) async {
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await operation() }
+            group.addTask { try? await clock.sleep(for: duration) }
+            await group.next()
+            group.cancelAll()
+        }
     }
 
     /// 내 프로필이 바뀜 → 열린 웹뷰 모두가 내 프로필을 다시 불러오게 한다(jiu-jitsu-frontend#413).

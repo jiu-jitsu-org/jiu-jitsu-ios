@@ -170,7 +170,11 @@ public struct AppFeature: Sendable {
                 } else if state.pendingDeepLink != nil {
                     // 공유 링크로 들어온 비로그인 사용자. 게시글 상세는 비로그인 접근 가능 정책이라
                     // 로그인 화면을 세우지 않고 게스트로 바로 글을 보여준다.
-                    state.destination = .appTab(.init(authInfo: .guest))
+                    var appTab = AppTabFeature.State(authInfo: .guest)
+                    // 로그인이 만료돼 게스트가 된 거라면(푸시는 로그인한 사람에게만 온다) 글 위에 만료 안내를 띄워
+                    // 왜 로그아웃됐는지 알리고 [로그인]으로 바로 로그인 창을 연다 — 앱 사용 중 만료 알럿과 같은 것(#373, QA A1-05).
+                    appTab.isSessionExpiredAlertPresented = isSessionExpired
+                    state.destination = .appTab(appTab)
                     return Self.consumePendingDeepLink(&state)
                 } else {
                     state.destination = .login(.init())
