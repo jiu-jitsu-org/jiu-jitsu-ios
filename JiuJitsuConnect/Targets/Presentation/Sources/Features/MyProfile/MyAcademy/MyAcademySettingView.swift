@@ -58,7 +58,7 @@ private extension MyAcademySettingView {
     }
     
     var titleSection: some View {
-        Text(store.validationState.message)
+        Text(store.validationState.message(isEdit: store.mode.isEdit))
             .font(Font.pretendard.display1)
             .foregroundStyle(store.validationState.messageColor)
             .frame(maxWidth: .infinity, alignment: .center)
