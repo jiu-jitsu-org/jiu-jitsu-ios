@@ -79,7 +79,7 @@ public struct UserProfileView: View {
                 set: { if !$0 { store.send(.view(.notFoundAlertConfirmed)) } }
             ),
             configuration: AppAlertConfiguration(
-                title: "존재하지 않는 회원입니다",
+                title: "존재하지 않는 회원이에요",
                 message: "탈퇴했거나 찾을 수 없는 회원이에요.",
                 primaryButton: .init(title: "확인") { store.send(.view(.notFoundAlertConfirmed)) },
                 secondaryButton: nil
@@ -101,15 +101,17 @@ public struct UserProfileView: View {
                         profileImageUrl: profile.profileImageUrl,
                         beltRank: profile.beltRank,
                         beltStripe: profile.beltStripe,
+                        isOwner: profile.isOwner,
                         pattern: MyHeaderPattern(profile.backgroundPattern),
                         safeAreaTop: safeAreaTop,
                         bottomSpacing: Metrics.gapAboveCard + beltCardHeight / 2
                     )
+                    // MY처럼 띠 색 머리 위로 빈 바탕이 드러나지 않게 이 스크롤만 튕기지 않는다(A2-16).
+                    .background { ScrollBounceDisabler() }
 
                     UserProfileBeltCardView(
                         beltRank: profile.beltRank,
-                        beltStripe: profile.beltStripe,
-                        isOwner: profile.isOwner
+                        beltStripe: profile.beltStripe
                     )
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { beltCardHeight = $0 }
                     .padding(.horizontal, Metrics.horizontalPadding)
@@ -220,6 +222,8 @@ private struct UserProfileHeaderView: View {
     let profileImageUrl: String?
     let beltRank: BeltRank?
     let beltStripe: BeltStripe?
+    /// `true`이면 MY처럼 닉네임 왼쪽에 관장·사범 인증 뱃지를 둔다.
+    let isOwner: Bool
     let pattern: MyHeaderPattern
     let safeAreaTop: CGFloat
     let bottomSpacing: CGFloat
@@ -247,17 +251,39 @@ private struct UserProfileHeaderView: View {
             .contentShape(Circle())
             .onTapGesture { replayTrigger += 1 }
 
-            Text(nickname)
-                .font(Font.pretendard.title3)
-                .foregroundStyle(foreground)
-                .frame(height: 29)
-                .padding(.top, 10)
+            // MY 머리와 같은 줄 — 인증 뱃지는 닉네임 왼쪽, 긴 글자는 좌우 20 안에서 한 줄 말줄임(조금은 줄여 담음).
+            HStack(spacing: 0) {
+                if isOwner {
+                    Assets.MyProfile.Icon.badgeCheckLight.swiftUIImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
+                        .padding(.trailing, 5)
+                        .accessibilityHidden(true)
+                }
+                Text(nickname)
+                    .font(Font.pretendard.title3)
+                    .foregroundStyle(foreground)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(height: 29)
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
+            .accessibilityElement(children: .ignore)
+            // 뱃지는 그림뿐이라 라벨에 인증 여부를 넣는다(MY 닉네임 줄과 같게).
+            .accessibilityLabel(isOwner ? "\(nickname), 관장·사범 인증" : nickname)
 
             if let academyName {
                 Text(academyName)
                     .font(Font.pretendard.bodyS)
                     .foregroundStyle(foreground.opacity(0.7))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .minimumScaleFactor(0.8)
                     .frame(height: 32)
+                    .padding(.horizontal, 20)
             }
 
             Spacer().frame(height: bottomSpacing)
@@ -300,21 +326,20 @@ private struct UserProfileHeaderView: View {
 
 // MARK: - UserProfileBeltCardView
 
-/// 벨트 + 관장·사범 인증 — MY 벨트 카드와 같은 모양(누를 수 없음). 벨트가 없어도 자리는 둔다.
+/// 벨트 — MY 벨트 카드와 같은 모양(누를 수 없음). 벨트가 없어도 자리는 둔다.
+/// 띠 그림은 MY와 같은 부품(그랄까지 그림, #320)을 쓰고, 관장·사범 인증은 MY처럼 닉네임 옆 뱃지로 보인다.
 private struct UserProfileBeltCardView: View {
     let beltRank: BeltRank?
     let beltStripe: BeltStripe?
-    let isOwner: Bool
 
     var body: some View {
         HStack(spacing: 12) {
             if let beltRank {
-                beltRank.beltIcon
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
+                BeltIcon.card(color: beltRank.selectButtonColor, stripes: beltStripe?.count ?? 0)
                     .frame(width: 40, height: 40)
+                    .background(Color.semantic.surface.secondary)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
-                    // 옆 글자가 띠를 읽으니 그림 이름(에셋 경로)은 읽지 않게 한다.
+                    // 옆 글자가 띠를 읽으니 그림은 읽지 않게 한다.
                     .accessibilityHidden(true)
             } else {
                 RoundedRectangle(cornerRadius: 10)
@@ -326,11 +351,14 @@ private struct UserProfileBeltCardView: View {
                 Text("벨트")
                     .font(Font.pretendard.labelM)
                     .foregroundStyle(Color.component.beltCard.filled.labelText)
+                    .lineLimit(1)
 
                 if let beltRank {
                     Text([beltRank.displayName, beltStripe?.displayName].compactMap { $0 }.joined(separator: " "))
                         .font(Font.pretendard.title3)
                         .foregroundStyle(Color.component.beltCard.filled.contentText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 } else {
                     Text("아직 등록하지 않았어요")
                         .font(Font.pretendard.title3)
@@ -338,23 +366,7 @@ private struct UserProfileBeltCardView: View {
                 }
             }
 
-            Spacer(minLength: 8)
-
-            // 역할 값(`OWNER`)이 관장과 사범을 구분하지 않아 MY와 같은 문구를 쓴다
-            if isOwner {
-                HStack(spacing: 4) {
-                    Assets.MyProfile.Icon.badgeCheckLight.swiftUIImage
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 20, height: 20)
-                        // 옆 '관장·사범' 글자가 뜻을 읽으니 그림 이름(에셋 경로)은 읽지 않게 한다.
-                        .accessibilityHidden(true)
-
-                    Text("관장·사범")
-                        .font(Font.pretendard.buttonS)
-                        .foregroundStyle(Color.semantic.primary.primary)
-                }
-            }
+            Spacer(minLength: 0)
         }
         .padding(.vertical, 24)
         .padding(.horizontal, 20)

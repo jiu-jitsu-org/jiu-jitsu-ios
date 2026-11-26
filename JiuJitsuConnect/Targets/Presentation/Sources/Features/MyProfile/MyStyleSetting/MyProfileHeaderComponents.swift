@@ -31,6 +31,8 @@ public struct MyProfileHeaderView: View {
     let isOwner: Bool
     /// 비로그인 MY(#242) — 닉네임 대신 인사와 로그인 안내를 보이고, 고치는 버튼과 "..." 메뉴를 숨긴다.
     let isGuest: Bool
+    /// 프로필을 아직 못 받음(처음 불러오는 중 · 처음 불러오기 실패) — 도장이 있는지 모르니 "도장 정보 입력하기" 대신 빈 자리를 둔다.
+    let isProfileUnknown: Bool
     /// 오른쪽 위 톱니바퀴(설정, #241). 커뮤니티에서 쌓아 연 MY에는 두지 않는다.
     let showsSettingsButton: Bool
 
@@ -66,6 +68,7 @@ public struct MyProfileHeaderView: View {
         safeAreaTop: CGFloat,
         isOwner: Bool = false,
         isGuest: Bool = false,
+        isProfileUnknown: Bool = false,
         showsSettingsButton: Bool = false,
         pendingProfileImageData: Data? = nil,
         isProfileImageDeleting: Bool = false,
@@ -88,6 +91,7 @@ public struct MyProfileHeaderView: View {
         self.safeAreaTop = safeAreaTop
         self.isOwner = isOwner
         self.isGuest = isGuest
+        self.isProfileUnknown = isProfileUnknown
         self.showsSettingsButton = showsSettingsButton
         self.pendingProfileImageData = pendingProfileImageData
         self.isProfileImageDeleting = isProfileImageDeleting
@@ -202,8 +206,18 @@ public struct MyProfileHeaderView: View {
             Spacer().frame(height: 84)
         }
 
+        // 프로필을 아직 모르면 도장 줄은 빈 자리 — 도장 있는 회원에게 "입력하기"가 보였다가 바뀌거나,
+        // 실패 상태에서 도장이 지워진 것처럼 보이지 않게 한다. 높이는 도장명이 있을 때와 같다.
+        if academyName == nil && isProfileUnknown {
+            Color.clear
+                .frame(height: 32)
+                .accessibilityHidden(true)
+
+            Spacer().frame(height: 84)
+        }
+
         // "도장 정보 입력하기" 버튼 (도장명이 없을 때만)
-        if academyName == nil {
+        if academyName == nil && !isProfileUnknown {
             Button {
                 onGymInfoTapped()
             } label: {
