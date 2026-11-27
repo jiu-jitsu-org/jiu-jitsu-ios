@@ -742,17 +742,32 @@ public struct AppTabFeature: Sendable {
         state.mountedTabs = allTabs
     }
 
-    /// `operation`을 최대 `duration`만 기다린다. 시간이 지나면 작업을 취소하고 돌아온다(진행 중인 요청은 취소로 끊긴다).
+    /// `operation`을 최대 `duration`만 기다린다. 시간이 지나면 작업을 취소하고 바로 돌아온다.
+    /// TaskGroup은 취소한 자식이 끝날 때까지 기다려, 취소를 늦게 받는 await(토큰 재발급 대기 등)가 끼면
+    /// 시간 초과가 걸리지 않는다(Splash `waitAtMost`, #367). 그래서 두 비구조적 Task 중 먼저 끝난 쪽만 넘긴다.
     static func runWithTimeout(
         _ duration: Duration,
         clock: any Clock<Duration>,
         _ operation: @escaping @Sendable () async -> Void
     ) async {
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { await operation() }
-            group.addTask { try? await clock.sleep(for: duration) }
-            await group.next()
-            group.cancelAll()
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let isResumed = LockIsolated(false)
+            let resumeOnce: @Sendable () -> Void = {
+                let shouldResume = isResumed.withValue { resumed in
+                    defer { resumed = true }
+                    return !resumed
+                }
+                if shouldResume { continuation.resume() }
+            }
+            let work = Task {
+                await operation()
+                resumeOnce()
+            }
+            Task {
+                try? await clock.sleep(for: duration)
+                work.cancel()
+                resumeOnce()
+            }
         }
     }
 
