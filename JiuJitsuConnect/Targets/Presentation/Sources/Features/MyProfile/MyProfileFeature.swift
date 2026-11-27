@@ -168,6 +168,8 @@ public struct MyProfileFeature: Sendable {
         case userProfile(UserProfileFeature)
         // 하단 탭에서 빠진 설정은 MY 오른쪽 위 톱니바퀴로 연다(#241). 차단한 회원 등 설정이 여는 웹 화면도 이 스택에 쌓인다.
         case settings(SettingsFeature)
+        // 커뮤니티 활동 → 글 → 대회 상세의 '내 기록에 남기기'(QA A3-9). 홈 · 대회 탭처럼 상세 위에 쌓고 저장은 AppTab이 한다.
+        case competitionInfo(CompetitionInfoFeature)
     }
 
     @Reducer
@@ -202,6 +204,8 @@ public struct MyProfileFeature: Sendable {
             case webSubview(CommunityDetailFeature.Action.DelegateAction)
             // 띠·도장 등 프로필 저장이 서버에 반영됨 → 부모가 열린 웹뷰 모두에 PROFILE_UPDATED를 보낸다(jiu-jitsu-frontend#413).
             case profileUpdated
+            // MY에서 등록 대회에 이어 붙인 기록을 새로 저장함(QA A3-4) → 부모가 열린 웹뷰 모두에 COMPETITION_RECORD_SAVED를 보낸다.
+            case competitionRecordAdded(competitionId: Int)
             // 이 스택에 쌓인 남의 프로필에서 회원을 차단·해제함(#328) → 부모가 열린 웹뷰 모두에 USER_BLOCK_CHANGED를 보낸다.
             case userBlockChanged(userId: Int, blocked: Bool)
             // 비로그인 MY의 '로그인하기'(#242) → 부모가 로그인 화면을 띄운다.
@@ -903,6 +907,9 @@ public struct MyProfileFeature: Sendable {
                     return .send(.destination(.presented(.academySetting(.saveFailed))))
                 case .myStyleSetting?:
                     return .send(.destination(.presented(.myStyleSetting(.saveFailed))))
+                case .competitionInfo?:
+                    // 대회 수정 저장 실패 — 수정 화면이 고친 값을 지킨 채 알린다(QA A3-2). 추가 실패는 competitionAddFailed로 온다.
+                    return .send(.destination(.presented(.competitionInfo(.saveFinished(.failed)))))
                 default:
                     return .send(.internal(.showToast(.init(message: "저장하지 못했어요. 다시 시도해 주세요", status: .error))))
                 }
@@ -1005,7 +1012,8 @@ public struct MyProfileFeature: Sendable {
                     title: payload.title,
                     accessToken: source.accessToken,
                     isTabRoot: false,
-                    capabilities: [.pickPhotos, .openHomeFeed]
+                    // 글의 대회 카드로 연 대회 상세에서도 '내 기록에 남기기'를 받는다(QA A3-9).
+                    capabilities: [.pickPhotos, .openHomeFeed, .openCompetitionRecord]
                 )))
                 return .none
 
@@ -1088,7 +1096,7 @@ public struct MyProfileFeature: Sendable {
                     category: .debug,
                     level: .info
                 )
-                state.destination = nil
+                // 저장 결과를 볼 때까지 수정 화면을 둔다 — 실패하면 고친 값을 지켜 그 화면에서 다시 저장하게 한다(QA A3-2).
                 Self.beginProfileSave(&state)
                 return .run { send in
                     let result = await TaskResult {
@@ -1129,11 +1137,13 @@ public struct MyProfileFeature: Sendable {
             case let .internal(.competitionAdded(profile, competition)):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
+                // 열린 웹(프로필 · 대회 화면)도 새 기록을 다시 읽게 알린다(QA A3-4). 웹 경로 저장과 같은 효과.
+                let notifyWeb = Self.notifyCompetitionRecordsChanged(addedTo: competition.competitionId)
                 // 입력 화면이 완료 화면을 대신 보여 준다. 저장 중 화면이 닫혔으면(예외적) 토스트로 알린다.
                 guard case .competitionInfo? = state.destination else {
-                    return .send(.internal(.showToast(.init(message: "대회 정보를 추가했어요", status: .success))))
+                    return .merge(notifyWeb, .send(.internal(.showToast(.init(message: "대회 정보를 추가했어요", status: .success)))))
                 }
-                return .send(.destination(.presented(.competitionInfo(.saveFinished(.succeeded(competition))))))
+                return .merge(notifyWeb, .send(.destination(.presented(.competitionInfo(.saveFinished(.succeeded(competition)))))))
 
             case .internal(.competitionAddFailed):
                 state.isLoadingProfile = false
@@ -1146,12 +1156,22 @@ public struct MyProfileFeature: Sendable {
             case let .internal(.competitionUpdated(profile)):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
-                return .send(.internal(.showToast(.init(message: "대회 정보를 수정했어요", status: .success))))
+                // 저장이 끝날 때까지 두었던 수정 화면을 닫는다(QA A3-2). 닫혀야 MY 토스트가 보인다.
+                if case .competitionInfo? = state.destination {
+                    state.destination = nil
+                }
+                return .merge(
+                    Self.notifyCompetitionRecordsChanged(),
+                    .send(.internal(.showToast(.init(message: "대회 정보를 수정했어요", status: .success))))
+                )
 
             case let .internal(.competitionDeleted(profile)):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
-                return .send(.internal(.showToast(.init(message: "대회 정보를 삭제했어요", status: .success))))
+                return .merge(
+                    Self.notifyCompetitionRecordsChanged(),
+                    .send(.internal(.showToast(.init(message: "대회 정보를 삭제했어요", status: .success))))
+                )
 
             case .internal(.competitionDeleteFailed):
                 state.isLoadingProfile = false
@@ -1159,6 +1179,10 @@ public struct MyProfileFeature: Sendable {
 
             case let .internal(.competitionTargetMissing(latest, isDelete)):
                 state.isLoadingProfile = false
+                // 고칠 기록이 이미 없으니 수정 화면에서 다시 저장해도 소용없다 — 닫고 지금 목록을 보여 준다.
+                if !isDelete, case .competitionInfo? = state.destination {
+                    state.destination = nil
+                }
                 // 다른 곳에서 바뀐 목록을 그대로 보여 줘 회원이 지금 기록을 보고 다시 하게 한다.
                 state.communityProfile = latest
                 let message = isDelete ? "삭제하지 못했어요. 다시 시도해 주세요" : "저장하지 못했어요. 다시 시도해 주세요"
@@ -1245,7 +1269,7 @@ public struct MyProfileFeature: Sendable {
             case let .internal(.competitionOrderSaved(profile)):
                 state.isLoadingProfile = false
                 state.communityProfile = profile
-                return .none
+                return Self.notifyCompetitionRecordsChanged()
 
             case let .internal(.competitionOrderReverted(profile)):
                 state.communityProfile = profile
@@ -1301,7 +1325,10 @@ public struct MyProfileFeature: Sendable {
                 state.isLoadingProfile = false
                 state.communityProfile = profile
                 let message = isPinned ? "맨 위에 고정했어요" : "고정을 해제했어요"
-                return .send(.internal(.showToast(.init(message: message, status: .success))))
+                return .merge(
+                    Self.notifyCompetitionRecordsChanged(),
+                    .send(.internal(.showToast(.init(message: message, status: .success))))
+                )
 
             case let .view(.competitionDetailTapped(competition)):
                 guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
@@ -1791,6 +1818,17 @@ public struct MyProfileFeature: Sendable {
     /// 앞 저장(또는 처음 불러오기)이 끝나기 전에 새 저장 · 저장 화면 진입을 막을 때의 안내(#155).
     private static func savingInProgressToast() -> Effect<Action> {
         .send(.internal(.showToast(.init(message: "아직 처리 중이에요. 잠시 후 다시 시도해 주세요", status: .info))))
+    }
+
+    /// MY에서 대회 기록을 바꿈(추가 · 수정 · 삭제 · 고정 · 순서) → 열린 웹뷰가 내 기록을 다시 읽게 알린다(QA A3-4).
+    /// 웹 경로(대회 상세 '내 기록에 남기기')로 저장했을 때와 같게, 등록 대회에 이어 붙인 새 기록이면 그 대회의
+    /// '결과 남기기' 배너 · 카드도 닫히게 COMPETITION_RECORD_SAVED를 함께 보낸다.
+    private static func notifyCompetitionRecordsChanged(addedTo competitionId: Int? = nil) -> Effect<Action> {
+        guard let competitionId else { return .send(.delegate(.profileUpdated)) }
+        return .merge(
+            .send(.delegate(.profileUpdated)),
+            .send(.delegate(.competitionRecordAdded(competitionId: competitionId)))
+        )
     }
 
     private static func profileUnavailableToast() -> Effect<Action> {

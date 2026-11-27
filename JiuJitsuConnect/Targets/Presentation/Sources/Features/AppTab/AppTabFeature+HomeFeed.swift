@@ -39,7 +39,8 @@ extension AppTabFeature {
             url: url,
             accessToken: accessToken,
             isTabRoot: false,
-            capabilities: [.pickPhotos, .openHomeFeed]
+            // 활동 → 글 → 대회 상세까지 이 스택에 쌓이므로 '내 기록에 남기기'도 받는다(QA A3-9).
+            capabilities: [.pickPhotos, .openHomeFeed, .openCompetitionRecord]
         )
     }
 }

@@ -23,6 +23,7 @@ extension AppTabFeature {
         case competition
         case home
         case homeCover
+        case myPage
     }
 
     /// 대회 상세의 '내 기록에 남기기'(#250, #304). 웹은 비로그인이면 로그인 안내를 대신 보내지만, 웹과 앱의 로그인 상태가
@@ -57,9 +58,13 @@ extension AppTabFeature {
         switch tab {
         case .home:
             CommunityFeature.pushCompetitionRecord(record, into: &state.home)
-        case .competition, .myPage:
+        case .competition:
             if case .competitionInfo? = state.competition.path.last { return }
             state.competition.path.append(.competitionInfo(record))
+        case .myPage:
+            // MY 탭 스택(커뮤니티 활동 → 글 → 대회 상세) 위에 쌓는다(QA A3-9).
+            if case .competitionInfo? = state.myPage.path.last { return }
+            state.myPage.path.append(.competitionInfo(record))
         }
     }
 
@@ -120,6 +125,8 @@ extension AppTabFeature {
             return .send(.home(.path(.element(id: id, action: .competitionInfo(action)))))
         case .homeCover:
             return .send(.home(.coverPath(.element(id: id, action: .competitionInfo(action)))))
+        case .myPage:
+            return .send(.myPage(.path(.element(id: id, action: .competitionInfo(action)))))
         }
     }
 
@@ -138,6 +145,9 @@ extension AppTabFeature {
             return record
         case .homeCover:
             guard case let .competitionInfo(record)? = state.home.coverPath[id: id] else { return nil }
+            return record
+        case .myPage:
+            guard case let .competitionInfo(record)? = state.myPage.path[id: id] else { return nil }
             return record
         }
     }

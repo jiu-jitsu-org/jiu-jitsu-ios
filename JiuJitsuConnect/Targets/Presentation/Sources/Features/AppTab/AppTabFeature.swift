@@ -349,6 +349,10 @@ public struct AppTabFeature: Sendable {
                 return Self.broadcastProfileUpdated()
             // 홈 · 대회 탭에 쌓인 MY나 남의 프로필 띠 묻기에서 저장함 → 웹에 알리고, 탭 MY도 다시 불러온다.
             // 탭 MY는 프로필이 있으면 다시 나타나도 부르지 않아, 그대로 두면 다른 탭에 갔다 와야 바뀌었다(QA A2-3).
+            // MY(탭이든 홈에 쌓인 것이든)에서 등록 대회에 이어 붙인 기록을 저장함 → 웹 경로 저장처럼 그 대회의 배너 · 카드를 닫게 알린다(QA A3-4).
+            case let .myPage(.delegate(.competitionRecordAdded(competitionId))),
+                 let .home(.delegate(.competitionRecordAdded(competitionId))):
+                return Self.broadcastCompetitionRecordSaved(webCompetitionId: competitionId)
             case .home(.delegate(.profileUpdated)), .competition(.delegate(.profileUpdated)):
                 return .merge(
                     Self.broadcastProfileUpdated(),
@@ -435,6 +439,10 @@ public struct AppTabFeature: Sendable {
             case let .home(.delegate(.competitionRecordRequested(payload))):
                 return Self.requestCompetitionRecord(payload, from: .home, into: &state)
 
+            // MY 탭의 커뮤니티 활동 → 글 → 대회 상세(QA A3-9)
+            case let .myPage(.delegate(.webSubview(.competitionRecordRequested(payload)))):
+                return Self.requestCompetitionRecord(payload, from: .myPage, into: &state)
+
             // 기록 추가 저장(#250). 대회 탭·홈 스택·홈 모달 안 스택 어디에 쌓였든 같은 저장을 거친다(#304).
             case let .competition(.path(.element(id: id, action: .competitionInfo(.delegate(.didFinishAdding(competition)))))):
                 return saveCompetitionRecord(competition, id: id, stack: .competition, state: state)
@@ -444,6 +452,9 @@ public struct AppTabFeature: Sendable {
 
             case let .home(.coverPath(.element(id: id, action: .competitionInfo(.delegate(.didFinishAdding(competition)))))):
                 return saveCompetitionRecord(competition, id: id, stack: .homeCover, state: state)
+
+            case let .myPage(.path(.element(id: id, action: .competitionInfo(.delegate(.didFinishAdding(competition)))))):
+                return saveCompetitionRecord(competition, id: id, stack: .myPage, state: state)
 
             // MARK: - DeepLink
 

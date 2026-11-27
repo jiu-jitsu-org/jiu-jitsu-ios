@@ -437,6 +437,8 @@ public struct CompetitionInfoFeature: Sendable {
 
             case let .saveFinished(.succeeded(competition)):
                 state.isSaving = false
+                // 수정은 완료 화면을 거치지 않는다 — 부모가 저장 성공과 함께 화면을 닫는다.
+                guard !state.mode.isEdit else { return .none }
                 state.savedRecords.append(competition)
                 state.hasSavedInThisFlow = true
                 state.celebratesOnDone = true
@@ -654,7 +656,7 @@ public struct CompetitionInfoFeature: Sendable {
     }
 
     /// 입력한 값으로 기록을 만들어 부모에게 저장을 맡긴다.
-    /// 새 기록은 부모가 저장 결과를 saveFinished로 돌려줄 때까지 기다렸다가 완료 화면으로 간다.
+    /// 부모가 저장 결과를 saveFinished로 돌려줄 때까지 기다린다. 새 기록은 성공하면 완료 화면으로 가고, 수정은 부모가 닫는다.
     /// - Parameters:
     ///   - uniform: 저장할 도복/노기. '건너뛰기'면 직접 고른 경우에만 넘긴다.
     ///   - belt: 저장할 출전 띠. '건너뛰기'면 직접 고른 경우에만 넘긴다.
@@ -682,9 +684,11 @@ public struct CompetitionInfoFeature: Sendable {
             displayOrder: original?.displayOrder,
             competitionId: state.linkedCompetition?.id
         )
+        // 수정도 저장 결과를 받을 때까지 화면을 둔다 — 실패하면 고친 값을 지켜 같은 자리에서 다시 저장하게 한다(QA A3-2).
+        // 성공하면 부모가 화면을 닫는다.
+        state.isSaving = true
         switch state.mode {
         case .add:
-            state.isSaving = true
             return .send(.delegate(.didFinishAdding(competition)))
         case let .edit(original):
             return .send(.delegate(.didFinishEditing(original: original, updated: competition)))

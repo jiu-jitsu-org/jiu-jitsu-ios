@@ -146,6 +146,7 @@ extension AppFeature {
                 case let .communityDetail(detail): return web(detail.analyticsScreen, id: elementPath)
                 case .userProfile: return native(.userProfile, id: elementPath)
                 case let .settings(settings): return settingsScreen(settings, id: elementPath)
+                case .competitionInfo: return native(.competitionRecordAdd, id: elementPath)
                 }
             }
             return native(.myProfile, id: id)

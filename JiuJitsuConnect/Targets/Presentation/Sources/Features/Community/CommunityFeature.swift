@@ -207,6 +207,8 @@ public struct CommunityFeature: Sendable {
             case competitionAlertsChecked(DeviceNotificationCheck)
             // 이 스택에 쌓인 MY · 남의 프로필 띠 묻기에서 내 프로필을 저장함 → 부모가 열린 웹뷰 모두에 PROFILE_UPDATED를 보낸다.
             case profileUpdated
+            // 이 스택에 쌓인 MY에서 등록 대회에 이어 붙인 기록을 저장함(QA A3-4) → 부모가 열린 웹뷰 모두에 COMPETITION_RECORD_SAVED를 보낸다.
+            case competitionRecordAdded(competitionId: Int)
             // 이 스택에 쌓인 남의 프로필에서 회원을 차단·해제함(#328) → 부모가 열린 웹뷰 모두에 USER_BLOCK_CHANGED를 보낸다.
             case userBlockChanged(userId: Int, blocked: Bool)
             // 홈에 쌓인 대회 상세의 '커뮤니티에서 더 보기'(#304) → 부모가 홈에 쌓인 화면을 닫아 피드를 보인다.
@@ -674,6 +676,10 @@ public struct CommunityFeature: Sendable {
                  .path(.element(id: _, action: .userProfile(.delegate(.profileUpdated)))),
                  .coverPath(.element(id: _, action: .userProfile(.delegate(.profileUpdated)))):
                 return .send(.delegate(.profileUpdated))
+
+            case let .path(.element(id: _, action: .myProfile(.delegate(.competitionRecordAdded(competitionId))))),
+                 let .coverPath(.element(id: _, action: .myProfile(.delegate(.competitionRecordAdded(competitionId))))):
+                return .send(.delegate(.competitionRecordAdded(competitionId: competitionId)))
 
             case let .path(.element(id: _, action: .userProfile(.delegate(.blockChanged(userId, blocked))))),
                  let .coverPath(.element(id: _, action: .userProfile(.delegate(.blockChanged(userId, blocked))))),
