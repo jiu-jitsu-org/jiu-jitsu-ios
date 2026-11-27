@@ -82,6 +82,54 @@ struct SettingsInteractiveRow: View {
     }
 }
 
+// MARK: - Version Row (#326)
+/// 버전 정보 줄. 새 버전이 있으면 줄 전체가 스토어로 가는 버튼이 되고, 버전 옆에 작은 '업데이트' 표시를 단다.
+/// 다른 줄과 같은 높이 · 글자 크기 안에 들어가게 버전 글자(captionM)와 같은 크기의 회색 캡슐로 둔다 —
+/// 파란 채움 버튼(32)은 40 높이 줄에 꽉 차 다른 줄보다 무거워 보였다.
+struct SettingsVersionRow: View {
+    let asset: ImageAsset
+    let version: String
+    let isUpdateAvailable: Bool
+    let onUpdate: () -> Void
+
+    var body: some View {
+        if isUpdateAvailable {
+            Button(action: onUpdate) {
+                content
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(SettingsRowButtonStyle())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("버전 정보 \(version), 새 버전이 있어요")
+            .accessibilityHint("앱 스토어에서 업데이트해요")
+            .accessibilityAddTraits(.isButton)
+        } else {
+            content
+                .accessibilityElement(children: .combine)
+        }
+    }
+
+    private var content: some View {
+        HStack(spacing: 8) {
+            SettingsRowContent(asset: asset, text: "버전 정보")
+            Spacer()
+            Text(version)
+                .font(Font.pretendard.captionM)
+                .foregroundStyle(Color.component.list.setting.valueText)
+            if isUpdateAvailable {
+                Text("업데이트")
+                    .font(Font.pretendard.captionM)
+                    .foregroundStyle(Color.component.button.neutral.defaultText)
+                    .padding(.horizontal, 10)
+                    .frame(height: 24)
+                    .background(Capsule().fill(Color.component.button.neutral.defaultBg))
+            }
+        }
+        .frame(minHeight: SettingsListMetrics.rowHeight)
+        .padding(.horizontal, 16)
+    }
+}
+
 /// 터치 다운 동안에만 행 전체에 눌림 배경을 노출하는 버튼 스타일
 private struct SettingsRowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {

@@ -84,14 +84,15 @@ public struct SettingsView: View {
                     }
 
                     // MARK: - 버전 정보 섹션
+                    // 새 버전이 있을 때만 버전 옆에 '업데이트'를 둔다. 최신이거나 확인 못 했으면 버전만 — 최신이라는 문구는 따로 알릴 필요가 없다.
                     SettingsSection {
-                        HStack(spacing: 8) {
-                            SettingsRowContent(asset: Assets.Common.Icon.version, text: "버전 정보")
-                            Spacer()
-                            versionValue
+                        SettingsVersionRow(
+                            asset: Assets.Common.Icon.version,
+                            version: store.appVersion,
+                            isUpdateAvailable: store.isLatestVersion == false
+                        ) {
+                            store.send(.view(.updateButtonTapped))
                         }
-                        .frame(minHeight: SettingsListMetrics.rowHeight)
-                        .padding(.horizontal, 16)
                     }
 
                     // MARK: - 계정 관리 섹션
@@ -133,7 +134,8 @@ public struct SettingsView: View {
         )
         .navigationBarHidden(true)
         .ignoresSafeArea(edges: .bottom)
-        .withdrawalGuard(isWithdrawing: store.isWithdrawing)
+        // 로그아웃도 끝날 때까지 같은 덮개로 막는다(QA A4-3) — 누른 뒤 반응이 없어 다시 누르거나 탈퇴를 누르지 않게.
+        .withdrawalGuard(isWithdrawing: store.isWithdrawing || store.isLoggingOut)
         .navigationDestination(
             item: $store.scope(
                 state: \.destination?.notificationSetting,
@@ -188,23 +190,6 @@ public struct SettingsView: View {
         .background(Color.component.background.default.ignoresSafeArea(edges: .top))
     }
 
-    // MARK: - 버전 정보 (#326)
-    /// 새 버전이 있을 때만 버전 옆에 '업데이트'를 둔다. 최신이거나 확인 못 했으면 버전만 — 최신이라는 문구는 따로 알릴 필요가 없다.
-    @ViewBuilder
-    private var versionValue: some View {
-        Text(store.appVersion)
-            .font(Font.pretendard.captionM)
-            .foregroundStyle(Color.component.list.setting.valueText)
-        if store.isLatestVersion == false {
-            Button {
-                store.send(.view(.updateButtonTapped))
-            } label: {
-                AppButtonConfiguration(title: "업데이트", size: .small)
-            }
-            .appButtonStyle(.primary, size: .small, height: 32)
-        }
-    }
-
     // MARK: - Alert Configuration Helper
     private func alertConfiguration(for alertType: SettingsFeature.State.Alert?) -> AppAlertConfiguration {
         switch alertType {
@@ -221,8 +206,9 @@ public struct SettingsView: View {
                 title: "회원 탈퇴",
                 message: store.isAppleWithdrawal
                     // Apple은 탈퇴 직전 재인증 창이 떠서 미리 알린다(#398). 예고 없이 뜨면 왜 다시 로그인하는지 몰라 닫게 된다.
-                    ? "30일 뒤 계정이 영구 삭제됩니다. 작성한 게시물과 댓글은 익명으로 남으며, 기간 내 재로그인 시 탈퇴가 취소됩니다. 확인을 위해 Apple 로그인 창이 한 번 더 열립니다."
-                    : "30일 뒤 계정이 영구 삭제됩니다. 작성한 게시물과 댓글은 익명으로 남으며, 기간 내 재로그인 시 탈퇴가 취소됩니다.",
+                    // 다른 안내('탈퇴 신청이 끝났어요')와 같은 해요체로 맞춘다(QA A4-9).
+                    ? "30일 뒤 계정이 영구 삭제돼요. 작성한 게시물과 댓글은 익명으로 남고, 그 전에 다시 로그인하면 탈퇴가 취소돼요. 확인을 위해 Apple 로그인 창이 한 번 더 열려요."
+                    : "30일 뒤 계정이 영구 삭제돼요. 작성한 게시물과 댓글은 익명으로 남고, 그 전에 다시 로그인하면 탈퇴가 취소돼요.",
                 primaryButton: .init(title: "탈퇴하기", style: .destructive, action: { store.send(.view(.confirmWithdrawal)) }),
                 secondaryButton: .init(title: "취소", style: .neutral, action: { store.send(.view(.alertDismissed)) }),
                 // 30일 · 익명 · 재로그인 취소 · Apple 확인 창까지 다 읽어야 해 줄 수를 막지 않는다.

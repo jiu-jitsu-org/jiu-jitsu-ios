@@ -57,6 +57,9 @@ public struct SettingsFeature: Sendable {
         public var toast: ToastState?
         // 탈퇴 요청이 서버에 가 있는 동안. MY 스택의 한 화면이라 닫히면 요청도 취소되므로(#241) 그동안 나가지 못하게 막는다.
         var isWithdrawing = false
+        // 로그아웃을 확인한 뒤 게스트로 바뀔 때까지(서버 요청 최대 5초 + 기기 토큰 폐기). 그동안 덮개로 다른 조작(탈퇴 등)을 막는다(QA A4-3).
+        // 로그아웃은 결과와 상관없이 늘 끝나고(#65) 끝나면 MY 스택이 게스트 MY로 바뀌어 이 화면도 사라지므로 따로 풀지 않는다.
+        var isLoggingOut = false
         // 지금 로그인한 수단(#380). 계정 묶음 맨 위 "카카오로 로그인 중"에 쓴다.
         // 같은 사람도 소셜마다 다른 계정이라, 로그아웃 뒤 같은 수단으로 돌아오도록 알려 둔다.
         var loginProvider: SNSProvider?
@@ -173,7 +176,7 @@ public struct SettingsFeature: Sendable {
                 return .run { _ in await openURL(storeURL) }
 
             case .view(.backTapped):
-                guard !state.isWithdrawing else { return .none }
+                guard !state.isWithdrawing, !state.isLoggingOut else { return .none }
                 return .run { _ in await self.dismiss() }
 
             case .view(.notificationButtonTapped):
@@ -252,10 +255,12 @@ public struct SettingsFeature: Sendable {
                 return .send(.delegate(.loginRequested))
 
             case .view(.logoutButtonTapped):
+                guard !state.isLoggingOut, !state.isWithdrawing else { return .none }
                 state.alert = .logout
                 return .none
 
             case .view(.withdrawalButtonTapped):
+                guard !state.isLoggingOut, !state.isWithdrawing else { return .none }
                 state.isAppleWithdrawal = authClient.storedProvider() == .apple
                 state.alert = .withdrawal
                 return .none
@@ -264,10 +269,13 @@ public struct SettingsFeature: Sendable {
             case .view(.confirmLogout):
                 // 서버 로그아웃 결과와 상관없이 항상 로그아웃한다(정책 2026-10-21, #65).
                 // 웹 요청 로그아웃과 같은 경로(`AppTabFeature.performWebLogout`)로 처리한다.
+                guard !state.isLoggingOut else { return .none }
+                state.alert = nil
+                state.isLoggingOut = true
                 return .send(.delegate(.logoutConfirmed))
 
             case .view(.confirmWithdrawal):
-                guard !state.isWithdrawing else { return .none }
+                guard !state.isWithdrawing, !state.isLoggingOut else { return .none }
                 state.isWithdrawing = true
                 return .run { send in
                     await send(.internal(.withdrawalResponse(
