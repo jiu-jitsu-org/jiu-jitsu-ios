@@ -258,7 +258,7 @@ public struct MyProfileView: View {
                 ),
                 configuration: .init(
                     title: "카메라 접근이 꺼져 있어요",
-                    message: "설정에서 카메라 접근을 허용하면 바로 찍을 수 있어요.",
+                    message: "설정에서 카메라 접근을 허용해 주세요.",
                     primaryButton: .init(title: "설정으로 가기", style: .primary, action: {
                         store.send(.view(.cameraAccessAlertSettingsTapped))
                     }),
