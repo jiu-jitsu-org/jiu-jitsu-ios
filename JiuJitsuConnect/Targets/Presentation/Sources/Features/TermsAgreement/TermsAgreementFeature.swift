@@ -44,7 +44,15 @@ public struct TermsAgreementFeature: Sendable {
 
         // Derived State
         var buttonTitle: String {
-            didAgreeToAllRequired ? "다음" : "모두 동의하기"
+            if didAgreeToAllRequired { return "다음" }
+            return fillsRequiredOnly ? "필수 항목 동의하기" : "모두 동의하기"
+        }
+
+        /// 이미 하나라도 직접 체크했으면 버튼은 남은 필수 항목만 채운다(QA A5-3).
+        /// 항목을 골라 체크하던 사람이 '모두 동의하기'를 눌러 일부러 비워 둔 선택 항목(광고성 정보 수신)까지 켜지지 않게 한다.
+        /// 아무것도 체크하지 않았을 때만 선택 항목까지 한 번에 켜는 '모두 동의하기'다 — 켠 뒤에도 화면에 머물러 선택 항목을 끌 수 있다.
+        var fillsRequiredOnly: Bool {
+            rows.contains { $0.isChecked }
         }
 
         var didAgreeToAllRequired: Bool {
@@ -95,9 +103,12 @@ public struct TermsAgreementFeature: Sendable {
                     return .send(.delegate(.didFinishAgreement(isMarketingAgreed: state.isMarketingAgreed)))
 
                 } else {
-                    Log.trace("모두 동의하기 실행", category: .view, level: .debug)
-                    // 정책: 전체 동의는 모든 항목 체크만 하고, 선택 항목을 해제할 수 있도록 화면에 머무름
+                    // 정책: 전체 동의는 모든 항목 체크만 하고, 선택 항목을 해제할 수 있도록 화면에 머무름.
+                    // 하나라도 직접 체크했으면 필수 항목만 채운다(QA A5-3) — 선택 항목은 본인이 고른 그대로 둔다.
+                    let requiredOnly = state.fillsRequiredOnly
+                    Log.trace(requiredOnly ? "필수 항목 동의하기 실행" : "모두 동의하기 실행", category: .view, level: .debug)
                     state.rows.ids.forEach { id in
+                        guard !requiredOnly || state.rows[id: id]?.term.type == .required else { return }
                         state.rows[id: id]?.isChecked = true
                     }
                     return .none
