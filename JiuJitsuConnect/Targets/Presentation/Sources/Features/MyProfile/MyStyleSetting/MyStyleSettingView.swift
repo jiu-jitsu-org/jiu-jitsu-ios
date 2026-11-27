@@ -458,7 +458,7 @@ private struct CardSwapEffect: ViewModifier {
             .offset(x: position * Self.distance)
             .rotationEffect(.degrees(position * Self.tilt))
             .scaleEffect(1 - abs(position) * Self.shrink)
-            .opacity(1 - abs(position))
+            .opacity(Double(1 - abs(position)))
     }
 }
 
