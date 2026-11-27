@@ -21,8 +21,16 @@ public struct MyAcademySettingView: View {
         VStack(spacing: 0) {
             headerView
             titleSection
-            textFieldSection
-            Spacer()
+            // 긴 도장 이름(최대 100자, 큰 글씨로 8줄 안팎)이면 입력이 화면을 넘쳐 머리줄이 상태 막대 밑으로 밀리고
+            // 위 안내 문구가 한 줄로 잘렸다. 입력만 스크롤 안에 두고 머리줄 · 안내 · 확인 버튼은 제자리에 둔다.
+            // 짧으면 지금처럼 위에 붙고 남는 공간은 비운다.
+            ScrollView {
+                textFieldSection
+            }
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+            // 입력이 길어지면 커서가 있는 끝 쪽이 보이게 한다.
+            .defaultScrollAnchor(.bottom, for: .sizeChanges)
             ctaButtonSection
         }
         .onAppear {
@@ -58,12 +66,14 @@ private extension MyAcademySettingView {
     }
     
     var titleSection: some View {
-        Text(store.validationState.message)
+        Text(store.validationState.message(isEdit: store.mode.isEdit))
             .font(Font.pretendard.display1)
             .foregroundStyle(store.validationState.messageColor)
             .frame(maxWidth: .infinity, alignment: .center)
             .multilineTextAlignment(.center)
             .lineLimit(2)
+            // 스크롤 안에서도 두 줄 문구가 잘리지 않게 높이를 글자에 맞춘다.
+            .fixedSize(horizontal: false, vertical: true)
             .lineSpacing(6.2)
             .padding(.horizontal, 30)
             .padding(.top, 120)
@@ -128,8 +138,11 @@ private struct BlinkingCursorView: View {
             .fill(Color.component.textfieldDisplay.focus.text)
             .frame(width: 2, height: 36)
             .opacity(isVisible ? 1 : 0)
-            .onAppear {
-                Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+            // 반복 Timer는 커서가 사라져도 멈추지 않고 나타날 때마다 쌓인다 — 화면 수명에 묶인 task로 깜빡인다.
+            .task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    guard !Task.isCancelled else { return }
                     withAnimation(.easeInOut(duration: 0.1)) {
                         isVisible.toggle()
                     }

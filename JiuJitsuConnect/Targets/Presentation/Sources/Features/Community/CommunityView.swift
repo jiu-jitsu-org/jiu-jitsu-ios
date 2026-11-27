@@ -169,6 +169,7 @@ public struct CommunityView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("검색")
             }
         }
         .padding(.trailing, 8)

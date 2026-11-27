@@ -45,6 +45,8 @@ struct StyleCard: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: Metrics.poseSize, height: Metrics.poseSize)
+                // 그림 이름(에셋 경로)을 읽지 않게 한다. 무엇인지는 아래 제목이 읽는다.
+                .accessibilityHidden(true)
 
             // 풀 타이틀
             // 한 줄에 다 들어가게 — 긴 이름(이스케이프 디펜스)만 글자를 줄이고 나머지는 40 그대로

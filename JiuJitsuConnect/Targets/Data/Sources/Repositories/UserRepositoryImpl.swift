@@ -88,7 +88,14 @@ public final class UserRepositoryImpl: UserRepository {
             return responseDTO
             
         } catch let error as NetworkError {
-            throw error.toDomainError()
+            let domainError = error.toDomainError()
+            // 앞선 탈퇴 요청이 시간 초과로 끝났어도 서버가 처리했으면, 다시 보낸 요청은 '이미 탈퇴'로 온다.
+            // 탈퇴가 끝난 것과 같으니 성공으로 돌려 앱이 로그인 상태로 남지 않게 한다.
+            if case .apiError(.alreadyWithdrawn, _) = domainError {
+                tokenStorage.clearLastLoginProvider()
+                return true
+            }
+            throw domainError
         } catch {
             throw DomainError.unknown(error.localizedDescription)
         }

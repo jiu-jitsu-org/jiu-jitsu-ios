@@ -137,6 +137,9 @@ public struct LoginFeature: Sendable {
 
                 // MARK: - 로그인 결과 처리
             case let .internal(.socialLoginResponse(.success(user))):
+                // SNS 단계는 버튼을 막지 않아 두 소셜이 겹칠 수 있다. 다른 로그인이 서버 단계 · 가입 화면에 들어갔으면
+                // 늦게 온 결과는 버린다 — 이어 가면 그 로그인이 저장한 토큰을 다른 계정으로 덮는다.
+                guard !state.isSigningUp else { return .none }
                 state.loadingProvider = user.snsProvider
                 return .run { send in
                     await send(.internal(.serverLoginResponse(
@@ -145,6 +148,8 @@ public struct LoginFeature: Sendable {
                 }
                 
             case let .internal(.socialLoginResponse(.failure(error))):
+                // 늦게 온 다른 소셜의 실패가 진행 중인 서버 로그인의 로딩을 풀지 않게 한다.
+                guard !state.isSigningUp else { return .none }
                 return handleError(state: &state, error: error)
                 
             case let .internal(.serverLoginResponse(.success(authInfo))):

@@ -170,6 +170,7 @@ public struct SettingsView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("뒤로 가기")
 
             Spacer()
 

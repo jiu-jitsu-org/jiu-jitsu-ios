@@ -139,7 +139,9 @@ public struct NotificationSettingFeature: Sendable {
                 return .merge(fetchSetting(generation: state.saveGeneration), loadDeviceNotificationStatus())
 
             case .view(.sceneBecameActive):
-                return loadDeviceNotificationStatus()
+                // 조회가 실패한 채면 서버 값도 다시 읽는다. 다시 시도 토스트가 사라지면 스켈레톤에서 빠져나올 길이 없다.
+                guard !state.isLoaded else { return loadDeviceNotificationStatus() }
+                return .merge(fetchSetting(generation: state.saveGeneration), loadDeviceNotificationStatus())
 
             case let .internal(.deviceNotificationStatusLoaded(status)):
                 state.deviceNotificationStatus = status
@@ -282,7 +284,8 @@ public struct NotificationSettingFeature: Sendable {
                 if let lastSaved = state.lastSavedSetting {
                     state.apply(lastSaved)
                 }
-                return handleError(error)
+                // 취소된 앞 요청이 이미 서버에 닿았을 수 있어, 되돌린 값이 서버 값과 다를 수 있다 — 서버 값을 한 번 다시 읽는다.
+                return .merge(handleError(error), fetchSetting(generation: state.saveGeneration))
 
             // MARK: - Toast Actions
 

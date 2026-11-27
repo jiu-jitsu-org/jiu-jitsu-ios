@@ -205,7 +205,7 @@ public struct CommunityFeature: Sendable {
             case debugDeepLinkRequested(DeepLink)
             // 홈 웹(피드·글 상세·알림함)의 관심 대회 '알림 받기' · 상세 종의 기기 알림 상태(#257 · #395) → 부모가 꺼짐 안내 · 토큰 등록을 맡는다.
             case competitionAlertsChecked(DeviceNotificationCheck)
-            // 이 스택에 쌓인 MY에서 프로필을 저장함 → 부모가 열린 웹뷰 모두에 PROFILE_UPDATED를 보낸다.
+            // 이 스택에 쌓인 MY · 남의 프로필 띠 묻기에서 내 프로필을 저장함 → 부모가 열린 웹뷰 모두에 PROFILE_UPDATED를 보낸다.
             case profileUpdated
             // 이 스택에 쌓인 남의 프로필에서 회원을 차단·해제함(#328) → 부모가 열린 웹뷰 모두에 USER_BLOCK_CHANGED를 보낸다.
             case userBlockChanged(userId: Int, blocked: Bool)
@@ -670,7 +670,9 @@ public struct CommunityFeature: Sendable {
                 return Self.pushMyActivity(from: .modal, into: &state)
 
             case .path(.element(id: _, action: .myProfile(.delegate(.profileUpdated)))),
-                 .coverPath(.element(id: _, action: .myProfile(.delegate(.profileUpdated)))):
+                 .coverPath(.element(id: _, action: .myProfile(.delegate(.profileUpdated)))),
+                 .path(.element(id: _, action: .userProfile(.delegate(.profileUpdated)))),
+                 .coverPath(.element(id: _, action: .userProfile(.delegate(.profileUpdated)))):
                 return .send(.delegate(.profileUpdated))
 
             case let .path(.element(id: _, action: .userProfile(.delegate(.blockChanged(userId, blocked))))),

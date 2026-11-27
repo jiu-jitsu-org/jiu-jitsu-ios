@@ -30,6 +30,7 @@ struct StyleCardBack: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 84)
+                    .accessibilityHidden(true)
 
                 Text(category)
                     .font(.pretendard.custom(weight: .medium, size: 15))

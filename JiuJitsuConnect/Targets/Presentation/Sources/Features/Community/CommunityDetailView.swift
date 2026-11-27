@@ -149,6 +149,7 @@ public struct CommunityDetailView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("뒤로 가기")
     }
 
     private var errorOverlay: some View {

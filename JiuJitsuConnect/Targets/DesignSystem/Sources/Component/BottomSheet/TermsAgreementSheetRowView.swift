@@ -57,6 +57,11 @@ public struct TermsAgreementRow: View {
             .onTapGesture {
                 onCheckTapped()
             }
+            // 체크 아이콘·제목·필수가 따로 읽히지 않게 한 요소로 묶고, 체크 여부를 선택 상태로 알린다.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(title), \(typeText)")
+            .accessibilityAddTraits(isChecked ? [.isButton, .isSelected] : .isButton)
+            .accessibilityAction { onCheckTapped() }
             
             Spacer()
             
@@ -72,6 +77,7 @@ public struct TermsAgreementRow: View {
                         .foregroundStyle(isChecked ? Color.component.bottomSheet.selected.listItem.followingIcon : Color.component.bottomSheet.unselected.listItem.followingIcon)
                 }
                 .frame(width: 40, height: 40)
+                .accessibilityLabel("\(title) 전문 보기")
             }
         }
     }

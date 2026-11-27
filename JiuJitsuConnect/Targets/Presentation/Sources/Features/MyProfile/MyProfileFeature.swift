@@ -16,7 +16,7 @@ import CoreKit
 public struct MyProfileFeature: Sendable {
     public init() {}
     
-    private enum CancelID { case toast, profileImageUpload, instructorVerificationUpload, profileRefresh }
+    private enum CancelID { case toast, profileImageUpload, instructorVerificationUpload, profileRefresh, userProfileForEntry }
 
     @ObservableState
     public struct State: Equatable, Sendable {
@@ -47,6 +47,9 @@ public struct MyProfileFeature: Sendable {
         // user-level 프로필 — 관장사범 인증 신청 상태(ownerVerification) 등.
         // 닉네임/프로필이미지 등 community와 겹치는 필드는 표시에 쓰지 않는다(단일 소스는 communityProfile).
         var userProfile: UserProfile?
+        // user 프로필을 바꾸는 일(사진 업로드 · 삭제, 관장 사범 인증 신청)을 몇 번 시작했는지.
+        // 그 전에 나간 조회 응답이 늦게 와 방금 바꾼 사진 · 인증 상태를 옛 값으로 덮지 않게 버리는 데 쓴다(QA A2-7).
+        var userProfileGeneration = 0
         
         // 토스트 메시지 상태
         var toast: ToastState?
@@ -96,6 +99,16 @@ public struct MyProfileFeature: Sendable {
 
         /// 커뮤니티에서 내 사진을 눌러 스택에 쌓은 MY인지(#197). 탭 화면이 아니라 왼쪽 위에 뒤로가기가 붙고 탭바가 없다.
         var isPushed: Bool = false
+
+        /// 쌓인 MY를 지금 닫으면 안 되는지 — 스택에서 빠지면 저장 · 업로드 effect가 함께 취소돼
+        /// 결과 안내 없이 저장이 끊긴다(QA A2-1). 처음 불러오는 중(프로필 없음)은 끊겨도 잃을 게 없어 막지 않는다.
+        var blocksLeaving: Bool {
+            isPushed && (
+                isUploadingProfileImage
+                    || isUploadingInstructorVerification
+                    || (isLoadingProfile && communityProfile != nil)
+            )
+        }
 
         // 띠 링 등장 움직임(#320) — 세션에서 MY가 처음 보일 때 한 번, 띠를 바꾼 직후 다시.
         // 탭이 미리 마운트돼 화면의 onAppear로는 '보인 때'를 알 수 없어 탭 진입(tabEntered)·쌓은 MY의 onAppear로 정한다.
@@ -242,10 +255,14 @@ public struct MyProfileFeature: Sendable {
             case profileResponse(TaskResult<CommunityProfile>)
             // user-level 프로필(GET /api/user/profile) 응답 — 관장사범 인증 신청 상태(ownerVerification) 등.
             // community 프로필과 독립적으로 처리해 한쪽 실패가 다른 쪽을 막지 않게 한다.
-            case userProfileResponse(TaskResult<UserProfile>)
+            case userProfileResponse(TaskResult<UserProfile>, generation: Int)
             case refreshProfile
+            /// 다른 화면(남의 프로필 띠 묻기 등)에서 내 프로필을 바꿈 — 이미 나가 있던 재조회는 바뀌기 전 값일 수 있어 버리고 새로 부른다(QA A2-3)
+            case profileChangedElsewhere
             case refreshProfileResponse(TaskResult<CommunityProfile>, saveGeneration: Int)
-            case refreshUserProfileResponse(TaskResult<UserProfile>)
+            case refreshUserProfileResponse(TaskResult<UserProfile>, generation: Int)
+            // user 프로필이 없어 사진 바꾸기 · 관장 사범 인증을 열기 전에 다시 받은 결과(QA A2-2, A3-10). 받으면 그 화면을 연다.
+            case userProfileFetchedForEntry(TaskResult<UserProfile>, generation: Int, entry: UserProfileEntry)
             case updateProfileSection(ProfileSection, String?)
             case saveBeltInfoOnly(rank: BeltRank, stripe: BeltStripe)
             // 스타일 저장 (특기 + 최애 한 번에)
@@ -263,6 +280,9 @@ public struct MyProfileFeature: Sendable {
             case competitionAddFailed                              // 대회 정보 추가 저장 실패
             case competitionUpdated(CommunityProfile) // 대회 정보 수정 저장 완료
             case competitionDeleted(CommunityProfile) // 대회 정보 삭제 저장 완료
+            case competitionDeleteFailed              // 대회 정보 삭제 저장 실패 — 저장이 아니라 삭제 실패로 알린다(QA A3-3)
+            // 바꿀 기록을 새로 받은 목록에서 못 찾아 저장하지 않음(QA A3-1, A3-7) — 화면을 서버 목록으로 맞추고 실패로 알린다.
+            case competitionTargetMissing(latest: CommunityProfile, isDelete: Bool)
             case competitionPinUpdated(CommunityProfile, isPinned: Bool) // 대회 고정/해제 저장 완료
             case competitionOrderSaved(CommunityProfile)    // 대회 순서 저장 완료
             case competitionOrderReverted(CommunityProfile) // 대회 순서 저장 실패 — 바꾸기 전 목록으로 되돌림
@@ -271,7 +291,9 @@ public struct MyProfileFeature: Sendable {
             case legacyHeaderPatternMigrated(TaskResult<CommunityProfile>) // 기기에 남은 무늬를 서버로 옮겨 담은 결과 (#337)
             // 알림 화면을 나간 뒤 대신 저장한 알림 설정이 서버에 반영됨. 루트의 분석 기록만 본다(#430).
             case notificationSettingSaved(NoticeSettingUpdate)
-            
+            // 알림 화면을 나간 뒤 대신 저장하다 실패함 — 맨 위에 보이는 화면에 알린다(QA A4-2).
+            case notificationSettingSaveFailed
+
             case showToast(ToastState)
             case toastDismissed
             case presentBeltPromotion(BeltPromotion)     // 더 높은 띠·그랄로 저장됨 → 축하 장면 띄우기 (#278, #286)
@@ -297,6 +319,12 @@ public struct MyProfileFeature: Sendable {
             case instructorVerificationRequestResponse(TaskResult<String>)
 
             // 닉네임 갱신 응답 (이미지와 동일한 PUT /api/user/profile 사용)
+
+            /// user 프로필이 있어야 여는 화면
+            public enum UserProfileEntry: Sendable {
+                case profileImageEdit
+                case instructorVerification
+            }
         }
     }
     
@@ -352,6 +380,7 @@ public struct MyProfileFeature: Sendable {
                 return .send(.internal(.loadProfile))
 
             case .view(.backTapped):
+                guard !state.blocksLeaving else { return Self.savingInProgressToast() }
                 return .run { _ in await self.dismiss() }
 
             case .view(.tabEntered), .view(.sceneBecameActive):
@@ -365,6 +394,12 @@ public struct MyProfileFeature: Sendable {
                 }
                 return .send(.internal(.refreshProfile))
 
+            case .internal(.profileChangedElsewhere):
+                // 앞서 나간 재조회 응답은 세대가 달라 버려지고, 진행 표시를 풀어 아래 재조회가 막히지 않게 한다.
+                state.profileSaveGeneration += 1
+                state.isRefreshingProfile = false
+                return .send(.internal(.refreshProfile))
+
             case .internal(.refreshProfile):
                 // 저장·업로드 중이면 그 결과가 화면의 최신값이므로 재조회하지 않는다.
                 guard !state.authInfo.isGuest,
@@ -374,11 +409,12 @@ public struct MyProfileFeature: Sendable {
                       !state.isRefreshingProfile else { return .none }
                 state.isRefreshingProfile = true
                 let saveGeneration = state.profileSaveGeneration
+                let userGeneration = state.userProfileGeneration
                 return .run { send in
                     async let communityResult = TaskResult { try await communityClient.fetchProfile() }
                     async let userResult = TaskResult { try await userClient.fetchUserProfile() }
                     await send(.internal(.refreshProfileResponse(communityResult, saveGeneration: saveGeneration)))
-                    await send(.internal(.refreshUserProfileResponse(userResult)))
+                    await send(.internal(.refreshUserProfileResponse(userResult, generation: userGeneration)))
                 }
                 .cancellable(id: CancelID.profileRefresh, cancelInFlight: true)
 
@@ -396,8 +432,9 @@ public struct MyProfileFeature: Sendable {
                     return .none
                 }
 
-            case let .internal(.refreshUserProfileResponse(result)):
-                guard !state.isUploadingInstructorVerification, !state.isUploadingProfileImage else { return .none }
+            case let .internal(.refreshUserProfileResponse(result, generation)):
+                guard !state.isUploadingInstructorVerification, !state.isUploadingProfileImage,
+                      generation == state.userProfileGeneration else { return .none }
                 switch result {
                 case let .success(profile):
                     state.userProfile = profile
@@ -411,6 +448,7 @@ public struct MyProfileFeature: Sendable {
                 guard !state.authInfo.isGuest else { return .none }
                 state.isLoadingProfile = true
                 state.profileLoadFailed = false
+                let userGeneration = state.userProfileGeneration
                 // community 프로필과 user 프로필을 병렬 조회 — 둘은 서로 다른 엔드포인트이고
                 // 의존성이 없어 직렬로 기다릴 이유가 없다. 각각 독립 TaskResult로 흘려보내
                 // user 조회 실패가 화면(community) 로딩을 막지 않게 한다.
@@ -418,7 +456,7 @@ public struct MyProfileFeature: Sendable {
                     async let communityResult = TaskResult { try await communityClient.fetchProfile() }
                     async let userResult = TaskResult { try await userClient.fetchUserProfile() }
                     await send(.internal(.profileResponse(communityResult)))
-                    await send(.internal(.userProfileResponse(userResult)))
+                    await send(.internal(.userProfileResponse(userResult, generation: userGeneration)))
                 }
 
             case let .internal(.profileResponse(.success(profile))):
@@ -426,15 +464,15 @@ public struct MyProfileFeature: Sendable {
                 state.communityProfile = profile
                 return migrateLegacyHeaderPatternIfNeeded(&state)
 
-            case let .internal(.userProfileResponse(.success(profile))):
-                // 사진을 바꾸는 중이면 업로드 전 값이라 덮지 않는다 — 업로드 응답이 최신값을 넣는다.
-                guard !state.isUploadingProfileImage else { return .none }
+            case let .internal(.userProfileResponse(.success(profile), generation)):
+                // 사진을 바꾸는 중이거나 그사이 바꿨으면 바꾸기 전 값이라 덮지 않는다 — 업로드 응답이 최신값을 넣는다.
+                guard !state.isUploadingProfileImage, generation == state.userProfileGeneration else { return .none }
                 state.userProfile = profile
                 // 서버 값이 기준이다. 남은 미리보기가 웹·다른 기기에서 바꾸거나 지운 사진을 가리지 않게 걷는다(#157).
                 state.pendingProfileImageData = nil
                 return .none
 
-            case let .internal(.userProfileResponse(.failure(error))):
+            case let .internal(.userProfileResponse(.failure(error), _)):
                 // user 프로필 조회 실패는 화면 표시를 막지 않는다(인증 뱃지 등 부가 정보 한정).
                 Log.trace("Failed to load user profile: \(error)", category: .network, level: .error)
                 return .none
@@ -533,6 +571,11 @@ public struct MyProfileFeature: Sendable {
             // MARK: - Delegate 처리 (자식 Feature로부터)
 
             case let .destination(.presented(.academySetting(.delegate(.saveAcademyName(academyName))))):
+                // 이름을 그대로 두고 '확인'하면 저장 없이 닫는다 — 닉네임 화면과 같이(정책 2.2, QA A2-13).
+                if let current = state.communityProfile?.academyName, current == academyName, !state.isLoadingProfile {
+                    state.destination = nil
+                    return .none
+                }
                 // 도장 이름 저장 요청 받음 → API 호출
                 return .send(.internal(.updateProfileSection(.academy, academyName)))
 
@@ -552,14 +595,21 @@ public struct MyProfileFeature: Sendable {
                 state.communityProfile = state.communityProfile?.updatingNickname(nickname)
                 // 닉네임 화면이 이미 저장했다. 그 전에 나간 재조회 응답이 옛 닉네임으로 덮지 않게 세대를 올린다.
                 state.profileSaveGeneration += 1
-                return .send(.internal(.showToast(.init(
-                    message: "닉네임 수정을 완료했어요", status: .success
-                ))))
+                // 열린 웹뷰도 새 닉네임을 쓰게 알린다(QA A2-4 — 웹이 닉네임까지 다시 읽는 건 jiu-jitsu-frontend 쪽 일).
+                return .merge(
+                    .send(.internal(.showToast(.init(message: "닉네임 수정을 완료했어요", status: .success)))),
+                    .send(.delegate(.profileUpdated))
+                )
                 
             case .destination(.presented(.nicknameSetting(.delegate(.cancel)))):
                 // 취소 - 아무것도 하지 않음
                 return .none
-                
+
+            case .destination(.dismiss):
+                // 닉네임 저장 중 뒤로가면 저장이 화면과 함께 취소돼 결과를 못 받는다. 서버엔 반영됐을 수 있어 다시 받는다(QA A2-15).
+                guard case .nicknameSetting? = state.destination else { return .none }
+                return .send(.internal(.refreshProfile))
+
             case let .destination(.presented(.myStyleSetting(.delegate(.didConfirmStyle(type, bestKey, favoriteKey))))):
                 // 스타일 저장 (최애 + 받아 둔 특기) → register 시 다음 단계, edit 시 화면 닫기
                 // 저장 화면은 저장 중엔 열리지 않으므로, 여기 걸리는 건 같은 화면의 '완료' 연타뿐이다(#155).
@@ -602,6 +652,10 @@ public struct MyProfileFeature: Sendable {
                 // 지난 저장에서 시트 닫힘을 기다리던 축하가 남아 있으면 이번 저장 뒤에 엉뚱하게 뜨지 않게 비운다.
                 state.pendingPromotion = nil
                 state.isBeltEntranceAfterPromotion = false
+                // 띠 · 그랄을 그대로 두고 '확인'하면 저장 없이 닫는다(QA A2-13).
+                if let profile = state.communityProfile, profile.beltRank == rank, profile.beltStripe == stripe {
+                    return .none
+                }
                 return .send(.internal(.saveBeltInfoOnly(rank: rank, stripe: stripe)))
                 
             case let .internal(.saveBeltInfoOnly(rank, stripe)):
@@ -824,6 +878,9 @@ public struct MyProfileFeature: Sendable {
                          previousProfile?.beltStripe != updatedProfile.beltStripe {
                     // 벨트 정보 수정
                     message = "벨트 정보 수정을 완료했어요"
+                } else if previousProfile?.academyName != updatedProfile.academyName {
+                    // 도장 이름 수정 — 다른 섹션 문구('벨트 정보 수정을 완료했어요')와 같은 꼴(QA A2-13)
+                    message = "도장 정보 수정을 완료했어요"
                 } else {
                     // 기타
                     message = "프로필 수정을 완료했어요"
@@ -915,12 +972,20 @@ public struct MyProfileFeature: Sendable {
                     } catch {
                         Log.trace("알림 화면 이탈 후 설정 저장 실패: \(error)", category: .network, level: .error)
                         analyticsClient.logErrorShown(error)
-                        await send(.internal(.showToast(.init(message: "알림 설정을 저장하지 못했어요. 다시 시도해 주세요", status: .error))))
+                        await send(.internal(.notificationSettingSaveFailed))
                     }
                 }
 
             case .internal(.notificationSettingSaved):
                 return .none
+
+            case .internal(.notificationSettingSaveFailed):
+                let toast = ToastState(message: "알림 설정을 저장하지 못했어요. 다시 시도해 주세요", status: .error)
+                // 알림 화면을 나오면 설정 화면이 MY 위에 남아 MY 토스트가 가려진다 — 설정이 맨 위면 설정 화면에 띄운다(QA A4-2).
+                if let id = state.path.ids.last, case .settings? = state.path[id: id] {
+                    return .send(.path(.element(id: id, action: .settings(.internal(.showToast(toast))))))
+                }
+                return .send(.internal(.showToast(toast)))
 
             case let .path(.element(id: _, action: .settings(.delegate(delegate)))):
                 return .send(.delegate(.settings(delegate)))
@@ -953,6 +1018,13 @@ public struct MyProfileFeature: Sendable {
             case let .path(.element(id: _, action: .userProfile(.delegate(.blockChanged(userId, blocked))))):
                 return .send(.delegate(.userBlockChanged(userId: userId, blocked: blocked)))
 
+            // 이 MY 위에 쌓은 남의 프로필 띠 묻기에서 내 띠를 저장함(QA A2-3) — 뒤로 돌아왔을 때 새 띠가 보이게 다시 불러오고, 웹에도 알린다.
+            case .path(.element(id: _, action: .userProfile(.delegate(.profileUpdated)))):
+                return .merge(
+                    .send(.internal(.profileChangedElsewhere)),
+                    .send(.delegate(.profileUpdated))
+                )
+
             case let .openUserProfile(userId):
                 // 연타·중복 전달로 같은 프로필이 겹쳐 쌓이지 않게 한다
                 if case let .userProfile(current)? = state.path.last, current.userId == userId { return .none }
@@ -981,7 +1053,7 @@ public struct MyProfileFeature: Sendable {
                 return .none
 
             case let .destination(.presented(.competitionInfo(.delegate(.didFinishAdding(competition))))):
-                guard let profile = state.communityProfile else {
+                guard state.communityProfile != nil else {
                     state.destination = nil
                     return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
@@ -990,12 +1062,11 @@ public struct MyProfileFeature: Sendable {
                     category: .debug,
                     level: .info
                 )
-                let updatedProfile = profile.addingCompetition(competition)
                 // 저장 결과를 보고 완료 화면('부문 추가')으로 넘어가야 하므로 입력 화면은 닫지 않는다(#123).
                 Self.beginProfileSave(&state)
                 return .run { send in
                     let result = await TaskResult {
-                        try await communityClient.updateProfile(updatedProfile, .competition)
+                        try await saveCompetitions { $0.addingCompetition(competition) }
                     }
                     switch result {
                     case .success(let saved):
@@ -1008,7 +1079,7 @@ public struct MyProfileFeature: Sendable {
                 }
 
             case let .destination(.presented(.competitionInfo(.delegate(.didFinishEditing(original, updated))))):
-                guard let profile = state.communityProfile else {
+                guard state.communityProfile != nil else {
                     state.destination = nil
                     return .send(.internal(.showToast(.init(message: "프로필 정보를 불러올 수 없어요", status: .error))))
                 }
@@ -1017,16 +1088,23 @@ public struct MyProfileFeature: Sendable {
                     category: .debug,
                     level: .info
                 )
-                let updatedProfile = profile.updatingCompetition(original: original, with: updated)
                 state.destination = nil
                 Self.beginProfileSave(&state)
                 return .run { send in
                     let result = await TaskResult {
-                        try await communityClient.updateProfile(updatedProfile, .competition)
+                        // 고칠 원래 기록을 새 목록에서 못 찾으면 바뀐 것 없이 저장하고 성공이라 하지 않게 멈춘다(QA A3-7).
+                        try await saveCompetitions { latest in
+                            guard let target = Self.resolve([original], in: latest.competitions)?.first else { return nil }
+                            // 고정·자리는 새 목록 값을 따른다 — 수정 화면은 들고 있던 원래 기록의 값을 그대로 실었다.
+                            let edited = updated.settingPinned(target.isPinned, displayOrder: target.displayOrder)
+                            return latest.updatingCompetition(original: target, with: edited)
+                        }
                     }
                     switch result {
                     case .success(let saved):
                         await send(.internal(.competitionUpdated(saved)))
+                    case .failure(let missing as CompetitionTargetMissing):
+                        await send(.internal(.competitionTargetMissing(latest: missing.latest, isDelete: false)))
                     case .failure(let error):
                         await send(.internal(.updateProfileResponse(.failure(error))))
                     }
@@ -1075,6 +1153,17 @@ public struct MyProfileFeature: Sendable {
                 state.communityProfile = profile
                 return .send(.internal(.showToast(.init(message: "대회 정보를 삭제했어요", status: .success))))
 
+            case .internal(.competitionDeleteFailed):
+                state.isLoadingProfile = false
+                return .send(.internal(.showToast(.init(message: "삭제하지 못했어요. 다시 시도해 주세요", status: .error))))
+
+            case let .internal(.competitionTargetMissing(latest, isDelete)):
+                state.isLoadingProfile = false
+                // 다른 곳에서 바뀐 목록을 그대로 보여 줘 회원이 지금 기록을 보고 다시 하게 한다.
+                state.communityProfile = latest
+                let message = isDelete ? "삭제하지 못했어요. 다시 시도해 주세요" : "저장하지 못했어요. 다시 시도해 주세요"
+                return .send(.internal(.showToast(.init(message: message, status: .error))))
+
             case let .view(.addDivisionTapped(entries)):
                 guard !state.isLoadingProfile else { return Self.savingInProgressToast() }
                 state.destination = .competitionInfo(
@@ -1101,15 +1190,19 @@ public struct MyProfileFeature: Sendable {
                         ))))
                     }
                 }
-                let updatedProfile = profile.settingCompetitionsPinned(entries, isPinned: isPinning)
                 Self.beginProfileSave(&state)
                 return .run { send in
                     let result = await TaskResult {
-                        try await communityClient.updateProfile(updatedProfile, .competition)
+                        try await saveCompetitions { latest in
+                            guard let targets = Self.resolve(entries, in: latest.competitions) else { return nil }
+                            return latest.settingCompetitionsPinned(targets, isPinned: isPinning)
+                        }
                     }
                     switch result {
                     case .success(let saved):
                         await send(.internal(.competitionPinUpdated(saved, isPinned: isPinning)))
+                    case .failure(let missing as CompetitionTargetMissing):
+                        await send(.internal(.competitionTargetMissing(latest: missing.latest, isDelete: false)))
                     case .failure(let error):
                         await send(.internal(.updateProfileResponse(.failure(error))))
                     }
@@ -1126,11 +1219,23 @@ public struct MyProfileFeature: Sendable {
                 Self.beginProfileSave(&state)
                 return .run { send in
                     let result = await TaskResult {
-                        try await communityClient.updateProfile(updatedProfile, .competition)
+                        try await saveCompetitions { latest in
+                            guard let targets = Self.resolve(groups.flatMap { $0 }, in: latest.competitions) else { return nil }
+                            // 찾은 새 목록 값을 원래 줄 묶음대로 다시 나눈다.
+                            var rest = targets[...]
+                            let latestGroups = groups.map { group in
+                                defer { rest = rest.dropFirst(group.count) }
+                                return Array(rest.prefix(group.count))
+                            }
+                            return latest.reorderingCompetitions(latestGroups)
+                        }
                     }
                     switch result {
                     case .success(let saved):
                         await send(.internal(.competitionOrderSaved(saved)))
+                    case .failure(let missing as CompetitionTargetMissing):
+                        // 먼저 옮겨 둔 순서 대신 서버 목록으로 맞춘다.
+                        await send(.internal(.competitionTargetMissing(latest: missing.latest, isDelete: false)))
                     case .failure(let error):
                         await send(.internal(.competitionOrderReverted(profile)))
                         await send(.internal(.updateProfileResponse(.failure(error))))
@@ -1207,6 +1312,8 @@ public struct MyProfileFeature: Sendable {
 
             case .view(.instructorVerificationMenuTapped):
                 guard !state.isUploadingInstructorVerification else { return .none }
+                // 신청 상태를 모르면 '미신청'으로 단정해 심사 중인 회원에게도 신청 화면이 뜬다 — 먼저 다시 받는다(QA A3-10).
+                guard state.userProfile != nil else { return fetchUserProfile(for: .instructorVerification, state: state) }
                 state.sheet = .instructorVerification(Self.instructorVerificationState(from: state))
                 return .none
 
@@ -1229,6 +1336,7 @@ public struct MyProfileFeature: Sendable {
                 // 인증 사진은 노출되지 않는 검수용이라 Optimistic Update 대신 로딩 오버레이로
                 // 진행을 표시하고 터치를 막는다. 완료·실패 응답에서 해제 후 결과 토스트(#62).
                 state.isUploadingInstructorVerification = true
+                state.userProfileGeneration += 1
                 Log.trace(
                     "관장 사범 인증 - 크롭 생략, 원본 업로드 시작 (\(data.count) bytes)",
                     category: .network,
@@ -1268,6 +1376,26 @@ public struct MyProfileFeature: Sendable {
                     ))))
                 }
 
+            case let .internal(.userProfileFetchedForEntry(result, generation, entry)):
+                switch result {
+                case let .success(profile):
+                    if !state.isUploadingProfileImage, generation == state.userProfileGeneration {
+                        state.userProfile = profile
+                        state.pendingProfileImageData = nil
+                    }
+                    // 받는 사이 다른 시트가 열렸으면 겹쳐 띄우지 않는다.
+                    guard state.userProfile != nil, state.sheet == nil else { return .none }
+                    switch entry {
+                    case .profileImageEdit:
+                        return .send(.view(.profileImageEditButtonTapped))
+                    case .instructorVerification:
+                        return .send(.view(.instructorVerificationMenuTapped))
+                    }
+                case let .failure(error):
+                    Log.trace("Failed to load user profile before \(entry): \(error)", category: .network, level: .error)
+                    return Self.profileUnavailableToast()
+                }
+
             case let .internal(.presentImageEditSheet(purpose, canDelete)):
                 state.sheet = .profileImageEdit(
                     ProfileImageEditFeature.State(purpose: purpose, canDelete: canDelete)
@@ -1279,6 +1407,8 @@ public struct MyProfileFeature: Sendable {
                 guard !state.isUploadingProfileImage else {
                     return .send(.internal(.showToast(.init(message: "사진을 바꾸는 중이에요. 잠시 후 다시 시도해 주세요", status: .info))))
                 }
+                // user 프로필이 없으면 사진을 다 고르고 자른 뒤에야 실패한다 — 열기 전에 다시 받는다(QA A2-2).
+                guard state.userProfile != nil else { return fetchUserProfile(for: .profileImageEdit, state: state) }
                 // 프로필 이미지 수정 옵션 바텀시트 노출
                 // 실제로 이미지가 렌더링되는 상태일 때만 '삭제' 옵션 노출
                 let canDelete = state.userProfile?.hasProfileImage ?? false
@@ -1324,6 +1454,7 @@ public struct MyProfileFeature: Sendable {
                 }
                 let updatedProfile = profile.updatingProfileImage(url: nil, fileId: nil)
                 state.isUploadingProfileImage = true
+                state.userProfileGeneration += 1
                 // Optimistic UX — 헤더를 즉시 기본 아이콘으로 전환
                 state.isProfileImageDeleting = true
                 Log.trace("프로필 이미지 - 삭제 요청 (imageFileId=\(imageFileId))", category: .network, level: .info)
@@ -1408,6 +1539,7 @@ public struct MyProfileFeature: Sendable {
                     ))))
                 }
                 state.isUploadingProfileImage = true
+                state.userProfileGeneration += 1
                 // Optimistic UX — 크롭 결과를 헤더에 즉시 노출 (네트워크와 무관하게)
                 state.pendingProfileImageData = croppedData
                 Log.trace(
@@ -1527,7 +1659,11 @@ public struct MyProfileFeature: Sendable {
                 let message = updatedProfile.profileImageUrl == nil
                     ? "프로필 이미지를 삭제했어요"
                     : "프로필 이미지를 변경했어요"
-                return .send(.internal(.showToast(.init(message: message, status: .success))))
+                // 열린 웹뷰도 새 사진을 쓰게 알린다(QA A2-4 — 웹이 사진까지 다시 읽는 건 jiu-jitsu-frontend 쪽 일).
+                return .merge(
+                    .send(.internal(.showToast(.init(message: message, status: .success)))),
+                    .send(.delegate(.profileUpdated))
+                )
 
             case let .internal(.profileImageUpdateResponse(.failure(error))):
                 state.isUploadingProfileImage = false
@@ -1607,6 +1743,20 @@ public struct MyProfileFeature: Sendable {
         )
     }
 
+    /// user 프로필을 다시 받아, 받으면 그 화면을 연다(QA A2-2, A3-10). 연타하면 앞 요청은 취소한다.
+    private func fetchUserProfile(for entry: Action.InternalAction.UserProfileEntry, state: State) -> Effect<Action> {
+        guard !state.authInfo.isGuest else { return .none }
+        let generation = state.userProfileGeneration
+        return .run { send in
+            await send(.internal(.userProfileFetchedForEntry(
+                await TaskResult { try await userClient.fetchUserProfile() },
+                generation: generation,
+                entry: entry
+            )))
+        }
+        .cancellable(id: CancelID.userProfileForEntry, cancelInFlight: true)
+    }
+
     /// 서버에 저장하기 전 이 기기에만 남긴 상단 무늬를 서버로 옮겨 담는다(#337). 프로필을 받을 때마다 부른다.
     /// 서버에 이미 무늬가 있으면(다른 기기에서 골랐거나 이미 옮겨 담음) 서버 값이 기준이라 기기 값만 지운다.
     private func migrateLegacyHeaderPatternIfNeeded(_ state: inout State) -> Effect<Action> {
@@ -1669,15 +1819,55 @@ public struct MyProfileFeature: Sendable {
         Self.beginProfileSave(&state)
         return .run { send in
             let result = await TaskResult {
-                try await communityClient.updateProfile(updatedProfile, .competition)
+                try await saveCompetitions { latest in
+                    guard let targets = Self.resolve(entries, in: latest.competitions) else { return nil }
+                    return targets.reduce(latest) { $0.removingCompetition($1) }
+                }
             }
             switch result {
             case .success(let saved):
                 await send(.internal(.competitionDeleted(saved)))
+            case .failure(let missing as CompetitionTargetMissing):
+                await send(.internal(.competitionTargetMissing(latest: missing.latest, isDelete: true)))
             case .failure(let error):
-                await send(.internal(.updateProfileResponse(.failure(error))))
+                Log.trace("Failed to delete competition: \(error)", category: .network, level: .error)
+                analyticsClient.logErrorShown(error)
+                await send(.internal(.competitionDeleteFailed))
             }
         }
+    }
+
+    /// 바꿀 기록을 새로 받은 목록에서 못 찾아 저장하지 않음 — 화면을 맞출 서버 목록을 싣는다(QA A3-1).
+    private struct CompetitionTargetMissing: Error {
+        let latest: CommunityProfile
+    }
+
+    /// 대회 저장은 목록 전체 교체라, 들고 있던 프로필이 낡았으면 그사이 다른 곳(탭 MY · 쌓인 MY · 웹 '내 기록에 남기기')에서
+    /// 바꾼 기록을 서버에서 지운다(QA A3-1). 웹 경로처럼 저장 직전에 새로 받아 그 위에 바꾼다.
+    /// `change`가 nil이면(바꿀 기록이 새 목록에 없음) 덮어쓰지 않고 `CompetitionTargetMissing`을 던진다.
+    private func saveCompetitions(
+        _ change: @Sendable (CommunityProfile) -> CommunityProfile?
+    ) async throws -> CommunityProfile {
+        let latest = try await communityClient.fetchProfile()
+        guard let updated = change(latest) else { throw CompetitionTargetMissing(latest: latest) }
+        return try await communityClient.updateProfile(updated, .competition)
+    }
+
+    /// 대상 기록을 새로 받은 목록에서 찾아 그 목록의 값으로 돌려준다. 하나라도 없으면 nil.
+    /// 기록에 식별자가 없어 값으로 찾되, 고정·자리(isPinned · displayOrder)는 다른 곳에서 바뀌었거나 서버가 달리 정리해
+    /// 돌려줄 수 있어 견주지 않는다 — 그것만 달라 '못 찾음'으로 저장이 실패하지 않게. 값이 모두 같은 기록을 먼저 고르고,
+    /// 같은 기록이 여럿이면 이미 고른 것은 다시 고르지 않아 개수까지 맞춘다.
+    private static func resolve(_ targets: [Competition], in competitions: [Competition]) -> [Competition]? {
+        var remaining = competitions
+        var resolved: [Competition] = []
+        for target in targets {
+            let unpinned = target.settingPinned(false, displayOrder: nil)
+            guard let index = remaining.firstIndex(of: target)
+                ?? remaining.firstIndex(where: { $0.settingPinned(false, displayOrder: nil) == unpinned })
+            else { return nil }
+            resolved.append(remaining.remove(at: index))
+        }
+        return resolved
     }
 }
 // MARK: - Sendable Conformances

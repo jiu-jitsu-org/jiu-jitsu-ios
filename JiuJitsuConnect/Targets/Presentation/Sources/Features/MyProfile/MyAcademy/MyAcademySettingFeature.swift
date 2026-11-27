@@ -20,9 +20,11 @@ public struct MyAcademySettingFeature: Sendable {
     private enum CancelID { case apiCall, toast }
     
     // 정규식 객체 재사용을 위한 Static 선언
-    // 닉네임과 다른 점: 띄어쓰기(\s) 추가
+    // 닉네임과 다른 점: 띄어쓰기(\s)와 실제 도장 이름에 흔한 기호(- & . , ( ) ' · /) 허용(QA A2-10).
+    // 서버는 글자 종류를 따로 막지 않는다(길이 100만 검사) — 이모지 · 특수문자 남용만 앱에서 막는다.
+    static let allowedSymbolsDescription = "- & . , ( ) ' · /"
     private static let academyNameRegex: NSRegularExpression? = {
-        let pattern = "^[a-zA-Z0-9가-힣\\s]*$"
+        let pattern = "^[a-zA-Z0-9가-힣\\s\\-&.,()'·/]*$"
         return try? NSRegularExpression(pattern: pattern, options: .caseInsensitive)
     }()
     
@@ -112,7 +114,7 @@ public struct MyAcademySettingFeature: Sendable {
                 state.isCtaButtonEnabled = true
                 
                 // 입력 값이 변경되면 검증 상태 초기화
-                // 에러 상태(.invalidLength, .invalidCharacters)에서 다시 입력하면 idle로 리셋
+                // 에러 상태(.empty, .tooLong, .invalidCharacters)에서 다시 입력하면 idle로 리셋
                 if state.validationState != .idle {
                     state.validationState = .idle
                 }
@@ -124,14 +126,19 @@ public struct MyAcademySettingFeature: Sendable {
                 // 1단계: 로컬 유효성 검사
                 // 서버가 앞뒤 공백을 지우고 저장하므로 같은 값으로 검사한다 — 공백만 있으면 빈 값이 돼 도장이 지워진다(#156).
                 let academyName = state.academyName.trimmingCharacters(in: .whitespacesAndNewlines)
-                // 글자 수 체크 (1~100자)
-                if !(1...100).contains(academyName.count) {
-                    state.validationState = .invalidLength
+                // 빈 값 · 길이 초과를 나눠 알린다(QA A2-10). 서버는 UTF-16 단위로 100까지 받는다.
+                if academyName.isEmpty {
+                    state.validationState = .empty
+                    state.isCtaButtonEnabled = false
+                    return .none
+                }
+                if academyName.utf16.count > 100 {
+                    state.validationState = .tooLong
                     state.isCtaButtonEnabled = false
                     return .none
                 }
                 
-                // 허용된 문자 체크 (한글/영문/숫자/띄어쓰기)
+                // 허용된 문자 체크 (한글/영문/숫자/띄어쓰기/흔한 기호)
                 if !isValid(academyName: academyName) {
                     state.validationState = .invalidCharacters
                     state.isCtaButtonEnabled = false
@@ -197,6 +204,7 @@ public struct MyAcademySettingFeature: Sendable {
             // Fallback: 정규식 생성 실패 시 기본 검증
             return academyName.allSatisfy { character in
                 character.isLetter || character.isNumber || character.isWhitespace
+                    || Self.allowedSymbolsDescription.contains(character)
             }
         }
         
@@ -227,7 +235,10 @@ public extension MyAcademySettingFeature {
     
     enum ValidationState: Equatable, Sendable {
         case idle
-        case invalidLength
+        /// 비우고 확인 — 지우려면 '삭제'를 눌러야 한다
+        case empty
+        /// 100자 넘음
+        case tooLong
         case invalidCharacters
     }
 
@@ -238,12 +249,17 @@ public extension MyAcademySettingFeature {
 }
 
 public extension MyAcademySettingFeature.ValidationState {
-    var message: String {
+    /// 위 큰 제목 — 무엇이 문제인지 그대로 말한다(QA A2-10). 수정 화면에서 비우면 지우는 길(오른쪽 위 '삭제')을 알려 준다.
+    func message(isEdit: Bool) -> String {
         switch self {
         case .idle:
             return "도장 이름을 입력해 주세요"
-        case .invalidLength, .invalidCharacters:
-            return "한글/영문/숫자로 작성해 주세요"
+        case .empty:
+            return isEdit ? "지우려면 오른쪽 위\n'삭제'를 눌러 주세요" : "도장 이름을 입력해 주세요"
+        case .tooLong:
+            return "도장 이름은 100자까지\n쓸 수 있어요"
+        case .invalidCharacters:
+            return "한글/영문/숫자와 기호\n\(MyAcademySettingFeature.allowedSymbolsDescription)만 쓸 수 있어요"
         }
     }
     
@@ -258,7 +274,7 @@ public extension MyAcademySettingFeature.ValidationState {
         switch self {
         case .idle:
             return Color.component.textfieldDisplay.focus.text
-        case .invalidLength, .invalidCharacters:
+        case .empty, .tooLong, .invalidCharacters:
             return Color.component.textfieldDisplay.default.placeholder
         }
     }

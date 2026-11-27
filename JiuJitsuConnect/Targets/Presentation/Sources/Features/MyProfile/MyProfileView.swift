@@ -89,6 +89,14 @@ public struct MyProfileView: View {
             }
             .toolbar(store.isPushed ? .hidden : .automatic, for: .navigationBar)
             .navigationBarBackButtonHidden(store.isPushed)
+            // 저장 · 업로드 중엔 스와이프로도 나가지 못하게 하고 뒤로가기와 같이 안내한다(QA A2-1).
+            .background {
+                if store.blocksLeaving {
+                    InteractivePopBlocker {
+                        store.send(.view(.backTapped))
+                    }
+                }
+            }
     }
 
     // 남의 프로필(UserProfileView)·웹 상세의 뒤로가기와 같은 자리·크기(아이콘 24 / 터치 40). 띠 색 헤더 위라 흰색.
@@ -106,14 +114,16 @@ public struct MyProfileView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("뒤로 가기")
     }
 
     private var screen: some View {
         GeometryReader { geometry in
             let safeAreaTop = geometry.safeAreaInsets.top
             let safeAreaBottom = geometry.safeAreaInsets.bottom
-            // 비로그인 머리(#242)는 도장명이 있을 때와 같은 높이라 같은 만큼 겹친다.
+            // 비로그인 머리(#242) · 프로필을 아직 모를 때의 빈 도장 자리는 도장명이 있을 때와 같은 높이라 같은 만큼 겹친다.
             let cardOverlapHeight = store.authInfo.isGuest || store.communityProfile?.academyName != nil
+                || isAwaitingProfile || isProfileLoadFailed
                 ? Metrics.Card.overlapWithAcademyName
                 : Metrics.Card.overlapWithButton
 
@@ -123,6 +133,8 @@ public struct MyProfileView: View {
                     VStack(spacing: 0) {
                         // 1. 헤더 영역 — "..." 메뉴는 헤더의 시스템 메뉴(#399)
                         headerView(safeAreaTop: safeAreaTop)
+                            // 띠 색 머리 위로 빈 바탕이 드러나지 않게 이 스크롤만 튕기지 않는다(앱 전체가 아니라, A2-16).
+                            .background { ScrollBounceDisabler() }
                             .zIndex(0)
 
                         // 2. 벨트 카드
@@ -169,7 +181,6 @@ public struct MyProfileView: View {
                 tabRootScroll?.report(report.offsetY, report.maxOffsetY, isUserScrolling)
             }
             .onAppear {
-                UIScrollView.appearance().bounces = false
                 store.send(.view(.onAppear))
             }
             .background(Color.component.background.default)
@@ -259,6 +270,7 @@ public struct MyProfileView: View {
             safeAreaTop: safeAreaTop,
             isOwner: store.userProfile?.userRole == .owner,
             isGuest: store.authInfo.isGuest,
+            isProfileUnknown: isAwaitingProfile || isProfileLoadFailed,
             // 설정은 탭의 MY에서만 연다. 커뮤니티에서 쌓아 연 MY(#197)는 뒤로가기로 돌아가는 화면이다.
             showsSettingsButton: !store.isPushed,
             // Optimistic Update — 업로드/삭제 진행 중 헤더 이미지 미리보기·로딩 표시
@@ -602,10 +614,16 @@ private extension View {
             .fullScreenCover(isPresented: isCameraPresented) {
                 CameraPickerView(
                     onPicked: { image in
-                        if let data = image.jpegData(compressionQuality: 0.95) {
-                            store.wrappedValue.send(.view(.imagePicked(data)))
-                        } else {
-                            store.wrappedValue.send(.view(.imagePickerCancelled))
+                        // 큰 사진은 줄이고 바로 세워, 메인 스레드 밖에서 인코딩한다(QA A2-6).
+                        Task { @MainActor in
+                            let data = await PickedImagePreparer.jpegData(from: image)
+                            // 줄이는 사이 고르기를 닫았으면(밀어서 닫기 등) 늦게 나온 사진으로 자르기를 열지 않는다.
+                            guard store.wrappedValue.imageCaptureSource != nil else { return }
+                            if let data {
+                                store.wrappedValue.send(.view(.imagePicked(data)))
+                            } else {
+                                store.wrappedValue.send(.view(.imagePickerCancelled))
+                            }
                         }
                     },
                     onCancel: {
@@ -617,10 +635,16 @@ private extension View {
             .fullScreenCover(isPresented: isLibraryPresented) {
                 PhotoLibraryPickerView(
                     onPicked: { image in
-                        if let data = image.jpegData(compressionQuality: 0.95) {
-                            store.wrappedValue.send(.view(.imagePicked(data)))
-                        } else {
-                            store.wrappedValue.send(.view(.imagePickerCancelled))
+                        // 큰 사진은 줄이고 바로 세워, 메인 스레드 밖에서 인코딩한다(QA A2-6).
+                        Task { @MainActor in
+                            let data = await PickedImagePreparer.jpegData(from: image)
+                            // 줄이는 사이 고르기를 닫았으면(밀어서 닫기 등) 늦게 나온 사진으로 자르기를 열지 않는다.
+                            guard store.wrappedValue.imageCaptureSource != nil else { return }
+                            if let data {
+                                store.wrappedValue.send(.view(.imagePicked(data)))
+                            } else {
+                                store.wrappedValue.send(.view(.imagePickerCancelled))
+                            }
                         }
                     },
                     onCancel: {

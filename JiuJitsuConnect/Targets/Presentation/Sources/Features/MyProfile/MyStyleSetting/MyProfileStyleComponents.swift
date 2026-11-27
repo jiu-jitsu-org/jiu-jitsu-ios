@@ -34,6 +34,8 @@ public struct MyProfileStyleSectionView: View {
     @State private var width: CGFloat = 0
     /// 맨 위 카드가 들썩이는 중인지
     @State private var isHinting = false
+    /// 포갠 카드를 눌러 펼친 시각
+    @State private var openedAt: Date?
     /// 한 번이라도 펼쳐 봤으면 더는 들썩이지 않는다
     @AppStorage("favoriteStyleCardsOpened") private var hasOpenedBefore = false
 
@@ -67,6 +69,8 @@ public struct MyProfileStyleSectionView: View {
         /// 포갠 카드는 기울어 위아래로 더 나온다
         static let pileHeightRatio: CGFloat = 1.22
         static let flipAngle: Double = 180
+        /// 펼친 직후 이만큼은 누름을 받지 않는다 — 펼쳐지는 동안의 두 번째 탭이 펼친 배치의 다른 카드로 가지 않게
+        static let tapGuardAfterOpen: TimeInterval = 0.6
 
         /// 들썩일 때 — 옆면(90도)까지는 가지 않아 앞면은 보이지 않는다
         static let hintAngle: Double = 132
@@ -149,6 +153,8 @@ public struct MyProfileStyleSectionView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel(for: item))
         .accessibilityHint(accessibilityHint)
+        // 눌러도 아무 일 없는 카드는 버튼으로 읽지 않는다
+        .accessibilityRemoveTraits(isInert ? .isButton : [])
         .rotationEffect(.degrees(showsOpen ? 0 : Metrics.pileAngle[index] + (lifted ? Metrics.hintTilt : 0)))
         .scaleEffect(lifted ? Metrics.hintScale : 1)
         .position(center(at: index))
@@ -174,6 +180,11 @@ public struct MyProfileStyleSectionView: View {
             isHinting = false
             hasOpenedBefore = true
             isOpen = true
+            openedAt = .now
+            return
+        }
+        // 누르는 자리는 펼친 배치로 바로 바뀌어, 빠른 두 번째 탭이 엉뚱한 카드(포갠 맨 위 자리 = 펼친 가운데)를 연다.
+        if let openedAt, Date.now.timeIntervalSince(openedAt) < Metrics.tapGuardAfterOpen {
             return
         }
         if let onStyleCardTapped {
@@ -185,7 +196,13 @@ public struct MyProfileStyleSectionView: View {
         }
     }
 
+    /// 남이 보는 프로필에서 셋 다 비었으면 늘 펼친 채라 덮이지도 않아, 눌러도 아무 일이 없다.
+    private var isInert: Bool {
+        onStyleCardTapped == nil && items.allSatisfy { $0.style == nil }
+    }
+
     private var accessibilityHint: String {
+        guard !isInert else { return "" }
         guard showsOpen else { return "세 장을 펼쳐요" }
         return onStyleCardTapped == nil ? "다시 덮어요" : "고르는 화면으로 가요"
     }
@@ -384,6 +401,8 @@ private struct DecorativeCardsView: View {
             }
         }
         .frame(height: 282)
+        // 장식 그림이라 VoiceOver에서는 건너뛴다(그림 이름을 읽지 않게).
+        .accessibilityHidden(true)
     }
     
     private func decorativeCard(config: DecorativeCardConfig, centerX: CGFloat) -> some View {

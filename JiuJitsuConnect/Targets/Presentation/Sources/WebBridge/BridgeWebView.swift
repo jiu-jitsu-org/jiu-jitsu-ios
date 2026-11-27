@@ -687,6 +687,13 @@ struct BridgeWebView: UIViewRepresentable {
         }
 
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            // 죽은 문서의 새로고침 결과는 오지 않는다 — 띠를 닫아 둔다. 상세(오류 화면)도 풀어야 재시도 로드가
+            // 새로고침으로 오인돼 로딩 알림이 막히거나 띠가 남지 않는다.
+            if isRefreshing {
+                isRefreshing = false
+                refreshNavigation = nil
+                pullToRefresh?.finishRefreshing(success: false)
+            }
             // 뜨기 전에 죽었으면 그 로드는 실패다. 오류 화면으로 받는 화면(상세)만 — 아니면 보인 오류 없이 실패만 남는다.
             if onWebProcessTerminated != nil { reportScreenLoad(.fail) }
             // 웹 프로세스가 죽으면 닫힘 신호도 새 문서(didCommit)도 오지 않을 수 있다 — 시트가 열린 채였으면 탭 바를 돌려놓는다.
@@ -708,12 +715,6 @@ struct BridgeWebView: UIViewRepresentable {
                 category: .network,
                 level: .error
             )
-            // 죽은 문서의 새로고침 결과는 오지 않는다 — 띠를 닫아 둔다.
-            if isRefreshing {
-                isRefreshing = false
-                refreshNavigation = nil
-                pullToRefresh?.finishRefreshing(success: false)
-            }
             // 다시 불러온 문서가 뜨기 전에 또 죽으면 같은 일을 되풀이하지 않고 오류 화면(다시 시도)으로 보낸다.
             guard !isRecoveringFromTermination else {
                 isRecoveringFromTermination = false

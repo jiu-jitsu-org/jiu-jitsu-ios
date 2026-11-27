@@ -345,11 +345,14 @@ public struct AppTabFeature: Sendable {
                 return .none
 
             // MY(탭이든 커뮤니티에 쌓인 것이든)에서 프로필을 저장하면 열린 웹뷰 모두가 내 프로필을 다시 불러오게 한다(jiu-jitsu-frontend#413).
-            case .myPage(.delegate(.profileUpdated)), .home(.delegate(.profileUpdated)):
+            case .myPage(.delegate(.profileUpdated)):
+                return Self.broadcastProfileUpdated()
+            // 홈 · 대회 탭에 쌓인 MY나 남의 프로필 띠 묻기에서 저장함 → 웹에 알리고, 탭 MY도 다시 불러온다.
+            // 탭 MY는 프로필이 있으면 다시 나타나도 부르지 않아, 그대로 두면 다른 탭에 갔다 와야 바뀌었다(QA A2-3).
+            case .home(.delegate(.profileUpdated)), .competition(.delegate(.profileUpdated)):
                 return .merge(
-                    .send(.home(.session(.profileUpdated))),
-                    .send(.competition(.session(.profileUpdated))),
-                    .send(.myPage(.session(.profileUpdated)))
+                    Self.broadcastProfileUpdated(),
+                    .send(.myPage(.internal(.profileChangedElsewhere)))
                 )
             // 어느 탭에서 연 남의 프로필이든 차단·해제하면 열린 웹뷰 모두가 그 회원 글·댓글을 다시 불러오게 한다(#328).
             case let .home(.delegate(.userBlockChanged(userId, blocked))),
@@ -542,10 +545,15 @@ public struct AppTabFeature: Sendable {
                 return .merge(
                     .cancel(id: CancelID.deviceTokenSync),
                     .cancel(id: CancelID.webTokenRefresh),
-                    .run { send in
+                    .run { [clock] send in
                         // 서버가 이 기기의 토큰 연결을 지우도록 함께 보낸다.
                         let fcmToken = firebaseClient.loadCachedToken().flatMap { $0.isEmpty ? nil : $0 }
-                        _ = try? await authClient.serverLogout(fcmToken)
+                        // 느리고 끊기는 망에서 기본 제한 시간(30초)을 다 기다리면 그동안 화면이 로그인 상태 그대로라
+                        // 무반응으로 보이고, 그사이 앱을 끄면 로그아웃이 안 된 채 남는다(QA A1-06).
+                        // 서버 결과와 상관없이 로그아웃하는 정책(#65)이라 서버 요청은 최대 5초만 기다린다.
+                        await Self.runWithTimeout(.seconds(5), clock: clock) {
+                            _ = try? await authClient.serverLogout(fcmToken)
+                        }
                         await authClient.signOut()
                         await WebSessionCookie.clear()
                         // 서버 요청이 실패해(오프라인 등) 연결이 남아도 이전 계정 푸시가 오지 않게 기기 토큰도 폐기한다.
@@ -732,6 +740,44 @@ public struct AppTabFeature: Sendable {
         let allTabs = Set(Tab.allCases)
         guard state.mountedTabs != allTabs, !state.home.isLoading, !state.isGreetingShowing else { return }
         state.mountedTabs = allTabs
+    }
+
+    /// `operation`을 최대 `duration`만 기다린다. 시간이 지나면 작업을 취소하고 바로 돌아온다.
+    /// TaskGroup은 취소한 자식이 끝날 때까지 기다려, 취소를 늦게 받는 await(토큰 재발급 대기 등)가 끼면
+    /// 시간 초과가 걸리지 않는다(Splash `waitAtMost`, #367). 그래서 두 비구조적 Task 중 먼저 끝난 쪽만 넘긴다.
+    static func runWithTimeout(
+        _ duration: Duration,
+        clock: any Clock<Duration>,
+        _ operation: @escaping @Sendable () async -> Void
+    ) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let isResumed = LockIsolated(false)
+            let resumeOnce: @Sendable () -> Void = {
+                let shouldResume = isResumed.withValue { resumed in
+                    defer { resumed = true }
+                    return !resumed
+                }
+                if shouldResume { continuation.resume() }
+            }
+            let work = Task {
+                await operation()
+                resumeOnce()
+            }
+            Task {
+                try? await clock.sleep(for: duration)
+                work.cancel()
+                resumeOnce()
+            }
+        }
+    }
+
+    /// 내 프로필이 바뀜 → 열린 웹뷰 모두가 내 프로필을 다시 불러오게 한다(jiu-jitsu-frontend#413).
+    private static func broadcastProfileUpdated() -> Effect<Action> {
+        .merge(
+            .send(.home(.session(.profileUpdated))),
+            .send(.competition(.session(.profileUpdated))),
+            .send(.myPage(.session(.profileUpdated)))
+        )
     }
 
 }

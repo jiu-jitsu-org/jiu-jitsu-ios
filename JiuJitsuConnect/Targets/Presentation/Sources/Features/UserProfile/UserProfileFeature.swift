@@ -121,6 +121,8 @@ public struct UserProfileFeature: Sendable {
         public enum DelegateAction: Sendable {
             /// 차단 · 해제가 서버에 반영됨 → 부모가 열린 웹뷰 모두에 USER_BLOCK_CHANGED를 보낸다(#328)
             case blockChanged(userId: Int, blocked: Bool)
+            /// 띠 묻기에서 내 띠를 저장함 → 부모가 열린 웹뷰에 PROFILE_UPDATED를 보내고 MY가 다시 불러오게 한다(QA A2-3)
+            case profileUpdated
         }
     }
 
@@ -326,7 +328,10 @@ public struct UserProfileFeature: Sendable {
 
             case .beltPrompt(.presented(.delegate(.saved))):
                 state.beltPrompt = nil
-                return .send(.internal(.showToast(.init(message: "벨트를 저장했어요", status: .success))))
+                return .merge(
+                    .send(.internal(.showToast(.init(message: "벨트를 저장했어요", status: .success)))),
+                    .send(.delegate(.profileUpdated))
+                )
 
             case .beltPrompt(.presented(.delegate(.later))):
                 state.beltPrompt = nil

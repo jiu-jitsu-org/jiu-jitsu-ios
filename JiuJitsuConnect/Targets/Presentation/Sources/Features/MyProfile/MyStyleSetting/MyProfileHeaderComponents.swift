@@ -31,6 +31,8 @@ public struct MyProfileHeaderView: View {
     let isOwner: Bool
     /// 비로그인 MY(#242) — 닉네임 대신 인사와 로그인 안내를 보이고, 고치는 버튼과 "..." 메뉴를 숨긴다.
     let isGuest: Bool
+    /// 프로필을 아직 못 받음(처음 불러오는 중 · 처음 불러오기 실패) — 도장이 있는지 모르니 "도장 정보 입력하기" 대신 빈 자리를 둔다.
+    let isProfileUnknown: Bool
     /// 오른쪽 위 톱니바퀴(설정, #241). 커뮤니티에서 쌓아 연 MY에는 두지 않는다.
     let showsSettingsButton: Bool
 
@@ -66,6 +68,7 @@ public struct MyProfileHeaderView: View {
         safeAreaTop: CGFloat,
         isOwner: Bool = false,
         isGuest: Bool = false,
+        isProfileUnknown: Bool = false,
         showsSettingsButton: Bool = false,
         pendingProfileImageData: Data? = nil,
         isProfileImageDeleting: Bool = false,
@@ -88,6 +91,7 @@ public struct MyProfileHeaderView: View {
         self.safeAreaTop = safeAreaTop
         self.isOwner = isOwner
         self.isGuest = isGuest
+        self.isProfileUnknown = isProfileUnknown
         self.showsSettingsButton = showsSettingsButton
         self.pendingProfileImageData = pendingProfileImageData
         self.isProfileImageDeleting = isProfileImageDeleting
@@ -202,8 +206,18 @@ public struct MyProfileHeaderView: View {
             Spacer().frame(height: 84)
         }
 
+        // 프로필을 아직 모르면 도장 줄은 빈 자리 — 도장 있는 회원에게 "입력하기"가 보였다가 바뀌거나,
+        // 실패 상태에서 도장이 지워진 것처럼 보이지 않게 한다. 높이는 도장명이 있을 때와 같다.
+        if academyName == nil && isProfileUnknown {
+            Color.clear
+                .frame(height: 32)
+                .accessibilityHidden(true)
+
+            Spacer().frame(height: 84)
+        }
+
         // "도장 정보 입력하기" 버튼 (도장명이 없을 때만)
-        if academyName == nil {
+        if academyName == nil && !isProfileUnknown {
             Button {
                 onGymInfoTapped()
             } label: {
@@ -344,7 +358,8 @@ private struct ProfileImageView: View {
             // VoiceOver에선 사진만 '다시 보기' 버튼으로 읽는다. 수정 띠는 아래 overlay라 따로 읽힌다.
             // 동작 줄이기에선 MyBeltRingView가 움직이지 않는다.
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("띠 링 다시 보기")
+            .accessibilityLabel(profilePhotoAccessibilityLabel(beltRank: beltRank, beltStripe: beltStripe))
+            .accessibilityHint("띠 링이 다시 돌아요")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { replayTrigger += 1 }
             // 사진 원 안쪽 아래를 띠로 덮는다 — MyBeltRingView가 사진을 원으로 잘라 링·틈은 덮지 않고,
@@ -457,6 +472,12 @@ private struct ProfileImageView: View {
     }
 }
 
+/// 사진 요소가 읽을 이름 — 사진 둘레 링이 띠를 보여 주니 띠도 함께 읽는다. MY와 남의 프로필이 같이 쓴다.
+func profilePhotoAccessibilityLabel(beltRank: BeltRank?, beltStripe: BeltStripe?) -> String {
+    guard let beltRank else { return "프로필 사진" }
+    return (["프로필 사진, \(beltRank.displayName) 띠", beltStripe?.displayName].compactMap { $0 }).joined(separator: " ")
+}
+
 // MARK: - NicknameEditRow
 
 /// 닉네임 + 수정 버튼 행
@@ -491,7 +512,8 @@ private struct NicknameEditRow: View {
                 .editRowHitArea()
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(nickname), 닉네임 수정")
+            // 뱃지는 그림뿐이라 라벨에 인증 여부를 넣는다.
+            .accessibilityLabel(isOwner ? "\(nickname), 관장·사범 인증, 닉네임 수정" : "\(nickname), 닉네임 수정")
         }
         .frame(height: height)
         .padding(.horizontal, 20)
