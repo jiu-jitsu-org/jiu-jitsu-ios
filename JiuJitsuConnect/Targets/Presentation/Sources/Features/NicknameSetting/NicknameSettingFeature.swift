@@ -46,6 +46,10 @@ public struct NicknameSettingFeature: Sendable {
         var isQuitSignupAlertPresented = false
         // 가입 요청을 보내 결과를 기다리는 중. 이때 그만두면 계정은 만들어지는데 화면만 나가므로 닫기를 막는다.
         var isSigningUp = false
+        // 응답을 못 받은 가입 요청(시간 초과 · 연결 끊김)의 닉네임(QA A5-7). 서버엔 계정이 생겼을 수 있다.
+        // 서버는 같은 임시 토큰의 가입을 다시 받지 않아(같은 닉네임이면 R0003, 다른 닉네임이면 서버 오류) 그 응답을 보면
+        // 이미 가입된 것으로 보고 같은 계정으로 다시 로그인하게 안내한다.
+        var uncertainSignupNickname: String?
 
         // MARK: - Passed Data (초기 설정 모드에만 사용)
         let tempToken: String?
@@ -109,6 +113,8 @@ public struct NicknameSettingFeature: Sendable {
             case signupSessionExpired
             /// 가입 중 닫기 → 그만두기(#368). 받은 쪽이 가입 단계를 비우고 로그인 전 화면으로 돌린다.
             case signupAbandoned
+            /// 응답을 못 받은 가입이 서버에선 끝났던 것으로 보임(QA A5-7) — 같은 계정으로 다시 로그인하면 바로 들어간다.
+            case signupMayHaveCompleted
             case didUpdateNickname(String)  // 닉네임 수정 저장 완료 — 부모가 화면을 닫고 프로필 반영
             case cancel
         }
@@ -257,6 +263,10 @@ public struct NicknameSettingFeature: Sendable {
             case let .internal(.checkNicknameResponse(nickname, .success(isAvailable))):
                 // 취소가 닿기 전에 도착한 이전 입력값의 응답은 버린다.
                 guard nickname == state.nickname else { return .none }
+                // 응답을 못 받은 가입의 닉네임이 이제 사용 중이면 그 가입이 끝난 것이다(QA A5-7).
+                if !isAvailable, state.mode == .initial, nickname == state.uncertainSignupNickname {
+                    return .send(.delegate(.signupMayHaveCompleted))
+                }
                 if isAvailable {
                     state.validationState = .available
                     state.validatedNickname = nickname
@@ -281,9 +291,20 @@ public struct NicknameSettingFeature: Sendable {
                 if case .apiError(code: .expiredToken, message: _) = error as? DomainError {
                     return .send(.delegate(.signupSessionExpired))
                 }
+                // 앞서 응답을 못 받은 가입이 있었는데 다시 보낸 가입이 중복 닉네임 · 서버 오류로 거절됨
+                // → 앞 가입이 서버에선 끝났다(QA A5-7). 막다른 '이미 사용 중' 대신 다시 로그인하게 한다.
+                if state.uncertainSignupNickname != nil, Self.suggestsAlreadySignedUp(error) {
+                    return .send(.delegate(.signupMayHaveCompleted))
+                }
                 // 일시 오류면 다시 시도할 수 있게 CTA를 살린다(중복·형식 오류는 handleError가 다시 끈다).
                 state.isCtaButtonEnabled = true
-                return handleError(state: &state, error: error)
+                guard Self.isUncertainFailure(error) else { return handleError(state: &state, error: error) }
+                // 응답을 못 받았다 — 서버엔 계정이 생겼을 수 있다. 다시 누르면 중복 확인을 거치지 않고 같은 닉네임으로
+                // 가입을 다시 보내, 그 응답으로 앞 가입이 끝났는지 가린다(QA A5-7). 확인한 닉네임 안내는 그대로 둔다.
+                state.uncertainSignupNickname = state.nickname
+                let effect = handleError(state: &state, error: error)
+                state.validationState = .available
+                return effect
 
             case let .internal(.updateNicknameResponse(.success(nickname))):
                 return .send(.delegate(.didUpdateNickname(nickname)))
@@ -311,6 +332,25 @@ public struct NicknameSettingFeature: Sendable {
             )))
         }
         .cancellable(id: CancelID.checkNickname, cancelInFlight: true)
+    }
+
+    /// 서버가 요청을 받았는지 알 수 없는 실패 — 시간 초과 · 연결 끊김 · 알 수 없는 오류.
+    private static func isUncertainFailure(_ error: Error) -> Bool {
+        guard let domainError = error as? DomainError else { return true }
+        switch domainError {
+        case .timeout, .networkUnavailable: return true
+        default: return false
+        }
+    }
+
+    /// 같은 임시 토큰으로 다시 가입했을 때 '이미 가입됨'을 뜻하는 서버 응답(jiu-jitsu-backend 코드 기준).
+    /// 같은 닉네임 → R0003(앞 가입이 그 닉네임을 씀), 다른 닉네임 → 소셜 계정 중복으로 서버 오류(5xx).
+    private static func suggestsAlreadySignedUp(_ error: Error) -> Bool {
+        switch error as? DomainError {
+        case .apiError(code: .nicknameDuplicated, message: _)?: return true
+        case let .serverError(_, statusCode, _)?: return (statusCode ?? 0) >= 500
+        default: return false
+        }
     }
 
     // 정규식 검사 최적화
@@ -349,6 +389,14 @@ public struct NicknameSettingFeature: Sendable {
                 logNicknameRejected(code)
                 return .none
             }
+
+            // 금칙어 — 형식 안내('한글/영문/숫자')를 다시 보여 주면 이미 지킨 규칙이라 이유를 모른다(QA A5-5).
+            if code == .forbiddenWord {
+                state.validationState = .forbiddenWord
+                state.isCtaButtonEnabled = false
+                logNicknameRejected(code)
+                return .none
+            }
             
             state.validationState = .networkError
             state.isKeyboardVisible = false
@@ -382,6 +430,11 @@ public struct NicknameSettingFeature: Sendable {
                 return .none
             case .invalidNickname:
                 state.validationState = .invalidCharacters
+                state.isCtaButtonEnabled = false
+                logNicknameRejected(code)
+                return .none
+            case .forbiddenWord:
+                state.validationState = .forbiddenWord
                 state.isCtaButtonEnabled = false
                 logNicknameRejected(code)
                 return .none
@@ -433,6 +486,7 @@ public extension NicknameSettingFeature {
         case unavailable
         case invalidLength
         case invalidCharacters
+        case forbiddenWord  // 서버 금칙어(C0016, QA A5-5)
         case networkError
         case saveFailed  // 수정 모드에서 중복 검사·저장이 일시 오류로 실패
     }
@@ -450,6 +504,8 @@ public extension NicknameSettingFeature.ValidationState {
             return "이미 사용 중인 닉네임이에요"
         case .invalidLength, .invalidCharacters:
             return "한글/영문/숫자,\n2~12자로 작성해 주세요"
+        case .forbiddenWord:
+            return "사용할 수 없는 단어가\n들어 있어요"
         case .saveFailed:
             return "잠시 문제가 생겼어요.\n다시 시도해 주세요"
         }
@@ -464,9 +520,10 @@ public extension NicknameSettingFeature.ValidationState {
     
     var textColor: Color {
         switch self {
-        case .idle, .available, .saveFailed:
+        // 연결 오류는 입력이 틀린 게 아니라 입력한 글자를 그대로 진하게 둔다 — 회색이면 지워진 것처럼 보인다(QA A5-6).
+        case .idle, .available, .saveFailed, .networkError:
             return Color.component.textfieldDisplay.focus.text
-        case .unavailable, .invalidLength, .invalidCharacters, .networkError:
+        case .unavailable, .invalidLength, .invalidCharacters, .forbiddenWord:
             return Color.component.textfieldDisplay.default.placeholder
         }
     }

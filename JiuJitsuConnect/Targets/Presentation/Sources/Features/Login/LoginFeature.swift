@@ -215,6 +215,13 @@ public struct LoginFeature: Sendable {
                     state.path.removeAll()
                     return .send(.internal(.showToast(.init(message: "시간이 지나 가입이 중단됐어요. 다시 로그인해 주세요", status: .info))))
 
+                    // 응답을 못 받은 가입이 서버에선 끝났던 것으로 보임(QA A5-7) — 이 임시 토큰으로는 더 못 한다.
+                    // 첫 화면으로 돌려 같은 계정으로 다시 로그인하게 한다. 그러면 기존 회원으로 바로 들어간다.
+                case .element(id: _, action: .nicknameSetting(.delegate(.signupMayHaveCompleted))):
+                    state.tempToken = nil
+                    state.path.removeAll()
+                    return .send(.internal(.showToast(.init(message: "가입이 이미 끝났을 수 있어요. 같은 계정으로 다시 로그인해 주세요", status: .info))))
+
                     // 가입을 그만둠(#368) — 임시 토큰을 버리고 로그인 첫 화면으로. 그다음은 부모가 정한다
                     // (앱 첫 화면은 로그인 화면에 머물고, 앱 안 로그인 창은 둘러보기처럼 닫힌다).
                 case .element(id: _, action: .nicknameSetting(.delegate(.signupAbandoned))):

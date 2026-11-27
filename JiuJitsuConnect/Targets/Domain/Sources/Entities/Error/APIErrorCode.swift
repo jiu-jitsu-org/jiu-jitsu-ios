@@ -20,6 +20,9 @@ public enum APIErrorCode: String, Equatable {
     case nicknameDuplicated = "R0003" // 이미 사용중인 닉네임
     case invalidNickname = "R0004" // 잘못된 닉네임 형식
 
+    // MARK: - Common (C0000)
+    case forbiddenWord = "C0016" // 금칙어가 들어 있음 — 닉네임 형식 검사(R0004) 다음, 중복 검사(R0003) 전에 본다(QA A5-5)
+
     // MARK: - User (U0000)
     case accountNotFound = "U0002" // 토큰의 회원이 없음 (인증 단계)
     case userNotFound = "U0011" // 존재하지 않는 회원 (탈퇴 유예 중인 작성자 포함)
