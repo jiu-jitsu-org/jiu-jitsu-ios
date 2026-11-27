@@ -293,7 +293,8 @@ public struct NicknameSettingFeature: Sendable {
                 }
                 // 앞서 응답을 못 받은 가입이 있었는데 다시 보낸 가입이 중복 닉네임 · 서버 오류로 거절됨
                 // → 앞 가입이 서버에선 끝났다(QA A5-7). 막다른 '이미 사용 중' 대신 다시 로그인하게 한다.
-                if state.uncertainSignupNickname != nil, Self.suggestsAlreadySignedUp(error) {
+                if let uncertain = state.uncertainSignupNickname,
+                   Self.suggestsAlreadySignedUp(error, sentNickname: state.nickname, uncertainNickname: uncertain) {
                     return .send(.delegate(.signupMayHaveCompleted))
                 }
                 // 일시 오류면 다시 시도할 수 있게 CTA를 살린다(중복·형식 오류는 handleError가 다시 끈다).
@@ -334,8 +335,10 @@ public struct NicknameSettingFeature: Sendable {
         .cancellable(id: CancelID.checkNickname, cancelInFlight: true)
     }
 
-    /// 서버가 요청을 받았는지 알 수 없는 실패 — 시간 초과 · 연결 끊김 · 알 수 없는 오류.
+    /// 서버가 요청을 받았는지 알 수 없는 실패 — 시간 초과 · 연결 끊김 · 알 수 없는 오류(응답을 읽지 못함 등).
+    /// 앱이 요청을 취소한 경우는 뺀다.
     private static func isUncertainFailure(_ error: Error) -> Bool {
+        if error is CancellationError || (error as? URLError)?.code == .cancelled { return false }
         guard let domainError = error as? DomainError else { return true }
         switch domainError {
         case .timeout, .networkUnavailable: return true
@@ -343,11 +346,12 @@ public struct NicknameSettingFeature: Sendable {
         }
     }
 
-    /// 같은 임시 토큰으로 다시 가입했을 때 '이미 가입됨'을 뜻하는 서버 응답(jiu-jitsu-backend 코드 기준).
+    /// 같은 임시 토큰으로 다시 가입했을 때 '이미 가입됨'을 뜻하는 서버 응답(jiu-jitsu-backend#307).
     /// 같은 닉네임 → R0003(앞 가입이 그 닉네임을 씀), 다른 닉네임 → 소셜 계정 중복으로 서버 오류(5xx).
-    private static func suggestsAlreadySignedUp(_ error: Error) -> Bool {
+    /// 닉네임을 바꿔 보낸 가입의 R0003은 그 닉네임을 다른 사람이 쓴다는 뜻이라 보통의 중복 안내로 둔다.
+    private static func suggestsAlreadySignedUp(_ error: Error, sentNickname: String, uncertainNickname: String) -> Bool {
         switch error as? DomainError {
-        case .apiError(code: .nicknameDuplicated, message: _)?: return true
+        case .apiError(code: .nicknameDuplicated, message: _)?: return sentNickname == uncertainNickname
         case let .serverError(_, statusCode, _)?: return (statusCode ?? 0) >= 500
         default: return false
         }
