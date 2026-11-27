@@ -24,7 +24,7 @@ public struct InstructorVerificationView: View {
     /// - 처음: 본문 457 — 빨간 경고 줄 대신 서류 예시(제목 + 세 줄)가 들어간다.
     /// - 사진 고른 뒤: 본문 567 — 경고 줄 없이 미리보기(4 + 200 + 12)가 들어간다.
     /// - 심사 중: 본문 457 — 경고 줄 없이 썸네일(4 + 90 + 12)이 들어간다. 사진 URL이 없으면 썸네일만큼(106) 낮다.
-    /// - 반려: #388 이전과 같다. 사유가 두 줄까지 늘 수 있어 처음 시트보다 한 줄(21) 더 잡는다.
+    /// - 반려: #388 이전과 같다. 사유 두 줄까지는 처음 시트보다 한 줄(21) 더 잡고, 그보다 길면 늘어난 줄만큼 시트를 키운다(QA A3-6).
     /// - 승인: 안내박스 없이 닉네임 미리보기와 확인 버튼만 있다 — 본문 내재 248(24 + 69 + 16 + 64 + 75) + 여백 56.
     ///   업로드 시트의 안내박스~CTA 간격(~60)과 맞춘 값이다. 문의처가 있으면 문의 버튼(4 + 51)이 붙는다.
     public static func contentHeight(for state: InstructorVerificationFeature.State) -> CGFloat {
@@ -38,8 +38,35 @@ public struct InstructorVerificationView: View {
         case .pending:
             return state.existingImageUrl != nil ? 484 : 378
         case .rejected:
-            return 430
+            return 430 + extraRejectedReasonHeight(for: state.verification)
         }
+    }
+
+    /// 반려 사유 경고 줄의 문구. 사유가 없으면 반려됐다는 것만 알린다.
+    static func rejectedWarningText(for verification: OwnerVerification) -> String {
+        verification.rejectReason.map { "반려 사유: \($0)" } ?? "인증이 반려됐어요. 사진을 다시 올려 주세요."
+    }
+
+    /// 반려 사유가 두 줄을 넘을 때 더 필요한 높이(QA A3-6). 다시 올릴 사진을 고르려면 사유를 끝까지 읽어야 해 자르지 않는다.
+    /// 시트 높이는 본문보다 먼저 정해야 해서 지금 화면 폭으로 줄 수를 어림한다. 넓게 어림해도 남는 자리는 안내박스와 CTA 사이 Spacer가 받는다.
+    /// 아주 긴 사유도 화면을 넘지 않게 화면 높이에서 위 여백을 남기고 멈춘다.
+    private static func extraRejectedReasonHeight(for verification: OwnerVerification) -> CGFloat {
+        let screen = UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.screen.bounds }
+            .first ?? CGRect(x: 0, y: 0, width: 375, height: 667)
+        // 시트 좌우 20 + 안내박스 안쪽 20씩, 경고 아이콘 18 + 간격 4
+        let textWidth = max(screen.width - Metrics.horizontalPadding * 4 - 22, 100)
+        let font = UIFont.pretendard.bodyS
+        let bounds = (rejectedWarningText(for: verification) as NSString).boundingRect(
+            with: CGSize(width: textWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font],
+            context: nil
+        )
+        let lines = Int((bounds.height / font.lineHeight).rounded(.up))
+        guard lines > 2 else { return 0 }
+        let extra = CGFloat(lines - 2) * font.lineHeight.rounded(.up)
+        return min(extra, max(screen.height - 120 - 430, 0))
     }
 
     public init(store: StoreOf<InstructorVerificationFeature>) {
@@ -317,10 +344,10 @@ public struct InstructorVerificationView: View {
                 .frame(height: 21)
                 .foregroundStyle(Color.semantic.error.error)
 
-            Text(store.verification.rejectReason.map { "반려 사유: \($0)" } ?? "인증이 반려됐어요. 사진을 다시 올려 주세요.")
+            // 줄 수를 막지 않는다 — 사유를 끝까지 읽어야 무엇을 다시 올릴지 안다(QA A3-6). 시트가 그만큼 높아진다.
+            Text(Self.rejectedWarningText(for: store.verification))
                 .font(Font.pretendard.bodyS)
                 .foregroundStyle(Color.semantic.error.error)
-                .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(minHeight: 21)
