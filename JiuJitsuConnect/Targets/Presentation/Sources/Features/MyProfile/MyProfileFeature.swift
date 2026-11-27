@@ -72,6 +72,8 @@ public struct MyProfileFeature: Sendable {
 
         // 프로필 이미지 캡처 픽커 (카메라/앨범 풀스크린)
         var imageCaptureSource: ImageCaptureSource?
+        // 카메라 접근을 꺼 둔 사람이 '카메라'를 고름 → 설정으로 가는 알럿(QA A3-8)
+        var isCameraAccessAlertPresented = false
 
         // 1:1 크롭 화면 풀스크린 커버
         @Presents var imageCropCover: ProfileImageCropFeature.State?
@@ -247,6 +249,8 @@ public struct MyProfileFeature: Sendable {
             case competitionsReordered([[Competition]])  // 대회 줄을 끌어 옮기고 '완료' — 순서가 바뀐 묶음(고정/고정 안 함)의 줄별 부문들, 위에서부터 (#204)
             case instructorVerificationMenuTapped   // "..." 메뉴의 "관장 사범 인증" 탭
             case imagePicked(Data)                  // 카메라/앨범 픽커에서 이미지 선택됨
+            case cameraAccessAlertSettingsTapped    // 카메라 접근 꺼짐 알럿 → 설정으로 가기(QA A3-8)
+            case cameraAccessAlertDismissed
             case imagePickerCancelled               // 픽커 취소 (시스템 dismiss 포함)
             case profileImageEditButtonTapped       // 프로필 이미지 우측 하단 카메라 버튼 탭
             case communityActivityTapped            // 벨트 카드 아래 '커뮤니티 활동' 줄 탭 (#44)
@@ -305,6 +309,7 @@ public struct MyProfileFeature: Sendable {
             // 프로필 이미지 수정 흐름 — 시트/풀스크린 전환 사이에 짧은 딜레이를 두고 발화
             case presentImageCaptureSource(State.ImageCaptureSource)
             case cameraUnavailable
+            case cameraAccessDenied
             case presentImageCrop(Data)
             // 관장 사범 인증 → 사진 첨부 시트로의 시트-시트 전환을 위한 딜레이 발화
             case presentImageEditSheet(ProfileImageEditFeature.Purpose, canDelete: Bool)
@@ -341,6 +346,7 @@ public struct MyProfileFeature: Sendable {
     @Dependency(\.userClient) var userClient
     @Dependency(\.noticeClient) var noticeClient
     @Dependency(\.dismiss) var dismiss
+    @Dependency(\.openURL) var openURL
     @Dependency(\.analyticsClient) var analyticsClient
     @Dependency(\.date) var date
     @Dependency(\.legacyHeaderPatternClient) var legacyHeaderPatternClient
@@ -1452,10 +1458,13 @@ public struct MyProfileFeature: Sendable {
                 state.pendingImagePurpose = state.sheet?.profileImageEdit?.purpose ?? .profileImage
                 // 카메라가 없는 기기에서 `.camera` picker를 띄우면 앱이 죽을 수 있다(#353)
                 return .run { send in
-                    if await cameraAvailabilityClient.isAvailable() {
-                        await send(.internal(.presentImageCaptureSource(.camera)))
-                    } else {
+                    if !(await cameraAvailabilityClient.isAvailable()) {
                         await send(.internal(.cameraUnavailable))
+                    } else if cameraAvailabilityClient.isAccessDenied() {
+                        // 거부한 채로 picker를 띄우면 시스템 차단 화면만 나온다 — 설정으로 가는 길을 알린다(QA A3-8).
+                        await send(.internal(.cameraAccessDenied))
+                    } else {
+                        await send(.internal(.presentImageCaptureSource(.camera)))
                     }
                 }
 
@@ -1507,6 +1516,25 @@ public struct MyProfileFeature: Sendable {
                 // 카메라 확인 사이에 시트를 닫았으면 띄우지 않는다 — 남은 값이 다음 시트에서 picker를 저절로 띄우지 않게
                 guard state.sheet != nil else { return .none }
                 state.imageCaptureSource = source
+                return .none
+
+            case .internal(.cameraAccessDenied):
+                // 알럿이 시트에 가려지지 않게 시트를 닫고 알린다(cameraUnavailable과 같은 이유)
+                state.sheet = nil
+                state.pendingImagePurpose = nil
+                state.isCameraAccessAlertPresented = true
+                return .none
+
+            case .view(.cameraAccessAlertSettingsTapped):
+                state.isCameraAccessAlertPresented = false
+                return .run { _ in
+                    // 이 앱의 설정 화면 — 카메라 스위치가 바로 보인다.
+                    guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                    await openURL(url)
+                }
+
+            case .view(.cameraAccessAlertDismissed):
+                state.isCameraAccessAlertPresented = false
                 return .none
 
             case .internal(.cameraUnavailable):

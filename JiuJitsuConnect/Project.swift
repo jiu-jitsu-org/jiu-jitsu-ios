@@ -178,7 +178,7 @@ let appInfoPlist: [String: Plist.Value] = {
         // setCrashlyticsCollectionEnabled는 쓰지 않는다 — UserDefaults에 남아 같은 번들 id로 깐 다른 구성에도 따라간다.
         "FirebaseCrashlyticsCollectionEnabled": "$(CRASHLYTICS_COLLECTION_ENABLED)",
         // 프로필 이미지 수정 + 커뮤니티 글 작성 웹뷰(<input type=file>) — 카메라 촬영
-        "NSCameraUsageDescription": "프로필 사진과 글에 올릴 사진을 찍을 때 카메라를 사용해요.",
+        "NSCameraUsageDescription": "프로필 사진, 글에 올릴 사진, 관장 사범 인증 서류를 찍을 때 카메라를 사용해요.",
         // 기능상 필수는 아님(PHPicker/웹뷰 파일 입력은 권한 프롬프트 없이 동작)이나
         // 보관함 접근 안내 일관성을 위해 명시.
         "NSPhotoLibraryUsageDescription": "프로필 사진과 글에 올릴 사진을 고를 때 사진 보관함에 접근해요.",

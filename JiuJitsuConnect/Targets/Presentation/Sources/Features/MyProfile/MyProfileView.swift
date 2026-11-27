@@ -250,6 +250,23 @@ public struct MyProfileView: View {
                 ),
                 configuration: competitionDeleteAlertConfiguration
             )
+            // 카메라 접근을 꺼 둔 채 '카메라'를 고름(QA A3-8) — 시스템 차단 화면 대신 설정으로 가는 길을 알린다.
+            .appAlert(
+                isPresented: Binding(
+                    get: { store.isCameraAccessAlertPresented },
+                    set: { if !$0 { store.send(.view(.cameraAccessAlertDismissed)) } }
+                ),
+                configuration: .init(
+                    title: "카메라 접근이 꺼져 있어요",
+                    message: "설정에서 카메라 접근을 허용하면 바로 찍을 수 있어요.",
+                    primaryButton: .init(title: "설정으로 가기", style: .primary, action: {
+                        store.send(.view(.cameraAccessAlertSettingsTapped))
+                    }),
+                    secondaryButton: .init(title: "닫기", style: .neutral, action: {
+                        store.send(.view(.cameraAccessAlertDismissed))
+                    })
+                )
+            )
             .imageCropPresentation(store: $store)
         }
     }
